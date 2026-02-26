@@ -387,7 +387,7 @@ async function runOpt() {
   else rsiPairs.push({os:30,ob:70});
 
   // Precompute indicators
-  const pvCache={},atrCache={},maCache={};
+  const pvCache={},atrCache={},atrAvgCache={},maCache={};
   // adxArr default (used when adxL not ranging); per-adxL computed in loop via adxCache
   const adxCache={};
   const adxArr=useAdx?(()=>{const l=_adxLArr[0];if(!adxCache[l])adxCache[l]=calcADX(l);return adxCache[l];})():null;
@@ -849,7 +849,8 @@ async function runOpt() {
       const pk = pvL+'_'+pvR;
       if (!pvCache[pk]) pvCache[pk] = {lo:calcPivotLow(pvL,pvR), hi:calcPivotHigh(pvL,pvR)};
       if (!atrCache[atrP]) atrCache[atrP] = calcRMA_ATR(atrP);
-      const atrAvg = calcSMA(Array.from(atrCache[atrP]), 50);
+      if (!atrAvgCache[atrP]) atrAvgCache[atrP] = calcSMA(atrCache[atrP], 50);
+      const atrAvg = atrAvgCache[atrP];
       const mk = _mType+'_'+maP;
       let maArr = null;
       if (maP > 0) { if (!maCache[mk]) maCache[mk] = calcMA(closes, maP, _mType); maArr = maCache[mk]; }
@@ -1038,7 +1039,8 @@ async function runOpt() {
       const pk = pvL+'_'+pvR;
       if (!pvCache[pk]) pvCache[pk] = {lo:calcPivotLow(pvL,pvR), hi:calcPivotHigh(pvL,pvR)};
       if (!atrCache[atrP]) atrCache[atrP] = calcRMA_ATR(atrP);
-      const atrAvg = calcSMA(Array.from(atrCache[atrP]), 50);
+      if (!atrAvgCache[atrP]) atrAvgCache[atrP] = calcSMA(atrCache[atrP], 50);
+      const atrAvg = atrAvgCache[atrP];
       const mk = _mType+'_'+maP;
       let maArr = null;
       if (maP > 0) { if (!maCache[mk]) maCache[mk] = calcMA(closes, maP, _mType); maArr = maCache[mk]; }
