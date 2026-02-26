@@ -720,6 +720,22 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
 #oos-rtbl tr:hover td { background:var(--bg3); }
 #oos-rtbl td:first-child { font-size:.66em; color:var(--accent); max-width:200px; overflow:hidden; text-overflow:ellipsis; }
 
+/* ##WFO_BEGIN## — WFO стили. Откат: удалить блок между ##WFO_BEGIN## и ##WFO_END## */
+.wfo-mode { border-color: var(--purple) !important; }
+.wfo-mode.active { background: rgba(139,92,246,.15) !important; color:var(--purple) !important; }
+.wfo-ctrl-bar { display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:5px 10px;background:var(--bg2);border-top:1px solid var(--border);font-size:.75em;display:none }
+.wfo-ctrl-bar.visible { display:flex }
+.wfomode-btn { padding:2px 7px;border:1px solid var(--border2);border-radius:3px;background:var(--bg);color:var(--text3);font-size:.85em;cursor:pointer;transition:all .1s }
+.wfomode-btn.active { border-color:var(--purple);color:var(--purple);background:rgba(139,92,246,.1) }
+#wfo-tbl-wrap { display:none;overflow-x:auto;margin-top:0 }
+#wfo-tbl { width:100%;border-collapse:collapse;font-size:.7em }
+#wfo-tbl th { background:var(--bg3);color:var(--text2);padding:5px 8px;border-bottom:1px solid var(--border2);white-space:nowrap;text-align:left }
+#wfo-tbl th:not(:first-child) { text-align:center }
+#wfo-tbl td { padding:3px 8px;border-bottom:1px solid var(--border) }
+#wfo-tbl tr:hover td { background:var(--bg3) }
+#wfo-summary-bar { padding:5px 10px;font-size:.65em;color:var(--text3);background:var(--bg2);border-top:1px solid var(--border) }
+/* ##WFO_END## */
+
 </style>
 </head>
 <body>
@@ -1191,6 +1207,35 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
     <span id="mass-rob-progress" style="color:var(--accent2)"></span>
   </div>
 
+  <!-- ##WFO_BEGIN## — WFO панель управления. Откат: удалить блок между ##WFO_BEGIN## и ##WFO_END## -->
+  <div class="wfo-ctrl-bar" id="wfo-ctrl-bar">
+    <span style="color:var(--purple);font-weight:600">⟳ Walk-Forward:</span>
+    <label style="display:flex;align-items:center;gap:3px;color:var(--text2)" title="Число скользящих окон">
+      Окон: <input type="number" id="wfo_wins" value="6" min="3" max="20" step="1"
+        style="width:36px;background:var(--bg2);color:var(--text1);border:1px solid var(--border);border-radius:3px;padding:1px 4px;font-size:.85em">
+    </label>
+    <label style="display:flex;align-items:center;gap:3px;color:var(--text2)" title="Размер OOS окна (% от данных)">
+      OOS%: <input type="number" id="wfo_oos_pct" value="15" min="5" max="40" step="5"
+        style="width:36px;background:var(--bg2);color:var(--text1);border:1px solid var(--border);border-radius:3px;padding:1px 4px;font-size:.85em">
+    </label>
+    <label style="display:flex;align-items:center;gap:3px;color:var(--text2)" title="Топ N стратегий для теста">
+      Топ: <input type="number" id="wfo_maxn" value="30" min="5" max="200" step="5"
+        style="width:40px;background:var(--bg2);color:var(--text1);border:1px solid var(--border);border-radius:3px;padding:1px 4px;font-size:.85em">
+    </label>
+    <div style="display:flex;gap:3px">
+      <div class="wfomode-btn active" id="wfomode_rolling"
+        onclick="document.querySelectorAll('.wfomode-btn').forEach(b=>b.classList.remove('active'));this.classList.add('active')"
+        title="IS окно фиксированной длины скользит вправо">Rolling</div>
+      <div class="wfomode-btn" id="wfomode_anchored"
+        onclick="document.querySelectorAll('.wfomode-btn').forEach(b=>b.classList.remove('active'));this.classList.add('active')"
+        title="IS всегда начинается с начала данных, OOS скользит вправо">Anchored</div>
+    </div>
+    <button class="tpl-btn2" id="btn-wfo-run" onclick="runWalkForward()"
+      style="padding:3px 10px;font-size:.85em;border-color:var(--purple);color:var(--purple)">▶ WFO тест</button>
+    <span id="wfo-progress" style="color:var(--accent2);font-size:.85em"></span>
+  </div>
+  <!-- ##WFO_END## -->
+
   <!-- OOS на новых данных (показывается только в fav режиме) -->
   <div id="new-data-bar" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 10px;background:var(--bg2);border-top:1px solid var(--border);font-size:.8em">
     <span style="color:var(--text2);font-weight:600">📂 Новые данные:</span>
@@ -1217,6 +1262,9 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
     <button class="tbl-mode-btn hc-mode" id="tbl-btn-hc" onclick="switchTableMode('hc')" style="display:none">Соседи <span id="tbl-cnt-hc">0</span></button>
     <button class="tbl-mode-btn" id="tbl-btn-fav" onclick="switchTableMode('fav')">Избранные <span id="tbl-cnt-fav">0</span></button>
     <button class="tbl-mode-btn oos-mode" id="tbl-btn-oos" onclick="switchTableMode('oos')" style="display:none">OOS <span id="tbl-cnt-oos">0</span></button>
+    <!-- ##WFO_BEGIN## -->
+    <button class="tbl-mode-btn wfo-mode" id="tbl-btn-wfo" onclick="switchTableMode('wfo')" title="Walk-Forward валидация стратегий по скользящим окнам">WFO <span id="tbl-cnt-wfo">0</span></button>
+    <!-- ##WFO_END## -->
     <button class="tbl-mode-btn" id="btn-reset-filters" onclick="resetAllFilters()" title="Сбросить все фильтры и сортировку" style="margin-left:auto">✕ Сброс</button>
     <button class="tbl-mode-btn" onclick="_downloadSources()" title="Скачать исходные файлы: core.js, opt.js, ui.js, shell.html, build.py, README.md">⬇ Исходники</button>
   </div>
@@ -1321,6 +1369,29 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
       <tbody id="tb"></tbody>
     </table>
   </div>
+
+  <!-- ##WFO_BEGIN## — WFO таблица. Откат: удалить блок между ##WFO_BEGIN## и ##WFO_END## -->
+  <div id="wfo-tbl-wrap">
+    <div id="wfo-summary-bar"><span id="wfo-summary">Запусти WFO тест чтобы увидеть результаты</span></div>
+    <table id="wfo-tbl">
+      <thead>
+        <tr>
+          <th style="min-width:180px;text-align:left">Стратегия</th>
+          <th title="% окон где OOS прибылен" style="min-width:70px">Consistency%</th>
+          <th title="Средний OOS PnL по всем окнам" style="min-width:70px">Avg OOS%</th>
+          <th title="Avg OOS / |Avg IS| — насколько OOS повторяет IS" style="min-width:60px">Efficiency</th>
+          <th title="Стандартное отклонение OOS PnL (меньше = стабильнее)" style="min-width:55px">Volatility</th>
+          <th title="IS PnL (на полных данных)" style="min-width:55px">IS PnL%</th>
+          <th title="IS WinRate" style="min-width:48px">IS WR%</th>
+          <th title="Спарклайн по OOS окнам" style="min-width:80px">OOS окна</th>
+        </tr>
+      </thead>
+      <tbody id="wfo-tbody">
+        <tr><td colspan="8" style="text-align:center;color:var(--text3);padding:20px">Нет данных. Запусти WFO тест.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <!-- ##WFO_END## -->
 
   <!-- ── OOS таблица: полностью отдельная, не зависит от стандартной ── -->
   <div id="oos-tbl-wrap" style="display:none;overflow-x:auto;margin-top:0">
