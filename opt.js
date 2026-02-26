@@ -226,14 +226,23 @@ async function runOpt() {
   // Хелпер: добавить OOS результаты в cfg после нахождения результата
   function _attachOOS(cfg) {
     if (!_useOOS) return;
-    // Только forward OOS: обучение на 0-70%, проверка на 70-100%
-    // Backward/middle убраны — они давали ложные отрицания на равномерно растущих
-    // стратегиях (backward проверяет IS-данные которые алгоритм уже видел)
-    const rf = _runOOS(_oosForwardData, cfg);
-    cfg._oos = {
-      forward: rf ? { pnl: rf.pnl, wr: rf.wr, n: rf.n, dd: rf.dd } : null,
-      isPct: Math.round(_isN / N * 100),
-    };
+    // Запускаем бэктест на ПОЛНЫХ данных для непрерывной equity-кривой.
+    // Делим её по _isN: нет проблемы прогрева индикаторов в OOS-части.
+    const rFull = _runOOS(_fullDATA, cfg);
+    cfg._oos = { forward: null, isPct: Math.round(_isN / N * 100) };
+    if (!rFull || !rFull.eq || rFull.eq.length < _isN + 5) return;
+    const eq       = rFull.eq;
+    const N_eq     = eq.length;
+    const splitIdx = Math.min(_isN - 1, N_eq - 2);
+    const isGain   = eq[splitIdx];                       // IS PnL (0..splitIdx bars)
+    const oosGain  = eq[N_eq - 1] - isGain;             // OOS PnL (splitIdx..end bars)
+    const isRate   = splitIdx > 0 ? isGain / (splitIdx + 1) : 0;  // PnL per bar (IS)
+    const oosBars  = N_eq - 1 - splitIdx;
+    const oosRate  = oosBars > 0 ? oosGain / oosBars : 0;         // PnL per bar (OOS)
+    // retention = OOS per-bar rate / IS per-bar rate
+    // 1.0 = равномерный рост, 0.5 = умеренная деградация, <0 = OOS убыточный
+    const retention = isRate !== 0 ? oosRate / isRate : (oosGain >= 0 ? 1 : -1);
+    cfg._oos.forward = { pnl: oosGain, retention, isGain, n: rFull.n, wr: rFull.wr, dd: rFull.dd };
   }
   const comm=$n('c_comm')||0.08;
   const spread=($n('c_spread')||0)/2; // спред делим на 2 стороны (как комиссия)

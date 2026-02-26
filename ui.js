@@ -470,14 +470,14 @@ function applyFilters() {
     const fParam = $('f_param')?.value; if (fParam !== '' && fParam !== undefined) { const v = _fd.param ?? -1; if (String(v) !== fParam) return false; }
     const fNoise = $('f_noise')?.value; if (fNoise !== '' && fNoise !== undefined) { const v = _fd.noise ?? -1; if (String(v) !== fNoise) return false; }
     const fMc    = $('f_mc')?.value;    if (fMc    !== '' && fMc    !== undefined) { const v = _fd.mc    ?? -1; if (String(v) !== fMc)    return false; }
-    // Фильтр по IS/OOS (только forward — честный OOS)
+    // Фильтр по IS/OOS: используем retention (нормализованный рост OOS/IS per bar)
     const fOosAuto = $('f_oos_auto')?.value;
     if (fOosAuto === 'pass') {
       const fwd = r.cfg && r.cfg._oos && r.cfg._oos.forward;
-      if (!fwd || fwd.pnl <= 0 || fwd.n < 3) return false;
+      if (!fwd || fwd.retention == null || fwd.retention < 0.3) return false;
     } else if (fOosAuto === 'fail') {
       const fwd = r.cfg && r.cfg._oos && r.cfg._oos.forward;
-      if (fwd && fwd.pnl > 0 && fwd.n >= 3) return false;
+      if (fwd && fwd.retention != null && fwd.retention >= 0.3) return false;
     }
     return true;
   });
@@ -570,25 +570,24 @@ function renderVisibleResults() {
       const cls = v >= 1 ? 'pos' : 'neg';
       return `<td class="${cls} col-rob-${key}" title="${key}: ${v ? 'пройден' : 'провален'}">${v}</td>`;
     };
-    // OOS ячейка: показываем forward OOS PnL если IS/OOS включён
+    // OOS ячейка: показываем retention — нормализованный прирост OOS vs IS (per bar)
     const _oos = r.cfg && r.cfg._oos;
     let oosCell = '—';
     if (_oos) {
-      const f = _oos.forward;
-      const fPnl = f ? f.pnl : null;
-      const fOk  = f && f.pnl > 0 && f.n >= 3;
-      const cls  = fOk ? 'pos' : (fPnl !== null ? 'neg' : 'muted');
-      const fTxt = fPnl !== null ? (fPnl >= 0 ? '+' : '') + fPnl.toFixed(1) + '%' : '?';
-      // Efficiency ratio: OOS_pnl/IS_pnl * (IS_bars/OOS_bars) — нормализовано по длине
-      // >1.0 = OOS работает лучше IS, 0.5–1.0 = хорошо, <0.5 = деградация
+      const f      = _oos.forward;
+      const ret    = f?.retention;
+      const fPnl   = f ? f.pnl : null;
+      const isGain = f?.isGain;
+      const hasRet = ret !== undefined && ret !== null;
+      const retPct = hasRet ? Math.round(ret * 100) : null;
+      // ≥80% = OOS растёт равномерно, 30-80% = умеренная деградация, <30% = подгонка
+      const cls  = hasRet ? (ret >= 0.8 ? 'pos' : ret >= 0.3 ? '' : 'neg') : 'muted';
+      const icon = hasRet ? (ret >= 0.8 ? '✅' : ret >= 0.3 ? '⚠️' : '❌') : '';
+      const retTxt = retPct !== null ? `${icon} ${retPct}%` : '?';
       const oosPct = 100 - _oos.isPct;
-      const effRatio = (f && f.pnl != null && r.pnl !== 0 && oosPct > 0)
-        ? (f.pnl / r.pnl * (_oos.isPct / oosPct))
-        : null;
-      const effTxt = effRatio !== null
-        ? (effRatio >= 1 ? '🟢' : effRatio >= 0.5 ? '🟡' : '🔴') + ' eff ' + effRatio.toFixed(2)
-        : '';
-      oosCell = `<span class="${cls}" title="IS/OOS разделение (обучение: ${_oos.isPct}% данных)&#10;Forward OOS (последние ${oosPct}% — не видел при обучении):&#10;  PnL: ${fTxt}  |  Сделок: ${f?.n||0}  |  WR: ${f?.wr?.toFixed(1)||'?'}%  |  DD: ${f?.dd?.toFixed(1)||'?'}%&#10;&#10;${effTxt}&#10;Efficiency ≥1.0 = OOS лучше IS&#10;Efficiency 0.5–1.0 = нормальная деградация&#10;Efficiency <0.5 = сильная подгонка под IS" style="font-size:.8em">${fTxt}</span>`;
+      const fTxt   = fPnl   != null ? (fPnl   >= 0 ? '+' : '') + fPnl.toFixed(1)   + '%' : '?';
+      const isTxt  = isGain != null ? (isGain >= 0 ? '+' : '') + isGain.toFixed(1) + '%' : '?';
+      oosCell = `<span class="${cls}" title="IS/OOS разделение (обучение: ${_oos.isPct}% / проверка: ${oosPct}%)&#10;Retention = скорость роста OOS / IS (нормализовано по барам)&#10;  IS доход: ${isTxt}  |  OOS доход: ${fTxt}&#10;  Сделок (всего): ${f?.n||0}  |  WR: ${f?.wr?.toFixed(1)||'?'}%  |  DD: ${f?.dd?.toFixed(1)||'?'}%&#10;&#10;≥80% = OOS растёт равномерно с IS ✅&#10;30–80% = умеренная деградация ⚠️&#10;&lt;30% = сильная подгонка под IS ❌" style="font-size:.8em">${retTxt}</span>`;
     }
     const fav = isFav(r.name) ? '⭐' : '☆';
     html +=
@@ -2561,7 +2560,7 @@ function doSort(col) {
     arr.sort((a,b) => {
       const af = a.cfg && a.cfg._oos && a.cfg._oos.forward;
       const bf = b.cfg && b.cfg._oos && b.cfg._oos.forward;
-      return d * ((af ? af.pnl : -9999) - (bf ? bf.pnl : -9999));
+      return d * ((af?.retention ?? -9999) - (bf?.retention ?? -9999));
     });
   } else if (col <= 11) {
     const keys = ['name','pnl','wr','n','dd','pdd','avg','p1','p2','dwr','dwr','robScore'];
