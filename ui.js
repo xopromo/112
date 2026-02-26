@@ -2278,12 +2278,17 @@ function drawEquityData(eq, label) {
   ctx.strokeStyle='rgba(255,170,0,0.4)'; ctx.setLineDash([3,3]);
   ctx.beginPath(); ctx.moveTo(sx,pad); ctx.lineTo(sx,H-pad); ctx.stroke();
   ctx.setLineDash([]);
-  const step=Math.max(1,Math.floor(eq.length/(W-2*pad)));
+  // Pixel-exact mapping: nPx пикселей → eq[round(px*(n-1)/(nPx-1))]
+  // Гарантирует заполнение ровно W-2*pad пикселей и точное совпадение с crosshair
+  const nPx = W - 2 * pad;
+  const nLast = Math.max(eq.length - 1, 1);
   ctx.beginPath();
   let firstX=pad;
-  for(let i=0,x=pad;i<eq.length;i+=step,x++) {
+  for(let px=0;px<nPx;px++) {
+    const x=pad+px;
+    const i=Math.round(px*(nLast)/(nPx-1));
     const y=H-pad-((eq[i]-mn)/range*(H-2*pad));
-    if(i===0){ctx.moveTo(x,y);firstX=x;}else ctx.lineTo(x,y);
+    if(px===0){ctx.moveTo(x,y);firstX=x;}else ctx.lineTo(x,y);
   }
   ctx.lineTo(W-pad,zy); ctx.lineTo(firstX,zy); ctx.closePath();
   ctx.fillStyle='rgba(0,212,255,0.06)'; ctx.fill();
@@ -2293,9 +2298,11 @@ function drawEquityData(eq, label) {
   grd.addColorStop(1,'rgba(0,212,255,0.6)');
   ctx.strokeStyle=grd; ctx.lineWidth=1.5;
   ctx.beginPath();
-  for(let i=0,x=pad;i<eq.length;i+=step,x++) {
+  for(let px=0;px<nPx;px++) {
+    const x=pad+px;
+    const i=Math.round(px*(nLast)/(nPx-1));
     const y=H-pad-((eq[i]-mn)/range*(H-2*pad));
-    if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+    if(px===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
   }
   ctx.stroke();
   ctx.fillStyle='rgba(180,200,220,0.6)'; ctx.font='8px JetBrains Mono,monospace';
@@ -2307,7 +2314,7 @@ function drawEquityData(eq, label) {
   ctx.fillText('◄ 1п      2п ►',sx-24,H-4);
 
   // Сохраняем параметры для crosshair
-  _eqChartParams = { eq, mn, mx, range, pad, step, W, H, label };
+  _eqChartParams = { eq, mn, mx, range, pad, W, H, label };
 
   // Синхронизируем размер crosshair-canvas
   const ch = document.getElementById('eq-crosshair');
@@ -2355,7 +2362,7 @@ function drawEquityForResult(r) {
     const cx = (e.clientX - rect.left) * scaleX / 2;
     const cy = (e.clientY - rect.top)  * scaleY / 2;
 
-    const { eq, mn, range, pad, step, W, H } = p;
+    const { eq, mn, range, pad, W, H } = p;
 
     // Только внутри рабочей области
     if (cx < pad || cx > W - pad || cy < pad || cy > H - pad) {
@@ -2363,10 +2370,10 @@ function drawEquityForResult(r) {
       return;
     }
 
-    // Индекс бара под курсором
-    const barFrac = (cx - pad) / (W - 2 * pad);          // 0..1
-    const barIdx  = Math.round(barFrac * (eq.length - 1));
-    const clampedIdx = Math.max(0, Math.min(eq.length - 1, barIdx));
+    // Индекс бара под курсором — тот же pixel-exact mapping что и при рисовании
+    const nPx   = W - 2 * pad;
+    const px    = Math.max(0, Math.min(nPx - 1, Math.round(cx - pad)));
+    const clampedIdx = Math.round(px * (eq.length - 1) / Math.max(nPx - 1, 1));
     const val = eq[clampedIdx];                           // PnL в этой точке
 
     // Y-координата реального значения на кривой
