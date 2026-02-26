@@ -5738,7 +5738,7 @@ function switchTableMode(mode) {
   if (exportBtn) exportBtn.style.display = (mode === 'oos' && _oosTableResults.length > 0) ? '' : 'none';
   // Кнопка сравнения
   const oosBtn = document.getElementById('btn-oos-new');
-  if (oosBtn) oosBtn.style.display = NEW_DATA ? '' : 'none';
+  if (oosBtn) oosBtn.style.display = DATA && DATA.length > 0 ? '' : 'none';
   // При переключении в режим HC — сбрасываем фильтры автоматически
   if (mode === 'hc') {
     if (typeof resetAllFilters === 'function') resetAllFilters();
@@ -10180,18 +10180,19 @@ function _applyOOSHeaders(oosMode) {
     }
     // OOS-заголовки
     // Подписи периодов в tooltip
-    const nOld = DATA ? DATA.length : 0, nNew = NEW_DATA ? NEW_DATA.length : 0;
+    const nOld = _oosTableResults.length > 0 ? (_oosTableResults[0].old_bars || 0) : 0;
+    const nNew = _oosTableResults.length > 0 ? (_oosTableResults[0].new_bars || 0) : 0;
     headerRow.innerHTML = `
       <th onclick="doOOSSort('name')" style="min-width:120px;resize:horizontal;overflow:auto">Стратегия ↕</th>
       <th class="col-fav" style="width:26px">⭐</th>
-      <th class="oos-th-hist" onclick="doOOSSort('old_pnl')" style="min-width:58px;resize:horizontal;overflow:auto" title="PnL ист (${nOld} баров)">PnL% ист ↕</th>
-      <th class="oos-th-new"  onclick="doOOSSort('new_pnl')" style="min-width:58px;resize:horizontal;overflow:auto" title="PnL нов (${nNew} баров)">PnL% нов ↕</th>
+      <th class="oos-th-hist" onclick="doOOSSort('old_pnl')" style="min-width:58px;resize:horizontal;overflow:auto" title="PnL IS — первые 70% (${nOld} баров)">PnL% IS ↕</th>
+      <th class="oos-th-new"  onclick="doOOSSort('new_pnl')" style="min-width:58px;resize:horizontal;overflow:auto" title="PnL OOS — последние 30% (${nNew} баров)">PnL% OOS ↕</th>
       <th class="oos-th-delta" onclick="doOOSSort('delta_pnl')" style="min-width:54px;resize:horizontal;overflow:auto">ΔPnL ↕</th>
-      <th class="oos-th-hist" onclick="doOOSSort('apt_old')" style="min-width:60px;resize:horizontal;overflow:auto" title="Ср. PnL% на сделку — история">Avg/tr ист ↕</th>
-      <th class="oos-th-new"  onclick="doOOSSort('apt_new')" style="min-width:60px;resize:horizontal;overflow:auto" title="Ср. PnL% на сделку — новые">Avg/tr нов ↕</th>
+      <th class="oos-th-hist" onclick="doOOSSort('apt_old')" style="min-width:60px;resize:horizontal;overflow:auto" title="Ср. PnL% на сделку — IS (70%)">Avg/tr IS ↕</th>
+      <th class="oos-th-new"  onclick="doOOSSort('apt_new')" style="min-width:60px;resize:horizontal;overflow:auto" title="Ср. PnL% на сделку — OOS (30%)">Avg/tr OOS ↕</th>
       <th class="oos-th-delta" onclick="doOOSSort('delta_apt')" style="min-width:56px;resize:horizontal;overflow:auto">ΔAvg/tr ↕</th>
-      <th class="oos-th-hist" onclick="doOOSSort('old_wr')" style="min-width:50px;resize:horizontal;overflow:auto" title="WR — история">WR% ист ↕</th>
-      <th class="oos-th-new"  onclick="doOOSSort('new_wr')" style="min-width:50px;resize:horizontal;overflow:auto" title="WR — новые">WR% нов ↕</th>
+      <th class="oos-th-hist" onclick="doOOSSort('old_wr')" style="min-width:50px;resize:horizontal;overflow:auto" title="WR — IS (70%)">WR% IS ↕</th>
+      <th class="oos-th-new"  onclick="doOOSSort('new_wr')" style="min-width:50px;resize:horizontal;overflow:auto" title="WR — OOS (30%)">WR% OOS ↕</th>
       <th class="oos-th-delta" onclick="doOOSSort('delta_wr')" style="min-width:44px;resize:horizontal;overflow:auto">ΔWR ↕</th>
       <th class="oos-th-hist" style="min-width:34px;resize:horizontal;overflow:auto" title="Сделок ист (${nOld} баров)"># ист</th>
       <th class="oos-th-new"  style="min-width:34px;resize:horizontal;overflow:auto" title="Сделок нов (${nNew} баров)"># нов</th>
@@ -10337,11 +10338,11 @@ function _getOOSSortVal(r, key) {
     const an = (r.new_n > 0 && r.new_pnl !== null) ? r.new_pnl / r.new_n : null;
     return (ao !== null && an !== null) ? an - ao : null;
   }
-  if (key === 'apb_old') return (DATA && r.old_pnl !== null) ? r.old_pnl / DATA.length * 1000 : null;
-  if (key === 'apb_new') return (NEW_DATA && r.new_pnl !== null) ? r.new_pnl / NEW_DATA.length * 1000 : null;
+  if (key === 'apb_old') return (r.old_bars && r.old_pnl !== null) ? r.old_pnl / r.old_bars * 1000 : null;
+  if (key === 'apb_new') return (r.new_bars && r.new_pnl !== null) ? r.new_pnl / r.new_bars * 1000 : null;
   if (key === 'delta_apb') {
-    const ao = (DATA && r.old_pnl !== null) ? r.old_pnl / DATA.length * 1000 : null;
-    const an = (NEW_DATA && r.new_pnl !== null) ? r.new_pnl / NEW_DATA.length * 1000 : null;
+    const ao = (r.old_bars && r.old_pnl !== null) ? r.old_pnl / r.old_bars * 1000 : null;
+    const an = (r.new_bars && r.new_pnl !== null) ? r.new_pnl / r.new_bars * 1000 : null;
     return (ao !== null && an !== null) ? an - ao : null;
   }
   if (key === 'score') {
@@ -10363,15 +10364,16 @@ function _renderOOSSummary() {
   const stable  = _oosTableResults.filter(r => {
     const ao = r.old_n > 0 ? r.old_pnl / r.old_n : 0;
     const an = r.new_n > 0 ? r.new_pnl / r.new_n : 0;
-    const apbO = DATA ? r.old_pnl / DATA.length : 0;
-    const apbN = NEW_DATA ? r.new_pnl / NEW_DATA.length : 0;
+    const apbO = r.old_bars ? r.old_pnl / r.old_bars : 0;
+    const apbN = r.new_bars ? r.new_pnl / r.new_bars : 0;
     const aptOk = ao > 0 && an / ao >= _stableThresh;
     const apbOk = apbO > 0 && apbN / apbO >= _stableThresh;
     return r.new_pnl > 0 && (aptOk || apbOk);
   }).length;
   const pos     = _oosTableResults.filter(r => r.new_pnl > 0).length;
   const broken  = _oosTableResults.filter(r => r.new_pnl !== null && r.new_pnl <= 0 && r.old_pnl > 0).length;
-  const newInfo = NEW_DATA ? `${NEW_DATA.length} баров` : '';
+  const oosBarCount = _oosTableResults.length > 0 ? (_oosTableResults[0].new_bars || 0) : 0;
+  const newInfo = oosBarCount > 0 ? `OOS: ${oosBarCount} баров` : '';
   bar.innerHTML = `📊 OOS: <b>${_oosTableResults.length}</b> стратегий | ` +
     `<span style="color:var(--green)">✅ стабильных: ${stable}</span> | ` +
     `<span style="color:var(--orange)">⚠️ хуже но +: ${pos - stable}</span> | ` +
@@ -10379,10 +10381,14 @@ function _renderOOSSummary() {
     (newInfo ? ` | Новые данные: ${newInfo}` : '');
 }
 
-// Запуск OOS-сравнения на выбранной выборке
+// Запуск OOS-сравнения: IS = первые 70% DATA, OOS = последние 30% DATA
 async function runOOSOnNewData() {
-  if (!NEW_DATA || NEW_DATA.length < 10) { alert('Сначала загрузите новые данные'); return; }
-  if (!DATA || DATA.length < 10) { alert('Нет исходных данных'); return; }
+  if (!DATA || DATA.length < 20) { alert('Нет исходных данных'); return; }
+
+  // Разбиваем текущие данные на IS (70%) и OOS (30%)
+  const isN    = Math.floor(DATA.length * 0.70);
+  const IS_DATA  = DATA.slice(0, isN);
+  const OOS_DATA = DATA.slice(isN);
 
   // Определяем источник — текущий режим таблицы
   let srcList = [];
@@ -10413,8 +10419,8 @@ async function runOOSOnNewData() {
 
     const origDATA = DATA;
     let rOld = null, rNew = null;
-    try { DATA = origDATA; rOld = _hcRunBacktest(r.cfg); } catch(e) {}
-    try { DATA = NEW_DATA; rNew = _hcRunBacktest(r.cfg); } catch(e) {}
+    try { DATA = IS_DATA;  rOld = _hcRunBacktest(r.cfg); } catch(e) {}
+    try { DATA = OOS_DATA; rNew = _hcRunBacktest(r.cfg); } catch(e) {}
     DATA = origDATA;
 
     _oosTableResults.push({
@@ -10439,8 +10445,8 @@ async function runOOSOnNewData() {
       new_n:     rNew ? rNew.n   : null,
       delta_pnl: (rOld && rNew) ? rNew.pnl - rOld.pnl : null,
       delta_wr:  (rOld && rNew) ? rNew.wr  - rOld.wr  : null,
-      old_bars:  DATA ? DATA.length : null,
-      new_bars:  NEW_DATA ? NEW_DATA.length : null,
+      old_bars:  IS_DATA.length,
+      new_bars:  OOS_DATA.length,
     });
   }
 
