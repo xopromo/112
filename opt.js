@@ -239,9 +239,22 @@ async function runOpt() {
     const isRate   = splitIdx > 0 ? isGain / (splitIdx + 1) : 0;  // PnL per bar (IS)
     const oosBars  = N_eq - 1 - splitIdx;
     const oosRate  = oosBars > 0 ? oosGain / oosBars : 0;         // PnL per bar (OOS)
-    // retention = OOS per-bar rate / IS per-bar rate
-    // 1.0 = равномерный рост, 0.5 = умеренная деградация, <0 = OOS убыточный
-    const retention = isRate !== 0 ? oosRate / isRate : (oosGain >= 0 ? 1 : -1);
+    // IS должен значимо вносить вклад, иначе retention не имеет смысла.
+    // Частый ложный случай: стратегия с большой IS-просадкой восстанавливается
+    // к ~0 к моменту split → isGain≈0 → oosRate/isRate→∞ → ложные тысячи %.
+    const totalGain = eq[N_eq - 1];
+    const minIsGain = totalGain > 0 ? Math.max(totalGain * 0.4, 0.1) : 0.1;
+    let retention;
+    if (isGain < minIsGain) {
+      // IS не вырос значимо — стратегия НЕ является равномерно растущей
+      retention = -1;
+    } else if (oosGain <= 0) {
+      // OOS убыточный: отрицательный retention, ограничен -2x
+      retention = Math.max(oosRate / isRate, -2.0);
+    } else {
+      // Оба периода прибыльны: отношение скоростей роста, ограничено 2x сверху
+      retention = Math.min(oosRate / isRate, 2.0);
+    }
     cfg._oos.forward = { pnl: oosGain, retention, isGain, n: rFull.n, wr: rFull.wr, dd: rFull.dd };
   }
   const comm=$n('c_comm')||0.08;
