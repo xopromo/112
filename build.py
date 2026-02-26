@@ -1,0 +1,70 @@
+#!/usr/bin/env python3
+"""
+build.py — собирает USE_Optimizer_vX_XX.html из четырёх файлов.
+Использование: python3 build.py [output.html]
+
+  shell.html  (~1700 строк) — HTML разметка + CSS
+  ui.js       (~4300 строк) — весь UI JavaScript
+  core.js      (~740 строк) — индикаторы + backtest engine
+  opt.js      (~1800 строк) — оптимизатор + тесты устойчивости
+
+Порядок сборки:
+  1. opt.js   → разрезаем по SECTION_A/B/C/D
+  2. core.js  → убираем заголовок
+  3. ui.js    → подставляем OPT_A, CORE, OPT_B, OPT_C, OPT_D
+  4. shell.html → подставляем готовый ui через ##UI##
+"""
+import sys, os
+
+out  = sys.argv[1] if len(sys.argv) > 1 else 'USE_Optimizer_v6_built.html'
+base = os.path.dirname(os.path.abspath(__file__))
+
+shell = open(os.path.join(base, 'shell.html'), encoding='utf-8').read()
+core  = open(os.path.join(base, 'core.js'),    encoding='utf-8').read()
+opt   = open(os.path.join(base, 'opt.js'),     encoding='utf-8').read()
+ui    = open(os.path.join(base, 'ui.js'),      encoding='utf-8').read()
+pine  = open(os.path.join(base, 'pine_export.js'), encoding='utf-8').read()
+
+# ── opt.js: разрезаем по маркерам секций ──────────────────────────────────
+SECS = ['// ##SECTION_A##\n', '// ##SECTION_B##\n',
+        '// ##SECTION_C##\n', '// ##SECTION_D##\n']
+for s in SECS:
+    assert s in opt, f"Marker not found in opt.js: {s!r}"
+
+i_a = opt.index(SECS[0]) + len(SECS[0])
+i_b = opt.index(SECS[1])
+i_c = opt.index(SECS[2])
+i_d = opt.index(SECS[3])
+
+opt_A = opt[i_a              : i_b            ].rstrip('\n')
+opt_B = opt[i_b+len(SECS[1]) : i_c            ].rstrip('\n')
+opt_C = opt[i_c+len(SECS[2]) : i_d            ].rstrip('\n')
+opt_D = opt[i_d+len(SECS[3]) :                ].rstrip('\n')
+
+# ── core.js: отрезаем заголовок, берём только код ─────────────────────────
+HDR_END = '// ============================================================\n\n'
+assert HDR_END in core, "Header end marker not found in core.js"
+core_code = core[core.rindex(HDR_END) + len(HDR_END):].rstrip('\n') + '\n'
+
+# ── Шаг 1: подставляем секции opt/core в ui.js ────────────────────────────
+ui_built = ui
+for ph, content in [
+    ('/* ##OPT_A## */', opt_A),
+    ('/* ##CORE## */',  core_code),
+    ('/* ##OPT_B## */', opt_B),
+    ('/* ##OPT_C## */', opt_C),
+    ('/* ##OPT_D## */', opt_D),
+]:
+    assert ph in ui_built, f"Placeholder not found in ui.js: {ph!r}"
+    ui_built = ui_built.replace(ph, content, 1)
+
+# ── Шаг 2: подставляем готовый ui в shell ─────────────────────────────────
+# ── Шаг 3: вставляем pine_export.js как отдельный <script> перед ##UI##
+assert '/* ##PINE## */' in shell, "Placeholder ##PINE## not found in shell.html"
+shell = shell.replace('/* ##PINE## */', pine, 1)
+
+assert '/* ##UI## */' in shell, "Placeholder ##UI## not found in shell.html"
+result = shell.replace('/* ##UI## */', ui_built, 1)
+
+open(out, 'w', encoding='utf-8').write(result)
+print(f"✅  {out}  ({len(result.splitlines())} строк)")
