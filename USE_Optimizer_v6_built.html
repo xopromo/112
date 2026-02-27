@@ -721,6 +721,22 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
 #oos-rtbl tr:hover td { background:var(--bg3); }
 #oos-rtbl td:first-child { font-size:.66em; color:var(--accent); max-width:200px; overflow:hidden; text-overflow:ellipsis; }
 
+/* ##WFO_BEGIN## — WFO стили. Откат: удалить блок между ##WFO_BEGIN## и ##WFO_END## */
+.wfo-mode { border-color: var(--purple) !important; }
+.wfo-mode.active { background: rgba(139,92,246,.15) !important; color:var(--purple) !important; }
+.wfo-ctrl-bar { display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:5px 10px;background:var(--bg2);border-top:1px solid var(--border);font-size:.75em;display:none }
+.wfo-ctrl-bar.visible { display:flex }
+.wfomode-btn { padding:2px 7px;border:1px solid var(--border2);border-radius:3px;background:var(--bg);color:var(--text3);font-size:.85em;cursor:pointer;transition:all .1s }
+.wfomode-btn.active { border-color:var(--purple);color:var(--purple);background:rgba(139,92,246,.1) }
+#wfo-tbl-wrap { display:none;overflow-x:auto;margin-top:0 }
+#wfo-tbl { width:100%;border-collapse:collapse;font-size:.7em }
+#wfo-tbl th { background:var(--bg3);color:var(--text2);padding:5px 8px;border-bottom:1px solid var(--border2);white-space:nowrap;text-align:left }
+#wfo-tbl th:not(:first-child) { text-align:center }
+#wfo-tbl td { padding:3px 8px;border-bottom:1px solid var(--border) }
+#wfo-tbl tr:hover td { background:var(--bg3) }
+#wfo-summary-bar { padding:5px 10px;font-size:.65em;color:var(--text3);background:var(--bg2);border-top:1px solid var(--border) }
+/* ##WFO_END## */
+
 </style>
 </head>
 <body>
@@ -1192,6 +1208,35 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
     <span id="mass-rob-progress" style="color:var(--accent2)"></span>
   </div>
 
+  <!-- ##WFO_BEGIN## — WFO панель управления. Откат: удалить блок между ##WFO_BEGIN## и ##WFO_END## -->
+  <div class="wfo-ctrl-bar" id="wfo-ctrl-bar">
+    <span style="color:var(--purple);font-weight:600">⟳ Walk-Forward:</span>
+    <label style="display:flex;align-items:center;gap:3px;color:var(--text2)" title="Число скользящих окон">
+      Окон: <input type="number" id="wfo_wins" value="6" min="3" max="20" step="1"
+        style="width:36px;background:var(--bg2);color:var(--text1);border:1px solid var(--border);border-radius:3px;padding:1px 4px;font-size:.85em">
+    </label>
+    <label style="display:flex;align-items:center;gap:3px;color:var(--text2)" title="Размер OOS окна (% от данных)">
+      OOS%: <input type="number" id="wfo_oos_pct" value="15" min="5" max="40" step="5"
+        style="width:36px;background:var(--bg2);color:var(--text1);border:1px solid var(--border);border-radius:3px;padding:1px 4px;font-size:.85em">
+    </label>
+    <label style="display:flex;align-items:center;gap:3px;color:var(--text2)" title="Топ N стратегий для теста">
+      Топ: <input type="number" id="wfo_maxn" value="30" min="5" max="200" step="5"
+        style="width:40px;background:var(--bg2);color:var(--text1);border:1px solid var(--border);border-radius:3px;padding:1px 4px;font-size:.85em">
+    </label>
+    <div style="display:flex;gap:3px">
+      <div class="wfomode-btn active" id="wfomode_rolling"
+        onclick="document.querySelectorAll('.wfomode-btn').forEach(b=>b.classList.remove('active'));this.classList.add('active')"
+        title="IS окно фиксированной длины скользит вправо">Rolling</div>
+      <div class="wfomode-btn" id="wfomode_anchored"
+        onclick="document.querySelectorAll('.wfomode-btn').forEach(b=>b.classList.remove('active'));this.classList.add('active')"
+        title="IS всегда начинается с начала данных, OOS скользит вправо">Anchored</div>
+    </div>
+    <button class="tpl-btn2" id="btn-wfo-run" onclick="runWalkForward()"
+      style="padding:3px 10px;font-size:.85em;border-color:var(--purple);color:var(--purple)">▶ WFO тест</button>
+    <span id="wfo-progress" style="color:var(--accent2);font-size:.85em"></span>
+  </div>
+  <!-- ##WFO_END## -->
+
   <!-- OOS на новых данных (показывается только в fav режиме) -->
   <div id="new-data-bar" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 10px;background:var(--bg2);border-top:1px solid var(--border);font-size:.8em">
     <span style="color:var(--text2);font-weight:600">📂 Новые данные:</span>
@@ -1218,6 +1263,9 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
     <button class="tbl-mode-btn hc-mode" id="tbl-btn-hc" onclick="switchTableMode('hc')" style="display:none">Соседи <span id="tbl-cnt-hc">0</span></button>
     <button class="tbl-mode-btn" id="tbl-btn-fav" onclick="switchTableMode('fav')">Избранные <span id="tbl-cnt-fav">0</span></button>
     <button class="tbl-mode-btn oos-mode" id="tbl-btn-oos" onclick="switchTableMode('oos')" style="display:none">OOS <span id="tbl-cnt-oos">0</span></button>
+    <!-- ##WFO_BEGIN## -->
+    <button class="tbl-mode-btn wfo-mode" id="tbl-btn-wfo" onclick="switchTableMode('wfo')" title="Walk-Forward валидация стратегий по скользящим окнам">WFO <span id="tbl-cnt-wfo">0</span></button>
+    <!-- ##WFO_END## -->
     <button class="tbl-mode-btn" id="btn-reset-filters" onclick="resetAllFilters()" title="Сбросить все фильтры и сортировку" style="margin-left:auto">✕ Сброс</button>
     <button class="tbl-mode-btn" onclick="_downloadSources()" title="Скачать исходные файлы: core.js, opt.js, ui.js, shell.html, build.py, README.md">⬇ Исходники</button>
   </div>
@@ -1322,6 +1370,47 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
       <tbody id="tb"></tbody>
     </table>
   </div>
+
+  <!-- ##WFO_BEGIN## — WFO таблица. Откат: удалить блок между ##WFO_BEGIN## и ##WFO_END## -->
+  <div id="wfo-tbl-wrap">
+    <div id="wfo-summary-bar"><span id="wfo-summary">Запусти WFO тест чтобы увидеть результаты</span></div>
+    <table id="wfo-tbl">
+      <thead>
+        <tr>
+          <th class="wfo-th-sort" data-key="name" data-label="Стратегия"
+              onclick="_wfoDoSort('name')" style="min-width:180px;text-align:left;cursor:pointer">Стратегия ↕</th>
+          <th class="wfo-th-sort" data-key="wfoScore" data-label="Consist%"
+              onclick="_wfoDoSort('wfoScore')" title="% окон где OOS прибылен. Главная метрика." style="min-width:70px;cursor:pointer">Consist% ▼</th>
+          <th class="wfo-th-sort" data-key="wfoAvgOOS" data-label="Avg OOS%"
+              onclick="_wfoDoSort('wfoAvgOOS')" title="Средний OOS PnL по всем окнам" style="min-width:70px;cursor:pointer">Avg OOS% ↕</th>
+          <th class="wfo-th-sort" data-key="wfoEff" data-label="Efficiency"
+              onclick="_wfoDoSort('wfoEff')" title="Avg OOS / |Avg IS| — насколько OOS повторяет IS" style="min-width:65px;cursor:pointer">Efficiency ↕</th>
+          <th class="wfo-th-sort" data-key="wfoStab" data-label="Volatility"
+              onclick="_wfoDoSort('wfoStab')" title="Стд.отклонение OOS PnL. Меньше = стабильнее." style="min-width:58px;cursor:pointer">Volatility ↕</th>
+          <th class="wfo-th-sort" data-key="pnl" data-label="IS PnL%"
+              onclick="_wfoDoSort('pnl')" title="IS PnL (на полных данных)" style="min-width:55px;cursor:pointer">IS PnL% ↕</th>
+          <th class="wfo-th-sort" data-key="wr" data-label="IS WR%"
+              onclick="_wfoDoSort('wr')" title="IS WinRate" style="min-width:48px;cursor:pointer">IS WR% ↕</th>
+          <th style="min-width:80px" title="Спарклайн OOS по окнам. Наведи для деталей.">OOS окна</th>
+        </tr>
+        <tr style="background:var(--bg2)">
+          <td style="padding:1px 3px"><input id="wff_name" placeholder="поиск…" oninput="_wfoApplyAndRender()"
+            style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border2);border-radius:3px;color:var(--text);font-size:.65em;padding:1px 4px;font-family:var(--font-mono)"></td>
+          <td style="padding:1px 2px"><input id="wff_cons" type="number" placeholder="≥%" oninput="_wfoApplyAndRender()"
+            style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border2);border-radius:3px;color:var(--text);font-size:.65em;padding:1px 3px"></td>
+          <td style="padding:1px 2px"><input id="wff_avg" type="number" placeholder="≥%" oninput="_wfoApplyAndRender()"
+            style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border2);border-radius:3px;color:var(--text);font-size:.65em;padding:1px 3px"></td>
+          <td style="padding:1px 2px"><input id="wff_eff" type="number" placeholder="≥%" oninput="_wfoApplyAndRender()"
+            style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border2);border-radius:3px;color:var(--text);font-size:.65em;padding:1px 3px"></td>
+          <td colspan="4"></td>
+        </tr>
+      </thead>
+      <tbody id="wfo-tbody">
+        <tr><td colspan="8" style="text-align:center;color:var(--text3);padding:20px">Нет данных. Запусти WFO тест.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <!-- ##WFO_END## -->
 
   <!-- ── OOS таблица: полностью отдельная, не зависит от стандартной ── -->
   <div id="oos-tbl-wrap" style="display:none;overflow-x:auto;margin-top:0">
@@ -8406,6 +8495,187 @@ function _robCacheLoad() {
     if (loaded > 0) console.log('[RobCache] Loaded ' + loaded + ' entries from localStorage');
   } catch(e) {}
 }
+
+// ##WFO_BEGIN##
+// ##SECTION_E##
+// WALK-FORWARD VALIDATION ENGINE
+// ============================================================
+// Принцип: берёт top-N результатов из текущей оптимизации,
+// прогоняет каждый по M скользящих (или заякоренных) окон,
+// вычисляет WFO-метрики: Consistency%, Efficiency, Stability.
+//
+// Откат: удалить всё между ##WFO_BEGIN## и ##WFO_END##,
+// удалить блоки с теми же маркерами из ui.js и shell.html.
+// ============================================================
+
+let _wfoRunning   = false;
+let _wfoResults   = []; // [{name, cfg, pnl, wr, wfoScore, wfoTotal, wfoEff, wfoStab, windows:[...]}]
+
+// ── Построить массив окон ─────────────────────────────────────
+// mode: 'rolling' | 'anchored'
+// Возвращает [{isStart, isEnd, oosStart, oosEnd}] (индексы в DATA)
+function _wfoBuildWindows(N, nWins, oosPct, mode) {
+  const oosLen = Math.max(20, Math.floor(N * oosPct));
+  const wins = [];
+  if (mode === 'anchored') {
+    // IS всегда начинается с 0, OOS скользит вправо
+    const step = Math.floor((N - oosLen) / nWins);
+    for (let i = 0; i < nWins; i++) {
+      const oosStart = Math.min(step * (i + 1), N - oosLen);
+      const oosEnd   = Math.min(oosStart + oosLen, N);
+      if (oosEnd - oosStart < 20) continue;
+      wins.push({ isStart: 0, isEnd: oosStart, oosStart, oosEnd });
+    }
+  } else {
+    // Rolling: IS фиксированной длины сдвигается вправо
+    const totalStep = Math.floor((N - oosLen) / nWins);
+    const isLen = totalStep; // IS ~ N/nWins
+    for (let i = 0; i < nWins; i++) {
+      const oosStart = Math.min(totalStep * (i + 1), N - oosLen);
+      const oosEnd   = Math.min(oosStart + oosLen, N);
+      const isStart  = Math.max(0, oosStart - isLen);
+      if (oosEnd - oosStart < 20 || oosStart - isStart < 20) continue;
+      wins.push({ isStart, isEnd: oosStart, oosStart, oosEnd });
+    }
+  }
+  return wins;
+}
+
+// ── Прогнать cfg на срезе DATA (idx), вернуть результат ──────
+function _wfoRunOnSlice(cfg, slice) {
+  if (!slice || slice.length < 30) return null;
+  const origDATA = DATA;
+  DATA = slice;
+  try {
+    const ind   = _calcIndicators(cfg);
+    const btCfg = buildBtCfg(cfg, ind);
+    return backtest(ind.pvLo, ind.pvHi, ind.atrArr, btCfg);
+  } catch(e) { return null; }
+  finally { DATA = origDATA; }
+}
+
+// ── Посчитать WFO-метрики по массиву окон ────────────────────
+// Возвращает { consistency, efficiency, stability, avgOosPnl }
+function _wfoCalcMetrics(windows) {
+  const n = windows.length;
+  if (n === 0) return { consistency: 0, efficiency: 0, stability: 0, avgOosPnl: 0 };
+
+  let posOOS = 0, sumOosPnl = 0, sumIsPnl = 0, sumSqDiff = 0;
+  const oosPnls = [];
+  for (const w of windows) {
+    const oosP = w.oos?.pnl ?? 0;
+    const isP  = w.is?.pnl  ?? 0;
+    if (oosP > 0) posOOS++;
+    sumOosPnl += oosP;
+    sumIsPnl  += isP;
+    oosPnls.push(oosP);
+  }
+  const avgOosPnl = sumOosPnl / n;
+  const consistency = Math.round(posOOS / n * 100); // % окон с +OOS
+  // Efficiency: средний OOS / средний IS (скорости роста per bar сравнивать сложнее —
+  // используем просто соотношение PnL; clamp от -1 до 1)
+  const avgIs = sumIsPnl / n;
+  const efficiency = avgIs !== 0
+    ? Math.max(-1, Math.min(1, avgOosPnl / Math.abs(avgIs)))
+    : (avgOosPnl > 0 ? 1 : -1);
+  // Stability: стандартное отклонение OOS PnL (меньше = стабильнее)
+  const mean = avgOosPnl;
+  oosPnls.forEach(p => { sumSqDiff += (p - mean) ** 2; });
+  const stability = Math.sqrt(sumSqDiff / n); // std dev
+
+  return { consistency, efficiency, stability, avgOosPnl };
+}
+
+// ── Главная функция WFO ───────────────────────────────────────
+let _wfoStopped = false;
+
+async function runWalkForward() {
+  if (!DATA) { alert('Нет данных'); return; }
+  if (_wfoRunning) {
+    _wfoStopped = true;
+    _wfoRunning = false;
+    const btn = document.getElementById('btn-wfo-run');
+    if (btn) btn.textContent = '▶ WFO тест';
+    return;
+  }
+
+  // Берём видимые результаты с cfg
+  const toTest = (typeof _visibleResults !== 'undefined' ? _visibleResults : results)
+    .filter(r => r.cfg);
+  if (!toTest.length) { alert('Нет результатов с параметрами (cfg). Сначала запусти оптимизацию.'); return; }
+
+  // Настройки WFO из UI
+  const nWins  = parseInt(document.getElementById('wfo_wins')?.value)  || 6;
+  const oosPct = parseFloat(document.getElementById('wfo_oos_pct')?.value) / 100 || 0.15;
+  const mode   = document.querySelector('.wfomode-btn.active')?.id?.replace('wfomode_', '') || 'rolling';
+  const maxStr = parseInt(document.getElementById('wfo_maxn')?.value) || 30;
+
+  const strats = toTest.slice(0, maxStr);
+  const wins   = _wfoBuildWindows(DATA.length, nWins, oosPct, mode);
+
+  if (wins.length === 0) { alert('Слишком мало данных для WFO окон'); return; }
+
+  _wfoRunning = true;
+  _wfoStopped = false;
+  _wfoResults = [];
+
+  const btn = document.getElementById('btn-wfo-run');
+  if (btn) btn.textContent = '⏹ Стоп';
+  const progEl = document.getElementById('wfo-progress');
+
+  for (let si = 0; si < strats.length; si++) {
+    if (_wfoStopped) break;
+    const r = strats[si];
+    if (progEl) progEl.textContent = `⏳ ${si + 1}/${strats.length}: ${r.name.slice(0, 40)}…`;
+    if (si % 3 === 0) await yieldToUI();
+
+    const windowResults = [];
+    for (const win of wins) {
+      const isSlice  = DATA.slice(win.isStart,  win.isEnd);
+      const oosSlice = DATA.slice(win.oosStart, win.oosEnd);
+      const isRes    = _wfoRunOnSlice(r.cfg, isSlice);
+      const oosRes   = _wfoRunOnSlice(r.cfg, oosSlice);
+      windowResults.push({
+        win,
+        is:  isRes  ? { pnl: isRes.pnl,  wr: isRes.wr,  n: isRes.n,  dd: isRes.dd  } : null,
+        oos: oosRes ? { pnl: oosRes.pnl, wr: oosRes.wr, n: oosRes.n, dd: oosRes.dd } : null,
+      });
+    }
+
+    const metrics = _wfoCalcMetrics(windowResults);
+    _wfoResults.push({
+      name:      r.name,
+      cfg:       r.cfg,
+      pnl:       r.pnl,
+      wr:        r.wr,
+      n:         r.n,
+      dd:        r.dd,
+      wfoScore:  metrics.consistency, // %
+      wfoEff:    metrics.efficiency,
+      wfoStab:   metrics.stability,
+      wfoAvgOOS: metrics.avgOosPnl,
+      wfoTotal:  wins.length,
+      windows:   windowResults,
+    });
+
+    // Обновляем wfoScore в основном results для отображения в главной таблице
+    const orig = results.find(x => x.name === r.name);
+    if (orig) orig.wfoScore = metrics.consistency;
+
+    // Обновляем wfo-таблицу в реальном времени
+    if (typeof renderWfoTable === 'function') renderWfoTable();
+  }
+
+  _wfoRunning = false;
+  if (btn) btn.textContent = '▶ WFO тест';
+  if (progEl) progEl.textContent = _wfoStopped
+    ? `⏹ Остановлено (${_wfoResults.length} из ${strats.length})`
+    : `✅ Готово: ${_wfoResults.length} стратегий × ${wins.length} окон`;
+
+  // Переключаем таблицу в WFO-режим
+  if (typeof switchTableMode === 'function') switchTableMode('wfo');
+}
+// ##WFO_END##
 let _hcFoundResults = [];
 
 // Показываем/скрываем список тестов устойчивости
@@ -10451,6 +10721,176 @@ async function runOOSOnNewData() {
   _updateTableModeCounts();
   switchTableMode('oos');
 }
+
+// ##WFO_BEGIN##
+// ============================================================
+// WFO UI — таблица Walk-Forward результатов
+// Откат: удалить блок между ##WFO_BEGIN## и ##WFO_END## в ui.js,
+//        аналогичные блоки в opt.js и shell.html.
+// ============================================================
+
+// ── Переключение режима таблицы: добавляем 'wfo' ─────────────
+// Патчим switchTableMode, чтобы 'wfo' показывал wfo-tbl-wrap
+const _origSwitchTableMode = switchTableMode;
+switchTableMode = function(mode) {
+  const wfoWrap    = document.getElementById('wfo-tbl-wrap');
+  const wfoCtrlBar = document.getElementById('wfo-ctrl-bar');
+  if (mode === 'wfo') {
+    // Скрываем стандартные таблицы вручную, показываем WFO
+    const stdScroll = document.querySelector('.tbl-scroll');
+    const oosTbl    = document.getElementById('oos-tbl-wrap');
+    if (stdScroll) stdScroll.style.display = 'none';
+    if (oosTbl)    oosTbl.style.display    = 'none';
+    if (wfoWrap)   wfoWrap.style.display   = 'block';
+    if (wfoCtrlBar) { wfoCtrlBar.style.display = 'flex'; wfoCtrlBar.classList.add('visible'); }
+    // Обновляем кнопки режима
+    ['results','hc','fav','oos','wfo'].forEach(m => {
+      const btn = document.getElementById('tbl-btn-' + m);
+      if (btn) btn.classList.toggle('active', m === 'wfo');
+    });
+    _tableMode = 'wfo';
+    renderWfoTable();
+  } else {
+    if (wfoWrap) wfoWrap.style.display = 'none';
+    if (wfoCtrlBar) { wfoCtrlBar.style.display = ''; wfoCtrlBar.classList.remove('visible'); }
+    _origSwitchTableMode(mode);
+  }
+};
+
+// ── Рендер WFO-таблицы ────────────────────────────────────────
+let _wfoSortKey = 'wfoScore';
+let _wfoSortDir = -1; // -1 = убывание
+let _wfoVisibleResults = []; // отфильтрованные/отсортированные строки (для клика)
+
+function _wfoDoSort(key) {
+  if (_wfoSortKey === key) _wfoSortDir *= -1;
+  else { _wfoSortKey = key; _wfoSortDir = -1; }
+  renderWfoTable();
+}
+
+function _wfoApplyAndRender() { renderWfoTable(); }
+
+function renderWfoTable() {
+  const tbody = document.getElementById('wfo-tbody');
+  if (!tbody) return;
+  const data = (typeof _wfoResults !== 'undefined') ? _wfoResults : [];
+  if (!data.length) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text3);padding:20px">Нет данных. Запусти WFO тест.</td></tr>';
+    // Обновляем иконки сортировки
+    document.querySelectorAll('.wfo-th-sort').forEach(th => th.textContent = th.dataset.label + ' ↕');
+    return;
+  }
+
+  // Читаем фильтры
+  const fName = (document.getElementById('wff_name')?.value || '').trim().toLowerCase();
+  const fCons = parseFloat(document.getElementById('wff_cons')?.value);
+  const fAvg  = parseFloat(document.getElementById('wff_avg')?.value);
+  const fEff  = parseFloat(document.getElementById('wff_eff')?.value);
+
+  let filtered = data.filter(r => {
+    if (fName && !r.name.toLowerCase().includes(fName)) return false;
+    if (!isNaN(fCons) && r.wfoScore < fCons) return false;
+    if (!isNaN(fAvg)  && r.wfoAvgOOS < fAvg) return false;
+    if (!isNaN(fEff)  && Math.round(r.wfoEff * 100) < fEff) return false;
+    return true;
+  });
+
+  // Сортировка
+  const k = _wfoSortKey, d = _wfoSortDir;
+  filtered.sort((a, b) => {
+    let av, bv;
+    if (k === 'wfoScore')  { av = a.wfoScore;           bv = b.wfoScore; }
+    else if (k === 'wfoAvgOOS') { av = a.wfoAvgOOS;    bv = b.wfoAvgOOS; }
+    else if (k === 'wfoEff')    { av = a.wfoEff;        bv = b.wfoEff; }
+    else if (k === 'wfoStab')   { av = a.wfoStab;       bv = b.wfoStab; }
+    else if (k === 'pnl')       { av = a.pnl;           bv = b.pnl; }
+    else if (k === 'wr')        { av = a.wr;            bv = b.wr; }
+    else if (k === 'name')      { return d * a.name.localeCompare(b.name); }
+    else { av = a.wfoScore; bv = b.wfoScore; }
+    return d * (av - bv);
+  });
+
+  // Обновляем иконки сортировки в заголовках
+  document.querySelectorAll('.wfo-th-sort').forEach(th => {
+    const isActive = th.dataset.key === k;
+    th.textContent = th.dataset.label + (isActive ? (d === -1 ? ' ▼' : ' ▲') : ' ↕');
+    th.style.color = isActive ? 'var(--accent)' : '';
+  });
+
+  _wfoVisibleResults = filtered; // сохраняем для обработчиков кликов
+
+  let html = '';
+  for (let i = 0; i < filtered.length; i++) {
+    const r   = filtered[i];
+    const sc    = r.wfoScore >= 70 ? 'pos' : r.wfoScore >= 50 ? 'warn' : 'neg';
+    const effP  = Math.round(r.wfoEff * 100);
+    const effSc = effP >= 60 ? 'pos' : effP >= 30 ? 'warn' : 'neg';
+    const avgP  = r.wfoAvgOOS;
+    const avgSc = avgP > 0 ? 'pos' : avgP > -5 ? 'warn' : 'neg';
+    const winBars = (r.windows || []).map(w => {
+      const p = w.oos?.pnl ?? 0;
+      const cl = p > 0 ? '#00e676' : '#ff3d57';
+      const h = Math.min(16, Math.abs(p) * 0.8 + 2);
+      return `<span style="display:inline-block;width:5px;height:${h}px;background:${cl};margin:0 1px;vertical-align:middle;border-radius:1px" title="OOS: ${p.toFixed(1)}%"></span>`;
+    }).join('');
+    const winTip = (r.windows || []).map((w, j) => {
+      const is  = w.is  ? `IS: ${w.is.pnl.toFixed(1)}% WR${w.is.wr.toFixed(0)}%`  : 'IS: нет';
+      const oos = w.oos ? `OOS: ${w.oos.pnl.toFixed(1)}% WR${w.oos.wr.toFixed(0)}%` : 'OOS: нет';
+      return `Окно ${j+1}: ${is} | ${oos}`;
+    }).join('&#10;');
+    html += `<tr data-i="${i}" style="cursor:pointer" title="Клик — equity-график | Двойной клик — детали">
+      <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.65em" title="${r.name}">${r.name}</td>
+      <td class="${sc}" style="text-align:center;font-weight:600">${r.wfoScore}%</td>
+      <td class="${avgSc}" style="text-align:right">${avgP >= 0 ? '+' : ''}${avgP.toFixed(1)}%</td>
+      <td class="${effSc}" style="text-align:center">${effP >= 0 ? '+' : ''}${effP}%</td>
+      <td style="text-align:right;color:var(--text2)">${r.wfoStab.toFixed(1)}</td>
+      <td style="text-align:right;color:var(--text2)">${r.pnl.toFixed(1)}%</td>
+      <td style="text-align:right;color:var(--text2)">${r.wr.toFixed(1)}%</td>
+      <td title="${winTip}" style="white-space:nowrap">${winBars}</td>
+    </tr>`;
+  }
+  tbody.innerHTML = html || '<tr><td colspan="8" style="text-align:center;color:var(--text3);padding:12px">Нет совпадений с фильтрами</td></tr>';
+
+  // ── Делегированные обработчики кликов ───────────────────────
+  tbody.onclick = function(e) {
+    const tr = e.target.closest('tr[data-i]');
+    if (!tr) return;
+    const idx = +tr.dataset.i;
+    const r = _wfoVisibleResults[idx];
+    if (!r) return;
+    // Снимаем предыдущее выделение в WFO и основной таблице
+    document.querySelectorAll('#wfo-tbody tr.sel').forEach(el => el.classList.remove('sel'));
+    tr.classList.add('sel');
+    // Показываем equity-график (та же канва, что в основной таблице)
+    const eqc = document.getElementById('eqc');
+    if (eqc) { eqc.style.display = ''; }
+    drawEquityForResult(r);
+  };
+  tbody.ondblclick = function(e) {
+    const tr = e.target.closest('tr[data-i]');
+    if (!tr) return;
+    const r = _wfoVisibleResults[+tr.dataset.i];
+    if (!r) return;
+    showDetail(r);
+  };
+
+  // Сводка
+  const allScores = data.map(r => r.wfoScore);
+  const avgCons = allScores.length ? (allScores.reduce((a,b)=>a+b,0)/allScores.length).toFixed(0) : '—';
+  const top3 = [...data].sort((a,b)=>b.wfoScore-a.wfoScore).slice(0,3).map(r=>`${r.name.slice(0,20)}… (${r.wfoScore}%)`).join(', ');
+  const sumEl = document.getElementById('wfo-summary');
+  if (sumEl) sumEl.textContent = `${data.length} стратегий (${filtered.length} видимых) | Ср.Consistency: ${avgCons}% | Топ: ${top3}`;
+}
+
+// ── Обновляем _updateTableModeCounts чтобы учитывать WFO ─────
+const _origUpdateTableModeCounts = _updateTableModeCounts;
+_updateTableModeCounts = function() {
+  _origUpdateTableModeCounts();
+  const wfoCnt = document.getElementById('tbl-cnt-wfo');
+  if (wfoCnt) wfoCnt.textContent = (typeof _wfoResults !== 'undefined') ? _wfoResults.length : 0;
+  // WFO кнопка всегда видима — ctrl bar доступен до первого прогона
+};
+// ##WFO_END##
 
 // Экспорт OOS результатов в CSV
 function exportOOSTableCSV() {
