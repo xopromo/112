@@ -2831,7 +2831,7 @@ function stopHillClimbing() {
 function _hcMetric(r, metric) {
   if (!r || r.n < 5) return -Infinity;
   switch(metric) {
-    case 'pdd': return r.dd > 0 ? r.pnl / r.dd : r.pnl > 0 ? 999 : 0;
+    case 'pdd': return r.dd > 0 ? r.pnl / r.dd : r.pnl > 0 ? 99 : 0;
     case 'pnl': return r.pnl;
     case 'wr':  return r.wr;
     case 'avg': return r.avg;
@@ -3565,7 +3565,8 @@ async function runHillClimbing() {
               const score = _hcMetric(r, metric);
               candidates.push({ cfg: nc, score, r });
               // Сохраняем все соседи не хуже 90% базы — чтобы показывать альтернативы
-              if (score >= baseScore * 0.90) {
+              // Порог: baseScore - 10% от |baseScore| (корректно и для отрицательных значений)
+              if (score >= baseScore - Math.abs(baseScore) * 0.10) {
                 allFound.push({ cfg: nc, score, r, delta: score - baseScore });
               }
             }
