@@ -3,16 +3,38 @@
 // ============================================================
 // Вызов: generatePineScript(r)  где r — объект результата из results[]
 // Возвращает строку — готовый Pine Script v5 индикатор
+//
+// ОГЛАВЛЕНИЕ:
+//   generatePineScript(r)                         line 26
+//     ##PINE_HELPERS##    — вспомогательные fn     line 30
+//     ##PINE_SLTP##       — SL/TP helpers          line 35
+//     ##PINE_HEADER##     — //@version=5, indicator line 63
+//     ##PINE_INPUTS##     — все input-переменные   line 73
+//     ##PINE_INDICATORS## — индикаторы и фильтры   line 248
+//     ##PINE_ENTRIES##    — логика сигналов входа  line 341
+//     ##PINE_SLTP_CALC##  — расчёт SL/TP           line 419
+//     ##PINE_BACKTEST##   — движок бэктеста/equity line 499
+//     ##PINE_PLOT##       — отрисовка equity       line 694
+//     ##PINE_VISUAL##     — визуализация сигналов  line 703
+//     ##PINE_TABLE##      — таблица статистики     line 915
+//     ##PINE_ALERTS##     — алерты                 line 979
+//   fixPineScript(code)                            line 1003
+//     Автоматически исправляет ошибки Pine v5
+//     ⚠️  КРИТИЧНО: не трогать без явной необходимости
+// ⚠️  Номера строк сдвигаются при правках — ориентируйся
+//     на маркеры  // ##PINE_NAME##  а не на номера.
 // ============================================================
 
 function generatePineScript(r) {
   if (!r || !r.cfg) return '// Нет конфига';
   const c = r.cfg;
 
+  // ##PINE_HELPERS##
   // ── helpers ──────────────────────────────────────────────
   const b = (v) => v ? 'true' : 'false';
   const f = (v, d=1) => (typeof v === 'number') ? v.toFixed(d) : String(v);
 
+  // ##PINE_SLTP##
   // ── SL / TP helpers ──────────────────────────────────────
   const slPair = c.slPair || {a:{type:'atr',m:1.5}, p:null, combo:false};
   const tpPair = c.tpPair || {a:{type:'rr',m:2}, b:null, combo:false};
@@ -40,6 +62,7 @@ function generatePineScript(r) {
   // ── Формируем Pine Script ─────────────────────────────────
   const lines = [];
 
+  // ##PINE_HEADER##
   lines.push(`//@version=5`);
   lines.push(`// ============================================================`);
   lines.push(`// USE Strategy Engine — экспорт из оптимизатора`);
@@ -49,6 +72,7 @@ function generatePineScript(r) {
   lines.push(`indicator("USE [${r.name}]", shorttitle="USE_EXP", overlay=true, max_lines_count=500, max_labels_count=500, max_boxes_count=500)`);
   lines.push(``);
 
+  // ##PINE_INPUTS##
   // ── INPUTS ───────────────────────────────────────────────
   lines.push(`// ==========================================`);
   lines.push(`// 1. ВХОДНЫЕ ДАННЫЕ`);
@@ -223,6 +247,7 @@ function generatePineScript(r) {
   lines.push(`c_bg      = input.color(color.new(color.black,40), "Фон", group=grp_tab)`);
   lines.push(``);
 
+  // ##PINE_INDICATORS##
   // ── INDICATORS & FILTERS ─────────────────────────────────
   lines.push(`// ==========================================`);
   lines.push(`// 2. ИНДИКАТОРЫ И ФИЛЬТРЫ`);
@@ -315,6 +340,7 @@ function generatePineScript(r) {
   lines.push(`bool vol_dir_ok_s = not use_vol_dir or bear_vol > bull_vol`);
   lines.push(``);
 
+  // ##PINE_ENTRIES##
   // Entry patterns logic
   lines.push(`// ── Entry Patterns ──`);
   if (c.usePivot) {
@@ -392,6 +418,7 @@ function generatePineScript(r) {
   lines.push(`bool sig_s = pat_s and all_filt_s and confirmed`);
   lines.push(``);
 
+  // ##PINE_SLTP_CALC##
   // ── SL/TP calc ───────────────────────────────────────────
   lines.push(`// ==========================================`);
   lines.push(`// 3. РАСЧЁТ SL / TP`);
@@ -471,6 +498,7 @@ function generatePineScript(r) {
   lines.push(`    result`);
   lines.push(``);
 
+  // ##PINE_BACKTEST##
   // ── BACKTEST / EQUITY ENGINE ─────────────────────────────
   lines.push(`// ==========================================`);
   lines.push(`// 4. БЭКТЕСТ (вариации ATR / SL / TP)`);
@@ -665,6 +693,7 @@ function generatePineScript(r) {
   lines.push(`[p_l2, w_l2, c_l2, dd_l2, _z7, _x31,_x32,_x33,_x34,_x35,_x36] = solve_core(sig_l, sig_s, atr_v[1], base_sl + 0.2, 0)`);
   lines.push(``);
 
+  // ##PINE_PLOT##
   // ── EQUITY PLOT ──────────────────────────────────────────
   lines.push(`// ==========================================`);
   lines.push(`// 5. EQUITY`);
@@ -673,6 +702,7 @@ function generatePineScript(r) {
   lines.push(`plot(0, "Zero", color=color.new(color.gray,70), style=plot.style_circles, display=display.pane)`);
   lines.push(``);
 
+  // ##PINE_VISUAL##
   // ── VISUAL ENGINE ────────────────────────────────────────
   lines.push(`// ==========================================`);
   lines.push(`// 6. ВИЗУАЛИЗАЦИЯ СДЕЛОК`);
@@ -884,6 +914,7 @@ function generatePineScript(r) {
   lines.push(`                b_trade := box.new(bar_index, v_ep, bar_index, v_ep, bgcolor=c_neu, border_width=0)`);
   lines.push(``);
 
+  // ##PINE_TABLE##
   // ── TABLE ────────────────────────────────────────────────
   lines.push(`// ==========================================`);
   lines.push(`// 7. ТАБЛИЦА СТАТИСТИКИ`);
@@ -947,6 +978,7 @@ function generatePineScript(r) {
   lines.push(`        table.merge_cells(t, 0, 17, 5, 17)`);
   lines.push(``);
 
+  // ##PINE_ALERTS##
   // ── ALERTS ───────────────────────────────────────────────
   lines.push(`// ==========================================`);
   lines.push(`// 8. АЛЕРТЫ`);

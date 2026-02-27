@@ -724,6 +724,34 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
 </style>
 </head>
 <body>
+<!-- ============================================================
+     shell.html — ОГЛАВЛЕНИЕ
+     ============================================================
+     <style> CSS                                   line 7
+     <body>                                         line 726
+     HEADER                                         line 753
+     PANELS (настройки)                             line 758
+       ##SECTION_DATA##     — загрузка данных       line 760
+       ##SECTION_ENTRIES##  — сигналы входа         line 799
+       ##SECTION_SLTP##     — SL / TP               line 873
+       ##SECTION_EXIT##     — механика выхода       line 914
+       ##SECTION_FILTERS##  — фильтры (тренд/цена)  line 975
+       ##SECTION_VOLUME##   — фильтры объёма        line 1035
+     ##SECTION_CONTROLS##   — кнопки + прогресс     line 1137
+     ##SECTION_TPL##        — модал шаблонов        line 1138
+     ##SECTION_FAVBAR##     — избранное (панель)    line 1161
+     ##SECTION_TABLE##      — таблица результатов   line 1241
+     ##SECTION_DETAIL##     — детальная панель      line 1434
+     ##SECTION_PINE##       — модал Pine Script     line 1451
+     ##SECTION_ROBUST##     — модал робастности     line 1470
+     ##SECTION_HC##         — модал Hill Climbing   line 1512
+     ##SECTION_PARSE##      — модал парсинга текста line 1704
+     ##SECTION_OOSCMP##     — модал OOS-сравнения   line 1732
+     SCRIPTS (##PINE## / ##UI##)                    line 1724
+     ============================================================
+     ⚠️  Номера строк сдвигаются при правках — ориентируйся
+         на маркеры <!-- ##SECTION_NAME## --> а не на номера.
+     ============================================================ -->
 <div class="app">
 
 <header>
@@ -733,7 +761,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
 
 <div class="panels" id="panels">
 
-<!-- DATA -->
+<!-- ##SECTION_DATA## -->
 <div class="panel" style="flex:0.5;min-width:185px">
   <h3>📁 Данные</h3>
   <div id="drop" onclick="document.getElementById('fi').click()">
@@ -772,7 +800,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
   <div class="hint">от:до:шаг или a,b,c</div>
 </div>
 
-<!-- ENTRIES -->
+<!-- ##SECTION_ENTRIES## -->
 <div class="panel" style="min-width:200px">
   <h3>🎯 Паттерны входа</h3>
 
@@ -846,7 +874,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
   <div class="hint">Симметричный, восходящий или нисходящий. Сигнал при пробое.</div>
 </div>
 
-<!-- SL/TP -->
+<!-- ##SECTION_SLTP## -->
 <div class="panel" style="min-width:180px">
   <h3>🛑 Stop Loss</h3>
   <div class="cb"><input type="checkbox" id="s_atr" checked><label data-tip="SL на основе ATR: стоп = цена входа ± N×ATR. Адаптируется к волатильности рынка">SL ×ATR</label></div>
@@ -887,7 +915,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
   <div class="hint">И = выход только когда ОБА TP пробиты</div>
 </div>
 
-<!-- EXIT MECHANICS -->
+<!-- ##SECTION_EXIT## -->
 <div class="panel" style="min-width:175px">
   <h3>🚪 Механики выхода</h3>
 
@@ -948,7 +976,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
   <div class="cb" style="margin-left:16px"><input type="checkbox" id="x_partbe" checked><label data-tip="После частичного закрытия перевести оставшуюся часть в безубыток">BE после TP1</label></div>
 </div>
 
-<!-- FILTERS: TREND / PRICE -->
+<!-- ##SECTION_FILTERS## -->
 <div class="panel" style="min-width:195px">
   <h3>📊 Фильтры — Тренд</h3>
 
@@ -1008,7 +1036,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
   <div class="field"><label>Макс ATR/сред ×</label><input id="f_vfm" value="1.5,2.0" data-tip="Максимальное отношение текущего ATR к среднему ATR. ›2.0 = аномальная волатильность"></div>
 </div>
 
-<!-- VOLUME FILTERS -->
+<!-- ##SECTION_VOLUME## -->
 <div class="panel" style="min-width:175px">
   <h3>📦 Объём (Volume)</h3>
   <div id="vol-panel-status" class="vol-miss">⚠️ Загрузи CSV с колонкой Volume</div>
@@ -1110,7 +1138,8 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
   </div>
 </div>
 
-<!-- Templates modal -->
+<!-- ##SECTION_CONTROLS## ends above -->
+<!-- ##SECTION_TPL## -->
 <div class="tpl-overlay" id="tpl-overlay" onclick="if(event.target===this)closeTplModal()">
   <div class="tpl-modal">
     <h3>📂 Шаблоны настроек</h3>
@@ -1133,7 +1162,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
   </div>
 </div>
 
-<!-- Favourites bar (shows below btn-row when non-empty) -->
+<!-- ##SECTION_FAVBAR## -->
 <div class="fav-section" id="fav-section">
   <div class="fav-header" onclick="toggleFavBody()">
     <span class="fav-title">⭐ Избранное</span>
@@ -1213,6 +1242,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
     </label>
     <span id="oos-new-progress" style="color:var(--accent2)"></span>
   </div>
+<!-- ##SECTION_TABLE## -->
   <div class="tbl-mode-bar" id="tbl-mode-bar">
     <button class="tbl-mode-btn active" id="tbl-btn-results" onclick="switchTableMode('results')">Результаты <span id="tbl-cnt-results">0</span></button>
     <button class="tbl-mode-btn hc-mode" id="tbl-btn-hc" onclick="switchTableMode('hc')" style="display:none">Соседи <span id="tbl-cnt-hc">0</span></button>
@@ -1405,7 +1435,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
 
 </div><!-- app -->
 
-<!-- DETAIL PANEL -->
+<!-- ##SECTION_DETAIL## -->
 <div id="detail-overlay" id="btn-close-detail" onclick="closeDetail()"></div>
 <div id="detail-panel">
   <div class="dp-header">
@@ -1419,10 +1449,11 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
     <button class="dp-copy-btn" style="background:var(--bg4);border-color:var(--accent2);color:var(--accent2)" id="btn-open-robust-from-detail" onclick="openRobustModal()">🔬 Тест устойчивости</button>
     <button class="dp-copy-btn" style="background:var(--bg4);border-color:var(--green);color:var(--green)" id="btn-open-hc-from-detail" onclick="openHCModal('selected')">🧗 Поиск соседей</button>
     <button class="dp-copy-btn" style="background:var(--bg4);border-color:#c792ea;color:#c792ea" id="btn-pine-export" onclick="openPineModal()">🌲 Pine Script</button>
+    <button class="dp-copy-btn" style="background:var(--bg4);border-color:#ffcb6b;color:#ffcb6b" id="btn-open-heatmap" onclick="openHeatmapModal()">🗺️ Карта параметров</button>
   </div>
 </div>
 
-<!-- PINE SCRIPT MODAL -->
+<!-- ##SECTION_PINE## -->
 <div class="tpl-overlay" id="pine-overlay" onclick="if(event.target===this)closePineModal()">
   <div class="tpl-modal" style="max-width:780px;width:96%;max-height:90vh;display:flex;flex-direction:column;gap:0;padding:16px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-shrink:0">
@@ -1441,7 +1472,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
   </div>
 </div>
 
-<!-- ROBUST TEST MODAL -->
+<!-- ##SECTION_ROBUST## -->
 <div class="tpl-overlay" id="robust-overlay" onclick="if(event.target===this)closeRobustModal()">
   <div class="tpl-modal" style="max-width:580px;max-height:90vh;overflow:hidden;display:flex;flex-direction:column;gap:0;padding:16px">
     <h3 style="flex-shrink:0;margin-bottom:6px">🔬 Тест устойчивости</h3>
@@ -1483,7 +1514,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
 </div>
 
 
-<!-- HILL CLIMBING MODAL -->
+<!-- ##SECTION_HC## -->
 <div class="tpl-overlay" id="hc-overlay" onclick="if(event.target===this)closeHCModal()">
   <div class="tpl-modal" style="max-width:640px;max-height:92vh;overflow-y:auto">
     <h3>🧗 Поиск лучших соседних параметров</h3>
@@ -1675,7 +1706,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
   </div>
 </div>
 
-<!-- TEXT PARSE MODAL -->
+<!-- ##SECTION_PARSE## -->
 <div class="tpl-overlay" id="parse-overlay" onclick="if(event.target===this)closeParseModal()">
   <div class="tpl-modal" style="max-width:540px">
     <h3>📝 Настройка из текста</h3>
@@ -1703,7 +1734,7 @@ Pivot left=5 right=2
 /* ##UI## */
 </script>
 </script>
-<!-- OOS COMPARE MODAL: сравнение избранных на старых и новых данных -->
+<!-- ##SECTION_OOSCMP## -->
 <div class="tpl-overlay" id="oos-compare-overlay" onclick="if(event.target===this)document.getElementById('oos-compare-overlay').classList.remove('open')">
   <div class="tpl-modal" style="max-width:820px;max-height:90vh;overflow:hidden;display:flex;flex-direction:column;gap:0;padding:16px">
     <h3 style="flex-shrink:0;margin-bottom:6px">📊 OOS — сравнение на новых данных</h3>
@@ -1751,6 +1782,49 @@ const _SRC_FILES = {
   'build.py': 'IyEvdXNyL2Jpbi9lbnYgcHl0aG9uMwoiIiIKYnVpbGQucHkg4oCUINGB0L7QsdC40YDQsNC10YIgVVNFX09wdGltaXplcl92WF9YWC5odG1sINC40Lcg0YfQtdGC0YvRgNGR0YUg0YTQsNC50LvQvtCyLgrQmNGB0L/QvtC70YzQt9C+0LLQsNC90LjQtTogcHl0aG9uMyBidWlsZC5weSBbb3V0cHV0Lmh0bWxdCgogIHNoZWxsLmh0bWwgICh+MTcwMCDRgdGC0YDQvtC6KSDigJQgSFRNTCDRgNCw0LfQvNC10YLQutCwICsgQ1NTCiAgdWkuanMgICAgICAgKH40MzAwINGB0YLRgNC+0LopIOKAlCDQstC10YHRjCBVSSBKYXZhU2NyaXB0CiAgY29yZS5qcyAgICAgICh+NzQwINGB0YLRgNC+0LopIOKAlCDQuNC90LTQuNC60LDRgtC+0YDRiyArIGJhY2t0ZXN0IGVuZ2luZQogIG9wdC5qcyAgICAgICh+MTgwMCDRgdGC0YDQvtC6KSDigJQg0L7Qv9GC0LjQvNC40LfQsNGC0L7RgCArINGC0LXRgdGC0Ysg0YPRgdGC0L7QudGH0LjQstC+0YHRgtC4CgrQn9C+0YDRj9C00L7QuiDRgdCx0L7RgNC60Lg6CiAgMS4gb3B0LmpzICAg4oaSINGA0LDQt9GA0LXQt9Cw0LXQvCDQv9C+IFNFQ1RJT05fQS9CL0MvRAogIDIuIGNvcmUuanMgIOKGkiDRg9Cx0LjRgNCw0LXQvCDQt9Cw0LPQvtC70L7QstC+0LoKICAzLiB1aS5qcyAgICDihpIg0L/QvtC00YHRgtCw0LLQu9GP0LXQvCBPUFRfQSwgQ09SRSwgT1BUX0IsIE9QVF9DLCBPUFRfRAogIDQuIHNoZWxsLmh0bWwg4oaSINC/0L7QtNGB0YLQsNCy0LvRj9C10Lwg0LPQvtGC0L7QstGL0LkgdWkg0YfQtdGA0LXQtyAjI1VJIyMKIiIiCmltcG9ydCBzeXMsIG9zCgpvdXQgID0gc3lzLmFyZ3ZbMV0gaWYgbGVuKHN5cy5hcmd2KSA+IDEgZWxzZSAnVVNFX09wdGltaXplcl92Nl9idWlsdC5odG1sJwpiYXNlID0gb3MucGF0aC5kaXJuYW1lKG9zLnBhdGguYWJzcGF0aChfX2ZpbGVfXykpCgpzaGVsbCA9IG9wZW4ob3MucGF0aC5qb2luKGJhc2UsICdzaGVsbC5odG1sJyksIGVuY29kaW5nPSd1dGYtOCcpLnJlYWQoKQpjb3JlICA9IG9wZW4ob3MucGF0aC5qb2luKGJhc2UsICdjb3JlLmpzJyksICAgIGVuY29kaW5nPSd1dGYtOCcpLnJlYWQoKQpvcHQgICA9IG9wZW4ob3MucGF0aC5qb2luKGJhc2UsICdvcHQuanMnKSwgICAgIGVuY29kaW5nPSd1dGYtOCcpLnJlYWQoKQp1aSAgICA9IG9wZW4ob3MucGF0aC5qb2luKGJhc2UsICd1aS5qcycpLCAgICAgIGVuY29kaW5nPSd1dGYtOCcpLnJlYWQoKQoKIyDilIDilIAgb3B0LmpzOiDRgNCw0LfRgNC10LfQsNC10Lwg0L/QviDQvNCw0YDQutC10YDQsNC8INGB0LXQutGG0LjQuSDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIAKU0VDUyA9IFsnLy8gIyNTRUNUSU9OX0EjI1xuJywgJy8vICMjU0VDVElPTl9CIyNcbicsCiAgICAgICAgJy8vICMjU0VDVElPTl9DIyNcbicsICcvLyAjI1NFQ1RJT05fRCMjXG4nXQpmb3IgcyBpbiBTRUNTOgogICAgYXNzZXJ0IHMgaW4gb3B0LCBmIk1hcmtlciBub3QgZm91bmQgaW4gb3B0LmpzOiB7cyFyfSIKCmlfYSA9IG9wdC5pbmRleChTRUNTWzBdKSArIGxlbihTRUNTWzBdKQppX2IgPSBvcHQuaW5kZXgoU0VDU1sxXSkKaV9jID0gb3B0LmluZGV4KFNFQ1NbMl0pCmlfZCA9IG9wdC5pbmRleChTRUNTWzNdKQoKb3B0X0EgPSBvcHRbaV9hICAgICAgICAgICAgICA6IGlfYiAgICAgICAgICAgIF0ucnN0cmlwKCdcbicpCm9wdF9CID0gb3B0W2lfYitsZW4oU0VDU1sxXSkgOiBpX2MgICAgICAgICAgICBdLnJzdHJpcCgnXG4nKQpvcHRfQyA9IG9wdFtpX2MrbGVuKFNFQ1NbMl0pIDogaV9kICAgICAgICAgICAgXS5yc3RyaXAoJ1xuJykKb3B0X0QgPSBvcHRbaV9kK2xlbihTRUNTWzNdKSA6ICAgICAgICAgICAgICAgIF0ucnN0cmlwKCdcbicpCgojIOKUgOKUgCBjb3JlLmpzOiDQvtGC0YDQtdC30LDQtdC8INC30LDQs9C+0LvQvtCy0L7Quiwg0LHQtdGA0ZHQvCDRgtC+0LvRjNC60L4g0LrQvtC0IOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgApIRFJfRU5EID0gJy8vID09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PVxuXG4nCmFzc2VydCBIRFJfRU5EIGluIGNvcmUsICJIZWFkZXIgZW5kIG1hcmtlciBub3QgZm91bmQgaW4gY29yZS5qcyIKY29yZV9jb2RlID0gY29yZVtjb3JlLnJpbmRleChIRFJfRU5EKSArIGxlbihIRFJfRU5EKTpdLnJzdHJpcCgnXG4nKSArICdcbicKCiMg4pSA4pSAINCo0LDQsyAxOiDQv9C+0LTRgdGC0LDQstC70Y/QtdC8INGB0LXQutGG0LjQuCBvcHQvY29yZSDQsiB1aS5qcyDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIAKdWlfYnVpbHQgPSB1aQpmb3IgcGgsIGNvbnRlbnQgaW4gWwogICAgKCcvKiAjI09QVF9BIyMgKi8nLCBvcHRfQSksCiAgICAoJy8qICMjQ09SRSMjICovJywgIGNvcmVfY29kZSksCiAgICAoJy8qICMjT1BUX0IjIyAqLycsIG9wdF9CKSwKICAgICgnLyogIyNPUFRfQyMjICovJywgb3B0X0MpLAogICAgKCcvKiAjI09QVF9EIyMgKi8nLCBvcHRfRCksCl06CiAgICBhc3NlcnQgcGggaW4gdWlfYnVpbHQsIGYiUGxhY2Vob2xkZXIgbm90IGZvdW5kIGluIHVpLmpzOiB7cGghcn0iCiAgICB1aV9idWlsdCA9IHVpX2J1aWx0LnJlcGxhY2UocGgsIGNvbnRlbnQsIDEpCgojIOKUgOKUgCDQqNCw0LMgMjog0L/QvtC00YHRgtCw0LLQu9GP0LXQvCDQs9C+0YLQvtCy0YvQuSB1aSDQsiBzaGVsbCDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIAKYXNzZXJ0ICcvKiAjI1VJIyMgKi8nIGluIHNoZWxsLCAiUGxhY2Vob2xkZXIgIyNVSSMjIG5vdCBmb3VuZCBpbiBzaGVsbC5odG1sIgpyZXN1bHQgPSBzaGVsbC5yZXBsYWNlKCcvKiAjI1VJIyMgKi8nLCB1aV9idWlsdCwgMSkKCm9wZW4ob3V0LCAndycsIGVuY29kaW5nPSd1dGYtOCcpLndyaXRlKHJlc3VsdCkKcHJpbnQoZiLinIUgIHtvdXR9ICAoe2xlbihyZXN1bHQuc3BsaXRsaW5lcygpKX0g0YHRgtGA0L7QuikiKQo='
 };
 </script>
+
+<!-- ##SECTION_HEATMAP## -->
+<!-- ОТКАТ: удалить этот блок + кнопку btn-open-heatmap из ##SECTION_DETAIL## + секцию ##UI_HEATMAP## из ui.js -->
+<div class="tpl-overlay" id="heatmap-overlay" onclick="if(event.target===this)closeHeatmapModal()">
+  <div class="tpl-modal" style="max-width:680px;width:96%;max-height:92vh;overflow:hidden;display:flex;flex-direction:column;gap:0;padding:16px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-shrink:0">
+      <h3 style="margin:0;color:#ffcb6b">🗺️ Тепловая карта параметров</h3>
+      <button class="dp-close" onclick="closeHeatmapModal()" style="position:static">✕</button>
+    </div>
+    <div style="flex-shrink:0;display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px;font-size:.75em">
+      <label style="display:flex;align-items:center;gap:4px;color:var(--text3)">Ось X:
+        <select id="hm-x-param" style="background:var(--bg4);color:var(--text1);border:1px solid var(--border);border-radius:4px;padding:2px 6px"></select>
+      </label>
+      <label style="display:flex;align-items:center;gap:4px;color:var(--text3)">Ось Y:
+        <select id="hm-y-param" style="background:var(--bg4);color:var(--text1);border:1px solid var(--border);border-radius:4px;padding:2px 6px"></select>
+      </label>
+      <label style="display:flex;align-items:center;gap:4px;color:var(--text3)">±шагов:
+        <select id="hm-steps" style="background:var(--bg4);color:var(--text1);border:1px solid var(--border);border-radius:4px;padding:2px 6px">
+          <option value="2">2 → 5×5</option>
+          <option value="3" selected>3 → 7×7</option>
+          <option value="4">4 → 9×9</option>
+        </select>
+      </label>
+      <label style="display:flex;align-items:center;gap:4px;color:var(--text3)">Метрика:
+        <select id="hm-metric" style="background:var(--bg4);color:var(--text1);border:1px solid var(--border);border-radius:4px;padding:2px 6px">
+          <option value="pnl">PnL %</option>
+          <option value="pdd">P/DD</option>
+          <option value="wr">Win Rate %</option>
+          <option value="dd">MaxDD % (↓ меньше)</option>
+          <option value="n">Сделок</option>
+        </select>
+      </label>
+      <button id="hm-run-btn" onclick="runHeatmap()" style="background:var(--bg4);border:1px solid #ffcb6b;color:#ffcb6b;border-radius:4px;padding:3px 12px;cursor:pointer;font-size:.9em">▶ Запустить</button>
+      <span id="hm-status" style="color:var(--text3);font-size:.85em"></span>
+    </div>
+    <div id="hm-canvas-wrap" style="overflow:auto;flex:1;min-height:160px;display:flex;align-items:flex-start;justify-content:center;padding:4px 0">
+      <canvas id="hm-canvas" style="display:block"></canvas>
+    </div>
+    <div style="flex-shrink:0;font-size:.6em;color:var(--text3);margin-top:6px">
+      Белая рамка = текущие значения стратегии. Зелёный = лучше, красный = хуже (в рамках сетки). Первый запуск медленнее — результаты кэшируются.
+    </div>
+  </div>
+</div>
 
 </body>
 </html>
