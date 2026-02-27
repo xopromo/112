@@ -10759,6 +10759,7 @@ switchTableMode = function(mode) {
 // ── Рендер WFO-таблицы ────────────────────────────────────────
 let _wfoSortKey = 'wfoScore';
 let _wfoSortDir = -1; // -1 = убывание
+let _wfoVisibleResults = []; // отфильтрованные/отсортированные строки (для клика)
 
 function _wfoDoSort(key) {
   if (_wfoSortKey === key) _wfoSortDir *= -1;
@@ -10815,8 +10816,11 @@ function renderWfoTable() {
     th.style.color = isActive ? 'var(--accent)' : '';
   });
 
+  _wfoVisibleResults = filtered; // сохраняем для обработчиков кликов
+
   let html = '';
-  for (const r of filtered) {
+  for (let i = 0; i < filtered.length; i++) {
+    const r   = filtered[i];
     const sc    = r.wfoScore >= 70 ? 'pos' : r.wfoScore >= 50 ? 'warn' : 'neg';
     const effP  = Math.round(r.wfoEff * 100);
     const effSc = effP >= 60 ? 'pos' : effP >= 30 ? 'warn' : 'neg';
@@ -10828,12 +10832,12 @@ function renderWfoTable() {
       const h = Math.min(16, Math.abs(p) * 0.8 + 2);
       return `<span style="display:inline-block;width:5px;height:${h}px;background:${cl};margin:0 1px;vertical-align:middle;border-radius:1px" title="OOS: ${p.toFixed(1)}%"></span>`;
     }).join('');
-    const winTip = (r.windows || []).map((w, i) => {
+    const winTip = (r.windows || []).map((w, j) => {
       const is  = w.is  ? `IS: ${w.is.pnl.toFixed(1)}% WR${w.is.wr.toFixed(0)}%`  : 'IS: нет';
       const oos = w.oos ? `OOS: ${w.oos.pnl.toFixed(1)}% WR${w.oos.wr.toFixed(0)}%` : 'OOS: нет';
-      return `Окно ${i+1}: ${is} | ${oos}`;
+      return `Окно ${j+1}: ${is} | ${oos}`;
     }).join('&#10;');
-    html += `<tr>
+    html += `<tr data-i="${i}" style="cursor:pointer" title="Клик — equity-график | Двойной клик — детали">
       <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.65em" title="${r.name}">${r.name}</td>
       <td class="${sc}" style="text-align:center;font-weight:600">${r.wfoScore}%</td>
       <td class="${avgSc}" style="text-align:right">${avgP >= 0 ? '+' : ''}${avgP.toFixed(1)}%</td>
@@ -10845,6 +10849,29 @@ function renderWfoTable() {
     </tr>`;
   }
   tbody.innerHTML = html || '<tr><td colspan="8" style="text-align:center;color:var(--text3);padding:12px">Нет совпадений с фильтрами</td></tr>';
+
+  // ── Делегированные обработчики кликов ───────────────────────
+  tbody.onclick = function(e) {
+    const tr = e.target.closest('tr[data-i]');
+    if (!tr) return;
+    const idx = +tr.dataset.i;
+    const r = _wfoVisibleResults[idx];
+    if (!r) return;
+    // Снимаем предыдущее выделение в WFO и основной таблице
+    document.querySelectorAll('#wfo-tbody tr.sel').forEach(el => el.classList.remove('sel'));
+    tr.classList.add('sel');
+    // Показываем equity-график (та же канва, что в основной таблице)
+    const eqc = document.getElementById('eqc');
+    if (eqc) { eqc.style.display = ''; }
+    drawEquityForResult(r);
+  };
+  tbody.ondblclick = function(e) {
+    const tr = e.target.closest('tr[data-i]');
+    if (!tr) return;
+    const r = _wfoVisibleResults[+tr.dataset.i];
+    if (!r) return;
+    showDetail(r);
+  };
 
   // Сводка
   const allScores = data.map(r => r.wfoScore);
