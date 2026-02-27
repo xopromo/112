@@ -1376,14 +1376,32 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
     <table id="wfo-tbl">
       <thead>
         <tr>
-          <th style="min-width:180px;text-align:left">Стратегия</th>
-          <th title="% окон где OOS прибылен" style="min-width:70px">Consistency%</th>
-          <th title="Средний OOS PnL по всем окнам" style="min-width:70px">Avg OOS%</th>
-          <th title="Avg OOS / |Avg IS| — насколько OOS повторяет IS" style="min-width:60px">Efficiency</th>
-          <th title="Стандартное отклонение OOS PnL (меньше = стабильнее)" style="min-width:55px">Volatility</th>
-          <th title="IS PnL (на полных данных)" style="min-width:55px">IS PnL%</th>
-          <th title="IS WinRate" style="min-width:48px">IS WR%</th>
-          <th title="Спарклайн по OOS окнам" style="min-width:80px">OOS окна</th>
+          <th class="wfo-th-sort" data-key="name" data-label="Стратегия"
+              onclick="_wfoDoSort('name')" style="min-width:180px;text-align:left;cursor:pointer">Стратегия ↕</th>
+          <th class="wfo-th-sort" data-key="wfoScore" data-label="Consist%"
+              onclick="_wfoDoSort('wfoScore')" title="% окон где OOS прибылен. Главная метрика." style="min-width:70px;cursor:pointer">Consist% ▼</th>
+          <th class="wfo-th-sort" data-key="wfoAvgOOS" data-label="Avg OOS%"
+              onclick="_wfoDoSort('wfoAvgOOS')" title="Средний OOS PnL по всем окнам" style="min-width:70px;cursor:pointer">Avg OOS% ↕</th>
+          <th class="wfo-th-sort" data-key="wfoEff" data-label="Efficiency"
+              onclick="_wfoDoSort('wfoEff')" title="Avg OOS / |Avg IS| — насколько OOS повторяет IS" style="min-width:65px;cursor:pointer">Efficiency ↕</th>
+          <th class="wfo-th-sort" data-key="wfoStab" data-label="Volatility"
+              onclick="_wfoDoSort('wfoStab')" title="Стд.отклонение OOS PnL. Меньше = стабильнее." style="min-width:58px;cursor:pointer">Volatility ↕</th>
+          <th class="wfo-th-sort" data-key="pnl" data-label="IS PnL%"
+              onclick="_wfoDoSort('pnl')" title="IS PnL (на полных данных)" style="min-width:55px;cursor:pointer">IS PnL% ↕</th>
+          <th class="wfo-th-sort" data-key="wr" data-label="IS WR%"
+              onclick="_wfoDoSort('wr')" title="IS WinRate" style="min-width:48px;cursor:pointer">IS WR% ↕</th>
+          <th style="min-width:80px" title="Спарклайн OOS по окнам. Наведи для деталей.">OOS окна</th>
+        </tr>
+        <tr style="background:var(--bg2)">
+          <td style="padding:1px 3px"><input id="wff_name" placeholder="поиск…" oninput="_wfoApplyAndRender()"
+            style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border2);border-radius:3px;color:var(--text);font-size:.65em;padding:1px 4px;font-family:var(--font-mono)"></td>
+          <td style="padding:1px 2px"><input id="wff_cons" type="number" placeholder="≥%" oninput="_wfoApplyAndRender()"
+            style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border2);border-radius:3px;color:var(--text);font-size:.65em;padding:1px 3px"></td>
+          <td style="padding:1px 2px"><input id="wff_avg" type="number" placeholder="≥%" oninput="_wfoApplyAndRender()"
+            style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border2);border-radius:3px;color:var(--text);font-size:.65em;padding:1px 3px"></td>
+          <td style="padding:1px 2px"><input id="wff_eff" type="number" placeholder="≥%" oninput="_wfoApplyAndRender()"
+            style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border2);border-radius:3px;color:var(--text);font-size:.65em;padding:1px 3px"></td>
+          <td colspan="4"></td>
         </tr>
       </thead>
       <tbody id="wfo-tbody">

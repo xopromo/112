@@ -4731,39 +4731,82 @@ switchTableMode = function(mode) {
 };
 
 // ── Рендер WFO-таблицы ────────────────────────────────────────
+let _wfoSortKey = 'wfoScore';
+let _wfoSortDir = -1; // -1 = убывание
+
+function _wfoDoSort(key) {
+  if (_wfoSortKey === key) _wfoSortDir *= -1;
+  else { _wfoSortKey = key; _wfoSortDir = -1; }
+  renderWfoTable();
+}
+
+function _wfoApplyAndRender() { renderWfoTable(); }
+
 function renderWfoTable() {
   const tbody = document.getElementById('wfo-tbody');
   if (!tbody) return;
   const data = (typeof _wfoResults !== 'undefined') ? _wfoResults : [];
   if (!data.length) {
     tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text3);padding:20px">Нет данных. Запусти WFO тест.</td></tr>';
+    // Обновляем иконки сортировки
+    document.querySelectorAll('.wfo-th-sort').forEach(th => th.textContent = th.dataset.label + ' ↕');
     return;
   }
-  // Сортируем по Consistency% убыванию
-  const sorted = [...data].sort((a, b) => (b.wfoScore - a.wfoScore) || (b.wfoAvgOOS - a.wfoAvgOOS));
+
+  // Читаем фильтры
+  const fName = (document.getElementById('wff_name')?.value || '').trim().toLowerCase();
+  const fCons = parseFloat(document.getElementById('wff_cons')?.value);
+  const fAvg  = parseFloat(document.getElementById('wff_avg')?.value);
+  const fEff  = parseFloat(document.getElementById('wff_eff')?.value);
+
+  let filtered = data.filter(r => {
+    if (fName && !r.name.toLowerCase().includes(fName)) return false;
+    if (!isNaN(fCons) && r.wfoScore < fCons) return false;
+    if (!isNaN(fAvg)  && r.wfoAvgOOS < fAvg) return false;
+    if (!isNaN(fEff)  && Math.round(r.wfoEff * 100) < fEff) return false;
+    return true;
+  });
+
+  // Сортировка
+  const k = _wfoSortKey, d = _wfoSortDir;
+  filtered.sort((a, b) => {
+    let av, bv;
+    if (k === 'wfoScore')  { av = a.wfoScore;           bv = b.wfoScore; }
+    else if (k === 'wfoAvgOOS') { av = a.wfoAvgOOS;    bv = b.wfoAvgOOS; }
+    else if (k === 'wfoEff')    { av = a.wfoEff;        bv = b.wfoEff; }
+    else if (k === 'wfoStab')   { av = a.wfoStab;       bv = b.wfoStab; }
+    else if (k === 'pnl')       { av = a.pnl;           bv = b.pnl; }
+    else if (k === 'wr')        { av = a.wr;            bv = b.wr; }
+    else if (k === 'name')      { return d * a.name.localeCompare(b.name); }
+    else { av = a.wfoScore; bv = b.wfoScore; }
+    return d * (av - bv);
+  });
+
+  // Обновляем иконки сортировки в заголовках
+  document.querySelectorAll('.wfo-th-sort').forEach(th => {
+    const isActive = th.dataset.key === k;
+    th.textContent = th.dataset.label + (isActive ? (d === -1 ? ' ▼' : ' ▲') : ' ↕');
+    th.style.color = isActive ? 'var(--accent)' : '';
+  });
+
   let html = '';
-  for (const r of sorted) {
+  for (const r of filtered) {
     const sc    = r.wfoScore >= 70 ? 'pos' : r.wfoScore >= 50 ? 'warn' : 'neg';
     const effP  = Math.round(r.wfoEff * 100);
     const effSc = effP >= 60 ? 'pos' : effP >= 30 ? 'warn' : 'neg';
     const avgP  = r.wfoAvgOOS;
     const avgSc = avgP > 0 ? 'pos' : avgP > -5 ? 'warn' : 'neg';
-    // Спарклайн по OOS PnL окон
     const winBars = (r.windows || []).map(w => {
       const p = w.oos?.pnl ?? 0;
       const cl = p > 0 ? '#00e676' : '#ff3d57';
       const h = Math.min(16, Math.abs(p) * 0.8 + 2);
-      const bot = p > 0 ? 0 : 0;
       return `<span style="display:inline-block;width:5px;height:${h}px;background:${cl};margin:0 1px;vertical-align:middle;border-radius:1px" title="OOS: ${p.toFixed(1)}%"></span>`;
     }).join('');
-
-    // Детальный тултип по окнам
     const winTip = (r.windows || []).map((w, i) => {
       const is  = w.is  ? `IS: ${w.is.pnl.toFixed(1)}% WR${w.is.wr.toFixed(0)}%`  : 'IS: нет';
       const oos = w.oos ? `OOS: ${w.oos.pnl.toFixed(1)}% WR${w.oos.wr.toFixed(0)}%` : 'OOS: нет';
       return `Окно ${i+1}: ${is} | ${oos}`;
     }).join('&#10;');
-
     html += `<tr>
       <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.65em" title="${r.name}">${r.name}</td>
       <td class="${sc}" style="text-align:center;font-weight:600">${r.wfoScore}%</td>
@@ -4775,14 +4818,14 @@ function renderWfoTable() {
       <td title="${winTip}" style="white-space:nowrap">${winBars}</td>
     </tr>`;
   }
-  tbody.innerHTML = html;
+  tbody.innerHTML = html || '<tr><td colspan="8" style="text-align:center;color:var(--text3);padding:12px">Нет совпадений с фильтрами</td></tr>';
 
-  // Обновляем сводные метрики
+  // Сводка
   const allScores = data.map(r => r.wfoScore);
   const avgCons = allScores.length ? (allScores.reduce((a,b)=>a+b,0)/allScores.length).toFixed(0) : '—';
-  const top3 = sorted.slice(0, 3).map(r => `${r.name.slice(0,20)}… (${r.wfoScore}%)`).join(', ');
+  const top3 = [...data].sort((a,b)=>b.wfoScore-a.wfoScore).slice(0,3).map(r=>`${r.name.slice(0,20)}… (${r.wfoScore}%)`).join(', ');
   const sumEl = document.getElementById('wfo-summary');
-  if (sumEl) sumEl.textContent = `${data.length} стратегий | Ср.Consistency: ${avgCons}% | Топ: ${top3}`;
+  if (sumEl) sumEl.textContent = `${data.length} стратегий (${filtered.length} видимых) | Ср.Consistency: ${avgCons}% | Топ: ${top3}`;
 }
 
 // ── Обновляем _updateTableModeCounts чтобы учитывать WFO ─────
