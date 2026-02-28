@@ -31,6 +31,23 @@ function _calcStatSig(r) {
 }
 // ─────────────────────────────────────────────────────────────
 
+// ── GT-Score (Hyp 1) ──────────────────────────────────────────
+// Антиовефиттинг метрика: (pnl/dd) × sig_mult × consistency_mult
+// sig_mult     = 1 + clamp(z, 0, 3) × 0.3   [1.0 .. 1.9]
+// consistMult  = 0.5 + clamp(1-dwr/100,0,1) × 0.5  [0.5 .. 1.0]
+function _calcGTScore(r) {
+  if (!r || r.n < 1) return -2;
+  const pdd = r.dd > 0 ? r.pnl / r.dd : (r.pnl > 0 ? 50 : -2);
+  if (pdd <= 0) return Math.max(-2, pdd);
+  const z = (r.wr - 50) / Math.sqrt(2500 / Math.max(r.n, 1));
+  const sigMult = 1 + Math.min(Math.max(z, 0), 3) * 0.3;
+  const dwr = r.dwr !== undefined ? r.dwr : 0;
+  const consistMult = 0.5 + Math.min(Math.max(1 - dwr / 100, 0), 1) * 0.5;
+  return pdd * sigMult * consistMult;
+}
+// ─────────────────────────────────────────────────────────────
+
+
 // ##SECTION_A##
 // RANGE PARSER
 // ============================================================
@@ -949,6 +966,7 @@ async function runOpt() {
       if (r && r.n >= minTrades && r.dd <= maxDD) {
         const pdd = r.dd>0 ? r.pnl/r.dd : 0;
         const sig = _calcStatSig(r);
+        const gt = _calcGTScore(r);
         let slDesc = slPair.combo ? `SL(ATR×${slPair.a.m}${slLogic==='or'?'|OR|':'|AND|'}${slPair.p.m}%)` : slPair.a ? `SL×${slPair.a.m}ATR` : `SL${slPair.p.m}%`;
         let tpDesc = tpPair.combo ? (()=>{const n1=tpPair.a.type==='rr'?`RR${tpPair.a.m}`:tpPair.a.type==='atr'?`TP×${tpPair.a.m}ATR`:`TP${tpPair.a.m}%`;const n2=tpPair.b.type==='rr'?`RR${tpPair.b.m}`:tpPair.b.type==='atr'?`TP×${tpPair.b.m}ATR`:`TP${tpPair.b.m}%`;return `TP(${n1}${tpLogic==='or'?'|OR|':'|AND|'}${n2})`;})() : tpPair.a ? (tpPair.a.type==='rr'?`RR×${tpPair.a.m}`:tpPair.a.type==='atr'?`TP×${tpPair.a.m}ATR`:`TP${tpPair.a.m}%`) : '';
         const name = buildName(btCfg, pvL, pvR, slDesc, tpDesc, {}, {maP, maType:_mType, stw:sTrendWin, atrP, adxL});
@@ -983,7 +1001,7 @@ async function runOpt() {
               useFat,fatConsec,fatVolDrop,
               atrPeriod:atrP,commission:commTotal,baseComm:comm,spreadVal:spread*2,
               revSkip,revCooldown,revSrc};
-          results.push({name,pnl:r.pnl,wr:r.wr,n:r.n,dd:r.dd,pdd,avg:r.avg,sig,
+          results.push({name,pnl:r.pnl,wr:r.wr,n:r.n,dd:r.dd,pdd,avg:r.avg,sig,gt,
             p1:r.p1,p2:r.p2,dwr:r.dwr,c1:r.c1,c2:r.c2,nL:r.nL||0,pL:r.pL||0,wrL:r.wrL,nS:r.nS||0,pS:r.pS||0,wrS:r.wrS,dwrLS:r.dwrLS,
             cfg:_cfg});
           equities[name] = r.eq;
@@ -1150,6 +1168,7 @@ async function runOpt() {
       }
       const pdd = (r && r.dd > 0) ? r.pnl/r.dd : (r && r.pnl > 0 ? 50 : 0);
       const sig = _calcStatSig(r);
+      const gt = _calcGTScore(r);
 
       if (r && r.n >= minTrades && r.dd <= maxDD) {
         let slDesc = slPair.combo ? `SL(ATR×${slPair.a.m}${slLogic==='or'?'|OR|':'|AND|'}${slPair.p.m}%)` : slPair.a ? `SL×${slPair.a.m}ATR` : `SL${slPair.p.m}%`;
@@ -1187,7 +1206,7 @@ async function runOpt() {
               atrPeriod:atrP,commission:commTotal,baseComm:comm,spreadVal:spread*2};
           // OOS НЕ вызываем здесь — это горячий цикл (миллионы итераций)
           // _attachOOS будет вызван батчем после завершения TPE
-          results.push({name,pnl:r.pnl,wr:r.wr,n:r.n,dd:r.dd,pdd,avg:r.avg,sig,
+          results.push({name,pnl:r.pnl,wr:r.wr,n:r.n,dd:r.dd,pdd,avg:r.avg,sig,gt,
             p1:r.p1,p2:r.p2,dwr:r.dwr,c1:r.c1,c2:r.c2,nL:r.nL||0,pL:r.pL||0,wrL:r.wrL,nS:r.nS||0,pS:r.pS||0,wrS:r.wrS,dwrLS:r.dwrLS,
             cfg:_cfg_tpe});
           equities[name] = r.eq;
@@ -1489,6 +1508,7 @@ async function runOpt() {
                                     if(r && r.n>=minTrades && r.dd<=maxDD) {
                                       const pdd=r.dd>0?r.pnl/r.dd:0;
                                       const sig=_calcStatSig(r);
+                                      const gt=_calcGTScore(r);
                                       // Build SL description
                                       let slDesc='';
                                       if(slPair.combo) {
@@ -1549,7 +1569,7 @@ async function runOpt() {
                                           useFat, fatConsec, fatVolDrop,
                                           atrPeriod:atrP, commission:commTotal, baseComm:comm, spreadVal:spread*2
                                         };
-                                      results.push({name,pnl:r.pnl,wr:r.wr,n:r.n,dd:r.dd,pdd,avg:r.avg,sig,
+                                      results.push({name,pnl:r.pnl,wr:r.wr,n:r.n,dd:r.dd,pdd,avg:r.avg,sig,gt,
                                         p1:r.p1,p2:r.p2,dwr:r.dwr,c1:r.c1,c2:r.c2,nL:r.nL||0,pL:r.pL||0,wrL:r.wrL,nS:r.nS||0,pS:r.pS||0,wrS:r.wrS,dwrLS:r.dwrLS,
                                         cfg:_cfg_ex});
                                       equities[name]=r.eq;
