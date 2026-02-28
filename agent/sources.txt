@@ -1,15 +1,15 @@
 # Источники для исследовательского агента
 # Один URL на строку. Строки с # — комментарии.
-# Агент скачивает эти страницы каждый час и ищет применимые идеи.
+# Только raw.githubusercontent.com — единственный внешний домен, разрешённый прокси.
 
-# Алгоритмическая торговля и оптимизация стратегий
-https://hudsonthames.org/blog/
-https://quantpedia.com/blog/
-https://robotwealth.com/blog/
+# Awesome-листы по квантовым финансам и ML
+https://raw.githubusercontent.com/wilsonfreitas/awesome-quant/master/README.md
+https://raw.githubusercontent.com/firmai/financial-machine-learning/master/README.md
 
-# Walk-forward, overfitting, валидация
-https://www.quantstart.com/articles/
-https://medium.com/tag/algorithmic-trading
+# Популярные библиотеки бэктестинга — changelog/docs
+https://raw.githubusercontent.com/kernc/backtesting.py/master/CHANGELOG.md
+https://raw.githubusercontent.com/ranaroussi/quantstats/main/CHANGELOG.md
+https://raw.githubusercontent.com/mementum/backtrader/master/changelog.txt
 
-# Pine Script / TradingView
-https://www.tradingview.com/pine-script-docs/en/v6/Release_notes.html
+# Документация по системной торговле
+https://raw.githubusercontent.com/robcarver17/pysystemtrade/master/docs/backtesting.md

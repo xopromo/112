@@ -2,10 +2,10 @@
 # =============================================================================
 # research_pipeline.sh — Главный pipeline исследовательского агента
 #
-# Три уровня:
-#   1. Groq (llama-3.3-70b) — скачивает, суммирует, фильтрует
-#   2. Claude Haiku (~$0.01) — выбирает гипотезы, пишет план
-#   3. Claude Sonnet (~$0.10) — реализует код, коммитит в ветку
+# Три уровня (все через claude CLI — api.groq.com заблокирован прокси):
+#   1. Claude Haiku — скачивает raw.githubusercontent.com, суммирует, фильтрует
+#   2. Claude Haiku — выбирает гипотезы, пишет план
+#   3. Claude Sonnet — реализует код, коммитит в ветку
 #
 # Запуск: bash research_pipeline.sh [--dry-run]
 # =============================================================================
@@ -29,11 +29,7 @@ REPORT_FILE="$REPORTS_DIR/${DATE_COMPACT}.md"
 LOG_FILE="/tmp/research_pipeline_${TIMESTAMP}.log"
 DRY_RUN="${1:-}"
 
-# Ключи ищем в /home/user/ (рабочая директория), потом в $HOME
-GROQ_KEY_FILE="/home/user/.groq_key"
-[[ ! -f "$GROQ_KEY_FILE" ]] && GROQ_KEY_FILE="${HOME}/.groq_key"
-ANTHROPIC_KEY_FILE="/home/user/.anthropic_key"
-[[ ! -f "$ANTHROPIC_KEY_FILE" ]] && ANTHROPIC_KEY_FILE="${HOME}/.anthropic_key"
+CLAUDE_BIN="${CLAUDE_BIN:-claude}"
 
 mkdir -p "$REPORTS_DIR"
 
@@ -54,17 +50,10 @@ update_state() {
 }
 
 # --- Проверки ---
-if [[ ! -f "$GROQ_KEY_FILE" ]]; then
-  log "ERROR: $GROQ_KEY_FILE not found. Создай файл с Groq API ключом."
-  exit 1
-fi
-
-ANTHROPIC_KEY="${ANTHROPIC_API_KEY:-}"
-if [[ -z "$ANTHROPIC_KEY" && -f "$ANTHROPIC_KEY_FILE" ]]; then
-  ANTHROPIC_KEY=$(cat "$ANTHROPIC_KEY_FILE" | tr -d '[:space:]')
-fi
-if [[ -z "$ANTHROPIC_KEY" ]]; then
-  log "ERROR: Anthropic API key не найден. Установи ANTHROPIC_API_KEY или создай ~/.anthropic_key"
+# Все LLM-вызовы идут через claude CLI (подписка), API-ключ не нужен.
+# groq_helper.sh также использует claude CLI вместо Groq (Groq заблокирован прокси).
+if ! command -v claude &>/dev/null; then
+  log "ERROR: claude CLI не найден. Установи: npm install -g @anthropic-ai/claude-code"
   exit 1
 fi
 
@@ -191,20 +180,9 @@ $DIGEST_CONTENT
 3. [конкретный шаг]
 **Почему сейчас:** [1 предложение]"
 
-# Вызов Haiku через Anthropic API
-HAIKU_RESPONSE=$(curl -s "https://api.anthropic.com/v1/messages" \
-  -H "x-api-key: $ANTHROPIC_KEY" \
-  -H "anthropic-version: 2023-06-01" \
-  -H "content-type: application/json" \
-  -d "$(jq -n \
-    --arg model "claude-haiku-4-5-20251001" \
-    --arg prompt "$HAIKU_PROMPT" \
-    '{
-      model: $model,
-      max_tokens: 1024,
-      messages: [{role: "user", content: $prompt}]
-    }')" \
-  | jq -r '.content[0].text // "ERROR: " + .error.message')
+# Вызов Haiku через claude CLI (подписка, не требует отдельного API-ключа)
+HAIKU_RESPONSE=$(claude --model claude-haiku-4-5-20251001 -p "$HAIKU_PROMPT" 2>/dev/null \
+  || echo "ERROR: claude CLI недоступен")
 
 echo "$HAIKU_RESPONSE" > "$PLAN_FILE"
 log "План сохранён: $PLAN_FILE"
@@ -270,32 +248,12 @@ $PINE_JS_HEAD
 После реализации: git add -A && git commit -m 'feat: [название] (Hyp N)'
 Ветка: $BRANCH_NAME"
 
-# Запускаем Sonnet через claude CLI
-if command -v claude &>/dev/null; then
-  log "Запускаю Claude Sonnet через CLI..."
-  echo "$SONNET_PROMPT" | claude --model claude-sonnet-4-6 -p - \
-    --allowedTools "Read,Edit,Write,Bash" \
-    --add-dir "$REPO_DIR" \
-    2>&1 | tee -a "$LOG_FILE"
-else
-  log "WARNING: claude CLI не найден. Запускаю через API напрямую..."
-  # Fallback: прямой API вызов (без файловых инструментов)
-  SONNET_RESPONSE=$(curl -s "https://api.anthropic.com/v1/messages" \
-    -H "x-api-key: $ANTHROPIC_KEY" \
-    -H "anthropic-version: 2023-06-01" \
-    -H "content-type: application/json" \
-    -d "$(jq -n \
-      --arg model "claude-sonnet-4-6" \
-      --arg prompt "$SONNET_PROMPT" \
-      '{
-        model: $model,
-        max_tokens: 4096,
-        messages: [{role: "user", content: $prompt}]
-      }')" \
-    | jq -r '.content[0].text')
-  echo "$SONNET_RESPONSE" > "$REPORT_FILE"
-  log "Sonnet ответ сохранён в $REPORT_FILE"
-fi
+# Запускаем Sonnet через claude CLI (требует подписки, работает в cron вне Claude Code)
+log "Запускаю Claude Sonnet через CLI..."
+claude --model claude-sonnet-4-6 \
+  -p "$SONNET_PROMPT" \
+  --allowedTools "Read,Edit,Write,Bash" \
+  2>&1 | tee -a "$LOG_FILE"
 
 # Коммитим отчёт и изменения
 git add -A

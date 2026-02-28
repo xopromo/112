@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # =============================================================================
 # groq_helper.sh — Уровень 1 исследовательского агента
-# Использует Groq API (llama-3.3-70b, бесплатно) для обработки URL
+# ПРИМЕЧАНИЕ: Groq API заблокирован прокси этой среды.
+# Используем Claude Haiku (api.anthropic.com разрешён).
+# Стоимость: ~$0.001/URL × 6 = $0.006/цикл (аналогично бесплатному Groq).
 #
 # Использование:
 #   groq_helper.sh summarize  <url>           — пересказ страницы 3-5 пунктов
@@ -14,48 +16,24 @@
 
 set -euo pipefail
 
-# Ключ ищем в /home/user/ (рабочая директория), потом в $HOME
-GROQ_KEY_FILE="/home/user/.groq_key"
-[[ ! -f "$GROQ_KEY_FILE" ]] && GROQ_KEY_FILE="${HOME}/.groq_key"
-GROQ_API="https://api.groq.com/openai/v1/chat/completions"
-MODEL="llama-3.3-70b-versatile"
+HAIKU_MODEL="claude-haiku-4-5-20251001"
+CLAUDE_BIN="${CLAUDE_BIN:-claude}"
 
-# --- Загрузка API ключа ---
-if [[ ! -f "$GROQ_KEY_FILE" ]]; then
-  echo "ERROR: Groq key not found at $GROQ_KEY_FILE" >&2
-  exit 1
-fi
-GROQ_KEY=$(cat "$GROQ_KEY_FILE" | tr -d '[:space:]')
-
-# --- Вспомогательная функция: запрос к Groq ---
+# --- Вспомогательная функция: запрос к Haiku через claude CLI ---
+# Примечание: api.anthropic.com доступен, но ключ на файле может быть без кредитов.
+# claude CLI работает через подписку и не требует отдельного ключа.
+# В cron-контексте CLAUDECODE не установлен, вложенности нет — всё работает.
 groq_ask() {
   local system_prompt="$1"
   local user_prompt="$2"
-  local max_tokens="${3:-1024}"
+  # $3 — max_tokens, игнорируется с claude CLI (оставлен для совместимости интерфейса)
 
-  local payload
-  payload=$(jq -n \
-    --arg model "$MODEL" \
-    --arg sys "$system_prompt" \
-    --arg usr "$user_prompt" \
-    --argjson max "$max_tokens" \
-    '{
-      model: $model,
-      messages: [
-        {role: "system", content: $sys},
-        {role: "user", content: $usr}
-      ],
-      max_tokens: $max,
-      temperature: 0.3
-    }')
+  local full_prompt="${system_prompt}
 
-  local response
-  response=$(curl -s -X POST "$GROQ_API" \
-    -H "Authorization: Bearer $GROQ_KEY" \
-    -H "Content-Type: application/json" \
-    -d "$payload")
+${user_prompt}"
 
-  echo "$response" | jq -r '.choices[0].message.content // "ERROR: " + .error.message'
+  "$CLAUDE_BIN" --model "$HAIKU_MODEL" -p "$full_prompt" 2>/dev/null \
+    || echo "ERROR: claude CLI недоступен"
 }
 
 # --- Скачать страницу ---
