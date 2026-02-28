@@ -1,0 +1,41 @@
+name: Research Agent
+
+on:
+  schedule:
+    - cron: '5 * * * *'   # каждый час в :05
+  workflow_dispatch:        # ручной запуск из GitHub UI (кнопка Run workflow)
+
+permissions:
+  contents: write           # нужно для git push веток
+
+jobs:
+  research:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get install -y jq
+          npm install -g @anthropic-ai/claude-code
+
+      - name: Setup API keys
+        run: |
+          echo "${{ secrets.GROQ_KEY }}" > ~/.groq_key
+          chmod 600 ~/.groq_key
+
+      - name: Configure git
+        run: |
+          git config user.name "Claude Agent"
+          git config user.email "noreply@anthropic.com"
+
+      - name: Run research pipeline
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          bash agent/research_pipeline.sh
