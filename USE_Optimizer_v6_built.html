@@ -1423,6 +1423,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
     <button class="dp-copy-btn" style="background:var(--bg4);border-color:var(--accent2);color:var(--accent2)" id="btn-open-robust-from-detail" onclick="openRobustModal()">🔬 Тест устойчивости</button>
     <button class="dp-copy-btn" style="background:var(--bg4);border-color:var(--green);color:var(--green)" id="btn-open-hc-from-detail" onclick="openHCModal('selected')">🧗 Поиск соседей</button>
     <button class="dp-copy-btn" style="background:var(--bg4);border-color:#c792ea;color:#c792ea" id="btn-pine-export" onclick="openPineModal()">🌲 Pine Script</button>
+    <button class="dp-copy-btn" style="background:var(--bg4);border-color:#ffcb6b;color:#ffcb6b" id="btn-open-heatmap" onclick="openHeatmapModal()">🗺️ Карта параметров</button>
   </div>
 </div>
 
@@ -10579,6 +10580,265 @@ function exportOOSTableCSV() {
 }
 
 
+// ============================================================
+// PARAMETER SENSITIVITY HEATMAP
+// ============================================================
+// Показывает устойчивость стратегии при изменении 2 параметров.
+// Открывается кнопкой "🗺️ Карта параметров" в детальной панели.
+
+const _HM_PARAMS = [
+  { key: 'pvL',       label: 'Pivot Left',   step: 1,    min: 1,   max: 15  },
+  { key: 'pvR',       label: 'Pivot Right',  step: 1,    min: 1,   max: 8   },
+  { key: 'atrPeriod', label: 'ATR Period',   step: 1,    min: 3,   max: 35  },
+  { key: 'sl_a_m',    label: 'SL ATR mult',  step: 0.5,  min: 0.5, max: 6   },
+  { key: 'sl_p_m',    label: 'SL % mult',    step: 0.5,  min: 0.5, max: 8   },
+  { key: 'tp_a_m',    label: 'TP mult',      step: 0.5,  min: 0.5, max: 8   },
+  { key: 'tp_b_m',    label: 'TP-B mult',    step: 0.5,  min: 0.5, max: 8   },
+  { key: 'maP',       label: 'MA Period',    step: 5,    min: 10,  max: 200 },
+  { key: 'beTrig',    label: 'BE Trigger',   step: 0.25, min: 0.25, max: 4  },
+  { key: 'trTrig',    label: 'Trail Trig',   step: 0.25, min: 0.25, max: 4  },
+  { key: 'trDist',    label: 'Trail Dist',   step: 0.25, min: 0.1,  max: 3  },
+  { key: 'adxThresh', label: 'ADX Thresh',   step: 5,    min: 10,  max: 55  },
+  { key: 'revBars',   label: 'Rev Bars',     step: 1,    min: 1,   max: 15  },
+];
+
+let _hmRunning = false;
+let _hmStop    = false;
+
+function openHeatmapModal() {
+  if (!_robustResult || !_robustResult.cfg) {
+    alert('Сначала откройте стратегию из таблицы результатов');
+    return;
+  }
+  const cfg = _robustResult.cfg;
+  const available = _HM_PARAMS.filter(p => typeof cfg[p.key] === 'number' && isFinite(cfg[p.key]));
+  if (available.length < 2) {
+    alert('Недостаточно числовых параметров для построения карты (нужно минимум 2)');
+    return;
+  }
+
+  const xSel = document.getElementById('hm-x-param');
+  const ySel = document.getElementById('hm-y-param');
+  xSel.innerHTML = '';
+  ySel.innerHTML = '';
+  available.forEach(p => {
+    xSel.add(new Option(`${p.label}  [${cfg[p.key]}]`, p.key));
+    ySel.add(new Option(`${p.label}  [${cfg[p.key]}]`, p.key));
+  });
+  if (available.length >= 2) ySel.selectedIndex = 1;
+
+  document.getElementById('hm-status').textContent = '';
+  const canvas = document.getElementById('hm-canvas');
+  canvas.width = 0; canvas.height = 0;
+  document.getElementById('hm-run-btn').textContent = '▶ Запустить';
+  document.getElementById('heatmap-overlay').classList.add('open');
+}
+
+function closeHeatmapModal() {
+  _hmStop = true;
+  document.getElementById('heatmap-overlay').classList.remove('open');
+}
+
+async function runHeatmap() {
+  if (!_robustResult || !_robustResult.cfg) return;
+  if (_hmRunning) { _hmStop = true; return; }
+
+  const cfg    = _robustResult.cfg;
+  const xKey   = document.getElementById('hm-x-param').value;
+  const yKey   = document.getElementById('hm-y-param').value;
+  const nSteps = parseInt(document.getElementById('hm-steps').value);
+  const metric = document.getElementById('hm-metric').value;
+
+  if (xKey === yKey) { alert('Выберите разные параметры для осей X и Y'); return; }
+
+  const xParam = _HM_PARAMS.find(p => p.key === xKey);
+  const yParam = _HM_PARAMS.find(p => p.key === yKey);
+  if (!xParam || !yParam) return;
+
+  function genAxis(param) {
+    const center = cfg[param.key];
+    const vals = [];
+    for (let i = -nSteps; i <= nSteps; i++) {
+      const v = Math.round((center + i * param.step) * 10000) / 10000;
+      if (v >= param.min && v <= param.max) vals.push(v);
+    }
+    return vals;
+  }
+
+  const xVals = genAxis(xParam);
+  const yVals = genAxis(yParam);
+  const total = xVals.length * yVals.length;
+
+  _hmRunning = true;
+  _hmStop    = false;
+  const runBtn = document.getElementById('hm-run-btn');
+  runBtn.textContent = '⏹ Стоп';
+
+  const grid = [];
+  let done = 0;
+
+  for (let yi = 0; yi < yVals.length; yi++) {
+    if (_hmStop) break;
+    const row = [];
+    for (let xi = 0; xi < xVals.length; xi++) {
+      if (_hmStop) break;
+
+      const testCfg = Object.assign({}, cfg, { [xKey]: xVals[xi], [yKey]: yVals[yi] });
+      const res = _hcRunBacktest(testCfg);
+
+      let val = null;
+      if (res && res.n > 0) {
+        if      (metric === 'pnl') val = res.pnl;
+        else if (metric === 'wr')  val = res.wr;
+        else if (metric === 'dd')  val = res.dd;
+        else if (metric === 'pdd') val = res.dd > 0 ? res.pnl / res.dd : null;
+        else if (metric === 'n')   val = res.n;
+      }
+      row.push(val);
+      done++;
+
+      if (done % 7 === 0) {
+        document.getElementById('hm-status').textContent = `${done}/${total}`;
+        _hmRender(grid.concat([row]), xVals, yVals, xParam, yParam, metric, cfg[xKey], cfg[yKey]);
+        await yieldToUI();
+      }
+    }
+    grid.push(row);
+  }
+
+  _hmRender(grid, xVals, yVals, xParam, yParam, metric, cfg[xKey], cfg[yKey]);
+  document.getElementById('hm-status').textContent = _hmStop ? `⏹ ${done}/${total}` : `✓ ${total} ячеек`;
+  _hmRunning = false;
+  _hmStop    = false;
+  runBtn.textContent = '▶ Запустить';
+}
+
+function _hmRender(grid, xVals, yVals, xParam, yParam, metric, cX, cY) {
+  const canvas = document.getElementById('hm-canvas');
+  const wrap   = document.getElementById('hm-canvas-wrap');
+
+  const PAD_L = 66, PAD_R = 14, PAD_T = 34, PAD_B = 44;
+  const cols = xVals.length, rows = yVals.length;
+  const wrapW  = Math.max(wrap.clientWidth - 8, 300);
+  const cellW  = Math.max(Math.floor((wrapW - PAD_L - PAD_R) / cols), 28);
+  const cellH  = Math.max(cellW - 2, 26);
+  const W = PAD_L + cols * cellW + PAD_R;
+  const H = PAD_T + rows * cellH + PAD_B;
+
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, W, H);
+
+  const flat = grid.flat().filter(v => v !== null && isFinite(v));
+  if (!flat.length) return;
+
+  const lowerBetter = (metric === 'dd');
+  const minV = Math.min(...flat), maxV = Math.max(...flat);
+  const range = maxV - minV || 1;
+
+  function getColor(v) {
+    if (v === null || !isFinite(v)) return '#1a1a1a';
+    let t = (v - minV) / range;
+    if (lowerBetter) t = 1 - t;
+    const r = t < 0.5 ? 255 : Math.round(255 - (t - 0.5) * 2 * 205);
+    const g = t < 0.5 ? Math.round(t * 2 * 185) : 185;
+    const b = t < 0.5 ? 70  : Math.round(70 - (t - 0.5) * 2 * 50);
+    return `rgba(${r},${g},${b},0.85)`;
+  }
+
+  const fSize = Math.max(9, Math.min(12, cellH - 10));
+  ctx.font = `${fSize}px monospace`;
+
+  for (let yi = 0; yi < grid.length; yi++) {
+    const row = grid[yi];
+    for (let xi = 0; xi < (row ? row.length : 0); xi++) {
+      const v  = row[xi];
+      const cx = PAD_L + xi * cellW;
+      const cy = PAD_T + (rows - 1 - yi) * cellH;
+
+      ctx.fillStyle = getColor(v);
+      ctx.fillRect(cx, cy, cellW, cellH);
+
+      ctx.strokeStyle = 'rgba(0,0,0,0.28)';
+      ctx.lineWidth = 0.5;
+      ctx.strokeRect(cx, cy, cellW, cellH);
+
+      if (xVals[xi] === cX && yVals[yi] === cY) {
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2.5;
+        ctx.strokeRect(cx + 1.5, cy + 1.5, cellW - 3, cellH - 3);
+      }
+
+      if (v !== null && cellW > 30) {
+        const disp = metric === 'n'   ? String(v)
+                   : metric === 'pdd' ? v.toFixed(2)
+                   : metric === 'dd'  ? v.toFixed(1) + '%'
+                   :                    v.toFixed(1);
+        ctx.fillStyle = 'rgba(0,0,0,0.78)';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(disp, cx + cellW / 2, cy + cellH / 2);
+      }
+    }
+  }
+
+  ctx.font = '10px monospace';
+  ctx.textBaseline = 'top';
+  for (let xi = 0; xi < xVals.length; xi++) {
+    const cx = PAD_L + xi * cellW + cellW / 2;
+    ctx.fillStyle = xVals[xi] === cX ? '#fff' : '#888';
+    ctx.textAlign = 'center';
+    ctx.fillText(xVals[xi], cx, PAD_T + rows * cellH + 5);
+  }
+
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'middle';
+  for (let yi = 0; yi < yVals.length; yi++) {
+    const cy = PAD_T + (rows - 1 - yi) * cellH + cellH / 2;
+    ctx.fillStyle = yVals[yi] === cY ? '#fff' : '#888';
+    ctx.fillText(yVals[yi], PAD_L - 6, cy);
+  }
+
+  ctx.fillStyle = '#ccc';
+  ctx.font = 'bold 11px monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'bottom';
+  ctx.fillText(xParam.label, PAD_L + cols * cellW / 2, H - 4);
+
+  ctx.save();
+  ctx.translate(11, PAD_T + rows * cellH / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  ctx.fillText(yParam.label, 0, 0);
+  ctx.restore();
+
+  const legX = PAD_L, legY = 6, legW = cols * cellW, legH = 8;
+  const grad = ctx.createLinearGradient(legX, 0, legX + legW, 0);
+  if (lowerBetter) {
+    grad.addColorStop(0,   'rgba(50,185,80,0.85)');
+    grad.addColorStop(0.5, 'rgba(255,200,50,0.85)');
+    grad.addColorStop(1,   'rgba(255,40,70,0.85)');
+  } else {
+    grad.addColorStop(0,   'rgba(255,40,70,0.85)');
+    grad.addColorStop(0.5, 'rgba(255,185,50,0.85)');
+    grad.addColorStop(1,   'rgba(50,185,80,0.85)');
+  }
+  ctx.fillStyle = grad;
+  ctx.fillRect(legX, legY, legW, legH);
+
+  const fmt = v => metric === 'n'   ? String(Math.round(v))
+                 : metric === 'pdd' ? v.toFixed(2)
+                 :                    v.toFixed(1);
+  ctx.fillStyle = '#777';
+  ctx.font = '9px monospace';
+  ctx.textBaseline = 'top';
+  ctx.textAlign = 'left';
+  ctx.fillText(lowerBetter ? fmt(minV) + ' (лучше)' : fmt(minV), legX, legY + legH + 2);
+  ctx.textAlign = 'right';
+  ctx.fillText(lowerBetter ? fmt(maxV) : fmt(maxV) + ' (лучше)', legX + legW, legY + legH + 2);
+}
+
 </script>
 </script>
 <!-- OOS COMPARE MODAL: сравнение избранных на старых и новых данных -->
@@ -10629,6 +10889,48 @@ const _SRC_FILES = {
   'build.py': 'IyEvdXNyL2Jpbi9lbnYgcHl0aG9uMwoiIiIKYnVpbGQucHkg4oCUINGB0L7QsdC40YDQsNC10YIgVVNFX09wdGltaXplcl92WF9YWC5odG1sINC40Lcg0YfQtdGC0YvRgNGR0YUg0YTQsNC50LvQvtCyLgrQmNGB0L/QvtC70YzQt9C+0LLQsNC90LjQtTogcHl0aG9uMyBidWlsZC5weSBbb3V0cHV0Lmh0bWxdCgogIHNoZWxsLmh0bWwgICh+MTcwMCDRgdGC0YDQvtC6KSDigJQgSFRNTCDRgNCw0LfQvNC10YLQutCwICsgQ1NTCiAgdWkuanMgICAgICAgKH40MzAwINGB0YLRgNC+0LopIOKAlCDQstC10YHRjCBVSSBKYXZhU2NyaXB0CiAgY29yZS5qcyAgICAgICh+NzQwINGB0YLRgNC+0LopIOKAlCDQuNC90LTQuNC60LDRgtC+0YDRiyArIGJhY2t0ZXN0IGVuZ2luZQogIG9wdC5qcyAgICAgICh+MTgwMCDRgdGC0YDQvtC6KSDigJQg0L7Qv9GC0LjQvNC40LfQsNGC0L7RgCArINGC0LXRgdGC0Ysg0YPRgdGC0L7QudGH0LjQstC+0YHRgtC4CgrQn9C+0YDRj9C00L7QuiDRgdCx0L7RgNC60Lg6CiAgMS4gb3B0LmpzICAg4oaSINGA0LDQt9GA0LXQt9Cw0LXQvCDQv9C+IFNFQ1RJT05fQS9CL0MvRAogIDIuIGNvcmUuanMgIOKGkiDRg9Cx0LjRgNCw0LXQvCDQt9Cw0LPQvtC70L7QstC+0LoKICAzLiB1aS5qcyAgICDihpIg0L/QvtC00YHRgtCw0LLQu9GP0LXQvCBPUFRfQSwgQ09SRSwgT1BUX0IsIE9QVF9DLCBPUFRfRAogIDQuIHNoZWxsLmh0bWwg4oaSINC/0L7QtNGB0YLQsNCy0LvRj9C10Lwg0LPQvtGC0L7QstGL0LkgdWkg0YfQtdGA0LXQtyAjI1VJIyMKIiIiCmltcG9ydCBzeXMsIG9zCgpvdXQgID0gc3lzLmFyZ3ZbMV0gaWYgbGVuKHN5cy5hcmd2KSA+IDEgZWxzZSAnVVNFX09wdGltaXplcl92Nl9idWlsdC5odG1sJwpiYXNlID0gb3MucGF0aC5kaXJuYW1lKG9zLnBhdGguYWJzcGF0aChfX2ZpbGVfXykpCgpzaGVsbCA9IG9wZW4ob3MucGF0aC5qb2luKGJhc2UsICdzaGVsbC5odG1sJyksIGVuY29kaW5nPSd1dGYtOCcpLnJlYWQoKQpjb3JlICA9IG9wZW4ob3MucGF0aC5qb2luKGJhc2UsICdjb3JlLmpzJyksICAgIGVuY29kaW5nPSd1dGYtOCcpLnJlYWQoKQpvcHQgICA9IG9wZW4ob3MucGF0aC5qb2luKGJhc2UsICdvcHQuanMnKSwgICAgIGVuY29kaW5nPSd1dGYtOCcpLnJlYWQoKQp1aSAgICA9IG9wZW4ob3MucGF0aC5qb2luKGJhc2UsICd1aS5qcycpLCAgICAgIGVuY29kaW5nPSd1dGYtOCcpLnJlYWQoKQoKIyDilIDilIAgb3B0LmpzOiDRgNCw0LfRgNC10LfQsNC10Lwg0L/QviDQvNCw0YDQutC10YDQsNC8INGB0LXQutGG0LjQuSDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIAKU0VDUyA9IFsnLy8gIyNTRUNUSU9OX0EjI1xuJywgJy8vICMjU0VDVElPTl9CIyNcbicsCiAgICAgICAgJy8vICMjU0VDVElPTl9DIyNcbicsICcvLyAjI1NFQ1RJT05fRCMjXG4nXQpmb3IgcyBpbiBTRUNTOgogICAgYXNzZXJ0IHMgaW4gb3B0LCBmIk1hcmtlciBub3QgZm91bmQgaW4gb3B0LmpzOiB7cyFyfSIKCmlfYSA9IG9wdC5pbmRleChTRUNTWzBdKSArIGxlbihTRUNTWzBdKQppX2IgPSBvcHQuaW5kZXgoU0VDU1sxXSkKaV9jID0gb3B0LmluZGV4KFNFQ1NbMl0pCmlfZCA9IG9wdC5pbmRleChTRUNTWzNdKQoKb3B0X0EgPSBvcHRbaV9hICAgICAgICAgICAgICA6IGlfYiAgICAgICAgICAgIF0ucnN0cmlwKCdcbicpCm9wdF9CID0gb3B0W2lfYitsZW4oU0VDU1sxXSkgOiBpX2MgICAgICAgICAgICBdLnJzdHJpcCgnXG4nKQpvcHRfQyA9IG9wdFtpX2MrbGVuKFNFQ1NbMl0pIDogaV9kICAgICAgICAgICAgXS5yc3RyaXAoJ1xuJykKb3B0X0QgPSBvcHRbaV9kK2xlbihTRUNTWzNdKSA6ICAgICAgICAgICAgICAgIF0ucnN0cmlwKCdcbicpCgojIOKUgOKUgCBjb3JlLmpzOiDQvtGC0YDQtdC30LDQtdC8INC30LDQs9C+0LvQvtCy0L7Quiwg0LHQtdGA0ZHQvCDRgtC+0LvRjNC60L4g0LrQvtC0IOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgApIRFJfRU5EID0gJy8vID09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PVxuXG4nCmFzc2VydCBIRFJfRU5EIGluIGNvcmUsICJIZWFkZXIgZW5kIG1hcmtlciBub3QgZm91bmQgaW4gY29yZS5qcyIKY29yZV9jb2RlID0gY29yZVtjb3JlLnJpbmRleChIRFJfRU5EKSArIGxlbihIRFJfRU5EKTpdLnJzdHJpcCgnXG4nKSArICdcbicKCiMg4pSA4pSAINCo0LDQsyAxOiDQv9C+0LTRgdGC0LDQstC70Y/QtdC8INGB0LXQutGG0LjQuCBvcHQvY29yZSDQsiB1aS5qcyDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIAKdWlfYnVpbHQgPSB1aQpmb3IgcGgsIGNvbnRlbnQgaW4gWwogICAgKCcvKiAjI09QVF9BIyMgKi8nLCBvcHRfQSksCiAgICAoJy8qICMjQ09SRSMjICovJywgIGNvcmVfY29kZSksCiAgICAoJy8qICMjT1BUX0IjIyAqLycsIG9wdF9CKSwKICAgICgnLyogIyNPUFRfQyMjICovJywgb3B0X0MpLAogICAgKCcvKiAjI09QVF9EIyMgKi8nLCBvcHRfRCksCl06CiAgICBhc3NlcnQgcGggaW4gdWlfYnVpbHQsIGYiUGxhY2Vob2xkZXIgbm90IGZvdW5kIGluIHVpLmpzOiB7cGghcn0iCiAgICB1aV9idWlsdCA9IHVpX2J1aWx0LnJlcGxhY2UocGgsIGNvbnRlbnQsIDEpCgojIOKUgOKUgCDQqNCw0LMgMjog0L/QvtC00YHRgtCw0LLQu9GP0LXQvCDQs9C+0YLQvtCy0YvQuSB1aSDQsiBzaGVsbCDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIAKYXNzZXJ0ICcvKiAjI1VJIyMgKi8nIGluIHNoZWxsLCAiUGxhY2Vob2xkZXIgIyNVSSMjIG5vdCBmb3VuZCBpbiBzaGVsbC5odG1sIgpyZXN1bHQgPSBzaGVsbC5yZXBsYWNlKCcvKiAjI1VJIyMgKi8nLCB1aV9idWlsdCwgMSkKCm9wZW4ob3V0LCAndycsIGVuY29kaW5nPSd1dGYtOCcpLndyaXRlKHJlc3VsdCkKcHJpbnQoZiLinIUgIHtvdXR9ICAoe2xlbihyZXN1bHQuc3BsaXRsaW5lcygpKX0g0YHRgtGA0L7QuikiKQo='
 };
 </script>
+
+<!-- ##SECTION_HEATMAP## -->
+<div class="tpl-overlay" id="heatmap-overlay" onclick="if(event.target===this)closeHeatmapModal()">
+  <div class="tpl-modal" style="max-width:680px;width:96%;max-height:92vh;overflow:hidden;display:flex;flex-direction:column;gap:0;padding:16px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-shrink:0">
+      <h3 style="margin:0;color:#ffcb6b">🗺️ Тепловая карта параметров</h3>
+      <button class="dp-close" onclick="closeHeatmapModal()" style="position:static">✕</button>
+    </div>
+    <div style="flex-shrink:0;display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px;font-size:.75em">
+      <label style="display:flex;align-items:center;gap:4px;color:var(--text3)">Ось X:
+        <select id="hm-x-param" style="background:var(--bg4);color:var(--text1);border:1px solid var(--border);border-radius:4px;padding:2px 6px"></select>
+      </label>
+      <label style="display:flex;align-items:center;gap:4px;color:var(--text3)">Ось Y:
+        <select id="hm-y-param" style="background:var(--bg4);color:var(--text1);border:1px solid var(--border);border-radius:4px;padding:2px 6px"></select>
+      </label>
+      <label style="display:flex;align-items:center;gap:4px;color:var(--text3)">±шагов:
+        <select id="hm-steps" style="background:var(--bg4);color:var(--text1);border:1px solid var(--border);border-radius:4px;padding:2px 6px">
+          <option value="2">2 → 5×5</option>
+          <option value="3" selected>3 → 7×7</option>
+          <option value="4">4 → 9×9</option>
+        </select>
+      </label>
+      <label style="display:flex;align-items:center;gap:4px;color:var(--text3)">Метрика:
+        <select id="hm-metric" style="background:var(--bg4);color:var(--text1);border:1px solid var(--border);border-radius:4px;padding:2px 6px">
+          <option value="pnl">PnL %</option>
+          <option value="pdd">P/DD</option>
+          <option value="wr">Win Rate %</option>
+          <option value="dd">MaxDD % (↓ меньше)</option>
+          <option value="n">Сделок</option>
+        </select>
+      </label>
+      <button id="hm-run-btn" onclick="runHeatmap()" style="background:var(--bg4);border:1px solid #ffcb6b;color:#ffcb6b;border-radius:4px;padding:3px 12px;cursor:pointer;font-size:.9em">▶ Запустить</button>
+      <span id="hm-status" style="color:var(--text3);font-size:.85em"></span>
+    </div>
+    <div id="hm-canvas-wrap" style="overflow:auto;flex:1;min-height:160px;display:flex;align-items:flex-start;justify-content:center;padding:4px 0">
+      <canvas id="hm-canvas" style="display:block"></canvas>
+    </div>
+    <div style="flex-shrink:0;font-size:.6em;color:var(--text3);margin-top:6px">
+      Белая рамка = текущие значения стратегии. Зелёный = лучше, красный = хуже (в рамках сетки). Первый запуск медленнее — результаты кэшируются.
+    </div>
+  </div>
+</div>
 
 </body>
 </html>
