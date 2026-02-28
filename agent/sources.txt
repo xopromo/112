@@ -1,0 +1,15 @@
+# Источники для исследовательского агента
+# Один URL на строку. Строки с # — комментарии.
+# Агент скачивает эти страницы каждый час и ищет применимые идеи.
+
+# Алгоритмическая торговля и оптимизация стратегий
+https://hudsonthames.org/blog/
+https://quantpedia.com/blog/
+https://robotwealth.com/blog/
+
+# Walk-forward, overfitting, валидация
+https://www.quantstart.com/articles/
+https://medium.com/tag/algorithmic-trading
+
+# Pine Script / TradingView
+https://www.tradingview.com/pine-script-docs/en/v6/Release_notes.html
