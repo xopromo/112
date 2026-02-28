@@ -1238,6 +1238,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
           <th class="col-pdd" data-sort="5" style="min-width:48px;resize:horizontal;overflow:auto;cursor:pointer">P/DD ↕</th>
           <th class="col-sig" data-sort="19" title="Статистическая значимость: z-тест WR>50%. ≥90% = значима." style="min-width:48px;resize:horizontal;overflow:auto;cursor:pointer;color:var(--accent)">Sig% ↕</th>
           <th class="col-gt" data-sort="20" title="GT-Score: (P/DD) × sig_mult × consistency_mult. Антиовефиттинг метрика." style="min-width:52px;resize:horizontal;overflow:auto;cursor:pointer;color:var(--accent)">GT ↕</th>
+          <th class="col-cvr" data-sort="21" title="CVR% — Temporal Cross-Validation Robustness: % из 6 временных окон, где стратегия прибыльна. ≥80% = устойчива." style="min-width:48px;resize:horizontal;overflow:auto;cursor:pointer;color:var(--accent)">CVR% ↕</th>
           <th class="col-avg" data-sort="6" style="min-width:44px;resize:horizontal;overflow:auto;cursor:pointer">Avg% ↕</th>
           <th class="col-p1" data-sort="7" style="min-width:52px;resize:horizontal;overflow:auto;cursor:pointer">1п PnL ↕</th>
           <th class="col-p2" data-sort="8" style="min-width:52px;resize:horizontal;overflow:auto;cursor:pointer">2п PnL ↕</th>
@@ -1269,6 +1270,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
           <th class="col-pdd"><input class="tf-inp" id="f_pdd" placeholder="≥" oninput="applyFiltersDebounced()"></th>
           <th class="col-sig"><input class="tf-inp" id="f_sig" placeholder="≥" oninput="applyFiltersDebounced()"></th>
           <th class="col-gt"><input class="tf-inp" id="f_gt" placeholder="≥" oninput="applyFiltersDebounced()"></th>
+          <th class="col-cvr"><input class="tf-inp" id="f_cvr" placeholder="≥" oninput="applyFiltersDebounced()"></th>
           <th class="col-avg"><input class="tf-inp" id="f_avg" placeholder="≥" oninput="applyFiltersDebounced()"></th>
           <th class="col-p1"><input class="tf-inp" id="f_p1" placeholder="≥" oninput="applyFiltersDebounced()"></th>
           <th class="col-p2"><input class="tf-inp" id="f_p2" placeholder="≥" oninput="applyFiltersDebounced()"></th>

@@ -418,6 +418,7 @@ function applyFilters() {
   const fPdd   = parseFloat($('f_pdd').value);
   const fSig   = parseFloat($('f_sig').value);
   const fGt    = parseFloat($('f_gt').value);
+  const fCvr   = parseFloat($('f_cvr').value);
   const fAvg   = parseFloat($('f_avg').value);
   const fP1    = parseFloat($('f_p1').value);
   const fP2    = parseFloat($('f_p2').value);
@@ -444,6 +445,7 @@ function applyFilters() {
     if (!isNaN(fPdd) && r.pdd < fPdd) return false;
     if (!isNaN(fSig) && (r.sig??0) < fSig) return false;
     if (!isNaN(fGt)  && (r.gt??-2) < fGt)  return false;
+    if (!isNaN(fCvr) && (r.cvr??-1) < fCvr) return false;
     if (!isNaN(fAvg) && r.avg < fAvg) return false;
     if (!isNaN(fP1)  && r.p1  < fP1)  return false;
     if (!isNaN(fP2)  && r.p2  < fP2)  return false;
@@ -606,6 +608,7 @@ function renderVisibleResults() {
       `<td class="col-pdd ${pddCls}">${r.pdd.toFixed(1)}</td>` +
       (()=>{ const s=r.sig??0; const sc=s>=90?'pos':s>=70?'':'neg'; return `<td class="col-sig ${sc}" title="Статистическая значимость WR (z-тест)\n≥90% = значима ✅\n70–90% = под вопросом\n&lt;70% = вероятно случайно">${s}%</td>`; })() +
       (()=>{ const g=r.gt??-2; const gc=g>=5?'pos':g>=2?'':'neg'; return `<td class="col-gt ${gc}" title="GT-Score = (P/DD) × sig_mult × consistency_mult\nАнтиовефиттинг метрика: штрафует за мало сделок и нестабильный WR">${g.toFixed(2)}</td>`; })() +
+      (()=>{ const v=r.cvr??null; if(v===null) return '<td class="col-cvr muted">—</td>'; const vc=v>=80?'pos':v>=50?'':'neg'; return `<td class="col-cvr ${vc}" title="CVR% — Temporal Cross-Validation Robustness\nПроцент из 6 временных окон, где стратегия прибыльна.\n≥80% = устойчива ✅ | 50–80% = умеренно | &lt;50% = нестабильна">${v}%</td>`; })() +
       `<td class="col-avg">${r.avg.toFixed(2)}</td>` +
       `<td class="col-p1 ${r.p1 >= 0 ? 'pos' : 'neg'}">${r.p1.toFixed(1)}</td>` +
       `<td class="col-p2 ${r.p2 >= 0 ? 'pos' : 'neg'}">${r.p2.toFixed(1)}</td>` +
@@ -718,7 +721,8 @@ function showDetail(r) {
     `<div class="dp-stat"><div class="v ${r.p2>=0?'pos':'neg'}">${r.p2.toFixed(1)}%</div><div class="l">2п PnL (${r.c2}сд)</div></div>`+
     (r.wrL!=null ? `<div class="dp-stat"><div class="v ${r.dwrLS<10?'ok':r.dwrLS<25?'warn':'bad'}">${r.dwrLS.toFixed(0)}%</div><div class="l">ΔWR L/S</div></div>` : '')+
     (r.wrL!=null ? `<div class="dp-stat"><div class="v">${r.wrL.toFixed(0)}% (${r.nL})</div><div class="l">Лонг WR</div></div>` : '')+
-    (r.wrS!=null ? `<div class="dp-stat"><div class="v">${r.wrS.toFixed(0)}% (${r.nS})</div><div class="l">Шорт WR</div></div>` : '');
+    (r.wrS!=null ? `<div class="dp-stat"><div class="v">${r.wrS.toFixed(0)}% (${r.nS})</div><div class="l">Шорт WR</div></div>` : '')+
+    (r.cvr!=null ? `<div class="dp-stat"><div class="v ${r.cvr>=80?'pos':r.cvr>=50?'warn':'neg'}">${r.cvr}%</div><div class="l">CVR%</div></div>` : '');
 
   // Helper: SL name
   function slName(pair) {
@@ -2572,6 +2576,8 @@ function doSort(col) {
     arr.sort((a,b) => d * ((a.sig??0) - (b.sig??0)));
   } else if (col === 20) {
     arr.sort((a,b) => d * ((a.gt??-2) - (b.gt??-2)));
+  } else if (col === 21) {
+    arr.sort((a,b) => d * ((a.cvr??-1) - (b.cvr??-1)));
   } else if (col <= 11) {
     const keys = ['name','pnl','wr','n','dd','pdd','avg','p1','p2','dwr','dwr','robScore'];
     const key = keys[col];
@@ -2760,6 +2766,7 @@ const _COL_DEFS = [
   { id: 'col-pdd',        label: 'P/DD',                default: true },
   { id: 'col-sig',        label: 'Sig%',                default: true },
   { id: 'col-gt',         label: 'GT-Score',            default: true },
+  { id: 'col-cvr',        label: 'CVR%',                default: true },
   { id: 'col-avg',        label: 'Avg%',                default: true },
   { id: 'col-p1',         label: '1п PnL',              default: true },
   { id: 'col-p2',         label: '2п PnL',              default: false },
