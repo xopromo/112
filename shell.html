@@ -769,6 +769,10 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
     <input type="checkbox" id="c_oos" checked>
     <label data-tip="Оптимизация на первых 70% данных (IS). Найденные стратегии автоматически проверяются на оставшихся 30% (OOS) — данные которые не участвовали в обучении. Показывает насколько стратегия реально работает на новых данных.">IS/OOS разделение (70/30)</label>
   </div>
+  <div class="cb" style="margin-top:4px">
+    <input type="checkbox" id="c_use_gt">
+    <label data-tip="GT-Score = (P/DD) × sig_mult × consistency_mult. Штрафует за малое число сделок (z-тест) и нестабильный WR между половинами. Помогает TPE находить надёжные стратегии, а не overfitted.">Оптимизировать по GT-Score (анти-overfitting)</label>
+  </div>
   <div class="hint">от:до:шаг или a,b,c</div>
 </div>
 

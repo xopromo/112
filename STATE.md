@@ -17,9 +17,7 @@
 - **Отчёты:** `/home/user/112/research_reports/`
 
 ## Очередь задач (приоритет)
-1. **GT-Score** [ГОТОВО к влитию] — ветка `claude/research-2026-02-27-23`
-   - `experiments/hypothesis_1_gtscore.js` — proof-of-concept готов
-   - Нужно: влить логику в `opt.js`, добавить колонку в `ui.js`
+1. **GT-Score** [ВЛИТО] — чекбокс `c_use_gt`, TPE оптимизирует по GT вместо P/DD
 2. **CPCV валидация** — combinatorial IS/OOS вместо одного split
 3. **WASM** — Rust+WASM для x15 ускорения backtest-цикла
 4. **TradingAgents** — LLM multi-agent анализ стратегий
@@ -28,6 +26,7 @@
 | Дата | Фича | Ветка |
 |------|------|-------|
 | 2026-02-28 | Sig% колонка + Pine v6 active= | claude/research-2026-02-28-08 |
+| 2026-02-28 | GT-Score как цель оптимизации TPE | ручное влитие |
 
 ## Следующий цикл
 - **Ожидается:** 2026-02-28 09:05

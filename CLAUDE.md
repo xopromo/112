@@ -105,17 +105,18 @@ bash agent/setup.sh
   - `active=` скрывает rsi_os/ob, ma_period, pivot_left/right и др.
 
 ### Исследовано, в ветках, ещё не влито в main
-- [ ] **GT-Score** — взвешенная анти-overfitting метрика вместо P/DD
-  - Ветка: `claude/research-2026-02-27-23`
-  - Формула: `(pnl/dd) × sig_mult × consistency_mult`
-  - Proof-of-concept: `experiments/hypothesis_1_gtscore.js`
 - [ ] **Experiments/** — директория с proof-of-concept скриптами от агента
 
+### Влито вручную
+- [x] **GT-Score** — цель оптимизации TPE (чекбокс `c_use_gt`)
+  - `opt.js`: `_calcGTScore()`, `_useGT = $c('c_use_gt')`, TPE score
+  - `ui.js`: колонка GT-Score, фильтр `f_gt`
+  - `shell.html`: чекбокс «Оптимизировать по GT-Score»
+
 ### Очередь (приоритет по порядку)
-1. **GT-Score** — влить из ветки research-2026-02-27-23 в main
-2. **CPCV валидация** — combinatorial IS/OOS вместо одного split
-3. **WASM** — перевод backtest-цикла на Rust+WASM для x15 ускорения
-4. **TradingAgents** — LLM multi-agent анализ стратегий
+1. **CPCV валидация** — combinatorial IS/OOS вместо одного split
+2. **WASM** — перевод backtest-цикла на Rust+WASM для x15 ускорения
+3. **TradingAgents** — LLM multi-agent анализ стратегий
 
 ---
 
