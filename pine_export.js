@@ -40,7 +40,7 @@ function generatePineScript(r) {
   // ── Формируем Pine Script ─────────────────────────────────
   const lines = [];
 
-  lines.push(`//@version=5`);
+  lines.push(`//@version=6`);
   lines.push(`// ============================================================`);
   lines.push(`// USE Strategy Engine — экспорт из оптимизатора`);
   lines.push(`// Конфиг: ${r.name}`);
@@ -961,8 +961,10 @@ function generatePineScript(r) {
   lines.push(`plotshape(a_se, "ES", shape.triangledown, location.abovebar, color.new(color.fuchsia,0), size=size.tiny)`);
 
   const rawCode = lines.join('\n');
-  // Автоматически исправляем известные ошибки Pine v5 перед возвратом
-  return (typeof fixPineScript === 'function') ? fixPineScript(rawCode) : rawCode;
+  // Фаза 1: исправляем известные ошибки
+  const fixed = (typeof fixPineScript === 'function') ? fixPineScript(rawCode) : rawCode;
+  // Фаза 2 (Hyp 4): добавляем active= к зависимым инпутам (Pine v6)
+  return _addActivePinev6(fixed);
 }
 
 // ============================================================
@@ -1078,4 +1080,51 @@ function fixPineScript(code) {
     console.log('[PineExport] Auto-fixed ' + fixed + ' Pine v5 issues');
   }
   return out.join('\n');
+}
+
+// ============================================================
+// _addActivePinev6(code) — Hyp 4: добавляет active=<toggle>
+// к зависимым input.*() вызовам (Pine Script v6).
+// Каждая группа: toggleVar → массив переменных-зависимостей.
+// Работает на regex-replace, безопасен для отсутствующих групп.
+// ============================================================
+function _addActivePinev6(code) {
+  if (!code) return code;
+  // [toggleVar, [...depVars]]
+  const groups = [
+    ['use_pivot',      ['pivot_left','pivot_right']],
+    ['use_pinbar',     ['pin_ratio']],
+    ['use_donch',      ['donch_len']],
+    ['use_boll',       ['boll_len','boll_mult']],
+    ['use_atr_bo',     ['atr_bo_len','atr_bo_mult']],
+    ['use_ma_touch',   ['ma_touch_bars']],
+    ['use_rsi',        ['rsi_os','rsi_ob']],
+    ['use_ma',         ['ma_period','ma_type']],
+    ['use_adx',        ['adx_thresh','adx_len']],
+    ['use_vol_filter', ['vol_mult']],
+    ['use_squeeze',    ['sqz_bb_len','sqz_kc_mult','sqz_min_bars']],
+    ['use_trail',      ['trail_trig','trail_dist']],
+    ['use_be',         ['be_trig','be_off']],
+    ['use_partial',    ['part_rr','part_pct','part_be']],
+  ];
+  let result = code;
+  let count = 0;
+  for (const [toggle, deps] of groups) {
+    // Пропускаем группу если переключатель отсутствует в коде
+    if (!result.includes(toggle + ' ')) continue;
+    for (const dep of deps) {
+      // Ищем: dep = input.*(... без уже существующего active=
+      const re = new RegExp(
+        `(${dep}\\s*=\\s*input\\.\\w+\\([^)]*?)\\)`,
+        'gm'
+      );
+      result = result.replace(re, (m, before) => {
+        if (m.includes('active=')) return m; // уже есть
+        count++;
+        return `${before}, active=${toggle})`;
+      });
+    }
+  }
+  if (count > 0) console.log(`[PineExport] Pine v6 active=: ${count} инпутов скрыто`);
+  return result;
 }

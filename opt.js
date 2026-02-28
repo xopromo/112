@@ -17,6 +17,20 @@
 // SECTION D: _robCache*  _fastCfgKey  _getDataHash  _robCacheLoad  (70 строк)
 // ============================================================
 
+// ── Statistical Significance (Hyp 3) ─────────────────────────
+// z-тест win rate: уверенность что WR > 50% не случайна.
+// Возвращает sig_pct [0..99].
+function _calcStatSig(r) {
+  if (!r || r.n < 2) return 0;
+  const z = (r.wr / 100 - 0.5) / Math.sqrt(0.25 / r.n);
+  if (z <= 0) return 0;
+  const t = 1 / (1 + 0.2316419 * z);
+  const p = (1/Math.sqrt(2*Math.PI)) * Math.exp(-z*z/2) *
+    t*(0.319382+t*(-0.356564+t*(1.781478+t*(-1.821256+t*1.330274))));
+  return Math.min(99, Math.max(0, Math.round((1 - p) * 100)));
+}
+// ─────────────────────────────────────────────────────────────
+
 // ##SECTION_A##
 // RANGE PARSER
 // ============================================================
@@ -934,6 +948,7 @@ async function runOpt() {
       done++;
       if (r && r.n >= minTrades && r.dd <= maxDD) {
         const pdd = r.dd>0 ? r.pnl/r.dd : 0;
+        const sig = _calcStatSig(r);
         let slDesc = slPair.combo ? `SL(ATR×${slPair.a.m}${slLogic==='or'?'|OR|':'|AND|'}${slPair.p.m}%)` : slPair.a ? `SL×${slPair.a.m}ATR` : `SL${slPair.p.m}%`;
         let tpDesc = tpPair.combo ? (()=>{const n1=tpPair.a.type==='rr'?`RR${tpPair.a.m}`:tpPair.a.type==='atr'?`TP×${tpPair.a.m}ATR`:`TP${tpPair.a.m}%`;const n2=tpPair.b.type==='rr'?`RR${tpPair.b.m}`:tpPair.b.type==='atr'?`TP×${tpPair.b.m}ATR`:`TP${tpPair.b.m}%`;return `TP(${n1}${tpLogic==='or'?'|OR|':'|AND|'}${n2})`;})() : tpPair.a ? (tpPair.a.type==='rr'?`RR×${tpPair.a.m}`:tpPair.a.type==='atr'?`TP×${tpPair.a.m}ATR`:`TP${tpPair.a.m}%`) : '';
         const name = buildName(btCfg, pvL, pvR, slDesc, tpDesc, {}, {maP, maType:_mType, stw:sTrendWin, atrP, adxL});
@@ -968,7 +983,7 @@ async function runOpt() {
               useFat,fatConsec,fatVolDrop,
               atrPeriod:atrP,commission:commTotal,baseComm:comm,spreadVal:spread*2,
               revSkip,revCooldown,revSrc};
-          results.push({name,pnl:r.pnl,wr:r.wr,n:r.n,dd:r.dd,pdd,avg:r.avg,
+          results.push({name,pnl:r.pnl,wr:r.wr,n:r.n,dd:r.dd,pdd,avg:r.avg,sig,
             p1:r.p1,p2:r.p2,dwr:r.dwr,c1:r.c1,c2:r.c2,nL:r.nL||0,pL:r.pL||0,wrL:r.wrL,nS:r.nS||0,pS:r.pS||0,wrS:r.wrS,dwrLS:r.dwrLS,
             cfg:_cfg});
           equities[name] = r.eq;
@@ -1134,6 +1149,7 @@ async function runOpt() {
         score = -2; // нет сделок вообще
       }
       const pdd = (r && r.dd > 0) ? r.pnl/r.dd : (r && r.pnl > 0 ? 50 : 0);
+      const sig = _calcStatSig(r);
 
       if (r && r.n >= minTrades && r.dd <= maxDD) {
         let slDesc = slPair.combo ? `SL(ATR×${slPair.a.m}${slLogic==='or'?'|OR|':'|AND|'}${slPair.p.m}%)` : slPair.a ? `SL×${slPair.a.m}ATR` : `SL${slPair.p.m}%`;
@@ -1171,7 +1187,7 @@ async function runOpt() {
               atrPeriod:atrP,commission:commTotal,baseComm:comm,spreadVal:spread*2};
           // OOS НЕ вызываем здесь — это горячий цикл (миллионы итераций)
           // _attachOOS будет вызван батчем после завершения TPE
-          results.push({name,pnl:r.pnl,wr:r.wr,n:r.n,dd:r.dd,pdd,avg:r.avg,
+          results.push({name,pnl:r.pnl,wr:r.wr,n:r.n,dd:r.dd,pdd,avg:r.avg,sig,
             p1:r.p1,p2:r.p2,dwr:r.dwr,c1:r.c1,c2:r.c2,nL:r.nL||0,pL:r.pL||0,wrL:r.wrL,nS:r.nS||0,pS:r.pS||0,wrS:r.wrS,dwrLS:r.dwrLS,
             cfg:_cfg_tpe});
           equities[name] = r.eq;
@@ -1472,6 +1488,7 @@ async function runOpt() {
 
                                     if(r && r.n>=minTrades && r.dd<=maxDD) {
                                       const pdd=r.dd>0?r.pnl/r.dd:0;
+                                      const sig=_calcStatSig(r);
                                       // Build SL description
                                       let slDesc='';
                                       if(slPair.combo) {
@@ -1532,7 +1549,7 @@ async function runOpt() {
                                           useFat, fatConsec, fatVolDrop,
                                           atrPeriod:atrP, commission:commTotal, baseComm:comm, spreadVal:spread*2
                                         };
-                                      results.push({name,pnl:r.pnl,wr:r.wr,n:r.n,dd:r.dd,pdd,avg:r.avg,
+                                      results.push({name,pnl:r.pnl,wr:r.wr,n:r.n,dd:r.dd,pdd,avg:r.avg,sig,
                                         p1:r.p1,p2:r.p2,dwr:r.dwr,c1:r.c1,c2:r.c2,nL:r.nL||0,pL:r.pL||0,wrL:r.wrL,nS:r.nS||0,pS:r.pS||0,wrS:r.wrS,dwrLS:r.dwrLS,
                                         cfg:_cfg_ex});
                                       equities[name]=r.eq;
