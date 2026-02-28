@@ -17,6 +17,26 @@
 // SECTION D: _robCache*  _fastCfgKey  _getDataHash  _robCacheLoad  (70 строк)
 // ============================================================
 
+// ##SECTION_A##
+// RANGE PARSER
+// ============================================================
+function parseRange(id) {
+  const v = $v(id);
+  if (!v) return [];
+  if (v.includes(':')) {
+    const parts = v.split(':').map(Number);
+    if (parts.length >= 3 && parts[2] > 0) {
+      const arr = [];
+      for (let x = parts[0]; x <= parts[1] + parts[2] * 0.0001; x += parts[2])
+        arr.push(Math.round(x * 10000) / 10000);
+      return arr;
+    }
+    return parts.filter(x => !isNaN(x));
+  }
+  return v.split(',').map(x => parseFloat(x.trim())).filter(x => !isNaN(x));
+}
+
+// ##SECTION_B##
 // ── Statistical Significance (Hyp 3) ─────────────────────────
 // z-тест win rate: уверенность что WR > 50% не случайна.
 // Возвращает sig_pct [0..99].
@@ -47,27 +67,6 @@ function _calcGTScore(r) {
 }
 // ─────────────────────────────────────────────────────────────
 
-
-// ##SECTION_A##
-// RANGE PARSER
-// ============================================================
-function parseRange(id) {
-  const v = $v(id);
-  if (!v) return [];
-  if (v.includes(':')) {
-    const parts = v.split(':').map(Number);
-    if (parts.length >= 3 && parts[2] > 0) {
-      const arr = [];
-      for (let x = parts[0]; x <= parts[1] + parts[2] * 0.0001; x += parts[2])
-        arr.push(Math.round(x * 10000) / 10000);
-      return arr;
-    }
-    return parts.filter(x => !isNaN(x));
-  }
-  return v.split(',').map(x => parseFloat(x.trim())).filter(x => !isNaN(x));
-}
-
-// ##SECTION_B##
 // NAME BUILDER — подробный
 // ============================================================
 function buildName(cfg, pvL, pvR, slDesc, tpDesc, filters, extras) {
