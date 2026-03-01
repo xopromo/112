@@ -142,3 +142,54 @@ cd /home/user/112
 python build.py   # → USE_Optimizer_v6_built.html
 ```
 -->
+
+---
+
+## Правила работы с кодовой базой (экономия токенов)
+
+### ⚠️ Никогда не искать код в USE_Optimizer_v6_built.html
+Используй ТОЛЬКО исходники: `opt.js`, `core.js`, `ui.js`, `pine_export.js`.
+Builded HTML генерируется из них — он дублирует весь код, тратит вдвое больше токенов.
+Проверять что фикс попал в build — только после `python build.py`, и только точечной grep.
+
+### Карта ключевых функций
+
+**opt.js** (оптимизатор + робастность):
+| Функция | Строка | Описание |
+|---------|--------|----------|
+| `parseRange` | ~23 | Парсит диапазон параметров |
+| `buildName` | ~100 | Строит имя результата |
+| `runOpt` | ~400 | Основная оптимизация (MC/TPE/exhaustive) |
+| `_calcGTScore` | ~820 | GT-Score (anti-overfitting метрика) |
+| `_calcStatSig` | ~840 | z-тест статистической значимости |
+| `runMassRobust` | ~1969 | Массовый тест устойчивости |
+| `runRobustScoreFor` | ~2035 | Тест устойчивости для одного результата |
+| `runRobustScoreForDetailed` | ~2202 | То же, но с деталями по каждому тесту |
+| `HC_NUMERIC_PARAMS` | ~2268 | Единый список числовых параметров HC |
+
+**ui.js** (интерфейс + HC):
+| Функция | Строка | Описание |
+|---------|--------|----------|
+| `switchTableMode` | ~360 | Переключение HC/Fav/Results режимов |
+| `resetAllFilters` | ~417 | Сброс всех фильтров |
+| `applyFilters` | ~431 | Применение фильтров к таблице |
+| `openHCModal` | ~2241 | Открыть модал поиска соседей |
+| `runOOSScan` | ~2728 | OOS-скан видимых результатов |
+| `_hcRunBacktest` | ~2499 | Быстрый бэктест для HC |
+| `_hcNeighbours` | ~3267 | Генерация соседних cfg |
+| `runHillClimbing` | ~3397 | Главный HC алгоритм |
+| `_hcRobScore` | ~2963 | Робастность для GA-поиска |
+
+**pine_export.js** (экспорт Pine Script):
+| Функция | Строка | Описание |
+|---------|--------|----------|
+| `generatePineScript` | 8 | Главная функция экспорта в Pine v6 |
+| `fixPineScript` | 987 | Автоисправление ошибок Pine |
+| `_addActivePinev6` | 1103 | Добавляет `active=` для toggle-групп |
+
+**core.js** (движок бэктеста):
+- `backtest(pvLo, pvHi, atrArr, cfg)` — основной бэктест-цикл
+- `_calcIndicators(cfg)` — вычисляет индикаторы
+
+### Известные баги (зафиксированы)
+- **_stopCheck() bug**: `_stopCheck = () => !_massRobRunning && !_hcRobRunning` — возвращает true если оба флага false. При запуске тестов всегда нужно установить один из флагов. Исправлено для: HC doRobFilter Phase 2, HC rob-metric Phase 2, OOS scan. НЕ исправлено для: прямых вызовов без контекста.

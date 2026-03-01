@@ -2729,6 +2729,7 @@ async function runOOSScan() {
   if (_oosScanRunning) { _oosScanRunning = false; return; }
   if (!DATA || !_visibleResults.length) return;
   _oosScanRunning = true;
+  _hcRobRunning = true; // разрешаем runRobustScoreFor работать (иначе _stopCheck()=true сразу)
   const btn = document.getElementById('btn-oos-scan');
   const status = document.getElementById('oos-scan-status');
   if (btn) btn.textContent = '⏹ Стоп';
@@ -2756,6 +2757,7 @@ async function runOOSScan() {
     if (done % 3 === 0) { await yieldToUI(); _updateHCSrcCounts(); }
   }
   _oosScanRunning = false;
+  _hcRobRunning = false;
   if (btn) btn.textContent = '🔎 OOS-скан';
   if (status) status.textContent = `✅ ${done} проверено | ≥1🛡: ${passed} | Кэш: ${_robCache.size}`;
   _updateHCSrcCounts();
