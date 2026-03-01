@@ -5,6 +5,14 @@
 
 ---
 
+## Важные правила для Claude
+
+- **GitHub токен:** В этой среде нет встроенных GitHub credentials. Если нужен push — сразу проси токен у пользователя, не трать время на поиск обходных путей. Токен передать через `git remote set-url origin https://TOKEN@github.com/xopromo/112`, после push убрать токен из URL.
+- **Commit signing:** В сессиях без pre-configured git source подпись коммитов не работает. Используй `git config commit.gpgsign false` на уровне репо.
+- **Рабочая директория:** `/home/user/112/` — клонируй именно сюда, не в другое место.
+
+---
+
 ## Проект: USE Optimizer
 
 Web-инструмент для оптимизации торговых стратегий TradingView.
