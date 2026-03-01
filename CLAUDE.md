@@ -107,19 +107,15 @@ bash agent/setup.sh
 - [x] **Pine Script v6** — перевод всех экспортов с v5 на v6
   - `pine_export.js`: `_addActivePinev6()`, 14 групп toggle→deps
   - `active=` скрывает rsi_os/ob, ma_period, pivot_left/right и др.
-
-### Исследовано, в ветках, ещё не влито в main
-- [ ] **GT-Score** — взвешенная анти-overfitting метрика вместо P/DD
-  - Ветка: `claude/research-2026-02-27-23`
+- [x] **GT-Score** — взвешенная анти-overfitting метрика как цель TPE
+  - `opt.js`: `_calcGTScore()`, чекбокс `c_use_gt`, score = GT вместо P/DD
+  - `ui.js`: колонка GT-Score, зелёный ≥5, красный <2, фильтр + сортировка
   - Формула: `(pnl/dd) × sig_mult × consistency_mult`
-  - Proof-of-concept: `experiments/hypothesis_1_gtscore.js`
-- [ ] **Experiments/** — директория с proof-of-concept скриптами от агента
 
 ### Очередь (приоритет по порядку)
-1. **GT-Score** — влить из ветки research-2026-02-27-23 в main
-2. **CPCV валидация** — combinatorial IS/OOS вместо одного split
-3. **WASM** — перевод backtest-цикла на Rust+WASM для x15 ускорения
-4. **TradingAgents** — LLM multi-agent анализ стратегий
+1. **CPCV валидация** — combinatorial IS/OOS вместо одного split
+2. **WASM** — перевод backtest-цикла на Rust+WASM для x15 ускорения
+3. **TradingAgents** — LLM multi-agent анализ стратегий
 
 ---
 
