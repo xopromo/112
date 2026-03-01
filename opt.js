@@ -67,25 +67,55 @@ function _calcGTScore(r) {
 }
 // ─────────────────────────────────────────────────────────────
 
-// ── CVR — Cross-Validation Robustness ────────────────────────
-// Делит equity curve на 6 равных временных окон.
-// CVR% = % окон с положительным PnL (0–100, выше = устойчивее).
-// Смысл: защита от "всё заработано за один период" — стратегия
-// должна быть прибыльна в большинстве временных сегментов.
-// Основан на концепции CPCV (Bailey et al.) применительно к
-// одиночной стратегии: temporal split вместо IS/OOS split.
+// ── CVR — Combinatorial Purged Cross-Validation (CPCV-style) ─
+// Делит equity curve на 6 равных фолдов, leave-one-out:
+// для каждого фолда вычисляет IS (остальные 5 фолдов) и OOS (этот фолд).
+// CVR% = среднее удержание OOS vs IS, ограниченное [0..100].
+// Значение: 80% = OOS-фолды в среднем удерживают 80% IS-производительности.
+// Отличие от старого CVR: учитывает IS базу, а не только абсолютный знак.
 function _calcCVR(eq) {
   if (!eq || eq.length < 100) return null;
-  const N = eq.length, warmup = 50, nSplits = 6;
-  const step = Math.floor((N - warmup) / nSplits);
+  const N = eq.length, warmup = 50, nFolds = 6;
+  const step = Math.floor((N - warmup) / nFolds);
   if (step < 15) return null;
-  let wins = 0;
-  for (let k = 0; k < nSplits; k++) {
+  // Per-bar gain rates for each fold
+  const foldRates = [];
+  for (let k = 0; k < nFolds; k++) {
     const s = warmup + k * step;
-    const e = k === nSplits - 1 ? N - 1 : warmup + (k + 1) * step - 1;
-    if (eq[e] - eq[s] > 0) wins++;
+    const e = k === nFolds - 1 ? N - 1 : warmup + (k + 1) * step - 1;
+    foldRates.push(step > 0 ? (eq[e] - eq[s]) / step : 0);
   }
-  return Math.round(wins / nSplits * 100);
+  // Leave-one-out: each fold as OOS, rest as IS
+  let totalRetention = 0;
+  for (let j = 0; j < nFolds; j++) {
+    const oosRate = foldRates[j];
+    let isRateSum = 0;
+    for (let k = 0; k < nFolds; k++) { if (k !== j) isRateSum += foldRates[k]; }
+    const isRate = isRateSum / (nFolds - 1);
+    // Retention: how well OOS matches IS — only meaningful if IS is positive
+    const retention = isRate > 0 ? Math.min(Math.max(oosRate / isRate, 0), 1)
+                    : isRate < 0 ? (oosRate < 0 ? 1 : 0) // consistent negative
+                    : 0.5; // IS ~= 0: neutral
+    totalRetention += retention;
+  }
+  return Math.round(totalRetention / nFolds * 100);
+}
+// ─────────────────────────────────────────────────────────────
+
+// ── Sharpe Ratio from equity curve (per-bar, timeframe-agnostic) ──
+// Sharpe = mean_return / std_return (unannualized, for relative comparison).
+// Multiplied by sqrt(n) → information ratio / t-stat (strategy confidence).
+// > 2.0 = statistically significant. Comparable within same dataset.
+function _calcSharpe(eq) {
+  if (!eq || eq.length < 10) return 0;
+  const returns = [];
+  for (let i = 1; i < eq.length; i++) returns.push(eq[i] - eq[i - 1]);
+  const n = returns.length;
+  const mean = returns.reduce((s, x) => s + x, 0) / n;
+  const variance = returns.reduce((s, x) => s + (x - mean) ** 2, 0) / n;
+  const std = Math.sqrt(variance);
+  if (std === 0) return mean > 0 ? 99 : 0;
+  return Math.round(mean / std * Math.sqrt(n) * 100) / 100;
 }
 // ─────────────────────────────────────────────────────────────
 
@@ -1024,7 +1054,7 @@ async function runOpt() {
               revSkip,revCooldown,revSrc};
           results.push({name,pnl:r.pnl,wr:r.wr,n:r.n,dd:r.dd,pdd,avg:r.avg,sig,gt,
             p1:r.p1,p2:r.p2,dwr:r.dwr,c1:r.c1,c2:r.c2,nL:r.nL||0,pL:r.pL||0,wrL:r.wrL,nS:r.nS||0,pS:r.pS||0,wrS:r.wrS,dwrLS:r.dwrLS,
-            cvr:_calcCVR(r.eq),cfg:_cfg});
+            cvr:_calcCVR(r.eq),sharpe:_calcSharpe(r.eq),pf:r.pf??1,cfg:_cfg});
           equities[name] = r.eq;
         }
       }
@@ -1229,7 +1259,7 @@ async function runOpt() {
           // _attachOOS будет вызван батчем после завершения TPE
           results.push({name,pnl:r.pnl,wr:r.wr,n:r.n,dd:r.dd,pdd,avg:r.avg,sig,gt,
             p1:r.p1,p2:r.p2,dwr:r.dwr,c1:r.c1,c2:r.c2,nL:r.nL||0,pL:r.pL||0,wrL:r.wrL,nS:r.nS||0,pS:r.pS||0,wrS:r.wrS,dwrLS:r.dwrLS,
-            cvr:_calcCVR(r.eq),cfg:_cfg_tpe});
+            cvr:_calcCVR(r.eq),sharpe:_calcSharpe(r.eq),pf:r.pf??1,cfg:_cfg_tpe});
           equities[name] = r.eq;
         }
       }
@@ -1592,7 +1622,7 @@ async function runOpt() {
                                         };
                                       results.push({name,pnl:r.pnl,wr:r.wr,n:r.n,dd:r.dd,pdd,avg:r.avg,sig,gt,
                                         p1:r.p1,p2:r.p2,dwr:r.dwr,c1:r.c1,c2:r.c2,nL:r.nL||0,pL:r.pL||0,wrL:r.wrL,nS:r.nS||0,pS:r.pS||0,wrS:r.wrS,dwrLS:r.dwrLS,
-                                        cvr:_calcCVR(r.eq),cfg:_cfg_ex});
+                                        cvr:_calcCVR(r.eq),sharpe:_calcSharpe(r.eq),pf:r.pf??1,cfg:_cfg_ex});
                                       equities[name]=r.eq;
                                       } // end else (не дубль)
                                     } // end if(r passed filter)

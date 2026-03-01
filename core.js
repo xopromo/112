@@ -267,6 +267,7 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
   let pnl = 0, trades = 0, wins = 0, maxPnl = 0, dd = 0;
   let p1 = 0, c1 = 0, w1 = 0, p2 = 0, c2 = 0, w2 = 0;
   let nL = 0, wL = 0, pL = 0, nS = 0, wS = 0, pS = 0; // лонг/шорт стат
+  let grossWin = 0, grossLoss = 0; // for Profit Factor
   const eq = new Float32Array(N);
   const start = cfg.start || 50;
   const volAvg = cfg.volAvg;
@@ -455,7 +456,8 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
       if (frc || hsl || htp || htr) {
         const tradePnl = (dir*(exitPrice-entry)/entry*100 - comm)*posSize;
         pnl += tradePnl; trades++;
-        if (tradePnl > 0) wins++;
+        if (tradePnl > 0) { wins++; grossWin += tradePnl; }
+        else { grossLoss += Math.abs(tradePnl); }
         if (i <= split) { p1+=tradePnl; c1++; if(tradePnl>0) w1++; }
         else { p2+=tradePnl; c2++; if(tradePnl>0) w2++; }
         if (dir===1) { pL+=tradePnl; nL++; if(tradePnl>0) wL++; }
@@ -746,9 +748,11 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
   const wr=trades>0?wins/trades*100:0;
   const wr1=c1>0?w1/c1*100:0, wr2=c2>0?w2/c2*100:0;
   const wrL=nL>0?wL/nL*100:null, wrS=nS>0?wS/nS*100:null;
+  const pf = grossLoss > 0 ? Math.round(grossWin / grossLoss * 100) / 100
+                           : (grossWin > 0 ? 99 : 1);
   return { pnl, wr, n:trades, dd, p1, w1:wr1, c1, p2, w2:wr2, c2, eq,
            dwr:Math.abs(wr1-wr2), avg:trades>0?pnl/trades:0,
-           nL, pL, wrL, nS, pS, wrS,
+           nL, pL, wrL, nS, pS, wrS, pf,
            dwrLS: (wrL!==null&&wrS!==null) ? Math.abs(wrL-wrS) : null };
 }
 

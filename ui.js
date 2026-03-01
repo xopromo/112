@@ -396,7 +396,7 @@ function applyFiltersDebounced() {
 
 function resetAllFilters() {
   // Сбрасываем все текстовые/числовые инпуты
-  ['f_name','f_pnl','f_wr','f_n','f_dd','f_pdd','f_sig','f_gt','f_avg','f_p1','f_p2','f_dwr'].forEach(id => {
+  ['f_name','f_pnl','f_wr','f_n','f_dd','f_pdd','f_sig','f_gt','f_cvr','f_sharpe','f_pf','f_avg','f_p1','f_p2','f_dwr'].forEach(id => {
     const el = $(id); if (el) el.value = '';
   });
   // Сбрасываем все select
@@ -418,7 +418,9 @@ function applyFilters() {
   const fPdd   = parseFloat($('f_pdd').value);
   const fSig   = parseFloat($('f_sig').value);
   const fGt    = parseFloat($('f_gt').value);
-  const fCvr   = parseFloat($('f_cvr').value);
+  const fCvr    = parseFloat($('f_cvr').value);
+  const fSharpe = parseFloat($('f_sharpe').value);
+  const fPf     = parseFloat($('f_pf').value);
   const fAvg   = parseFloat($('f_avg').value);
   const fP1    = parseFloat($('f_p1').value);
   const fP2    = parseFloat($('f_p2').value);
@@ -445,7 +447,9 @@ function applyFilters() {
     if (!isNaN(fPdd) && r.pdd < fPdd) return false;
     if (!isNaN(fSig) && (r.sig??0) < fSig) return false;
     if (!isNaN(fGt)  && (r.gt??-2) < fGt)  return false;
-    if (!isNaN(fCvr) && (r.cvr??-1) < fCvr) return false;
+    if (!isNaN(fCvr)    && (r.cvr??-1)    < fCvr)    return false;
+    if (!isNaN(fSharpe) && (r.sharpe??0)  < fSharpe) return false;
+    if (!isNaN(fPf)     && (r.pf??0)      < fPf)     return false;
     if (!isNaN(fAvg) && r.avg < fAvg) return false;
     if (!isNaN(fP1)  && r.p1  < fP1)  return false;
     if (!isNaN(fP2)  && r.p2  < fP2)  return false;
@@ -503,7 +507,7 @@ function renderResults() {
   if (_tableMode !== 'results') switchTableMode('results');
   _visibleResults = [...results]; // сброс фильтра при новом запуске
   // Очищаем поля фильтров
-  ['f_name','f_pnl','f_wr','f_n','f_dd','f_pdd','f_avg','f_p1','f_p2','f_dwr','f_rob'].forEach(id => {
+  ['f_name','f_pnl','f_wr','f_n','f_dd','f_pdd','f_sig','f_gt','f_cvr','f_sharpe','f_pf','f_avg','f_p1','f_p2','f_dwr','f_rob'].forEach(id => {
     const el=$(id); if(el) el.value='';
   });
   ['f_fav','f_split'].forEach(id => { const el=$(id); if(el) el.value=''; });
@@ -608,7 +612,9 @@ function renderVisibleResults() {
       `<td class="col-pdd ${pddCls}">${r.pdd.toFixed(1)}</td>` +
       (()=>{ const s=r.sig??0; const sc=s>=90?'pos':s>=70?'':'neg'; return `<td class="col-sig ${sc}" title="Статистическая значимость WR (z-тест)\n≥90% = значима ✅\n70–90% = под вопросом\n&lt;70% = вероятно случайно">${s}%</td>`; })() +
       (()=>{ const g=r.gt??-2; const gc=g>=5?'pos':g>=2?'':'neg'; return `<td class="col-gt ${gc}" title="GT-Score = (P/DD) × sig_mult × consistency_mult\nАнтиовефиттинг метрика: штрафует за мало сделок и нестабильный WR">${g.toFixed(2)}</td>`; })() +
-      (()=>{ const v=r.cvr??null; if(v===null) return '<td class="col-cvr muted">—</td>'; const vc=v>=80?'pos':v>=50?'':'neg'; return `<td class="col-cvr ${vc}" title="CVR% — Temporal Cross-Validation Robustness\nПроцент из 6 временных окон, где стратегия прибыльна.\n≥80% = устойчива ✅ | 50–80% = умеренно | &lt;50% = нестабильна">${v}%</td>`; })() +
+      (()=>{ const v=r.cvr??null; if(v===null) return '<td class="col-cvr muted">—</td>'; const vc=v>=80?'pos':v>=50?'':'neg'; return `<td class="col-cvr ${vc}" title="CVR% — CPCV (Combinatorial Purged Cross-Validation)\nLeave-one-out по 6 временным фолдам: среднее удержание OOS vs IS.\n≥80% = устойчивая генерализация ✅ | 50–80% = умеренно | &lt;50% = деградирует">${v}%</td>`; })() +
+      (()=>{ const v=r.sharpe??null; if(v===null||v===0) return '<td class="col-sharpe muted">—</td>'; const vc=v>=2?'pos':v>=1?'':'neg'; return `<td class="col-sharpe ${vc}" title="Sharpe Ratio (информационный коэффициент)\nmean_return/std × √n — мера статистической уверенности.\n≥2.0 = статистически значима ✅ | 1-2 = умеренно | &lt;1 = слабая стратегия">${v.toFixed(2)}</td>`; })() +
+      (()=>{ const v=r.pf??null; if(v===null) return '<td class="col-pf muted">—</td>'; const vc=v>=2?'pos':v>=1.5?'':'neg'; return `<td class="col-pf ${vc}" title="Profit Factor = сумма выигрышных сделок / сумма убыточных.\n≥2.0 = отличная стратегия ✅ | 1.5-2.0 = хорошая | &lt;1.5 = слабая | &lt;1.0 = убыточная">${v===99?'∞':v.toFixed(2)}</td>`; })() +
       `<td class="col-avg">${r.avg.toFixed(2)}</td>` +
       `<td class="col-p1 ${r.p1 >= 0 ? 'pos' : 'neg'}">${r.p1.toFixed(1)}</td>` +
       `<td class="col-p2 ${r.p2 >= 0 ? 'pos' : 'neg'}">${r.p2.toFixed(1)}</td>` +
@@ -722,7 +728,9 @@ function showDetail(r) {
     (r.wrL!=null ? `<div class="dp-stat"><div class="v ${r.dwrLS<10?'ok':r.dwrLS<25?'warn':'bad'}">${r.dwrLS.toFixed(0)}%</div><div class="l">ΔWR L/S</div></div>` : '')+
     (r.wrL!=null ? `<div class="dp-stat"><div class="v">${r.wrL.toFixed(0)}% (${r.nL})</div><div class="l">Лонг WR</div></div>` : '')+
     (r.wrS!=null ? `<div class="dp-stat"><div class="v">${r.wrS.toFixed(0)}% (${r.nS})</div><div class="l">Шорт WR</div></div>` : '')+
-    (r.cvr!=null ? `<div class="dp-stat"><div class="v ${r.cvr>=80?'pos':r.cvr>=50?'warn':'neg'}">${r.cvr}%</div><div class="l">CVR%</div></div>` : '');
+    (r.cvr!=null ? `<div class="dp-stat"><div class="v ${r.cvr>=80?'pos':r.cvr>=50?'warn':'neg'}">${r.cvr}%</div><div class="l">CVR%</div></div>` : '') +
+    (r.sharpe!=null&&r.sharpe!==0 ? `<div class="dp-stat"><div class="v ${r.sharpe>=2?'pos':r.sharpe>=1?'warn':'neg'}">${r.sharpe.toFixed(2)}</div><div class="l">Sharpe</div></div>` : '') +
+    (r.pf!=null ? `<div class="dp-stat"><div class="v ${r.pf>=2?'pos':r.pf>=1.5?'warn':'neg'}">${r.pf===99?'∞':r.pf.toFixed(2)}</div><div class="l">PF</div></div>` : '');
 
   // Helper: SL name
   function slName(pair) {
@@ -2578,6 +2586,10 @@ function doSort(col) {
     arr.sort((a,b) => d * ((a.gt??-2) - (b.gt??-2)));
   } else if (col === 21) {
     arr.sort((a,b) => d * ((a.cvr??-1) - (b.cvr??-1)));
+  } else if (col === 22) {
+    arr.sort((a,b) => d * ((a.sharpe??0) - (b.sharpe??0)));
+  } else if (col === 23) {
+    arr.sort((a,b) => d * ((a.pf??0) - (b.pf??0)));
   } else if (col <= 11) {
     const keys = ['name','pnl','wr','n','dd','pdd','avg','p1','p2','dwr','dwr','robScore'];
     const key = keys[col];
@@ -2767,6 +2779,8 @@ const _COL_DEFS = [
   { id: 'col-sig',        label: 'Sig%',                default: true },
   { id: 'col-gt',         label: 'GT-Score',            default: true },
   { id: 'col-cvr',        label: 'CVR%',                default: true },
+  { id: 'col-sharpe',     label: 'Sharpe',              default: true },
+  { id: 'col-pf',         label: 'Profit Factor',       default: true },
   { id: 'col-avg',        label: 'Avg%',                default: true },
   { id: 'col-p1',         label: '1п PnL',              default: true },
   { id: 'col-p2',         label: '2п PnL',              default: false },
