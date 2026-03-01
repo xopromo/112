@@ -3765,7 +3765,8 @@ async function runHillClimbing() {
       document.getElementById('btn-run-hc').style.display = 'none';
       document.getElementById('btn-stop-hc').style.display = '';
 
-      _hcRunning = true; // реактивируем для фазы 2 (стоп-кнопка)
+      _hcRunning = true;    // реактивируем для фазы 2 (стоп-кнопка)
+      _hcRobRunning = true; // разрешаем runRobustScoreFor работать (иначе _stopCheck()=true сразу)
       document.getElementById('btn-stop-hc').style.display = '';
       document.getElementById('btn-run-hc').style.display = 'none';
       for (let ri = 0; ri < toCheck.length; ri++) {
@@ -3792,6 +3793,7 @@ async function runHillClimbing() {
       });
 
       _hcRunning = false;
+      _hcRobRunning = false;
       document.getElementById('btn-stop-hc').style.display = 'none';
       document.getElementById('btn-run-hc').style.display = '';
       document.getElementById('hc-pbar').style.width = '100%';
