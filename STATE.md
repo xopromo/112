@@ -4,11 +4,11 @@
 > Также обновляй вручную когда вливаешь ветки в main.
 
 ## Последний цикл
-- **Дата:** 2026-02-28-21
-- **Ветка:** `claude/research-2026-02-28-21`
-- **Статус:** ПРОПУСТИТЬ (нет идей)
-- **Реализовано:** Sig% колонка (z-тест) + Pine Script v6 с active=
-- **Стоимость:** ~$0.014
+- **Дата:** 2026-03-01
+- **Ветка:** `claude/continue-project-112-ODvvw`
+- **Статус:** ВЫПОЛНЕНО
+- **Реализовано:** Sharpe Ratio колонка + Profit Factor колонка + CPCV upgrade CVR%
+- **Стоимость:** ручная сессия
 
 ## Агент
 - **Cron:** `5 * * * * /home/user/night_research.sh`
@@ -17,12 +17,12 @@
 - **Отчёты:** `/home/user/112/research_reports/`
 
 ## Очередь задач (приоритет)
-1. **GT-Score** [ГОТОВО к влитию] — ветка `claude/research-2026-02-27-23`
-   - `experiments/hypothesis_1_gtscore.js` — proof-of-concept готов
-   - Нужно: влить логику в `opt.js`, добавить колонку в `ui.js`
-2. **CPCV валидация** — combinatorial IS/OOS вместо одного split
-3. **WASM** — Rust+WASM для x15 ускорения backtest-цикла
-4. **TradingAgents** — LLM multi-agent анализ стратегий
+1. **GT-Score** ✅ — влито в main
+2. **CVR% → CPCV** ✅ — CVR переработана в leave-one-out CPCV retention метрику
+3. **Sharpe Ratio** ✅ — новая колонка в таблице
+4. **Profit Factor** ✅ — новая колонка + трекинг в core.js
+5. **WASM** — Rust+WASM для x15 ускорения backtest-цикла
+6. **TradingAgents** — LLM multi-agent анализ стратегий
 
 ## Влито в main
 | Дата | Фича | Ветка |
