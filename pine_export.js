@@ -200,7 +200,7 @@ function generatePineScript(r) {
   lines.push(`spread_pct = input.float(${f(spread,3)}, "Спред %", step=0.05, group=grp_strat)`);
   lines.push(`atr_len    = input.int(${atrP}, "Период ATR", group=grp_strat)`);
   lines.push(`atr_step   = input.int(2, "Шаг вариаций ATR", group=grp_strat)`);
-  lines.push(`max_bars   = input.int(10000, "Глубина теста", minval=100, maxval=10000, group=grp_strat)`);
+  lines.push(`max_bars   = input.int(50000, "Глубина теста", minval=100, maxval=500000, group=grp_strat)`);
   lines.push(``);
 
   // Visual
@@ -499,7 +499,8 @@ function generatePineScript(r) {
     lines.push(`    var float _pnl2 = 0.0`);
     lines.push(`    var int _cnt2 = 0`);
     lines.push(`    var int _wins2 = 0`);
-  lines.push(`    int _split = last_bar_index - max_bars + max_bars / 2`);
+  lines.push(`    int _eff = math.min(max_bars, last_bar_index + 1)`);
+  lines.push(`    int _split = last_bar_index - _eff + _eff / 2`);
   lines.push(`    var float _eq = 0.0`);
     lines.push(`    var int _sig_skip = 0`);
     lines.push(`    var int _cd_bar = -1`);
@@ -944,6 +945,10 @@ function generatePineScript(r) {
   lines.push(`        table.merge_cells(t, 0, 16, 5, 16)`);
   lines.push(`    if c_m == 0`);
   lines.push(`        table.cell(t, 0, 17, "⚠️ 0 сделок — проверь настройки и глубину теста", bgcolor=color.red, text_color=color.white, text_size=size.normal)`);
+  lines.push(`        table.merge_cells(t, 0, 17, 5, 17)`);
+  lines.push(`    else if max_bars < last_bar_index + 1`);
+  lines.push(`        int _missing = last_bar_index + 1 - max_bars`);
+  lines.push(`        table.cell(t, 0, 17, "⚠️ Данные охвачены не полностью: пропущено " + str.tostring(_missing) + " баров. Увеличь Глубину теста до " + str.tostring(last_bar_index + 1), bgcolor=color.new(color.orange,40), text_color=color.white, text_size=size.tiny)`);
   lines.push(`        table.merge_cells(t, 0, 17, 5, 17)`);
   lines.push(``);
 
