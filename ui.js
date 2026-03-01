@@ -1016,13 +1016,15 @@ async function checkPause() {
 }
 
 // ── yieldToUI: уступает управление UI без заморозки в фоновых вкладках ──
-// Использует MessageChannel вместо setTimeout(0) — браузеры НЕ
-// замедляют MessageChannel до 1000ms в фоне (в отличие от setTimeout).
-// ВАЖНО: yield должен быть настоящим macrotask-break чтобы браузер мог
-// обработать input events (скролл, клик). MessageChannel = микротаска,
-// не освобождает UI. setTimeout(0) = настоящий macrotask.
+// MessageChannel — настоящий macrotask, браузеры НЕ throttle-ят его до
+// 1000ms в фоновых вкладках (в отличие от setTimeout). Это позволяет TPE,
+// поиску соседей и тестам устойчивости работать в неактивной вкладке.
+const _yieldCh = new MessageChannel();
 function yieldToUI() {
-  return new Promise(res => setTimeout(res, 0));
+  return new Promise(res => {
+    _yieldCh.port1.onmessage = res;
+    _yieldCh.port2.postMessage(0);
+  });
 }
 
 // --- Stop ---
@@ -1603,12 +1605,12 @@ async function runRobustTest() {
     $('robust-results').innerHTML = results_html.join('');
   };
 
-  await new Promise(res=>setTimeout(res,0));
+  await yieldToUI();
 
   // ── 1. Walk-Forward ─────────────────────────────────────────
   if (tests.includes('walk')) {
     setProgress(5, '🔄 Walk-Forward...');
-    await new Promise(res=>setTimeout(res,0));
+    await yieldToUI();
     const N = fullDATA.length;
     const r1 = runOnSlice(fullDATA.slice(0, Math.floor(N*0.33)));
     const r2 = runOnSlice(fullDATA.slice(Math.floor(N*0.33), Math.floor(N*0.66)));
@@ -1632,7 +1634,7 @@ async function runRobustTest() {
   // ── 2. OOS ──────────────────────────────────────────────────
   if (tests.includes('oos')) {
     setProgress(25, '🔬 OOS (3 участка: начало/середина/конец)...');
-    await new Promise(res=>setTimeout(res,0));
+    await yieldToUI();
     const N = fullDATA.length;
     const segLen = Math.floor(N * 0.20);
     // Три OOS участка
@@ -1682,7 +1684,7 @@ async function runRobustTest() {
   // ── 3. Параметрическая чувствительность ─────────────────────
   if (tests.includes('param')) {
     setProgress(45, '🎛 Параметрическая чувствительность...');
-    await new Promise(res=>setTimeout(res,0));
+    await yieldToUI();
 
     const mutateSlPair = (pair, mult) => {
       if (!pair) return pair;
@@ -1723,7 +1725,7 @@ async function runRobustTest() {
   // ── 4. Monte Carlo (перестановки PnL по сделкам) ────────────
   if (tests.includes('mc')) {
     setProgress(60, '🎲 Monte Carlo (1000 перестановок)...');
-    await new Promise(res=>setTimeout(res,0));
+    await yieldToUI();
 
     // Собираем PnL сделок из базового прогона через equity diff
     const eq = base.eq;
@@ -1751,13 +1753,13 @@ async function runRobustTest() {
         `MC maxDD: медиана ${p50.toFixed(1)}% / p95 ${p95.toFixed(1)}%`,
         `1000 перестановок сделок. База: ${base.pnl.toFixed(1)}%`);
     }
-    await new Promise(res=>setTimeout(res,0));
+    await yieldToUI();
   }
 
   // ── 5. Шум данных ───────────────────────────────────────────
   if (tests.includes('noise')) {
     setProgress(78, '📡 Шум данных (100 прогонов)...');
-    await new Promise(res=>setTimeout(res,0));
+    await yieldToUI();
 
     const N_NOISE = Math.max(5, Math.min(200, parseInt(document.getElementById('noise_runs')?.value) || 20));
     const NOISE   = (parseFloat(document.getElementById('noise_level')?.value) || 0.2) / 100;
@@ -1769,7 +1771,7 @@ async function runRobustTest() {
       });
       const rv = runOnSlice(noisy);
       if (rv && rv.n>=5) pnls.push(rv.pnl);
-      if (sim%10===0) await new Promise(res=>setTimeout(res,0));
+      if (sim%10===0) await yieldToUI();
     }
     if (pnls.length<10) {
       addResult('⚠️','warn','Шум данных','Недостаточно результатов');
@@ -1781,7 +1783,7 @@ async function runRobustTest() {
         `Шум ±0.05%: avg ${avg.toFixed(1)}% / min ${minP.toFixed(1)}%`,
         `Разброс ${(maxP-minP).toFixed(1)}% по ${pnls.length} прогонам`);
     }
-    await new Promise(res=>setTimeout(res,0));
+    await yieldToUI();
   }
 
   setProgress(100, '✅ Готово');
@@ -2731,7 +2733,7 @@ async function runOOSScan() {
     }
     done++;
     if (status) status.textContent = `${done}/${toScan.length} | ≥1🛡: ${passed}`;
-    if (done % 3 === 0) { await new Promise(res => setTimeout(res, 0)); _updateHCSrcCounts(); }
+    if (done % 3 === 0) { await yieldToUI(); _updateHCSrcCounts(); }
   }
   _oosScanRunning = false;
   if (btn) btn.textContent = '🔎 OOS-скан';
@@ -3554,7 +3556,7 @@ async function runHillClimbing() {
       const totalCandidates = allCandidates.length;
       document.getElementById('hc-status').textContent =
         `🔎 Фаза 1: предварительный отбор из ${totalCandidates} кандидатов…`;
-      await new Promise(res => setTimeout(res, 0));
+      await yieldToUI();
 
       // ── Фаза 1: быстрый бэктест + OOS предотбор ──────────────────────
       const phase1Passed = []; // кандидаты прошедшие OOS
@@ -3578,7 +3580,7 @@ async function runHillClimbing() {
         if (ci % 5 === 0) {
           document.getElementById('hc-status').textContent =
             `🔎 Фаза 1: ${ci+1}/${totalCandidates} | OOS прошли: ${phase1Passed.length}`;
-          await new Promise(res => setTimeout(res, 0));
+          await yieldToUI();
         }
       }
 
@@ -3588,7 +3590,7 @@ async function runHillClimbing() {
         const totalPhase2 = phase1Passed.length;
         document.getElementById('hc-status').textContent =
           `🛡 Фаза 2: полные тесты на ${totalPhase2} кандидатах (OOS прошли)…`;
-        await new Promise(res => setTimeout(res, 0));
+        await yieldToUI();
 
         _hcRobRunning = true; // разрешаем noise/MC работать в фазе 2
         console.log('[HC Фаза2] robTests=', robTests, 'totalPhase2=', totalPhase2, '_hcRobRunning=', _hcRobRunning);
@@ -3614,7 +3616,7 @@ async function runHillClimbing() {
           const etaStr = remaining > 60 ? Math.round(remaining/60) + 'м ' + (remaining%60) + 'с' : remaining + 'с';
           document.getElementById('hc-status').textContent =
             `🛡 Фаза 2: ${pi+1}/${totalPhase2} | ≥${robMinThresh}🛡: ${withRob} | ~${etaStr} осталось`;
-          await new Promise(res => setTimeout(res, 0));
+          await yieldToUI();
         }
         _hcRobRunning = false; // сбрасываем после фазы 2
       }
@@ -3667,7 +3669,7 @@ async function runHillClimbing() {
               `⚡ Итер. ${iter}/${effectiveMaxIter} | Луч: ${beam.length} | Находки: ${allFound.length} | ${beam[0].score.toFixed(2)}`;
 
             if (iter % 10 === 0) {
-              await new Promise(res => setTimeout(res, 0));
+              await yieldToUI();
               if (!_hcRunning) break;
             }
           }
@@ -3693,7 +3695,7 @@ async function runHillClimbing() {
     const doGA = document.getElementById('hc_use_ga')?.checked;
     if (doGA && _hcRunning) {
       document.getElementById('hc-status').textContent = '🧬 GA-поиск запущен…';
-      await new Promise(res => setTimeout(res, 0));
+      await yieldToUI();
       const gaProgress = (gen, maxGen, best, total) => {
         document.getElementById('hc-pbar').style.width = Math.round(gen/maxGen*100) + '%';
         const bestRob = best.robScore !== undefined ? best.robScore+'/5' : best.score.toFixed(1);
@@ -3757,7 +3759,7 @@ async function runHillClimbing() {
         x.robScore = score;
         x.robMax   = robTests.length;
         x.robDetails = details;
-        await new Promise(res => setTimeout(res, 0));
+        await yieldToUI();
       }
 
       // Сортируем: сначала по robScore, потом по основной метрике
@@ -4010,7 +4012,7 @@ async function _runGA(startCfgs, opts, minTr, isRobMetric, allFound, baseScore, 
       // Сохраняем в allFound
       allFound.push({ cfg, score, r, delta: score - baseScore,
         robScore: robScore, robMax: isRobMetric ? 5 : undefined });
-      await new Promise(res => setTimeout(res, 0));
+      await yieldToUI();
     }
     if (!scored.length) break;
     scored.sort((a,b) => b.score - a.score);
@@ -4672,7 +4674,7 @@ async function runOOSOnNewData() {
     const r = srcList[i];
     if (!r.cfg) continue;
     if (progressEl) progressEl.textContent = `⏳ ${i+1}/${srcList.length}…`;
-    if (i % 5 === 0) await new Promise(res => setTimeout(res, 0));
+    if (i % 5 === 0) await yieldToUI();
 
     const origDATA = DATA;
     let rOld = null, rNew = null;
