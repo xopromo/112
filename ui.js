@@ -383,14 +383,10 @@ function switchTableMode(mode) {
   // Кнопка сравнения
   const oosBtn = document.getElementById('btn-oos-new');
   if (oosBtn) oosBtn.style.display = NEW_DATA ? '' : 'none';
-  // HC: сбрасываем все фильтры — результаты соседей несопоставимы с фильтрами results
-  // Fav: сбрасываем только f_fav='no' (иначе "не-избранные" скроет все избранные)
-  if (mode === 'hc') {
+  // При переходе в HC или Fav — сбрасываем все фильтры:
+  // фильтры основных результатов несовместимы с соседями/избранными
+  if (mode === 'hc' || mode === 'fav') {
     if (typeof resetAllFilters === 'function') resetAllFilters();
-  } else if (mode === 'fav') {
-    const fFavEl = $('f_fav');
-    if (fFavEl && fFavEl.value === 'no') fFavEl.value = '';
-    applyFilters();
   } else {
     applyFilters();
   }
@@ -420,7 +416,7 @@ function applyFiltersDebounced() {
 
 function resetAllFilters() {
   // Сбрасываем все текстовые/числовые инпуты
-  ['f_name','f_pnl','f_wr','f_n','f_dd','f_pdd','f_sig','f_gt','f_avg','f_p1','f_p2','f_dwr'].forEach(id => {
+  ['f_name','f_pnl','f_wr','f_n','f_dd','f_pdd','f_sig','f_gt','f_cvr','f_avg','f_p1','f_p2','f_dwr'].forEach(id => {
     const el = $(id); if (el) el.value = '';
   });
   // Сбрасываем все select
