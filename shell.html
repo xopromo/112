@@ -742,6 +742,14 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
     <input type="file" id="fi" accept=".csv" style="display:none">
   </div>
   <div id="finfo"></div>
+  <div style="margin-top:4px;display:flex;gap:5px;align-items:center">
+    <label style="font-size:.65em;color:var(--text3)" for="c_maxbars">Баров:</label>
+    <input type="number" id="c_maxbars" min="100" step="100" placeholder="все"
+      title="Использовать только последние N баров из загруженных данных. Оставь пустым — использовать все бары"
+      style="width:72px;font-size:.65em;padding:2px 5px;background:var(--bg3);border:1px solid var(--border2);border-radius:3px;color:var(--text1);text-align:right"
+      oninput="applyMaxBars()">
+    <span id="c_maxbars_info" style="font-size:.6em;color:var(--text3)"></span>
+  </div>
   <div id="finfo-append" style="font-size:.6em;color:var(--text3);margin-top:2px"></div>
   <div style="margin-top:5px;display:flex;gap:5px;align-items:center;flex-wrap:wrap">
     <button onclick="document.getElementById('fi_append').click()"

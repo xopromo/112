@@ -104,6 +104,8 @@
 // GLOBALS
 // ============================================================
 let DATA = null;
+let _rawDATA = null;    // полные загруженные данные до среза по max bars
+let _rawDataInfo = '';  // описание источника для finfo ("✅ filename" и т.п.)
 let NEW_DATA = null;  // Новые данные для OOS-проверки избранных
 let HAS_VOLUME = false;
 let results = [];
@@ -169,7 +171,9 @@ function loadFile(file) {
   const reader = new FileReader();
   reader.onload = e => {
     parseCSV(e.target.result);
-    $('finfo').textContent = '✅ ' + file.name + ': ' + DATA.length + ' баров';
+    _rawDATA = DATA;
+    _rawDataInfo = '✅ ' + file.name;
+    applyMaxBars();
     $('rbtn').disabled = false;
     updateVolStatus();
     updatePreview();
@@ -199,6 +203,21 @@ function parseCSV(text) {
       DATA.push({ o: +c[oi], h: +c[hi], l: +c[li], c: +c[ci], t: ti >= 0 ? +c[ti] : 0, v: vol });
     }
   }
+}
+
+// ============================================================
+// СРЕЗ ДАННЫХ — применяет ограничение "последних N баров"
+// ============================================================
+function applyMaxBars() {
+  if (!_rawDATA) return;
+  const n = parseInt($('c_maxbars')?.value) || 0;
+  const total = _rawDATA.length;
+  DATA = (n > 0 && n < total) ? _rawDATA.slice(total - n) : _rawDATA;
+  const used = DATA.length;
+  const suffix = used < total ? ` ⤵ ${used}` : '';
+  if ($('finfo')) $('finfo').textContent = _rawDataInfo + ': ' + total + ' баров' + suffix;
+  const infoEl = $('c_maxbars_info');
+  if (infoEl) infoEl.textContent = used < total ? `из ${total}` : '';
 }
 
 // ============================================================
@@ -244,15 +263,15 @@ function appendFile(file) {
       }
     }
 
-    const prevCount = DATA.length;
-    DATA = merged;
+    const prevCount = (_rawDATA || DATA).length;
+    _rawDATA = merged;
+    _appendedFiles.push(file.name);
+    _rawDataInfo = '✅ Всего: ' + _appendedFiles.length + ' файл(ов)';
+    applyMaxBars();
+    const added = _rawDATA.length - prevCount;
 
     // Проверяем volume
     HAS_VOLUME = DATA.some(b => b.v > 0);
-
-    _appendedFiles.push(file.name);
-    const added = DATA.length - prevCount;
-    $('finfo').textContent = '✅ Всего: ' + DATA.length + ' баров (' + _appendedFiles.length + ' файл(ов))';
     $('finfo-append').textContent = '+ ' + file.name + ': добавлено ' + added + ' новых баров';
     $('btn-clear-data').style.display = 'inline-block';
     $('rbtn').disabled = false;
@@ -264,11 +283,11 @@ function appendFile(file) {
 
 function clearAppendedData() {
   if (!confirm('Сбросить накопленные данные? Останется только последний загруженный файл.')) return;
-  // Перезагружаем последний файл
   _appendedFiles = [];
-  DATA = [];
+  DATA = []; _rawDATA = null; _rawDataInfo = '';
   $('finfo').textContent = '';
   $('finfo-append').textContent = '';
+  const infoEl = $('c_maxbars_info'); if (infoEl) infoEl.textContent = '';
   $('btn-clear-data').style.display = 'none';
   $('rbtn').disabled = true;
   alert('Данные сброшены. Загрузи основной CSV заново.');
