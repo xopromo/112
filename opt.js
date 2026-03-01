@@ -314,6 +314,7 @@ async function runOpt() {
   const commTotal = comm + spread; // итоговая стоимость одной стороны сделки
   const minTrades=$n('c_mint')||30;
   const maxDD=$n('c_maxdd')||300;
+  const _useGT = $c('c_use_gt');
 
   // Entry flags
   const usePv=$c('e_pv'),useEng=$c('e_eng'),usePin=$c('e_pin');
@@ -1169,13 +1170,13 @@ async function runOpt() {
       finally { if (_useOOS) DATA = _fullDATA; }
       done++;
       // Мягкий score: градация для всех результатов, не только прошедших фильтр
-      // Прошёл фильтр: P/DD (основная метрика)
+      // Прошёл фильтр: P/DD или GT-Score (зависит от c_use_gt)
       // Не прошёл: небольшой отрицательный score пропорционально насколько близко
       //   — помогает TPE уходить от совсем плохих зон
       let score;
       if (r && r.n >= minTrades && r.dd <= maxDD) {
         const pdd = r.dd > 0 ? r.pnl / r.dd : (r.pnl > 0 ? 50 : 0);
-        score = Math.max(0, pdd);
+        score = Math.max(0, _useGT ? _calcGTScore(r) : pdd);
       } else if (r && r.n > 0) {
         // Частичный score: pnl/maxDD нормализованный в [-1, 0)
         // Если pnl > 0 но DD превышает — слегка отрицательный
