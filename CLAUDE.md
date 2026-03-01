@@ -140,3 +140,23 @@ bash agent/setup.sh
 cd /home/user/112
 python build.py   # → USE_Optimizer_v6_built.html
 ```
+
+---
+
+## Установленные инструменты Claude Code
+
+### Context Mode (сжатие контекста)
+
+MCP-сервер, который сжимает вывод инструментов на ~98%, продлевая сессию с 30 мин до 3 часов.
+Источник: https://github.com/mksglu/claude-context-mode
+
+**Файлы на сервере:**
+- Код: `/home/user/.claude-context-mode/`
+- MCP-регистрация: `/root/.claude.json` (проект `/home/user/112`)
+- Хуки: `/root/.claude/settings.json` (PreToolUse для Bash, WebFetch, Read, Grep, Task)
+
+**Переустановка (если среда была сброшена):**
+```bash
+cd /home/user/112
+bash agent/setup_context_mode.sh
+```
