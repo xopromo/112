@@ -5859,8 +5859,8 @@ function switchTableMode(mode) {
   // Кнопка сравнения
   const oosBtn = document.getElementById('btn-oos-new');
   if (oosBtn) oosBtn.style.display = NEW_DATA ? '' : 'none';
-  // При переключении в режим HC — сбрасываем фильтры автоматически
-  if (mode === 'hc') {
+  // При переключении в HC или Fav — сбрасываем фильтры чтобы не скрыть результаты
+  if (mode === 'hc' || mode === 'fav') {
     if (typeof resetAllFilters === 'function') resetAllFilters();
   } else {
     applyFilters();
