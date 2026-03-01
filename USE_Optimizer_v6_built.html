@@ -5859,9 +5859,14 @@ function switchTableMode(mode) {
   // Кнопка сравнения
   const oosBtn = document.getElementById('btn-oos-new');
   if (oosBtn) oosBtn.style.display = NEW_DATA ? '' : 'none';
-  // При переключении в HC или Fav — сбрасываем фильтры чтобы не скрыть результаты
-  if (mode === 'hc' || mode === 'fav') {
+  // HC: сбрасываем все фильтры — результаты соседей несопоставимы с фильтрами results
+  // Fav: сбрасываем только f_fav='no' (иначе "не-избранные" скроет все избранные)
+  if (mode === 'hc') {
     if (typeof resetAllFilters === 'function') resetAllFilters();
+  } else if (mode === 'fav') {
+    const fFavEl = $('f_fav');
+    if (fFavEl && fFavEl.value === 'no') fFavEl.value = '';
+    applyFilters();
   } else {
     applyFilters();
   }
@@ -8800,7 +8805,7 @@ function stopHillClimbing() {
 function _hcMetric(r, metric) {
   if (!r || r.n < 5) return -Infinity;
   switch(metric) {
-    case 'pdd': return r.dd > 0 ? r.pnl / r.dd : r.pnl > 0 ? 999 : 0;
+    case 'pdd': return r.dd > 0 ? r.pnl / r.dd : r.pnl > 0 ? 99 : 0;
     case 'pnl': return r.pnl;
     case 'wr':  return r.wr;
     case 'avg': return r.avg;
@@ -9534,7 +9539,8 @@ async function runHillClimbing() {
               const score = _hcMetric(r, metric);
               candidates.push({ cfg: nc, score, r });
               // Сохраняем все соседи не хуже 90% базы — чтобы показывать альтернативы
-              if (score >= baseScore * 0.90) {
+              // Порог: baseScore - 10% от |baseScore| (корректно и для отрицательных значений)
+              if (score >= baseScore - Math.abs(baseScore) * 0.10) {
                 allFound.push({ cfg: nc, score, r, delta: score - baseScore });
               }
             }
