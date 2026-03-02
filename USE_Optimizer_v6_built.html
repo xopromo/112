@@ -4218,18 +4218,23 @@ async function runOpt() {
       const ind   = _calcIndicators(cfg);
       const btCfg = buildBtCfg(cfg, ind);
       return backtest(ind.pvLo, ind.pvHi, ind.atrArr, btCfg);
-    } catch(e) { return null; }
+    } catch(e) { console.error('[_runOOS] exception:', e, cfg); return null; }
     finally { DATA = origDATA; }
   }
 
   // Хелпер: добавить OOS результаты в cfg после нахождения результата.
   // name — ключ в глобальном equities; если передан, обновляет equities полной equity-кривой.
-  function _attachOOS(cfg, name) {
+  // isTradeN — количество сделок IS-прогона (для диагностики IS > TV инверсии).
+  function _attachOOS(cfg, name, isTradeN) {
     if (!_useOOS) return;
     // Запускаем бэктест на ПОЛНЫХ данных для непрерывной equity-кривой.
     // Делим её по _isN: нет проблемы прогрева индикаторов в OOS-части.
     const rFull = _runOOS(_fullDATA, cfg);
     cfg._oos = { forward: null, isPct: Math.round(_isN / N * 100) };
+    // Диагностика: IS сделок не может быть больше TV сделок (оба прогона с bar 0).
+    if (rFull && typeof isTradeN === 'number' && isTradeN > rFull.n) {
+      console.warn('[_attachOOS] IS > TV trades:', isTradeN, '>', rFull.n, cfg);
+    }
     if (!rFull || !rFull.eq || rFull.eq.length < _isN + 5) return;
     const eq       = rFull.eq;
     const N_eq     = eq.length;
@@ -4996,7 +5001,7 @@ async function runOpt() {
     if (_useOOS && results.length > 0) {
       setMcPhase(`⏳ OOS проверка ${results.length} результатов…`);
       for (let oi = 0; oi < results.length; oi++) {
-        _attachOOS(results[oi].cfg, results[oi].name);
+        _attachOOS(results[oi].cfg, results[oi].name, results[oi].n);
         if (oi % 50 === 0) { await yieldToUI(); }
       }
     }
@@ -5333,7 +5338,7 @@ async function runOpt() {
     if (_useOOS && results.length > 0) {
       setMcPhase(`⏳ OOS проверка ${results.length} результатов…`);
       for (let oi = 0; oi < results.length; oi++) {
-        _attachOOS(results[oi].cfg, results[oi].name);
+        _attachOOS(results[oi].cfg, results[oi].name, results[oi].n);
         if (oi % 50 === 0) { await yieldToUI(); }
       }
     }
@@ -5586,7 +5591,7 @@ async function runOpt() {
   if (_useOOS && results.length > 0) {
     setMcPhase(`⏳ OOS проверка ${results.length} результатов…`);
     for (let oi = 0; oi < results.length; oi++) {
-      _attachOOS(results[oi].cfg, results[oi].name);
+      _attachOOS(results[oi].cfg, results[oi].name, results[oi].n);
       if (oi % 50 === 0) { await yieldToUI(); }
     }
   }
@@ -5649,12 +5654,18 @@ function _calcIndicators(cfg) {
   const rsiArr = cfg.useRSI ? calcRSI(14) : null;
 
   // ── Bollinger Bands ───────────────────────────────────────
-  let bbB = null;
+  let bbB = null, bbD = null;
   if (cfg.useBoll) {
     const bl = cfg.bbLen || 20;
     const bm = cfg.bbMult || 2;
     bbB = calcSMA(closes, bl);
-    // bbD не нужен backtest напрямую — передаём только bbB (средняя линия)
+    bbD = new Float64Array(N);
+    for (let i = bl - 1; i < N; i++) {
+      const mean = bbB[i];
+      let s = 0;
+      for (let j = i - bl + 1; j <= i; j++) s += (closes[j] - mean) ** 2;
+      bbD[i] = Math.sqrt(s / bl) * bm;
+    }
   }
 
   // ── Donchian ──────────────────────────────────────────────
@@ -5768,7 +5779,7 @@ function _calcIndicators(cfg) {
   return {
     pvLo, pvHi, atrArr, atrAvg,
     maArr, maArrConfirm, adxArr, rsiArr,
-    bbB, donH, donL,
+    bbB, bbD, donH, donL,
     atrBoMA, atrBoATR2,
     matMA, matZone,
     sqzOn, sqzCount,
@@ -5802,6 +5813,7 @@ function buildBtCfg(cfg, ind) {
     pinRatio:   cfg.pinRatio   || 2,
     useBoll:    cfg.useBoll    || false,
     bbB:        ind.bbB,
+    bbD:        ind.bbD,
     useDonch:   cfg.useDonch   || false,
     useAtrBo:   cfg.useAtrBo   || false,
     atrBoMult:  cfg.atrBoMult  || 2,
