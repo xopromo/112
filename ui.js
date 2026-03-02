@@ -695,25 +695,51 @@ function showDetail(r) {
 
   $('dp-title').textContent = r.name;
 
-  // Stats bar
+  // Stats bar — IS row
   const pddCls = r.pdd>=10?'pos':r.pdd>=5?'warn':'neg';
   const dwrCls = r.dwr<10?'ok':r.dwr<20?'warn':'bad';
-  $('dp-stats').innerHTML =
+  const _fwd = r.cfg && r.cfg._oos && r.cfg._oos.forward;
+  const _isLabel = _fwd ? `<div class="dp-stats-lbl">IS · оптимизация (${r.cfg._oos.isPct}%)</div>` : '';
+  $('dp-stats').innerHTML = _isLabel +
+    `<div class="dp-stats-row">`+
     `<div class="dp-stat"><div class="v ${r.pnl>=0?'pos':'neg'}">${r.pnl.toFixed(1)}%</div><div class="l">PnL</div></div>`+
     `<div class="dp-stat"><div class="v">${r.wr.toFixed(1)}%</div><div class="l">WinRate</div></div>`+
     `<div class="dp-stat"><div class="v muted">${r.n}</div><div class="l">Сделок</div></div>`+
     `<div class="dp-stat"><div class="v neg">${r.dd.toFixed(1)}%</div><div class="l">MaxDD</div></div>`+
     `<div class="dp-stat"><div class="v ${pddCls}">${r.pdd.toFixed(1)}</div><div class="l">P/DD</div></div>`+
-    `<div class="dp-stat"><div class="v ${dwrCls}">${r.dwr.toFixed(1)}%</div><div class="l">ΔWR сплит</div></div>`;
-
-  // Split
-  $('dp-stats').innerHTML +=
+    `<div class="dp-stat"><div class="v ${dwrCls}">${r.dwr.toFixed(1)}%</div><div class="l">ΔWR сплит</div></div>`+
     `<div class="dp-stat"><div class="v ${r.p1>=0?'pos':'neg'}">${r.p1.toFixed(1)}%</div><div class="l">1п PnL (${r.c1}сд)</div></div>`+
     `<div class="dp-stat"><div class="v ${r.p2>=0?'pos':'neg'}">${r.p2.toFixed(1)}%</div><div class="l">2п PnL (${r.c2}сд)</div></div>`+
     (r.wrL!=null ? `<div class="dp-stat"><div class="v ${r.dwrLS<10?'ok':r.dwrLS<25?'warn':'bad'}">${r.dwrLS.toFixed(0)}%</div><div class="l">ΔWR L/S</div></div>` : '')+
     (r.wrL!=null ? `<div class="dp-stat"><div class="v">${r.wrL.toFixed(0)}% (${r.nL})</div><div class="l">Лонг WR</div></div>` : '')+
     (r.wrS!=null ? `<div class="dp-stat"><div class="v">${r.wrS.toFixed(0)}% (${r.nS})</div><div class="l">Шорт WR</div></div>` : '')+
-    (r.cvr!=null ? `<div class="dp-stat"><div class="v ${r.cvr>=80?'pos':r.cvr>=50?'warn':'neg'}">${r.cvr}%</div><div class="l">CVR%</div></div>` : '');
+    (r.cvr!=null ? `<div class="dp-stat"><div class="v ${r.cvr>=80?'pos':r.cvr>=50?'warn':'neg'}">${r.cvr}%</div><div class="l">CVR%</div></div>` : '')+
+    `</div>`;
+
+  // TradingView row (full data) — only when IS/OOS was enabled
+  if (_fwd && _fwd.pnlFull != null) {
+    const tvPnl = _fwd.pnlFull, tvWr = _fwd.wr, tvN = _fwd.n, tvDd = _fwd.dd;
+    const tvPdd = _fwd.pdd ?? 0, tvDwr = _fwd.dwr ?? 0;
+    const tvP1 = _fwd.p1 ?? 0, tvP2 = _fwd.p2 ?? 0;
+    const tvC1 = _fwd.c1 ?? 0, tvC2 = _fwd.c2 ?? 0;
+    const tvAvg = _fwd.avg ?? 0;
+    const tvPddCls = tvPdd>=10?'pos':tvPdd>=5?'warn':'neg';
+    const tvDwrCls = tvDwr<10?'ok':tvDwr<20?'warn':'bad';
+    const oosPct = 100 - r.cfg._oos.isPct;
+    $('dp-stats').innerHTML +=
+      `<div class="dp-stats-lbl tv">TradingView · полные данные (${oosPct}% сверх IS)</div>`+
+      `<div class="dp-stats-row">`+
+      `<div class="dp-stat"><div class="v ${tvPnl>=0?'pos':'neg'}">${tvPnl.toFixed(1)}%</div><div class="l">PnL</div></div>`+
+      `<div class="dp-stat"><div class="v">${tvWr.toFixed(1)}%</div><div class="l">WinRate</div></div>`+
+      `<div class="dp-stat"><div class="v muted">${tvN}</div><div class="l">Сделок</div></div>`+
+      `<div class="dp-stat"><div class="v neg">${tvDd.toFixed(1)}%</div><div class="l">MaxDD</div></div>`+
+      `<div class="dp-stat"><div class="v ${tvPddCls}">${tvPdd.toFixed(1)}</div><div class="l">P/DD</div></div>`+
+      `<div class="dp-stat"><div class="v ${tvDwrCls}">${tvDwr.toFixed(1)}%</div><div class="l">ΔWR сплит</div></div>`+
+      `<div class="dp-stat"><div class="v ${tvP1>=0?'pos':'neg'}">${tvP1.toFixed(1)}%</div><div class="l">1п PnL (${tvC1}сд)</div></div>`+
+      `<div class="dp-stat"><div class="v ${tvP2>=0?'pos':'neg'}">${tvP2.toFixed(1)}%</div><div class="l">2п PnL (${tvC2}сд)</div></div>`+
+      `<div class="dp-stat"><div class="v">${tvAvg.toFixed(2)}%</div><div class="l">Avg сделка</div></div>`+
+      `</div>`;
+  }
 
   // Helper: SL name
   function slName(pair) {

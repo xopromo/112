@@ -448,10 +448,22 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
 
 .dp-stats {
   display: flex;
-  gap: 0;
+  flex-direction: column;
   flex-shrink: 0;
   border-bottom: 1px solid var(--border);
 }
+.dp-stats-row { display: flex; }
+.dp-stats-lbl {
+  font-size: .48em;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  background: var(--bg2);
+  border-top: 1px solid var(--border);
+  color: var(--text2);
+}
+.dp-stats-lbl.tv { color: var(--accent); }
+.dp-stats-lbl:first-child { border-top: none; }
 .dp-stat {
   flex: 1;
   padding: 8px 6px;
