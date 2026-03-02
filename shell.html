@@ -1273,10 +1273,10 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
           <th class="col-dwr" data-sort="9" style="min-width:44px;resize:horizontal;overflow:auto;cursor:pointer">ΔWR ↕</th>
           <th class="col-split" data-sort="10" style="min-width:44px;resize:horizontal;overflow:auto;cursor:pointer">Split ↕</th>
           <th class="col-ls" data-sort="17" title="Разница WinRate лонг vs шорт" style="min-width:44px;resize:horizontal;overflow:auto;cursor:pointer">L/S ↕</th>
-          <th class="col-tv-score" data-sort="22" onclick="doSort(22)" title="Насколько стратегия держится на новых данных (IS→TV): ✓ хорошо / ~ умеренно / ✗ деградация" style="min-width:32px;resize:horizontal;overflow:auto;color:#f90;cursor:pointer">TV ↕</th>
-          <th class="col-tv-dpnl" data-sort="23" onclick="doSort(23)" title="IS PnL vs TV PnL: % удержания. ≥80% = хорошо, ≥50% = умеренно" style="min-width:60px;resize:horizontal;overflow:auto;color:#f90;cursor:pointer">ΔPnL TV ↕</th>
-          <th class="col-tv-ddd" data-sort="24" onclick="doSort(24)" title="Во сколько раз TV MaxDD больше IS MaxDD. ≤1.3 = хорошо" style="min-width:56px;resize:horizontal;overflow:auto;color:#f90;cursor:pointer">ΔDD TV ↕</th>
-          <th class="col-tv-dpdd" data-sort="25" onclick="doSort(25)" title="Изменение P/DD: % удержания. ≥70% = хорошо" style="min-width:56px;resize:horizontal;overflow:auto;color:#f90;cursor:pointer">ΔP/DD TV ↕</th>
+          <th class="col-tv-score" data-sort="22" title="OOS прибылен + скорость роста ≥50% от IS + DD не взорвался" style="min-width:32px;resize:horizontal;overflow:auto;color:#f90;cursor:pointer">TV ↕</th>
+          <th class="col-tv-dpnl" data-sort="23" title="OOS PnL — прибыль только за OOS-период (последние 30%). Показывает, зарабатывает ли стратегия на НОВЫХ данных" style="min-width:64px;resize:horizontal;overflow:auto;color:#f90;cursor:pointer">OOS PnL ↕</th>
+          <th class="col-tv-ddd" data-sort="24" title="Во сколько раз TV MaxDD больше IS MaxDD. ≤1.5 = хорошо" style="min-width:56px;resize:horizontal;overflow:auto;color:#f90;cursor:pointer">ΔDD TV ↕</th>
+          <th class="col-tv-dpdd" data-sort="25" title="TV P/DD vs IS P/DD: % удержания. ≥70% = хорошо" style="min-width:56px;resize:horizontal;overflow:auto;color:#f90;cursor:pointer">ΔP/DD TV ↕</th>
           <th class="col-rob" data-sort="11" title="Всего тестов пройдено" style="min-width:44px;resize:horizontal;overflow:auto;cursor:pointer">Rob ↕</th>
           <th class="col-rob-oos" data-sort="12" title="OOS: 3 участка" style="min-width:36px;resize:horizontal;overflow:auto;color:var(--accent);cursor:pointer">OOS</th>
           <th class="col-rob-walk" data-sort="13" title="Walk-Forward" style="min-width:36px;resize:horizontal;overflow:auto;color:var(--accent);cursor:pointer">WF</th>
@@ -1320,7 +1320,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
             <option value="1">~ умеренно</option>
             <option value="0">✗ деградация</option>
           </select></th>
-          <th class="col-tv-dpnl"><input class="tf-inp" id="f_tv_dpnl" placeholder="ret≥%" oninput="applyFiltersDebounced()" title="Мин. % удержания PnL (ret%)"></th>
+          <th class="col-tv-dpnl"><input class="tf-inp" id="f_tv_dpnl" placeholder="OOS≥%" oninput="applyFiltersDebounced()" title="Мин. OOS PnL (прибыль за OOS-период)"></th>
           <th class="col-tv-ddd"><input class="tf-inp" id="f_tv_ddd" placeholder="×≤" oninput="applyFiltersDebounced()" title="Макс. рост DD (×1.3 = не вырос)"></th>
           <th class="col-tv-dpdd"><input class="tf-inp" id="f_tv_dpdd" placeholder="ret≥%" oninput="applyFiltersDebounced()" title="Мин. % удержания P/DD"></th>
           <th class="col-rob"><select class="tf-sel" id="f_rob" onchange="applyFiltersDebounced()" title="Мин. пиктограмма Rob (≥ выбранного)">

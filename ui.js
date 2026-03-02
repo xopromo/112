@@ -504,18 +504,27 @@ function applyFilters() {
     const fTvDpdd  = parseFloat($('f_tv_dpdd')?.value);
     if (fTvScore !== '' || !isNaN(fTvDpnl) || !isNaN(fTvDdd) || !isNaN(fTvDpdd)) {
       const f = r.cfg?._oos?.forward;
-      if (!f || f.pnlFull == null) return false; // нет TV данных — исключаем при фильтре
-      const retPnl = r.pnl !== 0 ? f.pnlFull / Math.abs(r.pnl) * 100 : 0;
-      const mulDd  = r.dd > 0 ? f.dd / r.dd : 1;
+      if (!f || f.pnl == null) return false; // нет TV данных — исключаем при фильтре
+      const oosGain = f.pnl;
+      const isGain  = f.isGain ?? 0;
+      const isPct   = r.cfg._oos.isPct;
+      const oosPct  = 100 - isPct;
+      const isRate  = isPct  > 0 ? isGain  / isPct  : 0;
+      const oosRate = oosPct > 0 ? oosGain / oosPct : 0;
+      const rateRatio = isRate > 0 ? oosRate / isRate * 100 : (oosGain > 0 ? 200 : (oosGain < 0 ? -100 : 0));
+      const mulDd  = r.dd > 0 ? f.dd / r.dd : (f.dd > 0 ? 99 : 1);
       const retPdd = r.pdd > 0 ? (f.pdd??0) / r.pdd * 100 : 0;
-      const gPnl = retPnl>=80, okPnl = retPnl>=50;
-      const gDd  = mulDd<=1.3, okDd  = mulDd<=2.0;
-      const gPdd = retPdd>=70, okPdd = retPdd>=40;
-      const tvScore = (gPnl && gDd && gPdd) ? 2 : (!okPnl || !okDd || !okPdd) ? 0 : 1;
+      const oosProfit = oosGain > 0;
+      const goodRate  = rateRatio >= 70, okRate = rateRatio >= 30;
+      const goodDd    = mulDd <= 1.5,    okDd   = mulDd <= 2.5;
+      const goodPdd   = retPdd >= 70,    okPdd  = retPdd >= 40;
+      const allGood = oosProfit && goodRate && goodDd && goodPdd;
+      const allBad  = !oosProfit || !okDd;
+      const tvScore = allGood ? 2 : allBad ? 0 : 1;
       if (fTvScore !== '' && fTvScore !== undefined && tvScore < parseInt(fTvScore)) return false;
-      if (!isNaN(fTvDpnl) && retPnl < fTvDpnl) return false;
-      if (!isNaN(fTvDdd)  && mulDd  > fTvDdd)  return false;
-      if (!isNaN(fTvDpdd) && retPdd < fTvDpdd) return false;
+      if (!isNaN(fTvDpnl) && oosGain  < fTvDpnl) return false;
+      if (!isNaN(fTvDdd)  && mulDd    > fTvDdd)  return false;
+      if (!isNaN(fTvDpdd) && retPdd   < fTvDpdd) return false;
     }
     return true;
   });
@@ -630,31 +639,40 @@ function renderVisibleResults() {
       (()=>{
         const f = r.cfg && r.cfg._oos && r.cfg._oos.forward;
         if (!f || f.pnlFull == null) return '<td class="col-tv-score muted">—</td><td class="col-tv-dpnl muted">—</td><td class="col-tv-ddd muted">—</td><td class="col-tv-dpdd muted">—</td>';
-        const isPnl = r.pnl, tvPnl = f.pnlFull;
+        // oosGain/isGain — из ОДНОГО полного бэктеста (корректное сравнение)
+        const oosGain = f.pnl;           // прибыль только за OOS-период (последние 30%)
+        const isGain  = f.isGain ?? 0;   // прибыль за IS-период из полного бэктеста
+        const isPct   = r.cfg._oos.isPct;
+        const oosPct  = 100 - isPct;
+        // Скорость роста: PnL за 1% времени. Правильное сравнение IS↔OOS
+        const isRate  = isPct  > 0 ? isGain  / isPct  : 0;
+        const oosRate = oosPct > 0 ? oosGain / oosPct : 0;
+        // rateRatio: OOS скорость / IS скорость. 100% = одинаково, >100% = ускоряется
+        const rateRatio = isRate > 0 ? oosRate / isRate * 100
+                        : (oosGain > 0 ? 200 : (oosGain < 0 ? -100 : 0));
+        // DD и P/DD сравниваем между полным TV бэктестом и IS-only бэктестом
         const isDd  = r.dd,  tvDd  = f.dd;
-        const isPdd = r.pdd, tvPdd = f.pdd??0;
-        // ΔPnL: абс. разница + % удержания
-        const dPnl  = tvPnl - isPnl;
-        const retPnl = isPnl !== 0 ? tvPnl / Math.abs(isPnl) * 100 : 0;
-        // ΔDD: абс. разница + во сколько раз вырос
+        const isPdd = r.pdd, tvPdd = f.pdd ?? 0;
         const dDd   = tvDd - isDd;
-        const mulDd = isDd > 0 ? tvDd / isDd : 1;
-        // ΔP/DD: абс. разница + % удержания
+        const mulDd = isDd > 0 ? tvDd / isDd : (tvDd > 0 ? 99 : 1);
         const dPdd  = tvPdd - isPdd;
         const retPdd = isPdd > 0 ? tvPdd / isPdd * 100 : 0;
-        // TV score: хорошая = retPnl≥80, mulDd≤1.3, retPdd≥70
-        const goodPnl = retPnl >= 80, okPnl = retPnl >= 50;
-        const goodDd  = mulDd <= 1.3, okDd  = mulDd <= 2.0;
-        const goodPdd = retPdd >= 70, okPdd = retPdd >= 40;
-        const allGood = goodPnl && goodDd && goodPdd;
-        const allBad  = !okPnl || !okDd || !okPdd;
+        // TV score: главный критерий — OOS ПРИБЫЛЕН
+        const oosProfit = oosGain > 0;
+        const goodRate  = rateRatio >= 70;   // OOS растёт не хуже 70% скорости IS
+        const okRate    = rateRatio >= 30;
+        const goodDd    = mulDd <= 1.5,  okDd  = mulDd <= 2.5;
+        const goodPdd   = retPdd >= 70,  okPdd = retPdd >= 40;
+        const allGood = oosProfit && goodRate && goodDd && goodPdd;
+        const allBad  = !oosProfit || !okDd;
         const scoreIcon = allGood ? '✓' : allBad ? '✗' : '~';
         const scoreCls  = allGood ? 'pos' : allBad ? 'neg' : 'warn';
-        const pnlCls2  = goodPnl ? 'pos' : okPnl ? 'warn' : 'neg';
-        const ddCls2   = goodDd  ? 'pos' : okDd  ? 'warn' : 'neg';
-        const pddCls2  = goodPdd ? 'pos' : okPdd ? 'warn' : 'neg';
-        return `<td class="col-tv-score ${scoreCls}" title="PnL удержано ${retPnl.toFixed(0)}% · DD ×${mulDd.toFixed(1)} · P/DD удержано ${retPdd.toFixed(0)}%">${scoreIcon}</td>`+
-          `<td class="col-tv-dpnl ${pnlCls2}" title="IS: ${isPnl.toFixed(1)}% → TV: ${tvPnl.toFixed(1)}%"><span style="font-size:.9em">${dPnl>=0?'+':''}${dPnl.toFixed(1)}</span><br><span style="font-size:.65em;color:var(--text2)">${retPnl.toFixed(0)}% ret</span></td>`+
+        const oosCls    = oosGain >= 0 ? (goodRate ? 'pos' : 'warn') : 'neg';
+        const ddCls2    = goodDd  ? 'pos' : okDd  ? 'warn' : 'neg';
+        const pddCls2   = goodPdd ? 'pos' : okPdd ? 'warn' : 'neg';
+        const rateLbl   = `${rateRatio >= 0 ? '+' : ''}${rateRatio.toFixed(0)}% rate`;
+        return `<td class="col-tv-score ${scoreCls}" title="OOS PnL: ${oosGain.toFixed(1)}% · IS скорость: ${isRate.toFixed(2)}/% · OOS скорость: ${oosRate.toFixed(2)}/% · DD ×${mulDd.toFixed(1)}">${scoreIcon}</td>`+
+          `<td class="col-tv-dpnl ${oosCls}" title="OOS PnL (только за последние ${oosPct}%): ${oosGain.toFixed(1)}%&#10;IS PnL (в полном бэктесте, первые ${isPct}%): ${isGain.toFixed(1)}%&#10;Скорость: IS=${isRate.toFixed(2)}%/1%, OOS=${oosRate.toFixed(2)}%/1%"><span style="font-size:.9em">${oosGain>=0?'+':''}${oosGain.toFixed(1)}</span><br><span style="font-size:.65em;color:var(--text2)">${rateLbl}</span></td>`+
           `<td class="col-tv-ddd ${ddCls2}" title="IS DD: ${isDd.toFixed(1)}% → TV DD: ${tvDd.toFixed(1)}%"><span style="font-size:.9em">${dDd>=0?'+':''}${dDd.toFixed(1)}</span><br><span style="font-size:.65em;color:var(--text2)">×${mulDd.toFixed(1)}</span></td>`+
           `<td class="col-tv-dpdd ${pddCls2}" title="IS P/DD: ${isPdd.toFixed(1)} → TV P/DD: ${tvPdd.toFixed(1)}"><span style="font-size:.9em">${dPdd>=0?'+':''}${dPdd.toFixed(1)}</span><br><span style="font-size:.65em;color:var(--text2)">${retPdd.toFixed(0)}% ret</span></td>`;
       })() +
@@ -2675,19 +2693,23 @@ function doSort(col) {
   } else if (col === 17) {
     arr.sort((a,b) => d * ((a.dwrLS ?? 999) - (b.dwrLS ?? 999)));
   } else if (col >= 22 && col <= 25) {
-    // TV delta columns — sort by computed values
     const _tvVal = (r, c) => {
       const f = r.cfg?._oos?.forward;
       if (!f || f.pnlFull == null) return c === 24 ? 999 : -999;
-      const retPnl = r.pnl !== 0 ? f.pnlFull / Math.abs(r.pnl) * 100 : 0;
-      const mulDd  = r.dd > 0 ? f.dd / r.dd : 1;
-      const retPdd = r.pdd > 0 ? (f.pdd??0) / r.pdd * 100 : 0;
+      const oosGain  = f.pnl ?? 0;
+      const isGain   = f.isGain ?? 0;
+      const isPct    = r.cfg._oos.isPct, oosPct = 100 - isPct;
+      const isRate   = isPct  > 0 ? isGain  / isPct  : 0;
+      const oosRate  = oosPct > 0 ? oosGain / oosPct : 0;
+      const rateRatio = isRate > 0 ? oosRate / isRate * 100 : (oosGain > 0 ? 200 : -100);
+      const mulDd    = r.dd > 0 ? f.dd / r.dd : 1;
+      const retPdd   = r.pdd > 0 ? (f.pdd??0) / r.pdd * 100 : 0;
       if (c === 22) {
-        const g = retPnl>=80 && mulDd<=1.3 && retPdd>=70;
-        const b = retPnl<50  || mulDd>2.0  || retPdd<40;
+        const g = oosGain>0 && rateRatio>=70 && mulDd<=1.5 && retPdd>=70;
+        const b = oosGain<=0 || mulDd>2.5;
         return g ? 2 : b ? 0 : 1;
       }
-      if (c === 23) return retPnl;
+      if (c === 23) return oosGain;       // сортируем по OOS PnL напрямую
       if (c === 24) return mulDd;
       if (c === 25) return retPdd;
     };
@@ -3052,34 +3074,48 @@ function _hcMetric(r, metric) {
   }
 }
 
-// TV-метрика: запускает бэктест на IS (70%) и на полных данных,
-// возвращает числовой score для оптимизации IS→TV стабильности.
+// TV-метрика: запускает IS (70%) и полный бэктест, делит equity-кривую по splitIdx.
+// IS/OOS gains берётся из ОДНОГО полного бэктеста — корректное сравнение без edge-эффектов.
 function _hcTvScore(cfg, metric) {
   const N = DATA.length;
-  const isN = Math.round(N * 0.70);   // IS = первые 70%
+  const isN = Math.round(N * 0.70);
   const origData = DATA;
+  // IS-only run нужен только для DD-базиса
   DATA = origData.slice(0, isN);
   const rIS = _hcRunBacktest(cfg);
   DATA = origData;
   const rFull = _hcRunBacktest(cfg);
   if (!rIS || !rFull || rIS.n < 3 || rFull.n < 3) return -Infinity;
-  const pddIS   = rIS.dd   > 0 ? rIS.pnl   / rIS.dd   : (rIS.pnl   > 0 ? 99 : 0);
+  if (!rFull.eq || rFull.eq.length < isN + 5) return -Infinity;
+  // IS/OOS gains из equity-кривой ОДНОГО полного бэктеста
+  const eq = rFull.eq;
+  const N_eq = eq.length;
+  const splitIdx = Math.min(isN - 1, N_eq - 2);
+  const isGain  = eq[splitIdx];
+  const oosGain = eq[N_eq - 1] - isGain;
+  const isRate  = splitIdx > 0 ? isGain / (splitIdx + 1) : 0;
+  const oosBars = N_eq - 1 - splitIdx;
+  const oosRate = oosBars > 0 ? oosGain / oosBars : 0;
+  // rateRatio: скорость OOS / скорость IS × 100. 100% = одинаково, >100% = ускоряется
+  const rateRatio = isRate > 0 ? oosRate / isRate * 100
+                  : (oosGain > 0 ? 200 : (oosGain < 0 ? -100 : 0));
+  // DD: сравниваем IS-only бэктест с полным (оба — честные срезы данных)
+  const mulDd  = rIS.dd > 0 ? rFull.dd / rIS.dd : (rFull.dd > 0 ? 99 : 1);
+  const pddIS   = rIS.dd > 0 ? rIS.pnl / rIS.dd : (rIS.pnl > 0 ? 99 : 0);
   const pddFull = rFull.dd > 0 ? rFull.pnl / rFull.dd : (rFull.pnl > 0 ? 99 : 0);
-  // Retention metrics (%)
-  const retPnl = rIS.pnl !== 0 ? rFull.pnl / Math.abs(rIS.pnl) * 100 : 0;
-  const mulDd  = rIS.dd   > 0  ? rFull.dd  / rIS.dd   : (rFull.dd > 0 ? 999 : 1);
-  const retPdd = pddIS    > 0  ? pddFull   / pddIS    * 100           : 0;
+  const retPdd = pddIS > 0 ? pddFull / pddIS * 100 : 0;
   switch (metric) {
-    case 'tv_pnl':   return retPnl;
-    case 'tv_pdd':   return retPdd;
+    case 'tv_pnl': return oosGain;    // максимизировать OOS-прибыль напрямую
+    case 'tv_pdd': return retPdd;     // максимизировать удержание P/DD
     case 'tv_score': {
-      // Composite: reward high retention on all three axes, penalise DD explosion
-      const sPnl = Math.min(Math.max(retPnl, 0), 150);
-      const sDd  = Math.max(0, 200 - mulDd * 100); // 200 = no DD growth, 0 = DD doubled
-      const sPdd = Math.min(Math.max(retPdd, 0), 150);
-      return (sPnl + sDd + sPdd) / 3;
+      // OOS должен быть прибыльным — жёсткое требование
+      if (oosGain <= 0) return -100 - mulDd;
+      const sRate = Math.min(Math.max(rateRatio, 0), 150); // 0-150
+      const sDd   = Math.max(0, 200 - mulDd * 100);        // 200 = без роста DD, 0 = удвоился
+      const sPdd  = Math.min(Math.max(retPdd, 0), 150);    // 0-150
+      return (sRate + sDd + sPdd) / 3;
     }
-    default: return retPnl;
+    default: return oosGain;
   }
 }
 
