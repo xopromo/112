@@ -310,7 +310,9 @@ async function runOpt() {
     const pddFull = rFull.dd > 0 ? rFull.pnl / rFull.dd : (rFull.pnl > 0 ? 50 : 0);
     cfg._oos.forward = { pnl: oosGain, retention, isGain, n: rFull.n, wr: rFull.wr, dd: rFull.dd,
       pnlFull: rFull.pnl, avg: rFull.avg, pdd: pddFull,
-      dwr: rFull.dwr, p1: rFull.p1, p2: rFull.p2, c1: rFull.c1, c2: rFull.c2 };
+      dwr: rFull.dwr, p1: rFull.p1, p2: rFull.p2, c1: rFull.c1, c2: rFull.c2,
+      wrL: rFull.wrL??null, nL: rFull.nL||0, wrS: rFull.wrS??null, nS: rFull.nS||0,
+      dwrLS: rFull.dwrLS??null, cvr: _calcCVR(rFull.eq) };
   }
   const comm=$n('c_comm')||0.08;
   const spread=($n('c_spread')||0)/2; // спред делим на 2 стороны (как комиссия)

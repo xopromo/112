@@ -308,6 +308,10 @@ th:hover { background: var(--bg4); }
 }
 /* Настраиваемые колонки */
 .col-hidden { display: none !important; }
+/* TV delta columns */
+.col-tv-score, .col-tv-dpnl, .col-tv-ddd, .col-tv-dpdd {
+  font-size: .72em; text-align: center; vertical-align: middle; line-height: 1.3;
+}
 #col-settings-panel {
   position: absolute;
   right: 0; top: 100%;
@@ -446,14 +450,15 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
 }
 .dp-close:hover { border-color: var(--red); color: var(--red); }
 
-.dp-stats {
-  display: flex;
-  flex-direction: column;
+/* dp-stats: CSS grid — labels span all columns, stat cells auto-aligned */
+#dp-stats {
+  display: grid;
+  grid-template-columns: repeat(var(--ncols, 10), 1fr);
   flex-shrink: 0;
   border-bottom: 1px solid var(--border);
 }
-.dp-stats-row { display: flex; }
 .dp-stats-lbl {
+  grid-column: 1 / -1;
   font-size: .48em;
   letter-spacing: .07em;
   text-transform: uppercase;
@@ -465,10 +470,10 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
 .dp-stats-lbl.tv { color: var(--accent); }
 .dp-stats-lbl:first-child { border-top: none; }
 .dp-stat {
-  flex: 1;
   padding: 8px 6px;
   text-align: center;
   border-right: 1px solid var(--border);
+  min-width: 0;
 }
 .dp-stat:last-child { border-right: none; }
 .dp-stat .v { font-size: .95em; font-weight: 700; }
@@ -1268,6 +1273,10 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
           <th class="col-dwr" data-sort="9" style="min-width:44px;resize:horizontal;overflow:auto;cursor:pointer">ΔWR ↕</th>
           <th class="col-split" data-sort="10" style="min-width:44px;resize:horizontal;overflow:auto;cursor:pointer">Split ↕</th>
           <th class="col-ls" data-sort="17" title="Разница WinRate лонг vs шорт" style="min-width:44px;resize:horizontal;overflow:auto;cursor:pointer">L/S ↕</th>
+          <th class="col-tv-score" title="Насколько стратегия держится на новых данных (IS→TV): ✓ хорошо / ~ умеренно / ✗ деградация" style="min-width:32px;resize:horizontal;overflow:auto;color:#f90;cursor:default">TV</th>
+          <th class="col-tv-dpnl" title="IS PnL vs TV PnL (полные данные): абсолютная разница + процент удержания" style="min-width:60px;resize:horizontal;overflow:auto;color:#f90;cursor:default">ΔPnL TV</th>
+          <th class="col-tv-ddd" title="Изменение MaxDD: TV MaxDD − IS MaxDD (абс.) + во сколько раз вырос" style="min-width:56px;resize:horizontal;overflow:auto;color:#f90;cursor:default">ΔDD TV</th>
+          <th class="col-tv-dpdd" title="Изменение P/DD: TV P/DD − IS P/DD (абс.) + процент удержания" style="min-width:56px;resize:horizontal;overflow:auto;color:#f90;cursor:default">ΔP/DD TV</th>
           <th class="col-rob" data-sort="11" title="Всего тестов пройдено" style="min-width:44px;resize:horizontal;overflow:auto;cursor:pointer">Rob ↕</th>
           <th class="col-rob-oos" data-sort="12" title="OOS: 3 участка" style="min-width:36px;resize:horizontal;overflow:auto;color:var(--accent);cursor:pointer">OOS</th>
           <th class="col-rob-walk" data-sort="13" title="Walk-Forward" style="min-width:36px;resize:horizontal;overflow:auto;color:var(--accent);cursor:pointer">WF</th>
@@ -1305,6 +1314,10 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
             <option value="warn">⚠️ &lt;25%</option>
             <option value="bad">❌ ≥25%</option>
           </select></th>
+          <th class="col-tv-score"></th>
+          <th class="col-tv-dpnl"></th>
+          <th class="col-tv-ddd"></th>
+          <th class="col-tv-dpdd"></th>
           <th class="col-rob"><select class="tf-sel" id="f_rob" onchange="applyFiltersDebounced()" title="Мин. пиктограмма Rob (≥ выбранного)">
             <option value="">все</option>
             <option value="5">■■■■■</option>

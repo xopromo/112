@@ -606,6 +606,37 @@ function renderVisibleResults() {
       `<td class="col-dwr ${sc}">${r.dwr.toFixed(1)}</td>` +
       `<td class="col-split ${sc}">${stable}</td>`
       + `<td class="col-ls ${lsSc}" title="L:${r.nL||0}сд WR${r.wrL!=null?r.wrL.toFixed(0):'?'}% | S:${r.nS||0}сд WR${r.wrS!=null?r.wrS.toFixed(0):'?'}%">${lsIcon}${r.dwrLS!=null?' '+r.dwrLS.toFixed(0)+'%':''}</td>` +
+      (()=>{
+        const f = r.cfg && r.cfg._oos && r.cfg._oos.forward;
+        if (!f || f.pnlFull == null) return '<td class="col-tv-score muted">—</td><td class="col-tv-dpnl muted">—</td><td class="col-tv-ddd muted">—</td><td class="col-tv-dpdd muted">—</td>';
+        const isPnl = r.pnl, tvPnl = f.pnlFull;
+        const isDd  = r.dd,  tvDd  = f.dd;
+        const isPdd = r.pdd, tvPdd = f.pdd??0;
+        // ΔPnL: абс. разница + % удержания
+        const dPnl  = tvPnl - isPnl;
+        const retPnl = isPnl !== 0 ? tvPnl / Math.abs(isPnl) * 100 : 0;
+        // ΔDD: абс. разница + во сколько раз вырос
+        const dDd   = tvDd - isDd;
+        const mulDd = isDd > 0 ? tvDd / isDd : 1;
+        // ΔP/DD: абс. разница + % удержания
+        const dPdd  = tvPdd - isPdd;
+        const retPdd = isPdd > 0 ? tvPdd / isPdd * 100 : 0;
+        // TV score: хорошая = retPnl≥80, mulDd≤1.3, retPdd≥70
+        const goodPnl = retPnl >= 80, okPnl = retPnl >= 50;
+        const goodDd  = mulDd <= 1.3, okDd  = mulDd <= 2.0;
+        const goodPdd = retPdd >= 70, okPdd = retPdd >= 40;
+        const allGood = goodPnl && goodDd && goodPdd;
+        const allBad  = !okPnl || !okDd || !okPdd;
+        const scoreIcon = allGood ? '✓' : allBad ? '✗' : '~';
+        const scoreCls  = allGood ? 'pos' : allBad ? 'neg' : 'warn';
+        const pnlCls2  = goodPnl ? 'pos' : okPnl ? 'warn' : 'neg';
+        const ddCls2   = goodDd  ? 'pos' : okDd  ? 'warn' : 'neg';
+        const pddCls2  = goodPdd ? 'pos' : okPdd ? 'warn' : 'neg';
+        return `<td class="col-tv-score ${scoreCls}" title="PnL удержано ${retPnl.toFixed(0)}% · DD ×${mulDd.toFixed(1)} · P/DD удержано ${retPdd.toFixed(0)}%">${scoreIcon}</td>`+
+          `<td class="col-tv-dpnl ${pnlCls2}" title="IS: ${isPnl.toFixed(1)}% → TV: ${tvPnl.toFixed(1)}%"><span style="font-size:.9em">${dPnl>=0?'+':''}${dPnl.toFixed(1)}</span><br><span style="font-size:.65em;color:var(--text2)">${retPnl.toFixed(0)}% ret</span></td>`+
+          `<td class="col-tv-ddd ${ddCls2}" title="IS DD: ${isDd.toFixed(1)}% → TV DD: ${tvDd.toFixed(1)}%"><span style="font-size:.9em">${dDd>=0?'+':''}${dDd.toFixed(1)}</span><br><span style="font-size:.65em;color:var(--text2)">×${mulDd.toFixed(1)}</span></td>`+
+          `<td class="col-tv-dpdd ${pddCls2}" title="IS P/DD: ${isPdd.toFixed(1)} → TV P/DD: ${tvPdd.toFixed(1)}"><span style="font-size:.9em">${dPdd>=0?'+':''}${dPdd.toFixed(1)}</span><br><span style="font-size:.65em;color:var(--text2)">${retPdd.toFixed(0)}% ret</span></td>`;
+      })() +
       `<td class="col-rob">${robCell}</td>` +
       _robTd('oos') + _robTd('walk') + _robTd('param') + _robTd('noise') + _robTd('mc') +
       '<td></td></tr>';
@@ -695,50 +726,59 @@ function showDetail(r) {
 
   $('dp-title').textContent = r.name;
 
-  // Stats bar — IS row
-  const pddCls = r.pdd>=10?'pos':r.pdd>=5?'warn':'neg';
-  const dwrCls = r.dwr<10?'ok':r.dwr<20?'warn':'bad';
+  // Stats bar — unified IS + TV rows via CSS grid
   const _fwd = r.cfg && r.cfg._oos && r.cfg._oos.forward;
+  const _hasLS = r.wrL != null;
+  // Column count: 9 base + Avg + CVR + (3 L/S if applicable)
+  const _ncols = 11 + (_hasLS ? 3 : 0);
+
+  // Build one row of dp-stat cells (same structure for both IS and TV)
+  function _statsRow(v) {
+    const pddC = v.pdd>=10?'pos':v.pdd>=5?'warn':'neg';
+    const dwrC = v.dwr<10?'ok':v.dwr<20?'warn':'bad';
+    const cvrC = v.cvr!=null ? (v.cvr>=80?'pos':v.cvr>=50?'warn':'neg') : 'muted';
+    const cvrV = v.cvr!=null ? v.cvr+'%' : '—';
+    let h =
+      `<div class="dp-stat"><div class="v ${v.pnl>=0?'pos':'neg'}">${v.pnl.toFixed(1)}%</div><div class="l">PnL</div></div>`+
+      `<div class="dp-stat"><div class="v">${v.wr.toFixed(1)}%</div><div class="l">WinRate</div></div>`+
+      `<div class="dp-stat"><div class="v muted">${v.n}</div><div class="l">Сделок</div></div>`+
+      `<div class="dp-stat"><div class="v neg">${v.dd.toFixed(1)}%</div><div class="l">MaxDD</div></div>`+
+      `<div class="dp-stat"><div class="v ${pddC}">${v.pdd.toFixed(1)}</div><div class="l">P/DD</div></div>`+
+      `<div class="dp-stat"><div class="v ${dwrC}">${v.dwr.toFixed(1)}%</div><div class="l">ΔWR сплит</div></div>`+
+      `<div class="dp-stat"><div class="v ${v.p1>=0?'pos':'neg'}">${v.p1.toFixed(1)}%</div><div class="l">1п (${v.c1}сд)</div></div>`+
+      `<div class="dp-stat"><div class="v ${v.p2>=0?'pos':'neg'}">${v.p2.toFixed(1)}%</div><div class="l">2п (${v.c2}сд)</div></div>`+
+      `<div class="dp-stat"><div class="v">${v.avg.toFixed(2)}%</div><div class="l">Avg/сд</div></div>`+
+      `<div class="dp-stat"><div class="v ${cvrC}">${cvrV}</div><div class="l">CVR%</div></div>`;
+    if (_hasLS) {
+      const lsC = v.dwrLS!=null ? (v.dwrLS<10?'ok':v.dwrLS<25?'warn':'bad') : 'muted';
+      h +=
+        `<div class="dp-stat"><div class="v ${lsC}">${v.dwrLS!=null?v.dwrLS.toFixed(0)+'%':'—'}</div><div class="l">ΔWR L/S</div></div>`+
+        `<div class="dp-stat"><div class="v">${v.wrL!=null?v.wrL.toFixed(0)+'% ('+v.nL+')':'—'}</div><div class="l">Лонг WR</div></div>`+
+        `<div class="dp-stat"><div class="v">${v.wrS!=null?v.wrS.toFixed(0)+'% ('+v.nS+')':'—'}</div><div class="l">Шорт WR</div></div>`;
+    }
+    return h;
+  }
+
   const _isLabel = _fwd ? `<div class="dp-stats-lbl">IS · оптимизация (${r.cfg._oos.isPct}%)</div>` : '';
-  $('dp-stats').innerHTML = _isLabel +
-    `<div class="dp-stats-row">`+
-    `<div class="dp-stat"><div class="v ${r.pnl>=0?'pos':'neg'}">${r.pnl.toFixed(1)}%</div><div class="l">PnL</div></div>`+
-    `<div class="dp-stat"><div class="v">${r.wr.toFixed(1)}%</div><div class="l">WinRate</div></div>`+
-    `<div class="dp-stat"><div class="v muted">${r.n}</div><div class="l">Сделок</div></div>`+
-    `<div class="dp-stat"><div class="v neg">${r.dd.toFixed(1)}%</div><div class="l">MaxDD</div></div>`+
-    `<div class="dp-stat"><div class="v ${pddCls}">${r.pdd.toFixed(1)}</div><div class="l">P/DD</div></div>`+
-    `<div class="dp-stat"><div class="v ${dwrCls}">${r.dwr.toFixed(1)}%</div><div class="l">ΔWR сплит</div></div>`+
-    `<div class="dp-stat"><div class="v ${r.p1>=0?'pos':'neg'}">${r.p1.toFixed(1)}%</div><div class="l">1п PnL (${r.c1}сд)</div></div>`+
-    `<div class="dp-stat"><div class="v ${r.p2>=0?'pos':'neg'}">${r.p2.toFixed(1)}%</div><div class="l">2п PnL (${r.c2}сд)</div></div>`+
-    (r.wrL!=null ? `<div class="dp-stat"><div class="v ${r.dwrLS<10?'ok':r.dwrLS<25?'warn':'bad'}">${r.dwrLS.toFixed(0)}%</div><div class="l">ΔWR L/S</div></div>` : '')+
-    (r.wrL!=null ? `<div class="dp-stat"><div class="v">${r.wrL.toFixed(0)}% (${r.nL})</div><div class="l">Лонг WR</div></div>` : '')+
-    (r.wrS!=null ? `<div class="dp-stat"><div class="v">${r.wrS.toFixed(0)}% (${r.nS})</div><div class="l">Шорт WR</div></div>` : '')+
-    (r.cvr!=null ? `<div class="dp-stat"><div class="v ${r.cvr>=80?'pos':r.cvr>=50?'warn':'neg'}">${r.cvr}%</div><div class="l">CVR%</div></div>` : '')+
-    `</div>`;
+  const dp = $('dp-stats');
+  dp.style.setProperty('--ncols', _ncols);
+  dp.innerHTML = _isLabel + _statsRow({
+    pnl: r.pnl, wr: r.wr, n: r.n, dd: r.dd, pdd: r.pdd, dwr: r.dwr,
+    p1: r.p1, p2: r.p2, c1: r.c1, c2: r.c2, avg: r.avg, cvr: r.cvr??null,
+    dwrLS: r.dwrLS??null, wrL: r.wrL??null, nL: r.nL||0, wrS: r.wrS??null, nS: r.nS||0
+  });
 
   // TradingView row (full data) — only when IS/OOS was enabled
   if (_fwd && _fwd.pnlFull != null) {
-    const tvPnl = _fwd.pnlFull, tvWr = _fwd.wr, tvN = _fwd.n, tvDd = _fwd.dd;
-    const tvPdd = _fwd.pdd ?? 0, tvDwr = _fwd.dwr ?? 0;
-    const tvP1 = _fwd.p1 ?? 0, tvP2 = _fwd.p2 ?? 0;
-    const tvC1 = _fwd.c1 ?? 0, tvC2 = _fwd.c2 ?? 0;
-    const tvAvg = _fwd.avg ?? 0;
-    const tvPddCls = tvPdd>=10?'pos':tvPdd>=5?'warn':'neg';
-    const tvDwrCls = tvDwr<10?'ok':tvDwr<20?'warn':'bad';
     const oosPct = 100 - r.cfg._oos.isPct;
-    $('dp-stats').innerHTML +=
-      `<div class="dp-stats-lbl tv">TradingView · полные данные (${oosPct}% сверх IS)</div>`+
-      `<div class="dp-stats-row">`+
-      `<div class="dp-stat"><div class="v ${tvPnl>=0?'pos':'neg'}">${tvPnl.toFixed(1)}%</div><div class="l">PnL</div></div>`+
-      `<div class="dp-stat"><div class="v">${tvWr.toFixed(1)}%</div><div class="l">WinRate</div></div>`+
-      `<div class="dp-stat"><div class="v muted">${tvN}</div><div class="l">Сделок</div></div>`+
-      `<div class="dp-stat"><div class="v neg">${tvDd.toFixed(1)}%</div><div class="l">MaxDD</div></div>`+
-      `<div class="dp-stat"><div class="v ${tvPddCls}">${tvPdd.toFixed(1)}</div><div class="l">P/DD</div></div>`+
-      `<div class="dp-stat"><div class="v ${tvDwrCls}">${tvDwr.toFixed(1)}%</div><div class="l">ΔWR сплит</div></div>`+
-      `<div class="dp-stat"><div class="v ${tvP1>=0?'pos':'neg'}">${tvP1.toFixed(1)}%</div><div class="l">1п PnL (${tvC1}сд)</div></div>`+
-      `<div class="dp-stat"><div class="v ${tvP2>=0?'pos':'neg'}">${tvP2.toFixed(1)}%</div><div class="l">2п PnL (${tvC2}сд)</div></div>`+
-      `<div class="dp-stat"><div class="v">${tvAvg.toFixed(2)}%</div><div class="l">Avg сделка</div></div>`+
-      `</div>`;
+    dp.innerHTML +=
+      `<div class="dp-stats-lbl tv">TradingView · полные данные (IS+${oosPct}%)</div>` +
+      _statsRow({
+        pnl: _fwd.pnlFull, wr: _fwd.wr, n: _fwd.n, dd: _fwd.dd, pdd: _fwd.pdd??0,
+        dwr: _fwd.dwr??0, p1: _fwd.p1??0, p2: _fwd.p2??0, c1: _fwd.c1??0, c2: _fwd.c2??0,
+        avg: _fwd.avg??0, cvr: _fwd.cvr??null,
+        dwrLS: _fwd.dwrLS??null, wrL: _fwd.wrL??null, nL: _fwd.nL||0, wrS: _fwd.wrS??null, nS: _fwd.nS||0
+      });
   }
 
   // Helper: SL name
@@ -2271,7 +2311,7 @@ function showBestStats() {
 // Параметры последнего нарисованного графика — для crosshair
 let _eqChartParams = null;
 
-function drawEquityData(eq, label) {
+function drawEquityData(eq, label, splitPct) {
   if (!eq || !eq.length) return;
   const wrap = document.getElementById('eq-wrap');
   const canvas=$('eqc');
@@ -2302,10 +2342,20 @@ function drawEquityData(eq, label) {
   const zy=H-pad-((0-mn)/range*(H-2*pad));
   ctx.strokeStyle='rgba(255,255,255,0.15)'; ctx.lineWidth=1;
   ctx.beginPath(); ctx.moveTo(pad,zy); ctx.lineTo(W-pad,zy); ctx.stroke();
-  const sx=pad+(W-2*pad)/2;
-  ctx.strokeStyle='rgba(255,170,0,0.4)'; ctx.setLineDash([3,3]);
+  // IS/OOS or 1п/2п split line
+  const _splitFrac = (splitPct != null && splitPct > 0 && splitPct < 100) ? splitPct / 100 : 0.5;
+  const sx = pad + (W - 2*pad) * _splitFrac;
+  const _isOOS = splitPct != null;
+  ctx.strokeStyle = _isOOS ? 'rgba(255,160,40,0.7)' : 'rgba(255,170,0,0.4)';
+  ctx.lineWidth = _isOOS ? 1.5 : 1;
+  ctx.setLineDash([3,3]);
   ctx.beginPath(); ctx.moveTo(sx,pad); ctx.lineTo(sx,H-pad); ctx.stroke();
   ctx.setLineDash([]);
+  if (_isOOS) {
+    // Shaded OOS region
+    ctx.fillStyle='rgba(255,160,40,0.04)';
+    ctx.fillRect(sx, pad, W-pad-sx, H-2*pad);
+  }
   // Pixel-exact mapping: nPx пикселей → eq[round(px*(n-1)/(nPx-1))]
   // Гарантирует заполнение ровно W-2*pad пикселей и точное совпадение с crosshair
   const nPx = W - 2 * pad;
@@ -2338,8 +2388,13 @@ function drawEquityData(eq, label) {
   ctx.fillText(mn.toFixed(1)+'%',1,H-pad-2);
   ctx.fillStyle='rgba(0,212,255,0.7)'; ctx.font='8px JetBrains Mono,monospace';
   ctx.fillText((label||'').substring(0,60),pad,9);
-  ctx.fillStyle='rgba(255,170,0,0.5)';
-  ctx.fillText('◄ 1п      2п ►',sx-24,H-4);
+  ctx.fillStyle='rgba(255,160,40,0.6)';
+  if (_isOOS) {
+    ctx.fillText(`◄ IS (${splitPct}%)`, sx-38, H-4);
+    ctx.fillText(`OOS (${100-splitPct}%) ►`, sx+4, H-4);
+  } else {
+    ctx.fillText('◄ 1п      2п ►', sx-24, H-4);
+  }
 
   // Сохраняем параметры для crosshair
   _eqChartParams = { eq, mn, mx, range, pad, W, H, label };
@@ -2357,17 +2412,18 @@ function drawEquity(name) {
 // Обёртка для режимов hc/fav — рисует equity из объекта результата
 function drawEquityForResult(r) {
   if (!r) return;
+  const splitPct = r.cfg?._oos?.isPct ?? null;
   // Проверяем доступные источники equity
   if (r.eq && r.eq.length) {
-    drawEquityData(r.eq, r.name);
+    drawEquityData(r.eq, r.name, splitPct);
   } else if (equities[r.name]) {
-    drawEquityData(equities[r.name], r.name);
+    drawEquityData(equities[r.name], r.name, splitPct);
   } else if (r.cfg) {
     // Для fav и hc результатов без eq — запускаем лёгкий бэктест
     const raw = _hcRunBacktest(r.cfg);
     if (raw && raw.eq) {
       r.eq = raw.eq; // кэшируем
-      drawEquityData(raw.eq, r.name);
+      drawEquityData(raw.eq, r.name, splitPct);
     }
   }
 }
@@ -2788,6 +2844,10 @@ const _COL_DEFS = [
   { id: 'col-dwr',        label: 'ΔWR',                 default: true },
   { id: 'col-split',      label: 'Split',               default: true },
   { id: 'col-ls',          label: 'L/S Split',           default: true },
+  { id: 'col-tv-score',   label: 'TV рейтинг',          default: true },
+  { id: 'col-tv-dpnl',    label: 'ΔPnL TV',             default: true },
+  { id: 'col-tv-ddd',     label: 'ΔDD TV',              default: true },
+  { id: 'col-tv-dpdd',    label: 'ΔP/DD TV',            default: true },
   { id: 'col-rob',        label: 'Rob (итого)',         default: true },
   { id: 'col-rob-oos',    label: '🔬 OOS',              default: true },
   { id: 'col-rob-walk',   label: '🔬 Walk-Forward',    default: true },
