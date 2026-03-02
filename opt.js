@@ -275,8 +275,9 @@ async function runOpt() {
     finally { DATA = origDATA; }
   }
 
-  // Хелпер: добавить OOS результаты в cfg после нахождения результата
-  function _attachOOS(cfg) {
+  // Хелпер: добавить OOS результаты в cfg после нахождения результата.
+  // name — ключ в глобальном equities; если передан, обновляет equities полной equity-кривой.
+  function _attachOOS(cfg, name) {
     if (!_useOOS) return;
     // Запускаем бэктест на ПОЛНЫХ данных для непрерывной equity-кривой.
     // Делим её по _isN: нет проблемы прогрева индикаторов в OOS-части.
@@ -313,6 +314,9 @@ async function runOpt() {
       dwr: rFull.dwr, p1: rFull.p1, p2: rFull.p2, c1: rFull.c1, c2: rFull.c2,
       wrL: rFull.wrL??null, nL: rFull.nL||0, wrS: rFull.wrS??null, nS: rFull.nS||0,
       dwrLS: rFull.dwrLS??null, cvr: _calcCVR(rFull.eq) };
+    // Обновляем глобальный equities полной кривой — чтобы график показывал 100% данных
+    // с правильным split-маркером на IS/OOS границе, а не растянутую IS-кривую.
+    if (name && typeof equities !== 'undefined') equities[name] = rFull.eq;
   }
   const comm=$n('c_comm')||0.08;
   const spread=($n('c_spread')||0)/2; // спред делим на 2 стороны (как комиссия)
@@ -1045,7 +1049,7 @@ async function runOpt() {
     if (_useOOS && results.length > 0) {
       setMcPhase(`⏳ OOS проверка ${results.length} результатов…`);
       for (let oi = 0; oi < results.length; oi++) {
-        _attachOOS(results[oi].cfg);
+        _attachOOS(results[oi].cfg, results[oi].name);
         if (oi % 50 === 0) { await yieldToUI(); }
       }
     }
@@ -1382,7 +1386,7 @@ async function runOpt() {
     if (_useOOS && results.length > 0) {
       setMcPhase(`⏳ OOS проверка ${results.length} результатов…`);
       for (let oi = 0; oi < results.length; oi++) {
-        _attachOOS(results[oi].cfg);
+        _attachOOS(results[oi].cfg, results[oi].name);
         if (oi % 50 === 0) { await yieldToUI(); }
       }
     }
@@ -1635,7 +1639,7 @@ async function runOpt() {
   if (_useOOS && results.length > 0) {
     setMcPhase(`⏳ OOS проверка ${results.length} результатов…`);
     for (let oi = 0; oi < results.length; oi++) {
-      _attachOOS(results[oi].cfg);
+      _attachOOS(results[oi].cfg, results[oi].name);
       if (oi % 50 === 0) { await yieldToUI(); }
     }
   }

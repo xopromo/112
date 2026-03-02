@@ -798,7 +798,7 @@ function showDetail(r) {
     return h;
   }
 
-  const _isLabel = _fwd ? `<div class="dp-stats-lbl">IS · оптимизация (${r.cfg._oos.isPct}%)</div>` : '';
+  const _isLabel = _fwd ? `<div class="dp-stats-lbl" title="Отдельный бэктест только на IS-данных (первые ${r.cfg._oos.isPct}%). Используется для отбора стратегий. PnL может отличаться от IS-части графика из-за разной инициализации индикаторов.">IS · оптимизация (${r.cfg._oos.isPct}%) <span style="font-size:.75em;opacity:.6">· изолированный прогон</span></div>` : '';
   const dp = $('dp-stats');
   dp.style.setProperty('--ncols', _ncols);
   dp.innerHTML = _isLabel + _statsRow({
@@ -811,7 +811,7 @@ function showDetail(r) {
   if (_fwd && _fwd.pnlFull != null) {
     const oosPct = 100 - r.cfg._oos.isPct;
     dp.innerHTML +=
-      `<div class="dp-stats-lbl tv">TradingView · полные данные (IS+${oosPct}%)</div>` +
+      `<div class="dp-stats-lbl tv" title="Полный бэктест на всех данных (IS+OOS). Соответствует equity-графику.">TradingView · полный бэктест (IS+${oosPct}%) <span style="font-size:.75em;opacity:.6">· см. график</span></div>` +
       _statsRow({
         pnl: _fwd.pnlFull, wr: _fwd.wr, n: _fwd.n, dd: _fwd.dd, pdd: _fwd.pdd??0,
         dwr: _fwd.dwr??0, p1: _fwd.p1??0, p2: _fwd.p2??0, c1: _fwd.c1??0, c2: _fwd.c2??0,
