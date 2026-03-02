@@ -1243,7 +1243,6 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
           <th data-sort="0" style="min-width:80px;resize:horizontal;overflow:auto;cursor:pointer">Конфигурация ↕</th>
           <th class="col-fav" title="Избранное" style="width:28px">⭐</th>
           <th class="col-pnl" data-sort="1" style="min-width:52px;resize:horizontal;overflow:auto;cursor:pointer">PnL% ↕</th>
-          <th class="col-oos-auto" data-sort="18" title="IS/OOS: оптимизация на 70% данных, проверка на forward OOS (последние 30%)." style="min-width:72px;resize:horizontal;overflow:auto;color:var(--green);cursor:pointer">OOS⚡ ↕</th>
           <th class="col-wr" data-sort="2" style="min-width:48px;resize:horizontal;overflow:auto;cursor:pointer">WR% ↕</th>
           <th class="col-n" data-sort="3" style="min-width:36px;resize:horizontal;overflow:auto;cursor:pointer"># ↕</th>
           <th class="col-dd" data-sort="4" style="min-width:48px;resize:horizontal;overflow:auto;cursor:pointer">DD% ↕</th>
@@ -1271,11 +1270,6 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
             <option value="">все</option><option value="fav">⭐</option><option value="no">☆</option>
           </select></th>
           <th class="col-pnl"><input class="tf-inp" id="f_pnl" placeholder="≥" oninput="applyFiltersDebounced()"></th>
-          <th class="col-oos-auto"><select class="tf-sel" id="f_oos_auto" onchange="applyFiltersDebounced()" title="Фильтр IS/OOS: forward OOS (последние 30% данных)">
-            <option value="">все</option>
-            <option value="pass">✅ прибылен</option>
-            <option value="fail">❌ убыток</option>
-          </select></th>
           <th class="col-wr"><input class="tf-inp" id="f_wr" placeholder="≥" oninput="applyFiltersDebounced()"></th>
           <th class="col-n"><input class="tf-inp" id="f_n" placeholder="≥" oninput="applyFiltersDebounced()"></th>
           <th class="col-dd"><input class="tf-inp" id="f_dd" placeholder="≤" oninput="applyFiltersDebounced()"></th>
@@ -5941,7 +5935,7 @@ function resetAllFilters() {
     const el = $(id); if (el) el.value = '';
   });
   // Сбрасываем все select
-  ['f_fav','f_split','f_ls','f_rob','f_oos','f_walk','f_param','f_noise','f_mc','f_oos_auto'].forEach(id => {
+  ['f_fav','f_split','f_ls','f_rob','f_oos','f_walk','f_param','f_noise','f_mc'].forEach(id => {
     const el = $(id); if (el) el.value = '';
   });
   // Сбрасываем сортировку
@@ -6017,15 +6011,6 @@ function applyFilters() {
     const fParam = $('f_param')?.value; if (fParam !== '' && fParam !== undefined) { const v = _fd.param ?? -1; if (String(v) !== fParam) return false; }
     const fNoise = $('f_noise')?.value; if (fNoise !== '' && fNoise !== undefined) { const v = _fd.noise ?? -1; if (String(v) !== fNoise) return false; }
     const fMc    = $('f_mc')?.value;    if (fMc    !== '' && fMc    !== undefined) { const v = _fd.mc    ?? -1; if (String(v) !== fMc)    return false; }
-    // Фильтр по IS/OOS: используем retention (нормализованный рост OOS/IS per bar)
-    const fOosAuto = $('f_oos_auto')?.value;
-    if (fOosAuto === 'pass') {
-      const fwd = r.cfg && r.cfg._oos && r.cfg._oos.forward;
-      if (!fwd || fwd.retention == null || fwd.retention < 0.3) return false;
-    } else if (fOosAuto === 'fail') {
-      const fwd = r.cfg && r.cfg._oos && r.cfg._oos.forward;
-      if (fwd && fwd.retention != null && fwd.retention >= 0.3) return false;
-    }
     return true;
   });
 
@@ -6117,32 +6102,12 @@ function renderVisibleResults() {
       const cls = v >= 1 ? 'pos' : 'neg';
       return `<td class="${cls} col-rob-${key}" title="${key}: ${v ? 'пройден' : 'провален'}">${v}</td>`;
     };
-    // OOS ячейка: показываем retention — нормализованный прирост OOS vs IS (per bar)
-    const _oos = r.cfg && r.cfg._oos;
-    let oosCell = '—';
-    if (_oos) {
-      const f      = _oos.forward;
-      const ret    = f?.retention;
-      const fPnl   = f ? f.pnl : null;
-      const isGain = f?.isGain;
-      const hasRet = ret !== undefined && ret !== null;
-      const retPct = hasRet ? Math.round(ret * 100) : null;
-      // ≥80% = OOS растёт равномерно, 30-80% = умеренная деградация, <30% = подгонка
-      const cls  = hasRet ? (ret >= 0.8 ? 'pos' : ret >= 0.3 ? '' : 'neg') : 'muted';
-      const icon = hasRet ? (ret >= 0.8 ? '✅' : ret >= 0.3 ? '⚠️' : '❌') : '';
-      const retTxt = retPct !== null ? `${icon} ${retPct}%` : '?';
-      const oosPct = 100 - _oos.isPct;
-      const fTxt   = fPnl   != null ? (fPnl   >= 0 ? '+' : '') + fPnl.toFixed(1)   + '%' : '?';
-      const isTxt  = isGain != null ? (isGain >= 0 ? '+' : '') + isGain.toFixed(1) + '%' : '?';
-      oosCell = `<span class="${cls}" title="IS/OOS разделение (обучение: ${_oos.isPct}% / проверка: ${oosPct}%)&#10;Retention = скорость роста OOS / IS (нормализовано по барам)&#10;  IS доход: ${isTxt}  |  OOS доход: ${fTxt}&#10;  Сделок (всего): ${f?.n||0}  |  WR: ${f?.wr?.toFixed(1)||'?'}%  |  DD: ${f?.dd?.toFixed(1)||'?'}%&#10;&#10;≥80% = OOS растёт равномерно с IS ✅&#10;30–80% = умеренная деградация ⚠️&#10;&lt;30% = сильная подгонка под IS ❌" style="font-size:.8em">${retTxt}</span>`;
-    }
     const fav = isFav(r.name) ? '⭐' : '☆';
     html +=
       `<tr data-i="${rii}" style="cursor:pointer">` +
       `<td class="accent" style="font-size:.66em;max-width:380px;overflow:hidden;text-overflow:ellipsis">${r.name}</td>` +
       `<td class="col-fav" style="cursor:pointer;font-size:.85em" data-fav="${rii}">${fav}</td>` +
       `<td class="col-pnl ${pnlCls}">${r.pnl.toFixed(1)}</td>` +
-      `<td class="col-oos-auto" title="IS/OOS">${oosCell}</td>` +
       `<td class="col-wr">${r.wr.toFixed(1)}</td>` +
       `<td class="col-n muted">${r.n}</td>` +
       `<td class="col-dd neg">${r.dd.toFixed(1)}</td>` +
@@ -8109,12 +8074,6 @@ function doSort(col) {
 
   if (col === 0) {
     arr.sort((a,b) => d * a.name.localeCompare(b.name));
-  } else if (col === 18) {
-    arr.sort((a,b) => {
-      const af = a.cfg && a.cfg._oos && a.cfg._oos.forward;
-      const bf = b.cfg && b.cfg._oos && b.cfg._oos.forward;
-      return d * ((af?.retention ?? -9999) - (bf?.retention ?? -9999));
-    });
   } else if (col === 19) {
     arr.sort((a,b) => d * ((a.sig??0) - (b.sig??0)));
   } else if (col === 20) {

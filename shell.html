@@ -1243,7 +1243,6 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
           <th data-sort="0" style="min-width:80px;resize:horizontal;overflow:auto;cursor:pointer">Конфигурация ↕</th>
           <th class="col-fav" title="Избранное" style="width:28px">⭐</th>
           <th class="col-pnl" data-sort="1" style="min-width:52px;resize:horizontal;overflow:auto;cursor:pointer">PnL% ↕</th>
-          <th class="col-oos-auto" data-sort="18" title="IS/OOS: оптимизация на 70% данных, проверка на forward OOS (последние 30%)." style="min-width:72px;resize:horizontal;overflow:auto;color:var(--green);cursor:pointer">OOS⚡ ↕</th>
           <th class="col-wr" data-sort="2" style="min-width:48px;resize:horizontal;overflow:auto;cursor:pointer">WR% ↕</th>
           <th class="col-n" data-sort="3" style="min-width:36px;resize:horizontal;overflow:auto;cursor:pointer"># ↕</th>
           <th class="col-dd" data-sort="4" style="min-width:48px;resize:horizontal;overflow:auto;cursor:pointer">DD% ↕</th>
@@ -1271,11 +1270,6 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
             <option value="">все</option><option value="fav">⭐</option><option value="no">☆</option>
           </select></th>
           <th class="col-pnl"><input class="tf-inp" id="f_pnl" placeholder="≥" oninput="applyFiltersDebounced()"></th>
-          <th class="col-oos-auto"><select class="tf-sel" id="f_oos_auto" onchange="applyFiltersDebounced()" title="Фильтр IS/OOS: forward OOS (последние 30% данных)">
-            <option value="">все</option>
-            <option value="pass">✅ прибылен</option>
-            <option value="fail">❌ убыток</option>
-          </select></th>
           <th class="col-wr"><input class="tf-inp" id="f_wr" placeholder="≥" oninput="applyFiltersDebounced()"></th>
           <th class="col-n"><input class="tf-inp" id="f_n" placeholder="≥" oninput="applyFiltersDebounced()"></th>
           <th class="col-dd"><input class="tf-inp" id="f_dd" placeholder="≤" oninput="applyFiltersDebounced()"></th>
