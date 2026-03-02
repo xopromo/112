@@ -2790,11 +2790,13 @@ document.addEventListener('DOMContentLoaded', function() {
     if (box) box.style.display = this.checked ? 'flex' : 'none';
   });
 
-  // Показываем hint при выборе метрики rob
+  // Показываем hint при выборе метрики rob или tv
   document.querySelectorAll('input[name="hc_metric"]').forEach(radio => {
     radio.addEventListener('change', function() {
       const hint = document.getElementById('hc-rob-metric-hint');
       if (hint) hint.style.display = this.value === 'rob' ? 'block' : 'none';
+      const tvHint = document.getElementById('hc-tv-metric-hint');
+      if (tvHint) tvHint.style.display = this.value.startsWith('tv_') ? 'block' : 'none';
       const robMinRow = document.getElementById('hc-rob-min-row');
       if (robMinRow) robMinRow.style.display = this.value === 'rob' ? 'block' : 'none';
     });
@@ -3047,6 +3049,37 @@ function _hcMetric(r, metric) {
       return rob * 100 + Math.min(pdd, 99); // 500 max + pdd tiebreak
     }
     default:    return r.dd > 0 ? r.pnl / r.dd : 0;
+  }
+}
+
+// TV-метрика: запускает бэктест на IS (70%) и на полных данных,
+// возвращает числовой score для оптимизации IS→TV стабильности.
+function _hcTvScore(cfg, metric) {
+  const N = DATA.length;
+  const isN = Math.round(N * 0.70);   // IS = первые 70%
+  const origData = DATA;
+  DATA = origData.slice(0, isN);
+  const rIS = _hcRunBacktest(cfg);
+  DATA = origData;
+  const rFull = _hcRunBacktest(cfg);
+  if (!rIS || !rFull || rIS.n < 3 || rFull.n < 3) return -Infinity;
+  const pddIS   = rIS.dd   > 0 ? rIS.pnl   / rIS.dd   : (rIS.pnl   > 0 ? 99 : 0);
+  const pddFull = rFull.dd > 0 ? rFull.pnl / rFull.dd : (rFull.pnl > 0 ? 99 : 0);
+  // Retention metrics (%)
+  const retPnl = rIS.pnl !== 0 ? rFull.pnl / Math.abs(rIS.pnl) * 100 : 0;
+  const mulDd  = rIS.dd   > 0  ? rFull.dd  / rIS.dd   : (rFull.dd > 0 ? 999 : 1);
+  const retPdd = pddIS    > 0  ? pddFull   / pddIS    * 100           : 0;
+  switch (metric) {
+    case 'tv_pnl':   return retPnl;
+    case 'tv_pdd':   return retPdd;
+    case 'tv_score': {
+      // Composite: reward high retention on all three axes, penalise DD explosion
+      const sPnl = Math.min(Math.max(retPnl, 0), 150);
+      const sDd  = Math.max(0, 200 - mulDd * 100); // 200 = no DD growth, 0 = DD doubled
+      const sPdd = Math.min(Math.max(retPdd, 0), 150);
+      return (sPnl + sDd + sPdd) / 3;
+    }
+    default: return retPnl;
   }
 }
 
@@ -3499,6 +3532,9 @@ async function runHillClimbing() {
   const pvStep  = parseInt(document.getElementById('hc_pvstep').value)  || 1;
 
   const isRobMetric = metric === 'rob';
+  const isTvMetric  = metric === 'tv_score' || metric === 'tv_pnl' || metric === 'tv_pdd';
+  const _metricLbl  = {pdd:'P/DD',pnl:'PnL%',wr:'WR%',avg:'Avg%',rob:'Rob',
+                       tv_score:'TV Score',tv_pnl:'TV PnL ret%',tv_pdd:'TV P/DD ret%'}[metric]||'Score';
   // В режиме устойчивости ограничиваем итерации — каждая стоит ~300мс
   const effectiveMaxIter = isRobMetric ? Math.min(maxIter, 30) : maxIter;
 
@@ -3605,7 +3641,7 @@ async function runHillClimbing() {
     const baseR = _hcRunBacktest(startCfg);
     if (!baseR || baseR.n < minTr) continue;
 
-    const baseScore = _hcMetric(baseR, metric);
+    const baseScore = isTvMetric ? _hcTvScore(startCfg, metric) : _hcMetric(baseR, metric);
 
     const visited = new Set();
     visited.add(JSON.stringify(startCfg));
@@ -3767,7 +3803,7 @@ async function runHillClimbing() {
               // Обучаем surrogate на каждом бэктесте
               const _rpdd = r.dd > 0 ? r.pnl/r.dd : (r.pnl > 0 ? 50 : 0);
               _surrogate.addPoint(nc, _rpdd);
-              const score = _hcMetric(r, metric);
+              const score = isTvMetric ? _hcTvScore(nc, metric) : _hcMetric(r, metric);
               candidates.push({ cfg: nc, score, r });
               // Сохраняем все соседи не хуже 90% базы — чтобы показывать альтернативы
               // Порог: baseScore - 10% от |baseScore| (корректно и для отрицательных значений)
@@ -3779,7 +3815,7 @@ async function runHillClimbing() {
             const pct = Math.min(99, Math.round(iter / effectiveMaxIter * 100));
             document.getElementById('hc-pbar').style.width = pct + '%';
             document.getElementById('hc-status').textContent =
-              `⚡ Итер. ${iter}/${effectiveMaxIter} | Луч: ${beam.length} | Находки: ${allFound.length} | ${beam[0].score.toFixed(2)}`;
+              `⚡ Итер. ${iter}/${effectiveMaxIter} | Луч: ${beam.length} | Находки: ${allFound.length} | ${_metricLbl}: ${beam[0].score.toFixed(1)}`;
 
             if (iter % 10 === 0) {
               await yieldToUI();
@@ -4190,7 +4226,7 @@ function _hcRenderResults(found, metric) {
     return { ...x, name, descParts };
   });
 
-  const metricLabel = {pdd:'P/DD',pnl:'PnL%',wr:'WR%',avg:'Avg%'}[metric]||'Score';
+  const metricLabel = {pdd:'P/DD',pnl:'PnL%',wr:'WR%',avg:'Avg%',tv_score:'TV Score',tv_pnl:'TV PnL ret%',tv_pdd:'TV P/DD ret%'}[metric]||'Score';
   let html = '<div style="font-size:.65em;font-weight:600;color:var(--text3);margin-bottom:6px">ТОП УЛУЧШЕНИЙ (' + top.length + ' из ' + found.length + '):</div>';
   html += '<div style="display:flex;flex-direction:column;gap:4px">';
 

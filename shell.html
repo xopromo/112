@@ -1604,6 +1604,25 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
         <span style="font-size:.85em;color:var(--text3)">(OOS+WF+Param на каждом шаге, ~10× медленнее)</span>
       </label>
     </div>
+    <!-- TV метрики -->
+    <div style="display:flex;gap:6px;margin-bottom:4px;flex-wrap:wrap">
+      <label style="display:flex;align-items:center;gap:4px;font-size:.7em;cursor:pointer;border:1px solid #f90;border-radius:4px;padding:2px 6px;background:rgba(255,153,0,.06)">
+        <input type="radio" name="hc_metric" id="hc_m_tv_score" value="tv_score" style="accent-color:#f90">
+        <span style="color:#f90;font-weight:600">📊 TV Score</span>
+        <span style="font-size:.85em;color:var(--text3)">(IS→TV стабильность, ~2× медл.)</span>
+      </label>
+      <label style="display:flex;align-items:center;gap:4px;font-size:.7em;cursor:pointer;border:1px solid #f90;border-radius:4px;padding:2px 6px;background:rgba(255,153,0,.06)">
+        <input type="radio" name="hc_metric" id="hc_m_tv_pnl" value="tv_pnl" style="accent-color:#f90">
+        <span style="color:#f90;font-weight:600">📊 TV PnL ret%</span>
+      </label>
+      <label style="display:flex;align-items:center;gap:4px;font-size:.7em;cursor:pointer;border:1px solid #f90;border-radius:4px;padding:2px 6px;background:rgba(255,153,0,.06)">
+        <input type="radio" name="hc_metric" id="hc_m_tv_pdd" value="tv_pdd" style="accent-color:#f90">
+        <span style="color:#f90;font-weight:600">📊 TV P/DD ret%</span>
+      </label>
+    </div>
+    <div id="hc-tv-metric-hint" style="display:none;font-size:.62em;color:var(--text3);background:rgba(255,153,0,.05);border:1px solid rgba(255,153,0,.3);border-radius:4px;padding:4px 8px;margin-bottom:8px">
+      📊 TV метрика: каждый сосед тестируется <b>дважды</b> — на IS (70%) и на полных данных. Beam search ищет стратегии, которые <b>не теряют эффективность на новых данных</b>. ~2× медленнее P/DD.
+    </div>
     <div id="hc-rob-metric-hint" style="display:none;font-size:.62em;color:var(--text3);background:rgba(0,230,118,.05);border:1px solid rgba(0,230,118,.2);border-radius:4px;padding:4px 8px;margin-bottom:8px">
       ⚡ В режиме Устойчивость: каждый сосед проверяется на <b>всех 5 тестах</b> (OOS★★★★★ → WF → Param → Noise → MC). Итераций авто-лимит 30 — каждая итерация ~2–5 сек.
       Beam search идёт <b>в направлении максимальной устойчивости</b>, не просто лучшей метрики. P/DD — тай-брейкер.
