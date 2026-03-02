@@ -531,8 +531,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
 .dp-copy-btn {
   display: block;
   width: 100%;
-  margin-top: 12px;
-  padding: 8px;
+  padding: 6px 8px;
   background: rgba(0,212,255,0.08);
   border: 1px solid var(--accent2);
   border-radius: 6px;
@@ -546,9 +545,12 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
 }
 .dp-copy-btn:hover { background: rgba(0,212,255,0.15); }
 .dp-footer {
-  padding: 10px 16px;
+  padding: 8px 12px;
   border-top: 1px solid var(--border);
   flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 .tbl-scroll { max-height: 500px; overflow-y: auto; }
@@ -1457,11 +1459,11 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
   <div class="dp-stats" id="dp-stats"></div>
   <div class="dp-body" id="dp-body"></div>
   <div class="dp-footer">
-    <button class="dp-copy-btn" id="btn-copy-detail" onclick="copyDetail()">📋 Скопировать настройки текстом</button>
-    <button class="dp-copy-btn" style="background:var(--bg4);border-color:var(--accent2);color:var(--accent2)" id="btn-open-robust-from-detail" onclick="openRobustModal()">🔬 Тест устойчивости</button>
-    <button class="dp-copy-btn" style="background:var(--bg4);border-color:var(--green);color:var(--green)" id="btn-open-hc-from-detail" onclick="openHCModal('selected')">🧗 Поиск соседей</button>
-    <button class="dp-copy-btn" style="background:var(--bg4);border-color:#c792ea;color:#c792ea" id="btn-pine-export" onclick="openPineModal()">🌲 Pine Script</button>
-    <button class="dp-copy-btn" style="background:var(--bg4);border-color:#ffcb6b;color:#ffcb6b" id="btn-open-heatmap" onclick="openHeatmapModal()">🗺️ Карта параметров</button>
+    <button class="dp-copy-btn" style="flex:1 1 calc(33% - 6px)" id="btn-copy-detail" onclick="copyDetail()">📋 Скопировать настройки</button>
+    <button class="dp-copy-btn" style="flex:1 1 calc(33% - 6px);background:var(--bg4);border-color:var(--accent2);color:var(--accent2)" id="btn-open-robust-from-detail" onclick="openRobustModal()">🔬 Тест устойчивости</button>
+    <button class="dp-copy-btn" style="flex:1 1 calc(33% - 6px);background:var(--bg4);border-color:var(--green);color:var(--green)" id="btn-open-hc-from-detail" onclick="openHCModal('selected')">🧗 Поиск соседей</button>
+    <button class="dp-copy-btn" style="flex:1 1 calc(50% - 6px);background:var(--bg4);border-color:#c792ea;color:#c792ea" id="btn-pine-export" onclick="openPineModal()">🌲 Pine Script</button>
+    <button class="dp-copy-btn" style="flex:1 1 calc(50% - 6px);background:var(--bg4);border-color:#ffcb6b;color:#ffcb6b" id="btn-open-heatmap" onclick="openHeatmapModal()">🗺️ Карта параметров</button>
   </div>
 </div>
 
@@ -6341,8 +6343,8 @@ function showDetail(r) {
   // Stats bar — unified IS + TV rows via CSS grid
   const _fwd = r.cfg && r.cfg._oos && r.cfg._oos.forward;
   const _hasLS = r.wrL != null;
-  // Column count: 9 base + Avg + CVR + (3 L/S if applicable)
-  const _ncols = 11 + (_hasLS ? 3 : 0);
+  // Column count: 9 base + Avg + CVR + (1 ΔWR L/S if applicable)
+  const _ncols = 11 + (_hasLS ? 1 : 0);
 
   // Build one row of dp-stat cells (same structure for both IS and TV)
   function _statsRow(v) {
@@ -6363,10 +6365,7 @@ function showDetail(r) {
       `<div class="dp-stat"><div class="v ${cvrC}">${cvrV}</div><div class="l">CVR%</div></div>`;
     if (_hasLS) {
       const lsC = v.dwrLS!=null ? (v.dwrLS<10?'ok':v.dwrLS<25?'warn':'bad') : 'muted';
-      h +=
-        `<div class="dp-stat"><div class="v ${lsC}">${v.dwrLS!=null?v.dwrLS.toFixed(0)+'%':'—'}</div><div class="l">ΔWR L/S</div></div>`+
-        `<div class="dp-stat"><div class="v">${v.wrL!=null?v.wrL.toFixed(0)+'% ('+v.nL+')':'—'}</div><div class="l">Лонг WR</div></div>`+
-        `<div class="dp-stat"><div class="v">${v.wrS!=null?v.wrS.toFixed(0)+'% ('+v.nS+')':'—'}</div><div class="l">Шорт WR</div></div>`;
+      h += `<div class="dp-stat" title="Разница WR лонгов и шортов. L:${v.nL||0}сд WR${v.wrL!=null?v.wrL.toFixed(0):'?'}% · S:${v.nS||0}сд WR${v.wrS!=null?v.wrS.toFixed(0):'?'}%"><div class="v ${lsC}">${v.dwrLS!=null?v.dwrLS.toFixed(0)+'%':'—'}</div><div class="l">ΔWR L/S</div></div>`;
     }
     return h;
   }

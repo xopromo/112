@@ -768,8 +768,8 @@ function showDetail(r) {
   // Stats bar — unified IS + TV rows via CSS grid
   const _fwd = r.cfg && r.cfg._oos && r.cfg._oos.forward;
   const _hasLS = r.wrL != null;
-  // Column count: 9 base + Avg + CVR + (3 L/S if applicable)
-  const _ncols = 11 + (_hasLS ? 3 : 0);
+  // Column count: 9 base + Avg + CVR + (1 ΔWR L/S if applicable)
+  const _ncols = 11 + (_hasLS ? 1 : 0);
 
   // Build one row of dp-stat cells (same structure for both IS and TV)
   function _statsRow(v) {
@@ -790,10 +790,7 @@ function showDetail(r) {
       `<div class="dp-stat"><div class="v ${cvrC}">${cvrV}</div><div class="l">CVR%</div></div>`;
     if (_hasLS) {
       const lsC = v.dwrLS!=null ? (v.dwrLS<10?'ok':v.dwrLS<25?'warn':'bad') : 'muted';
-      h +=
-        `<div class="dp-stat"><div class="v ${lsC}">${v.dwrLS!=null?v.dwrLS.toFixed(0)+'%':'—'}</div><div class="l">ΔWR L/S</div></div>`+
-        `<div class="dp-stat"><div class="v">${v.wrL!=null?v.wrL.toFixed(0)+'% ('+v.nL+')':'—'}</div><div class="l">Лонг WR</div></div>`+
-        `<div class="dp-stat"><div class="v">${v.wrS!=null?v.wrS.toFixed(0)+'% ('+v.nS+')':'—'}</div><div class="l">Шорт WR</div></div>`;
+      h += `<div class="dp-stat" title="Разница WR лонгов и шортов. L:${v.nL||0}сд WR${v.wrL!=null?v.wrL.toFixed(0):'?'}% · S:${v.nS||0}сд WR${v.wrS!=null?v.wrS.toFixed(0):'?'}%"><div class="v ${lsC}">${v.dwrLS!=null?v.dwrLS.toFixed(0)+'%':'—'}</div><div class="l">ΔWR L/S</div></div>`;
     }
     return h;
   }
