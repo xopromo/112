@@ -416,11 +416,12 @@ function applyFiltersDebounced() {
 
 function resetAllFilters() {
   // Сбрасываем все текстовые/числовые инпуты
-  ['f_name','f_pnl','f_wr','f_n','f_dd','f_pdd','f_sig','f_gt','f_cvr','f_avg','f_p1','f_p2','f_dwr'].forEach(id => {
+  ['f_name','f_pnl','f_wr','f_n','f_dd','f_pdd','f_sig','f_gt','f_cvr','f_avg','f_p1','f_p2','f_dwr',
+   'f_tv_dpnl','f_tv_ddd','f_tv_dpdd'].forEach(id => {
     const el = $(id); if (el) el.value = '';
   });
   // Сбрасываем все select
-  ['f_fav','f_split','f_ls','f_rob','f_oos','f_walk','f_param','f_noise','f_mc'].forEach(id => {
+  ['f_fav','f_split','f_ls','f_rob','f_oos','f_walk','f_param','f_noise','f_mc','f_tv_score'].forEach(id => {
     const el = $(id); if (el) el.value = '';
   });
   // Сбрасываем сортировку
@@ -496,6 +497,26 @@ function applyFilters() {
     const fParam = $('f_param')?.value; if (fParam !== '' && fParam !== undefined) { const v = _fd.param ?? -1; if (String(v) !== fParam) return false; }
     const fNoise = $('f_noise')?.value; if (fNoise !== '' && fNoise !== undefined) { const v = _fd.noise ?? -1; if (String(v) !== fNoise) return false; }
     const fMc    = $('f_mc')?.value;    if (fMc    !== '' && fMc    !== undefined) { const v = _fd.mc    ?? -1; if (String(v) !== fMc)    return false; }
+    // TV delta filters
+    const fTvScore = $('f_tv_score')?.value;
+    const fTvDpnl  = parseFloat($('f_tv_dpnl')?.value);
+    const fTvDdd   = parseFloat($('f_tv_ddd')?.value);
+    const fTvDpdd  = parseFloat($('f_tv_dpdd')?.value);
+    if (fTvScore !== '' || !isNaN(fTvDpnl) || !isNaN(fTvDdd) || !isNaN(fTvDpdd)) {
+      const f = r.cfg?._oos?.forward;
+      if (!f || f.pnlFull == null) return false; // нет TV данных — исключаем при фильтре
+      const retPnl = r.pnl !== 0 ? f.pnlFull / Math.abs(r.pnl) * 100 : 0;
+      const mulDd  = r.dd > 0 ? f.dd / r.dd : 1;
+      const retPdd = r.pdd > 0 ? (f.pdd??0) / r.pdd * 100 : 0;
+      const gPnl = retPnl>=80, okPnl = retPnl>=50;
+      const gDd  = mulDd<=1.3, okDd  = mulDd<=2.0;
+      const gPdd = retPdd>=70, okPdd = retPdd>=40;
+      const tvScore = (gPnl && gDd && gPdd) ? 2 : (!okPnl || !okDd || !okPdd) ? 0 : 1;
+      if (fTvScore !== '' && fTvScore !== undefined && tvScore < parseInt(fTvScore)) return false;
+      if (!isNaN(fTvDpnl) && retPnl < fTvDpnl) return false;
+      if (!isNaN(fTvDdd)  && mulDd  > fTvDdd)  return false;
+      if (!isNaN(fTvDpdd) && retPdd < fTvDpdd) return false;
+    }
     return true;
   });
 
@@ -2653,6 +2674,24 @@ function doSort(col) {
     arr.sort((a,b) => d * ((a[key]||0) - (b[key]||0)));
   } else if (col === 17) {
     arr.sort((a,b) => d * ((a.dwrLS ?? 999) - (b.dwrLS ?? 999)));
+  } else if (col >= 22 && col <= 25) {
+    // TV delta columns — sort by computed values
+    const _tvVal = (r, c) => {
+      const f = r.cfg?._oos?.forward;
+      if (!f || f.pnlFull == null) return c === 24 ? 999 : -999;
+      const retPnl = r.pnl !== 0 ? f.pnlFull / Math.abs(r.pnl) * 100 : 0;
+      const mulDd  = r.dd > 0 ? f.dd / r.dd : 1;
+      const retPdd = r.pdd > 0 ? (f.pdd??0) / r.pdd * 100 : 0;
+      if (c === 22) {
+        const g = retPnl>=80 && mulDd<=1.3 && retPdd>=70;
+        const b = retPnl<50  || mulDd>2.0  || retPdd<40;
+        return g ? 2 : b ? 0 : 1;
+      }
+      if (c === 23) return retPnl;
+      if (c === 24) return mulDd;
+      if (c === 25) return retPdd;
+    };
+    arr.sort((a,b) => d * (_tvVal(a,col) - _tvVal(b,col)));
   } else if (detailKeys[col]) {
     const dk = detailKeys[col];
     arr.sort((a,b) => {
@@ -3903,7 +3942,8 @@ async function runHillClimbing() {
       name, cfg: x.cfg,
       pnl: raw.pnl, wr: raw.wr, n: raw.n, dd: raw.dd, pdd,
       avg: raw.avg||0, dwr: raw.dwr||0,
-      p1: raw.p1||0, p2: raw.p2||0,
+      p1: raw.p1||0, p2: raw.p2||0, c1: raw.c1||0, c2: raw.c2||0,
+      sig: _calcStatSig(raw), gt: _calcGTScore(raw), cvr: _calcCVR(raw.eq),
       robScore: x.robScore, robMax: x.robMax, robDetails: x.robDetails,
       eq: raw.eq,
       nL: raw.nL||0, pL: raw.pL||0, wrL: raw.wrL,
