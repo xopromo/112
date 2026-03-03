@@ -105,6 +105,7 @@ jobs:
           if not all_results:
               try:
                   from bs4 import BeautifulSoup
+                  from urllib.parse import parse_qs, urlparse, unquote
                   q = quote_plus(query)
                   r = requests.get(f'https://html.duckduckgo.com/html/?q={q}',
                                    headers={'User-Agent': UA}, timeout=15)
@@ -113,7 +114,14 @@ jobs:
                       a    = tag.find('a', class_='result__a')
                       snip = tag.find('a', class_='result__snippet')
                       if a:
-                          url = a.get('href', '')
+                          raw_url = a.get('href', '')
+                          # Decode DDG redirect URL (//duckduckgo.com/l/?uddg=...)
+                          if 'duckduckgo.com/l/' in raw_url or raw_url.startswith('//duckduckgo.com'):
+                              full = raw_url if raw_url.startswith('http') else 'https:' + raw_url
+                              qs   = parse_qs(urlparse(full).query)
+                              url  = unquote(qs.get('uddg', [''])[0]) or raw_url
+                          else:
+                              url = raw_url
                           all_results.append({
                               'title':     a.get_text(strip=True),
                               'url':       url,
