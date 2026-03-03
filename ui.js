@@ -416,7 +416,7 @@ function applyFiltersDebounced() {
 
 function resetAllFilters() {
   // Сбрасываем все текстовые/числовые инпуты
-  ['f_name','f_pnl','f_wr','f_n','f_dd','f_pdd','f_sig','f_gt','f_cvr','f_avg','f_p1','f_p2','f_dwr',
+  ['f_name','f_pnl','f_wr','f_n','f_dd','f_pdd','f_sig','f_gt','f_cvr','f_sortino','f_avg','f_p1','f_p2','f_dwr', // ##SOR f_sortino
    'f_tv_dpnl','f_tv_ddd','f_tv_dpdd'].forEach(id => {
     const el = $(id); if (el) el.value = '';
   });
@@ -439,7 +439,8 @@ function applyFilters() {
   const fPdd   = parseFloat($('f_pdd').value);
   const fSig   = parseFloat($('f_sig').value);
   const fGt    = parseFloat($('f_gt').value);
-  const fCvr   = parseFloat($('f_cvr').value);
+  const fCvr     = parseFloat($('f_cvr').value);
+  const fSortino = parseFloat($('f_sortino').value); // ##SOR
   const fAvg   = parseFloat($('f_avg').value);
   const fP1    = parseFloat($('f_p1').value);
   const fP2    = parseFloat($('f_p2').value);
@@ -467,6 +468,7 @@ function applyFilters() {
     if (!isNaN(fSig) && (r.sig??0) < fSig) return false;
     if (!isNaN(fGt)  && (r.gt??-2) < fGt)  return false;
     if (!isNaN(fCvr) && (r.cvr??-1) < fCvr) return false;
+    if (!isNaN(fSortino) && (r.sortino??-99) < fSortino) return false; // ##SOR
     if (!isNaN(fAvg) && r.avg < fAvg) return false;
     if (!isNaN(fP1)  && r.p1  < fP1)  return false;
     if (!isNaN(fP2)  && r.p2  < fP2)  return false;
@@ -630,6 +632,7 @@ function renderVisibleResults() {
       (()=>{ const s=r.sig??0; const sc=s>=90?'pos':s>=70?'':'neg'; return `<td class="col-sig ${sc}" title="Статистическая значимость WR (z-тест)\n≥90% = значима ✅\n70–90% = под вопросом\n&lt;70% = вероятно случайно">${s}%</td>`; })() +
       (()=>{ const g=r.gt??-2; const gc=g>=5?'pos':g>=2?'':'neg'; return `<td class="col-gt ${gc}" title="GT-Score = (P/DD) × sig_mult × consistency_mult\nАнтиовефиттинг метрика: штрафует за мало сделок и нестабильный WR">${g.toFixed(2)}</td>`; })() +
       (()=>{ const v=r.cvr??null; if(v===null) return '<td class="col-cvr muted">—</td>'; const vc=v>=80?'pos':v>=50?'':'neg'; return `<td class="col-cvr ${vc}" title="CVR% — Temporal Cross-Validation Robustness\nПроцент из 6 временных окон, где стратегия прибыльна.\n≥80% = устойчива ✅ | 50–80% = умеренно | &lt;50% = нестабильна">${v}%</td>`; })() +
+      (()=>{ const v=r.sortino??null; if(v===null) return '<td class="col-sor muted">—</td>'; const vc=v>=3?'pos':v>=2?'warn':'neg'; return `<td class="col-sor ${vc}" title="Sortino Ratio = PnL / downside_vol\ndownside_vol = sqrt(mean(min(Δeq,0)²)) — только отриц. движения.\n≥3 = отлично ✅ | ≥2 = хорошо | &lt;1 = нестабильно">${v.toFixed(1)}</td>`; })() + // ##SOR
       `<td class="col-avg">${r.avg.toFixed(2)}</td>` +
       `<td class="col-p1 ${r.p1 >= 0 ? 'pos' : 'neg'}">${r.p1.toFixed(1)}</td>` +
       `<td class="col-p2 ${r.p2 >= 0 ? 'pos' : 'neg'}">${r.p2.toFixed(1)}</td>` +
@@ -768,8 +771,8 @@ function showDetail(r) {
   // Stats bar — unified IS + TV rows via CSS grid
   const _fwd = r.cfg && r.cfg._oos && r.cfg._oos.forward;
   const _hasLS = r.wrL != null;
-  // Column count: 9 base + Avg + CVR + UPI + (1 ΔWR L/S if applicable)
-  const _ncols = 12 + (_hasLS ? 1 : 0);
+  // Column count: 9 base + Avg + CVR + UPI + Sortino + (1 ΔWR L/S if applicable)
+  const _ncols = 13 + (_hasLS ? 1 : 0); // ##SOR +1
 
   // Build one row of dp-stat cells (same structure for both IS and TV)
   function _statsRow(v) {
@@ -779,6 +782,8 @@ function showDetail(r) {
     const cvrV = v.cvr!=null ? v.cvr+'%' : '—';
     const upiC = v.upi!=null ? (v.upi>=5?'pos':v.upi>=2?'warn':'neg') : 'muted';
     const upiV = v.upi!=null ? v.upi.toFixed(1) : '—';
+    const sorC = v.sortino!=null ? (v.sortino>=3?'pos':v.sortino>=2?'warn':'neg') : 'muted'; // ##SOR
+    const sorV = v.sortino!=null ? v.sortino.toFixed(1) : '—'; // ##SOR
     let h =
       `<div class="dp-stat"><div class="v ${v.pnl>=0?'pos':'neg'}">${v.pnl.toFixed(1)}%</div><div class="l">PnL</div></div>`+
       `<div class="dp-stat"><div class="v">${v.wr.toFixed(1)}%</div><div class="l">WinRate</div></div>`+
@@ -790,7 +795,8 @@ function showDetail(r) {
       `<div class="dp-stat"><div class="v ${v.p2>=0?'pos':'neg'}">${v.p2.toFixed(1)}%</div><div class="l">2п (${v.c2}сд)</div></div>`+
       `<div class="dp-stat"><div class="v">${v.avg.toFixed(2)}%</div><div class="l">Avg/сд</div></div>`+
       `<div class="dp-stat"><div class="v ${cvrC}">${cvrV}</div><div class="l">CVR%</div></div>`+
-      `<div class="dp-stat" title="Ulcer Performance Index = PnL / sqrt(mean(просадка²))\nЛучше Calmar: учитывает длительность и частоту просадок.\n≥5 = устойчива ✅ | 2–5 = умеренно | &lt;2 = нестабильна"><div class="v ${upiC}">${upiV}</div><div class="l">UPI</div></div>`;
+      `<div class="dp-stat" title="Ulcer Performance Index = PnL / sqrt(mean(просадка²))\nЛучше Calmar: учитывает длительность и частоту просадок.\n≥5 = устойчива ✅ | 2–5 = умеренно | &lt;2 = нестабильна"><div class="v ${upiC}">${upiV}</div><div class="l">UPI</div></div>`+
+      `<div class="dp-stat" title="Sortino Ratio = PnL / downside_dev\ndownside_dev = sqrt(mean(min(Δeq,0)²)) — только отриц. движения.\n≥3 = отлично ✅ | ≥2 = хорошо | &lt;1 = нестабильно"><div class="v ${sorC}">${sorV}</div><div class="l">Sortino</div></div>`; // ##SOR
     if (_hasLS) {
       const lsC = v.dwrLS!=null ? (v.dwrLS<10?'ok':v.dwrLS<25?'warn':'bad') : 'muted';
       h += `<div class="dp-stat" title="Разница WR лонгов и шортов. L:${v.nL||0}сд WR${v.wrL!=null?v.wrL.toFixed(0):'?'}% · S:${v.nS||0}сд WR${v.wrS!=null?v.wrS.toFixed(0):'?'}%"><div class="v ${lsC}">${v.dwrLS!=null?v.dwrLS.toFixed(0)+'%':'—'}</div><div class="l">ΔWR L/S</div></div>`;
@@ -804,6 +810,7 @@ function showDetail(r) {
   dp.innerHTML = _isLabel + _statsRow({
     pnl: r.pnl, wr: r.wr, n: r.n, dd: r.dd, pdd: r.pdd, dwr: r.dwr,
     p1: r.p1, p2: r.p2, c1: r.c1, c2: r.c2, avg: r.avg, cvr: r.cvr??null, upi: r.upi??null,
+    sortino: r.sortino??null, // ##SOR
     dwrLS: r.dwrLS??null, wrL: r.wrL??null, nL: r.nL||0, wrS: r.wrS??null, nS: r.nS||0
   });
 
@@ -816,6 +823,7 @@ function showDetail(r) {
         pnl: _fwd.pnlFull, wr: _fwd.wr, n: _fwd.n, dd: _fwd.dd, pdd: _fwd.pdd??0,
         dwr: _fwd.dwr??0, p1: _fwd.p1??0, p2: _fwd.p2??0, c1: _fwd.c1??0, c2: _fwd.c2??0,
         avg: _fwd.avg??0, cvr: _fwd.cvr??null, upi: _fwd.upi??null,
+        sortino: _fwd.sortino??null, // ##SOR
         dwrLS: _fwd.dwrLS??null, wrL: _fwd.wrL??null, nL: _fwd.nL||0, wrS: _fwd.wrS??null, nS: _fwd.nS||0
       });
   }
@@ -947,6 +955,41 @@ function showDetail(r) {
     html = section('📊', 'CPCV — БЛОЧНАЯ ВАЛИДАЦИЯ', _cpcvHtml) + html;
   }
   // ##CPCV_END##
+
+  // ##KR_SQN_START## — удалить для отката (вместе с _calcKRatio, _calcSQN в opt.js
+  //                     и collectTrades/_trPnl/tradePnl в core.js)
+  {
+    let _rKS = null;
+    try {
+      const _ind = _calcIndicators(r.cfg);
+      const _btc = buildBtCfg(r.cfg, _ind);
+      _btc.collectTrades = true;
+      _rKS = backtest(_ind.pvLo, _ind.pvHi, _ind.atrArr, _btc);
+    } catch(_) {}
+
+    const _kr  = _rKS ? _calcKRatio(_rKS.eq)          : null;
+    const _sqn = _rKS ? _calcSQN(_rKS.tradePnl)        : null;
+
+    let _ksHtml = '';
+    if (_kr !== null) {
+      const _kc = _kr >= 2 ? 'pos' : _kr >= 1 ? 'warn' : 'neg';
+      _ksHtml += row('K-Ratio',
+        `<span class="${_kc}">${_kr.toFixed(1)}</span>` +
+        ` <span style="opacity:.6;font-size:.85em">${_kr >= 2 ? 'равномерный рост' : _kr >= 1 ? 'умеренная стабильность' : 'нестабильный рост'}</span>`, '');
+    } else {
+      _ksHtml += row('K-Ratio', 'нет данных', 'muted');
+    }
+    if (_sqn !== null) {
+      const _sc = _sqn >= 5 ? 'pos' : _sqn >= 2 ? 'warn' : 'neg';
+      _ksHtml += row('SQN',
+        `<span class="${_sc}">${_sqn.toFixed(1)}</span>` +
+        ` <span style="opacity:.6;font-size:.85em">${_sqn >= 5 ? 'excellent ✅' : _sqn >= 3 ? 'good' : _sqn >= 1 ? 'average' : 'poor'}</span>`, '');
+    } else {
+      _ksHtml += row('SQN', 'нет данных — нужно ≥10 сделок', 'muted');
+    }
+    html = section('📐', 'K-RATIO · SQN', _ksHtml) + html;
+  }
+  // ##KR_SQN_END##
 
   $('dp-body').innerHTML = html;
 
@@ -2707,6 +2750,8 @@ function doSort(col) {
     arr.sort((a,b) => d * ((a.gt??-2) - (b.gt??-2)));
   } else if (col === 21) {
     arr.sort((a,b) => d * ((a.cvr??-1) - (b.cvr??-1)));
+  } else if (col === 26) { // ##SOR
+    arr.sort((a,b) => d * ((a.sortino??-99) - (b.sortino??-99)));
   } else if (col <= 11) {
     const keys = ['name','pnl','wr','n','dd','pdd','avg','p1','p2','dwr','dwr','robScore'];
     const key = keys[col];
@@ -2922,6 +2967,7 @@ const _COL_DEFS = [
   { id: 'col-sig',        label: 'Sig%',                default: true },
   { id: 'col-gt',         label: 'GT-Score',            default: true },
   { id: 'col-cvr',        label: 'CVR%',                default: true },
+  { id: 'col-sor',        label: 'Sortino',             default: true }, // ##SOR
   { id: 'col-avg',        label: 'Avg%',                default: true },
   { id: 'col-p1',         label: '1п PnL',              default: true },
   { id: 'col-p2',         label: '2п PnL',              default: false },
@@ -3421,7 +3467,8 @@ function _hcBuildOOS(cfg) {
       pnlFull: rFull.pnl, avg: rFull.avg, pdd: pddFull,
       dwr: rFull.dwr, p1: rFull.p1, p2: rFull.p2, c1: rFull.c1, c2: rFull.c2,
       wrL: rFull.wrL ?? null, nL: rFull.nL || 0, wrS: rFull.wrS ?? null, nS: rFull.nS || 0,
-      dwrLS: rFull.dwrLS ?? null, cvr: _calcCVR(rFull.eq), upi: _calcUlcerIdx(rFull.eq)
+      dwrLS: rFull.dwrLS ?? null, cvr: _calcCVR(rFull.eq), upi: _calcUlcerIdx(rFull.eq),
+      sortino: _calcSortino(rFull.eq) // ##SOR
     }
   };
 
@@ -4132,6 +4179,7 @@ async function runHillClimbing() {
       p1: _isR.p1||0, p2: _isR.p2||0, c1: _isR.c1||0, c2: _isR.c2||0,
       sig: _calcStatSig(_isR), gt: _calcGTScore(_isR), cvr: _isR.cvr != null ? _isR.cvr : _calcCVR(_isR.eq),
       upi: _isR.upi != null ? _isR.upi : _calcUlcerIdx(_isR.eq),
+      sortino: _isR.sortino != null ? _isR.sortino : _calcSortino(_isR.eq), // ##SOR
       robScore: x.robScore, robMax: x.robMax, robDetails: x.robDetails,
       eq: x.r.eq,
       nL: _isR.nL||0, pL: _isR.pL||0, wrL: _isR.wrL,

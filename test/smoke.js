@@ -140,7 +140,59 @@ assert(_calcUlcerIdx(new Float32Array(10)) === null, '10 баров → null (м
 }
 
 // ════════════════════════════════════════════════════════════
-// 5. _calcCPCVScore
+// 5. _calcSortino / _calcKRatio / _calcSQN
+// ════════════════════════════════════════════════════════════
+console.log('5. _calcSortino / _calcKRatio / _calcSQN');
+{
+  // _calcSortino
+  assert(_calcSortino(null) === null, 'Sortino: null → null');
+  assert(_calcSortino(new Float32Array(5)) === null, 'Sortino: 5 баров → null');
+  const eqUp = new Float32Array(50); for (let i=0;i<50;i++) eqUp[i]=i; // только рост, 0 downside
+  assert(_calcSortino(eqUp) === 99.9, `Sortino: нет downside → 99.9 (${_calcSortino(eqUp)})`);
+  const eqWave = new Float32Array(50); for (let i=0;i<50;i++) eqWave[i]=Math.sin(i/3)*5+i*0.3;
+  const sor = _calcSortino(eqWave);
+  assert(sor !== null && !isNaN(sor), `Sortino: волнистый equity → число (${sor})`);
+
+  // _calcKRatio
+  assert(_calcKRatio(null) === null, 'K-Ratio: null → null');
+  assert(_calcKRatio(new Float32Array(10)) === null, 'K-Ratio: 10 баров → null');
+  const eqLin = new Float32Array(50); for (let i=0;i<50;i++) eqLin[i]=i; // идеально ровный рост → 99.9
+  const kr = _calcKRatio(eqLin);
+  assert(kr === 99.9, `K-Ratio: идеально ровный рост → 99.9 (${kr})`);
+  const eqRand = new Float32Array(50); for (let i=0;i<50;i++) eqRand[i]=Math.random()*50-25;
+  const krRand = _calcKRatio(eqRand);
+  assert(krRand !== null, `K-Ratio: случайный equity → число (${krRand})`);
+
+  // _calcSQN
+  assert(_calcSQN(null) === null, 'SQN: null → null');
+  assert(_calcSQN([1,2,3]) === null, 'SQN: 3 элемента → null (нужно ≥10)');
+  const goodTrades = Array.from({length:20}, () => 1.0); // все одинаковые → std=0
+  assert(_calcSQN(goodTrades) === 99.9, `SQN: нет дисперсии → 99.9 (${_calcSQN(goodTrades)})`);
+  const mixTrades = [1,2,3,4,5,-1,-2,-3,-4,-5, 2,2,2,2,2,-2,-2,-2,-2,-2];
+  const sqn = _calcSQN(mixTrades);
+  assert(sqn !== null && !isNaN(sqn), `SQN: смешанные сделки → число (${sqn})`);
+}
+
+// ════════════════════════════════════════════════════════════
+// 5b. backtest() tradePnl (collectTrades)
+// ════════════════════════════════════════════════════════════
+console.log('5b. backtest tradePnl');
+{
+  DATA = makeData(N);
+  const ind = _calcIndicators(NO_TRADE_CFG);
+  const btCfg = buildBtCfg(NO_TRADE_CFG, ind);
+  // без collectTrades — tradePnl должен быть пустым массивом
+  const r = backtest(ind.pvLo, ind.pvHi, ind.atrArr, btCfg);
+  assert(Array.isArray(r.tradePnl), `tradePnl — массив (${typeof r.tradePnl})`);
+  assert(r.tradePnl.length === 0, `tradePnl пуст без collectTrades (длина: ${r.tradePnl.length})`);
+  // с collectTrades — tradePnl может быть пустым (нет сделок с NO_TRADE_CFG) но должен быть массивом
+  btCfg.collectTrades = true;
+  const r2 = backtest(ind.pvLo, ind.pvHi, ind.atrArr, btCfg);
+  assert(Array.isArray(r2.tradePnl), `tradePnl с collectTrades — массив (${typeof r2.tradePnl})`);
+}
+
+// ════════════════════════════════════════════════════════════
+// 6. _calcCPCVScore
 // ════════════════════════════════════════════════════════════
 console.log('5. _calcCPCVScore');
 {

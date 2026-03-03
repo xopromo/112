@@ -268,6 +268,10 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
   let p1 = 0, c1 = 0, w1 = 0, p2 = 0, c2 = 0, w2 = 0;
   let nL = 0, wL = 0, pL = 0, nS = 0, wS = 0, pS = 0; // лонг/шорт стат
   const eq = new Float32Array(N);
+  // ##SQN_START## — collectTrades для SQN в showDetail; НЕ задаётся в горячем цикле
+  // Откат: удалить эти 2 строки + tradePnl в return ниже
+  const _trPnl = cfg.collectTrades ? [] : null;
+  // ##SQN_END##
   const start = cfg.start || 50;
   const volAvg = cfg.volAvg;
   const bodyAvg = cfg.bodyAvg;
@@ -455,6 +459,7 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
       if (frc || hsl || htp || htr) {
         const tradePnl = (dir*(exitPrice-entry)/entry*100 - comm)*posSize;
         pnl += tradePnl; trades++;
+        if (_trPnl) _trPnl.push(tradePnl); // ##SQN##
         if (tradePnl > 0) wins++;
         if (i <= split) { p1+=tradePnl; c1++; if(tradePnl>0) w1++; }
         else { p2+=tradePnl; c2++; if(tradePnl>0) w2++; }
@@ -749,6 +754,7 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
   return { pnl, wr, n:trades, dd, p1, w1:wr1, c1, p2, w2:wr2, c2, eq,
            dwr:Math.abs(wr1-wr2), avg:trades>0?pnl/trades:0,
            nL, pL, wrL, nS, pS, wrS,
-           dwrLS: (wrL!==null&&wrS!==null) ? Math.abs(wrL-wrS) : null };
+           dwrLS: (wrL!==null&&wrS!==null) ? Math.abs(wrL-wrS) : null,
+           tradePnl: _trPnl??[] }; // ##SQN## пусто если collectTrades не задан
 }
 

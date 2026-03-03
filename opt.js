@@ -109,6 +109,73 @@ function _calcUlcerIdx(eq) {
 }
 // ─────────────────────────────────────────────────────────────
 
+// ── Sortino Ratio (поиск 2026-03-03-20) ──────────────────────
+// Sortino = pnl / downside_dev
+// downside_dev = sqrt( mean( min(Δeq_i, 0)² ) ) — только отриц. движения
+// Отличие от UPI: штрафует за НЕСТАБИЛЬНОСТЬ потерь, а не глубину.
+// Sortino ≥ 3 = отлично, ≥ 2 = хорошо, < 1 = плохо.
+// eq — Float32Array из backtest() (кумулятивный PnL в %).
+// Откат: удалить эту функцию + поле sortino во всех results.push() (opt.js)
+//        + в _attachOOS.forward + _ncols/statsRow/table/filter/sort/col (ui.js)
+//        + <th col-sor> и <th f_sortino> (shell.html)
+function _calcSortino(eq) {
+  if (!eq || eq.length < 10) return null;
+  const N = eq.length;
+  let sumSqDown = 0;
+  for (let i = 1; i < N; i++) {
+    const r = eq[i] - eq[i - 1];
+    if (r < 0) sumSqDown += r * r;
+  }
+  const downDev = Math.sqrt(sumSqDown / (N - 1));
+  if (downDev < 1e-9) return eq[N - 1] > 0 ? 99.9 : null;
+  return Math.round(eq[N - 1] / downDev * 10) / 10;
+}
+// ─────────────────────────────────────────────────────────────
+
+// ── K-Ratio (поиск 2026-03-03-20) ────────────────────────────
+// K-Ratio = slope_of_OLS(eq) / se(slope)
+// OLS: eq[i] ~ a + b·i. Высокий K = equity растёт равномерно.
+// K ≥ 2 = отлично, ≥ 1 = хорошо, < 0.5 = нестабильно.
+// Вычисляется лениво в showDetail (НЕ в горячем цикле).
+// Откат: удалить эту функцию + блок ##KR_SQN## в showDetail (ui.js)
+function _calcKRatio(eq) {
+  if (!eq || eq.length < 20) return null;
+  const N = eq.length;
+  let sx = 0, sy = 0, sxy = 0, sx2 = 0;
+  for (let i = 0; i < N; i++) { sx += i; sy += eq[i]; sxy += i * eq[i]; sx2 += i * i; }
+  const den = N * sx2 - sx * sx;
+  if (Math.abs(den) < 1e-10) return null;
+  const b = (N * sxy - sx * sy) / den;
+  const a = (sy - b * sx) / N;
+  let ssr = 0;
+  for (let i = 0; i < N; i++) { const e = eq[i] - (a + b * i); ssr += e * e; }
+  const se = Math.sqrt(ssr / Math.max(N - 2, 1) / (sx2 - sx * sx / N));
+  if (se < 1e-10) return b > 0 ? 99.9 : b < 0 ? -99.9 : null; // ровный тренд → макс. K-Ratio
+  return Math.round(b / se * 10) / 10;
+}
+// ─────────────────────────────────────────────────────────────
+
+// ── SQN — System Quality Number (поиск 2026-03-03-20) ────────
+// SQN = (mean_trade / std_trade) × √n  (Van Tharp)
+// SQN > 5 = excellent, 3–5 = good, 1–3 = average, < 1 = poor.
+// Требует tradePnl[] из backtest() (core.js, cfg.collectTrades=true).
+// Вычисляется лениво в showDetail (НЕ в горячем цикле).
+// Откат: удалить эту функцию + блок ##KR_SQN## в showDetail (ui.js)
+//        + revert core.js: collectTrades / _trPnl / tradePnl в return
+function _calcSQN(tradePnlArr) {
+  if (!tradePnlArr || tradePnlArr.length < 10) return null;
+  const n = tradePnlArr.length;
+  let sum = 0;
+  for (let i = 0; i < n; i++) sum += tradePnlArr[i];
+  const mean = sum / n;
+  let varSum = 0;
+  for (let i = 0; i < n; i++) { const d = tradePnlArr[i] - mean; varSum += d * d; }
+  const std = Math.sqrt(varSum / n);
+  if (std < 1e-10) return mean > 0 ? 99.9 : null;
+  return Math.round(mean / std * Math.sqrt(n) * 10) / 10;
+}
+// ─────────────────────────────────────────────────────────────
+
 // ── CPCV: Block Walk-Forward Score (Hyp 1 — CPCV валидация) ──
 // Делит DATA на K равных временных блоков, запускает backtest
 // независимо на каждом. Надёжнее CVR: отдельный прогрев
@@ -379,7 +446,8 @@ async function runOpt() {
       pnlFull: rFull.pnl, avg: rFull.avg, pdd: pddFull,
       dwr: rFull.dwr, p1: rFull.p1, p2: rFull.p2, c1: rFull.c1, c2: rFull.c2,
       wrL: rFull.wrL??null, nL: rFull.nL||0, wrS: rFull.wrS??null, nS: rFull.nS||0,
-      dwrLS: rFull.dwrLS??null, cvr: _calcCVR(rFull.eq), upi: _calcUlcerIdx(rFull.eq) };
+      dwrLS: rFull.dwrLS??null, cvr: _calcCVR(rFull.eq), upi: _calcUlcerIdx(rFull.eq),
+      sortino: _calcSortino(rFull.eq) };
     // Обновляем глобальный equities полной кривой — чтобы график показывал 100% данных
     // с правильным split-маркером на IS/OOS границе, а не растянутую IS-кривую.
     if (name && typeof equities !== 'undefined') equities[name] = rFull.eq;
@@ -1101,7 +1169,7 @@ async function runOpt() {
               revSkip,revCooldown,revSrc};
           results.push({name,pnl:r.pnl,wr:r.wr,n:r.n,dd:r.dd,pdd,avg:r.avg,sig,gt,
             p1:r.p1,p2:r.p2,dwr:r.dwr,c1:r.c1,c2:r.c2,nL:r.nL||0,pL:r.pL||0,wrL:r.wrL,nS:r.nS||0,pS:r.pS||0,wrS:r.wrS,dwrLS:r.dwrLS,
-            cvr:_calcCVR(r.eq),upi:_calcUlcerIdx(r.eq),cfg:_cfg});
+            cvr:_calcCVR(r.eq),upi:_calcUlcerIdx(r.eq),sortino:_calcSortino(r.eq),cfg:_cfg});
           equities[name] = r.eq;
         }
       }
@@ -1308,7 +1376,7 @@ async function runOpt() {
           // _attachOOS будет вызван батчем после завершения TPE
           results.push({name,pnl:r.pnl,wr:r.wr,n:r.n,dd:r.dd,pdd,avg:r.avg,sig,gt,
             p1:r.p1,p2:r.p2,dwr:r.dwr,c1:r.c1,c2:r.c2,nL:r.nL||0,pL:r.pL||0,wrL:r.wrL,nS:r.nS||0,pS:r.pS||0,wrS:r.wrS,dwrLS:r.dwrLS,
-            cvr:_calcCVR(r.eq),upi:_calcUlcerIdx(r.eq),cfg:_cfg_tpe});
+            cvr:_calcCVR(r.eq),upi:_calcUlcerIdx(r.eq),sortino:_calcSortino(r.eq),cfg:_cfg_tpe});
           equities[name] = r.eq;
         }
       }
@@ -1672,7 +1740,7 @@ async function runOpt() {
                                         };
                                       results.push({name,pnl:r.pnl,wr:r.wr,n:r.n,dd:r.dd,pdd,avg:r.avg,sig,gt,
                                         p1:r.p1,p2:r.p2,dwr:r.dwr,c1:r.c1,c2:r.c2,nL:r.nL||0,pL:r.pL||0,wrL:r.wrL,nS:r.nS||0,pS:r.pS||0,wrS:r.wrS,dwrLS:r.dwrLS,
-                                        cvr:_calcCVR(r.eq),upi:_calcUlcerIdx(r.eq),cfg:_cfg_ex});
+                                        cvr:_calcCVR(r.eq),upi:_calcUlcerIdx(r.eq),sortino:_calcSortino(r.eq),cfg:_cfg_ex});
                                       equities[name]=r.eq;
                                       } // end else (не дубль)
                                     } // end if(r passed filter)
