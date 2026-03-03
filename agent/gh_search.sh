@@ -27,10 +27,14 @@ ACCEPT_H="Accept: application/vnd.github.v3+json"
 
 log() { echo "[gh_search] $*" >&2; }
 
-# Trigger workflow
-log "Triggering search workflow for: $QUERY"
-BEFORE=$(python3 -c "from datetime import datetime, timezone, timedelta; print((datetime.now(timezone.utc) - timedelta(seconds=5)).strftime('%Y-%m-%dT%H:%M:%SZ'))")
+# Record time before triggering (minus 5s buffer)
+BEFORE=$(python3 -c "
+from datetime import datetime, timezone, timedelta
+print((datetime.now(timezone.utc) - timedelta(seconds=5)).strftime('%Y-%m-%dT%H:%M:%SZ'))
+")
 
+# Trigger workflow
+log "Triggering search for: $QUERY"
 HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
     -H "$AUTH_H" -H "$ACCEPT_H" -H "Content-Type: application/json" \
     "$API/repos/$REPO/actions/workflows/search.yml/dispatches" \
@@ -62,13 +66,14 @@ for r in d.get('workflow_runs', []):
 done
 
 if [ -z "$RUN_ID" ]; then
-    log "Could not find workflow run"
-    echo '{"error": "Could not find workflow run after 30s"}'
+    log "Could not find workflow run after 30s"
+    echo '{"error": "Could not find workflow run"}'
     exit 1
 fi
 log "Run ID: $RUN_ID"
 
 # Wait for completion (max 2 min)
+STATUS=""
 for i in $(seq 1 24); do
     sleep 5
     STATUS=$(curl -s -H "$AUTH_H" -H "$ACCEPT_H" \
@@ -79,28 +84,19 @@ for i in $(seq 1 24); do
 done
 
 if [ "$STATUS" != "completed" ]; then
-    echo '{"error": "Workflow did not complete in time"}'
+    echo '{"error": "Workflow did not complete in 2 minutes"}'
     exit 1
 fi
 
-# Download artifact
-log "Downloading results..."
-ARTIFACT_URL=$(curl -s -H "$AUTH_H" -H "$ACCEPT_H" \
-    "$API/repos/$REPO/actions/runs/$RUN_ID/artifacts" | \
-    python3 -c "
-import json,sys
-d = json.load(sys.stdin)
-arts = d.get('artifacts', [])
-if arts:
-    print(arts[0]['archive_download_url'])
-" 2>/dev/null)
+# Read results from search-results branch via raw.githubusercontent.com
+log "Fetching results..."
+RESULT=$(curl -s \
+    -H "$AUTH_H" \
+    "https://raw.githubusercontent.com/$REPO/search-results/results.json")
 
-if [ -z "$ARTIFACT_URL" ]; then
-    echo '{"error": "No artifacts found in completed run"}'
+if [ -z "$RESULT" ] || echo "$RESULT" | grep -q "404: Not Found"; then
+    echo '{"error": "results.json not found on search-results branch"}'
     exit 1
 fi
 
-TMP=$(mktemp)
-curl -s -L -H "$AUTH_H" -H "$ACCEPT_H" "$ARTIFACT_URL" -o "${TMP}.zip"
-unzip -p "${TMP}.zip" results.json
-rm -f "${TMP}" "${TMP}.zip"
+echo "$RESULT"
