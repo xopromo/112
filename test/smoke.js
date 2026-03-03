@@ -112,9 +112,37 @@ assert(_calcCVR(new Float32Array(50))  === null, '50 баров → null (мал
 }
 
 // ════════════════════════════════════════════════════════════
-// 4. backtest() — полнота return
+// 4. _calcUlcerIdx
 // ════════════════════════════════════════════════════════════
-console.log('4. backtest() поля');
+console.log('4. _calcUlcerIdx');
+assert(_calcUlcerIdx(null)                 === null, 'null → null');
+assert(_calcUlcerIdx(new Float32Array(10)) === null, '10 баров → null (мало данных)');
+{
+  // Без просадок (только рост) — ui < 0.001 → null
+  const eqUp = new Float32Array(100); for (let i = 0; i < 100; i++) eqUp[i] = i;
+  assert(_calcUlcerIdx(eqUp) === null, 'нет просадок → null');
+
+  // Equity с просадками — UPI должен быть числом
+  const eqWave = new Float32Array(100);
+  for (let i = 0; i < 100; i++) eqWave[i] = Math.sin(i / 5) * 10 + i * 0.5;
+  const upi = _calcUlcerIdx(eqWave);
+  assert(upi !== null && !isNaN(upi), `волнистый equity → число (${upi})`);
+
+  // Стратегия с меньшими/реже просадками → выше UPI
+  const eqSmooth = new Float32Array(100);
+  const eqJagged = new Float32Array(100);
+  for (let i = 0; i < 100; i++) {
+    eqSmooth[i] = i * 0.5;                         // рост без просадок
+    eqJagged[i] = i * 0.5 - (i % 10 === 0 ? 5 : 0); // просадки каждые 10 баров
+  }
+  const upiJagged = _calcUlcerIdx(eqJagged);
+  assert(upiJagged !== null, `пилообразный equity → число (${upiJagged})`);
+}
+
+// ════════════════════════════════════════════════════════════
+// 5. backtest() — полнота return
+// ════════════════════════════════════════════════════════════
+console.log('5. backtest() поля');
 DATA = makeData(N);
 {
   const r = backtest(ZERO, ZERO, ONES, NO_TRADE_CFG);
@@ -132,10 +160,10 @@ DATA = makeData(N);
 }
 
 // ════════════════════════════════════════════════════════════
-// 5. buildBtCfg() — обязательные поля (регрессия 4cb0e94)
+// 6. buildBtCfg() — обязательные поля (регрессия 4cb0e94)
 //    donH/donL/sqzOn/bbD/atrBoMA/atrBoATR пропускались
 // ════════════════════════════════════════════════════════════
-console.log('5. buildBtCfg() поля');
+console.log('6. buildBtCfg() поля');
 {
   const cfg = { slPair: {}, tpPair: {}, commission: 0 };
   const ind = {

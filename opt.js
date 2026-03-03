@@ -89,6 +89,26 @@ function _calcCVR(eq) {
 }
 // ─────────────────────────────────────────────────────────────
 
+// ── Ulcer Performance Index (Hyp 4) ──────────────────────────
+// UPI = pnl / ulcerIdx, где ulcerIdx = sqrt(mean(dd_from_peak²))
+// Лучше Calmar: учитывает длительность и частоту просадок,
+// а не только максимум. Источник: quantstats 0.0.81 (2026).
+// Возвращает null если данных мало или нет просадок.
+function _calcUlcerIdx(eq) {
+  if (!eq || eq.length < 20) return null;
+  const N = eq.length;
+  let peak = eq[0], sumSq = 0;
+  for (let i = 0; i < N; i++) {
+    if (eq[i] > peak) peak = eq[i];
+    const dd = peak - eq[i];
+    sumSq += dd * dd;
+  }
+  const ui = Math.sqrt(sumSq / N);
+  if (ui < 0.001) return null;
+  return Math.round(eq[N - 1] / ui * 10) / 10;
+}
+// ─────────────────────────────────────────────────────────────
+
 // NAME BUILDER — подробный
 // ============================================================
 function buildName(cfg, pvL, pvR, slDesc, tpDesc, filters, extras) {
@@ -318,7 +338,7 @@ async function runOpt() {
       pnlFull: rFull.pnl, avg: rFull.avg, pdd: pddFull,
       dwr: rFull.dwr, p1: rFull.p1, p2: rFull.p2, c1: rFull.c1, c2: rFull.c2,
       wrL: rFull.wrL??null, nL: rFull.nL||0, wrS: rFull.wrS??null, nS: rFull.nS||0,
-      dwrLS: rFull.dwrLS??null, cvr: _calcCVR(rFull.eq) };
+      dwrLS: rFull.dwrLS??null, cvr: _calcCVR(rFull.eq), upi: _calcUlcerIdx(rFull.eq) };
     // Обновляем глобальный equities полной кривой — чтобы график показывал 100% данных
     // с правильным split-маркером на IS/OOS границе, а не растянутую IS-кривую.
     if (name && typeof equities !== 'undefined') equities[name] = rFull.eq;
@@ -1040,7 +1060,7 @@ async function runOpt() {
               revSkip,revCooldown,revSrc};
           results.push({name,pnl:r.pnl,wr:r.wr,n:r.n,dd:r.dd,pdd,avg:r.avg,sig,gt,
             p1:r.p1,p2:r.p2,dwr:r.dwr,c1:r.c1,c2:r.c2,nL:r.nL||0,pL:r.pL||0,wrL:r.wrL,nS:r.nS||0,pS:r.pS||0,wrS:r.wrS,dwrLS:r.dwrLS,
-            cvr:_calcCVR(r.eq),cfg:_cfg});
+            cvr:_calcCVR(r.eq),upi:_calcUlcerIdx(r.eq),cfg:_cfg});
           equities[name] = r.eq;
         }
       }
@@ -1247,7 +1267,7 @@ async function runOpt() {
           // _attachOOS будет вызван батчем после завершения TPE
           results.push({name,pnl:r.pnl,wr:r.wr,n:r.n,dd:r.dd,pdd,avg:r.avg,sig,gt,
             p1:r.p1,p2:r.p2,dwr:r.dwr,c1:r.c1,c2:r.c2,nL:r.nL||0,pL:r.pL||0,wrL:r.wrL,nS:r.nS||0,pS:r.pS||0,wrS:r.wrS,dwrLS:r.dwrLS,
-            cvr:_calcCVR(r.eq),cfg:_cfg_tpe});
+            cvr:_calcCVR(r.eq),upi:_calcUlcerIdx(r.eq),cfg:_cfg_tpe});
           equities[name] = r.eq;
         }
       }
@@ -1611,7 +1631,7 @@ async function runOpt() {
                                         };
                                       results.push({name,pnl:r.pnl,wr:r.wr,n:r.n,dd:r.dd,pdd,avg:r.avg,sig,gt,
                                         p1:r.p1,p2:r.p2,dwr:r.dwr,c1:r.c1,c2:r.c2,nL:r.nL||0,pL:r.pL||0,wrL:r.wrL,nS:r.nS||0,pS:r.pS||0,wrS:r.wrS,dwrLS:r.dwrLS,
-                                        cvr:_calcCVR(r.eq),cfg:_cfg_ex});
+                                        cvr:_calcCVR(r.eq),upi:_calcUlcerIdx(r.eq),cfg:_cfg_ex});
                                       equities[name]=r.eq;
                                       } // end else (не дубль)
                                     } // end if(r passed filter)

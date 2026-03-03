@@ -768,8 +768,8 @@ function showDetail(r) {
   // Stats bar — unified IS + TV rows via CSS grid
   const _fwd = r.cfg && r.cfg._oos && r.cfg._oos.forward;
   const _hasLS = r.wrL != null;
-  // Column count: 9 base + Avg + CVR + (1 ΔWR L/S if applicable)
-  const _ncols = 11 + (_hasLS ? 1 : 0);
+  // Column count: 9 base + Avg + CVR + UPI + (1 ΔWR L/S if applicable)
+  const _ncols = 12 + (_hasLS ? 1 : 0);
 
   // Build one row of dp-stat cells (same structure for both IS and TV)
   function _statsRow(v) {
@@ -777,6 +777,8 @@ function showDetail(r) {
     const dwrC = v.dwr<10?'ok':v.dwr<20?'warn':'bad';
     const cvrC = v.cvr!=null ? (v.cvr>=80?'pos':v.cvr>=50?'warn':'neg') : 'muted';
     const cvrV = v.cvr!=null ? v.cvr+'%' : '—';
+    const upiC = v.upi!=null ? (v.upi>=5?'pos':v.upi>=2?'warn':'neg') : 'muted';
+    const upiV = v.upi!=null ? v.upi.toFixed(1) : '—';
     let h =
       `<div class="dp-stat"><div class="v ${v.pnl>=0?'pos':'neg'}">${v.pnl.toFixed(1)}%</div><div class="l">PnL</div></div>`+
       `<div class="dp-stat"><div class="v">${v.wr.toFixed(1)}%</div><div class="l">WinRate</div></div>`+
@@ -787,7 +789,8 @@ function showDetail(r) {
       `<div class="dp-stat"><div class="v ${v.p1>=0?'pos':'neg'}">${v.p1.toFixed(1)}%</div><div class="l">1п (${v.c1}сд)</div></div>`+
       `<div class="dp-stat"><div class="v ${v.p2>=0?'pos':'neg'}">${v.p2.toFixed(1)}%</div><div class="l">2п (${v.c2}сд)</div></div>`+
       `<div class="dp-stat"><div class="v">${v.avg.toFixed(2)}%</div><div class="l">Avg/сд</div></div>`+
-      `<div class="dp-stat"><div class="v ${cvrC}">${cvrV}</div><div class="l">CVR%</div></div>`;
+      `<div class="dp-stat"><div class="v ${cvrC}">${cvrV}</div><div class="l">CVR%</div></div>`+
+      `<div class="dp-stat" title="Ulcer Performance Index = PnL / sqrt(mean(просадка²))\nЛучше Calmar: учитывает длительность и частоту просадок.\n≥5 = устойчива ✅ | 2–5 = умеренно | &lt;2 = нестабильна"><div class="v ${upiC}">${upiV}</div><div class="l">UPI</div></div>`;
     if (_hasLS) {
       const lsC = v.dwrLS!=null ? (v.dwrLS<10?'ok':v.dwrLS<25?'warn':'bad') : 'muted';
       h += `<div class="dp-stat" title="Разница WR лонгов и шортов. L:${v.nL||0}сд WR${v.wrL!=null?v.wrL.toFixed(0):'?'}% · S:${v.nS||0}сд WR${v.wrS!=null?v.wrS.toFixed(0):'?'}%"><div class="v ${lsC}">${v.dwrLS!=null?v.dwrLS.toFixed(0)+'%':'—'}</div><div class="l">ΔWR L/S</div></div>`;
@@ -800,7 +803,7 @@ function showDetail(r) {
   dp.style.setProperty('--ncols', _ncols);
   dp.innerHTML = _isLabel + _statsRow({
     pnl: r.pnl, wr: r.wr, n: r.n, dd: r.dd, pdd: r.pdd, dwr: r.dwr,
-    p1: r.p1, p2: r.p2, c1: r.c1, c2: r.c2, avg: r.avg, cvr: r.cvr??null,
+    p1: r.p1, p2: r.p2, c1: r.c1, c2: r.c2, avg: r.avg, cvr: r.cvr??null, upi: r.upi??null,
     dwrLS: r.dwrLS??null, wrL: r.wrL??null, nL: r.nL||0, wrS: r.wrS??null, nS: r.nS||0
   });
 
@@ -812,7 +815,7 @@ function showDetail(r) {
       _statsRow({
         pnl: _fwd.pnlFull, wr: _fwd.wr, n: _fwd.n, dd: _fwd.dd, pdd: _fwd.pdd??0,
         dwr: _fwd.dwr??0, p1: _fwd.p1??0, p2: _fwd.p2??0, c1: _fwd.c1??0, c2: _fwd.c2??0,
-        avg: _fwd.avg??0, cvr: _fwd.cvr??null,
+        avg: _fwd.avg??0, cvr: _fwd.cvr??null, upi: _fwd.upi??null,
         dwrLS: _fwd.dwrLS??null, wrL: _fwd.wrL??null, nL: _fwd.nL||0, wrS: _fwd.wrS??null, nS: _fwd.nS||0
       });
   }
@@ -3397,7 +3400,7 @@ function _hcBuildOOS(cfg) {
       pnlFull: rFull.pnl, avg: rFull.avg, pdd: pddFull,
       dwr: rFull.dwr, p1: rFull.p1, p2: rFull.p2, c1: rFull.c1, c2: rFull.c2,
       wrL: rFull.wrL ?? null, nL: rFull.nL || 0, wrS: rFull.wrS ?? null, nS: rFull.nS || 0,
-      dwrLS: rFull.dwrLS ?? null, cvr: _calcCVR(rFull.eq)
+      dwrLS: rFull.dwrLS ?? null, cvr: _calcCVR(rFull.eq), upi: _calcUlcerIdx(rFull.eq)
     }
   };
 
@@ -3410,7 +3413,7 @@ function _hcBuildOOS(cfg) {
     p1: rIS.p1 || 0, p2: rIS.p2 || 0, c1: rIS.c1 || 0, c2: rIS.c2 || 0,
     nL: rIS.nL || 0, pL: rIS.pL || 0, wrL: rIS.wrL ?? null,
     nS: rIS.nS || 0, pS: rIS.pS || 0, wrS: rIS.wrS ?? null,
-    dwrLS: rIS.dwrLS ?? null, cvr: _calcCVR(rIS.eq)
+    dwrLS: rIS.dwrLS ?? null, cvr: _calcCVR(rIS.eq), upi: _calcUlcerIdx(rIS.eq)
   } : null;
 
   return { _oos, isStats, eq: rFull.eq };
@@ -4107,6 +4110,7 @@ async function runHillClimbing() {
       avg: _isR.avg||0, dwr: _isR.dwr||0,
       p1: _isR.p1||0, p2: _isR.p2||0, c1: _isR.c1||0, c2: _isR.c2||0,
       sig: _calcStatSig(_isR), gt: _calcGTScore(_isR), cvr: _isR.cvr != null ? _isR.cvr : _calcCVR(_isR.eq),
+      upi: _isR.upi != null ? _isR.upi : _calcUlcerIdx(_isR.eq),
       robScore: x.robScore, robMax: x.robMax, robDetails: x.robDetails,
       eq: x.r.eq,
       nL: _isR.nL||0, pL: _isR.pL||0, wrL: _isR.wrL,
