@@ -3429,6 +3429,7 @@ function _hcNeighbours(cfg, opts) {
 
   function mutate(key, delta) {
     const c = JSON.parse(JSON.stringify(cfg));
+    delete c._oos; // не наследовать IS/OOS данные от родительского cfg — они устарели для нового соседа
     if (key === 'sl_a')  { if (c.slPair&&c.slPair.a)  c.slPair.a.m  = Math.max(0.2, +(c.slPair.a.m  + delta).toFixed(2)); else return null; }
     else if (key === 'sl_p') { if (c.slPair&&c.slPair.p)  c.slPair.p.m  = Math.max(0.5, +(c.slPair.p.m  + delta).toFixed(1)); else return null; }
     else if (key === 'tp_a') { if (c.tpPair&&c.tpPair.a)  c.tpPair.a.m  = Math.max(0.2, +(c.tpPair.a.m  + delta).toFixed(2)); else return null; }
