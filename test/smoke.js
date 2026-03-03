@@ -140,9 +140,28 @@ assert(_calcUlcerIdx(new Float32Array(10)) === null, '10 баров → null (м
 }
 
 // ════════════════════════════════════════════════════════════
-// 5. backtest() — полнота return
+// 5. _calcCPCVScore
 // ════════════════════════════════════════════════════════════
-console.log('5. backtest() поля');
+console.log('5. _calcCPCVScore');
+{
+  // Мало данных → null
+  DATA = makeData(100);
+  assert(_calcCPCVScore(NO_TRADE_CFG) === null, 'DATA 100 баров → null');
+
+  // Достаточно данных, но 0 сделок на блоке → valid < 3 → null
+  DATA = makeData(400);
+  assert(_calcCPCVScore(NO_TRADE_CFG) === null, '0 сделок/блок → null');
+
+  // Структура возврата при наличии сделок не тестируется в smoke
+  // (нужны реальные рыночные данные с паттернами входа)
+
+  DATA = makeData(N); // восстановить для следующих тестов
+}
+
+// ════════════════════════════════════════════════════════════
+// 6. backtest() — полнота return
+// ════════════════════════════════════════════════════════════
+console.log('6. backtest() поля');
 DATA = makeData(N);
 {
   const r = backtest(ZERO, ZERO, ONES, NO_TRADE_CFG);
@@ -160,10 +179,10 @@ DATA = makeData(N);
 }
 
 // ════════════════════════════════════════════════════════════
-// 6. buildBtCfg() — обязательные поля (регрессия 4cb0e94)
+// 7. buildBtCfg() — обязательные поля (регрессия 4cb0e94)
 //    donH/donL/sqzOn/bbD/atrBoMA/atrBoATR пропускались
 // ════════════════════════════════════════════════════════════
-console.log('6. buildBtCfg() поля');
+console.log('7. buildBtCfg() поля');
 {
   const cfg = { slPair: {}, tpPair: {}, commission: 0 };
   const ind = {

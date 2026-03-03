@@ -927,6 +927,27 @@ function showDetail(r) {
   }
   html += section('⚙️', 'ОБЩИЕ ПАРАМЕТРЫ', gen);
 
+  // ##CPCV_START## — удалить этот блок для отката (вместе с _calcCPCVScore в opt.js)
+  {
+    const _cpcv = _calcCPCVScore(r.cfg);
+    let _cpcvHtml = '';
+    if (_cpcv) {
+      const _sc = _cpcv.score >= 80 ? 'pos' : _cpcv.score >= 60 ? 'warn' : 'neg';
+      _cpcvHtml += row('Счёт',
+        `<span class="${_sc}">${_cpcv.wins} / ${_cpcv.valid} блоков прибыльны · ${_cpcv.score}%</span>`, '');
+      const _bHtml = _cpcv.blocks.map((b, i) => {
+        if (!b) return `<span style="display:inline-block;min-width:52px;padding:3px 5px;border-radius:4px;background:var(--bg2);color:var(--muted);font-size:.78em;text-align:center">Б${i+1}<br>нет сд</span>`;
+        const _bc = b.pnl > 0 ? 'var(--pos)' : 'var(--neg)';
+        return `<span style="display:inline-block;min-width:52px;padding:3px 5px;border-radius:4px;background:var(--bg2);color:${_bc};font-size:.78em;text-align:center">Б${i+1}<br>${b.pnl>0?'+':''}${b.pnl.toFixed(1)}%<br>${b.n}сд WR${b.wr}%</span>`;
+      }).join('');
+      _cpcvHtml += `<div class="dp-row"><span class="dp-label">Блоки</span><span class="dp-val" style="display:flex;gap:5px;flex-wrap:wrap">${_bHtml}</span></div>`;
+    } else {
+      _cpcvHtml += row('Статус', 'нет данных — нужно ≥300 баров и ≥3 блока с ≥2 сделками', 'muted');
+    }
+    html = section('📊', 'CPCV — БЛОЧНАЯ ВАЛИДАЦИЯ', _cpcvHtml) + html;
+  }
+  // ##CPCV_END##
+
   $('dp-body').innerHTML = html;
 
   // Build copy text

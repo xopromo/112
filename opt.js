@@ -109,6 +109,47 @@ function _calcUlcerIdx(eq) {
 }
 // ─────────────────────────────────────────────────────────────
 
+// ── CPCV: Block Walk-Forward Score (Hyp 1 — CPCV валидация) ──
+// Делит DATA на K равных временных блоков, запускает backtest
+// независимо на каждом. Надёжнее CVR: отдельный прогрев
+// индикаторов на каждом блоке устраняет look-ahead bias.
+//
+// score % = доля блоков с PnL > 0 из имеющих ≥ 2 сделки.
+// Вызывается ЛЕНИВО (в showDetail), НЕ во время оптимизации.
+//
+// Откат: удалить эту функцию + блок ##CPCV## в showDetail (ui.js)
+function _calcCPCVScore(cfg) {
+  if (!DATA || DATA.length < 300) return null;
+  const N = DATA.length;
+  const nSplits = N >= 500 ? 5 : 4;
+  const blockSize = Math.floor(N / nSplits);
+  if (blockSize < 75) return null;
+
+  let wins = 0, valid = 0;
+  const blocks = [];
+  for (let k = 0; k < nSplits; k++) {
+    const s = k * blockSize;
+    const e = k === nSplits - 1 ? N : s + blockSize;
+    const origDATA = DATA;
+    DATA = origDATA.slice(s, e);
+    let r = null;
+    try {
+      const ind   = _calcIndicators(cfg);
+      const btCfg = buildBtCfg(cfg, ind);
+      r = backtest(ind.pvLo, ind.pvHi, ind.atrArr, btCfg);
+    } catch(_) {}
+    DATA = origDATA;
+    if (!r || r.n < 2) { blocks.push(null); continue; }
+    valid++;
+    if (r.pnl > 0) wins++;
+    blocks.push({ pnl: r.pnl, n: r.n, wr: Math.round(r.wr) });
+  }
+
+  if (valid < 3) return null;
+  return { score: Math.round(wins / valid * 100), wins, valid, blocks };
+}
+// ─────────────────────────────────────────────────────────────
+
 // NAME BUILDER — подробный
 // ============================================================
 function buildName(cfg, pvL, pvR, slDesc, tpDesc, filters, extras) {
