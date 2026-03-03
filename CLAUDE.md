@@ -121,7 +121,8 @@ bash agent/setup.sh
 
 ## Текущее состояние агента
 
-Смотри: `STATE.md` — обновляется автоматически после каждого цикла.
+Смотри: `STATE.md` — обновляется автоматически после каждого цикла агента и вручную при слиянии веток.
+⚠️ Поле «Следующий цикл» в STATE.md может быть устаревшим — игнорируй его, агент запускается по крону `5 * * * *`.
 
 ---
 
@@ -131,6 +132,43 @@ bash agent/setup.sh
 2. Прочитай `research_reports/` — отчёты агента с деталями
 3. Ветки `claude/research-*` содержат готовый код для влития
 4. Если агент не работает — сообщи пользователю, не запускай ничего самостоятельно
+
+---
+
+## Веб-поиск (SearXNG)
+
+Бесплатный веб-поиск через self-hosted SearXNG вместо платного WebSearch.
+
+- **MCP-инструмент:** `mcp__searxng__searxng_web_search` (предпочитать встроенному WebSearch)
+- **SearXNG URL:** `http://localhost:8888`
+- **Docker контейнер:** `searxng` (restart: unless-stopped)
+
+### Запуск SearXNG (если не запущен)
+<!-- НЕ ВЫПОЛНЯТЬ АВТОМАТИЧЕСКИ — только по явной просьбе пользователя
+```bash
+bash /home/user/112/agent/setup_searxng.sh
+# или просто:
+docker start searxng
+```
+-->
+
+### Установка на новой машине
+<!-- НЕ ВЫПОЛНЯТЬ АВТОМАТИЧЕСКИ — только по явной просьбе пользователя
+```bash
+bash /home/user/112/agent/setup_searxng.sh
+# Скрипт: запускает Docker, прописывает mcpServers в ~/.claude/settings.json
+# После этого — перезапустить Claude Code
+```
+-->
+
+---
+
+## Договорённости с пользователем
+
+| Команда | Действие |
+|---------|----------|
+| `"сохрани"` | `git commit` + `git push` |
+| `"сохрани стабильную"` | `git commit` + `git push` + тег `stable-YYYY-MM-DD` (если в день несколько — `stable-YYYY-MM-DD-2` и т.д.) |
 
 ---
 
@@ -154,37 +192,39 @@ Builded HTML генерируется из них — он дублирует в
 
 ### Карта ключевых функций
 
+**⚠️ Строки могут устаревать после крупных изменений — обновляй карту при слиянии веток агента.**
+
 **opt.js** (оптимизатор + робастность):
 | Функция | Строка | Описание |
 |---------|--------|----------|
-| `parseRange` | ~23 | Парсит диапазон параметров |
-| `buildName` | ~100 | Строит имя результата |
-| `runOpt` | ~400 | Основная оптимизация (MC/TPE/exhaustive) |
-| `_calcGTScore` | ~820 | GT-Score (anti-overfitting метрика) |
-| `_calcStatSig` | ~840 | z-тест статистической значимости |
-| `runMassRobust` | ~1969 | Массовый тест устойчивости |
-| `runRobustScoreFor` | ~2035 | Тест устойчивости для одного результата |
-| `runRobustScoreForDetailed` | ~2202 | То же, но с деталями по каждому тесту |
-| `HC_NUMERIC_PARAMS` | ~2268 | Единый список числовых параметров HC |
+| `parseRange` | 23 | Парсит диапазон параметров |
+| `_calcStatSig` | 43 | z-тест статистической значимости |
+| `_calcGTScore` | 58 | GT-Score (anti-overfitting метрика) |
+| `buildName` | 94 | Строит имя результата |
+| `runOpt` | 225 | Основная оптимизация (MC/TPE/exhaustive) |
+| `runMassRobust` | 1978 | Массовый тест устойчивости |
+| `runRobustScoreFor` | 2044 | Тест устойчивости для одного результата |
+| `runRobustScoreForDetailed` | 2211 | То же, но с деталями по каждому тесту |
+| `HC_NUMERIC_PARAMS` | 2277 | Единый список числовых параметров HC |
 
 **ui.js** (интерфейс + HC):
 | Функция | Строка | Описание |
 |---------|--------|----------|
-| `switchTableMode` | ~360 | Переключение HC/Fav/Results режимов |
-| `resetAllFilters` | ~417 | Сброс всех фильтров |
-| `applyFilters` | ~431 | Применение фильтров к таблице |
-| `openHCModal` | ~2241 | Открыть модал поиска соседей |
-| `runOOSScan` | ~2728 | OOS-скан видимых результатов |
-| `_hcRunBacktest` | ~2499 | Быстрый бэктест для HC |
-| `_hcNeighbours` | ~3267 | Генерация соседних cfg |
-| `runHillClimbing` | ~3397 | Главный HC алгоритм |
-| `_hcRobScore` | ~2963 | Робастность для GA-поиска |
+| `switchTableMode` | 359 | Переключение HC/Fav/Results режимов |
+| `resetAllFilters` | 417 | Сброс всех фильтров |
+| `applyFilters` | 432 | Применение фильтров к таблице |
+| `runOOSScan` | 2835 | OOS-скан видимых результатов |
+| `openHCModal` | 3022 | Открыть модал поиска соседей |
+| `_hcRobScore` | 3121 | Робастность для GA-поиска |
+| `_hcRunBacktest` | 3325 | Быстрый бэктест для HC |
+| `_hcNeighbours` | 3425 | Генерация соседних cfg |
+| `runHillClimbing` | 3555 | Главный HC алгоритм |
 
 **pine_export.js** (экспорт Pine Script):
 | Функция | Строка | Описание |
 |---------|--------|----------|
-| `generatePineScript` | 8 | Главная функция экспорта в Pine v6 |
-| `fixPineScript` | 987 | Автоисправление ошибок Pine |
+| `generatePineScript` | 14 | Главная функция экспорта в Pine v6 |
+| `fixPineScript` | 993 | Автоисправление ошибок Pine |
 | `_addActivePinev6` | 1103 | Добавляет `active=` для toggle-групп |
 
 **core.js** (движок бэктеста):
@@ -192,4 +232,6 @@ Builded HTML генерируется из них — он дублирует в
 - `_calcIndicators(cfg)` — вычисляет индикаторы
 
 ### Известные баги (зафиксированы)
-- **_stopCheck() bug**: `_stopCheck = () => !_massRobRunning && !_hcRobRunning` — возвращает true если оба флага false. При запуске тестов всегда нужно установить один из флагов. Исправлено для: HC doRobFilter Phase 2, HC rob-metric Phase 2, OOS scan. НЕ исправлено для: прямых вызовов без контекста.
+- **_stopCheck() bug**: `_stopCheck = () => !_massRobRunning && !_hcRobRunning` — возвращает true если оба флага false. При запуске тестов всегда нужно установить один из флагов.
+  - ✅ Исправлено для: HC doRobFilter Phase 2, HC rob-metric Phase 2, OOS scan, runHillClimbing (строки 3776, 3930).
+  - ⚠️ НЕ исправлено для: прямых вызовов `runRobustScoreFor` / `runRobustScoreForDetailed` без контекста HC/Mass.
