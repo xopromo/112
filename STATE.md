@@ -4,14 +4,14 @@
 > Также обновляй вручную когда вливаешь ветки в main.
 
 ## Последняя ручная сессия
-- **Дата:** 2026-03-03 19:48
+- **Дата:** 2026-03-03 20:10
 - **Ветка:** `main`
 - **Последние коммиты:**
+  - 0291806 feat: CPCV блочная валидация (Hyp 1)
+  - be96cc3 chore: update STATE.md after research 2026-03-03-19
   - aff8e56 feat: Ulcer Performance Index (Hyp 4)
   - 28b8b7f test: добавить smoke-тесты критичных функций
   - 91efb7b docs: форматы объектов в CLAUDE.md + Stop hook для STATE.md
-  - 25aafe2 fix: убрать несуществующую _hcBuildOOS из карты CLAUDE.md (функция не реализована)
-  - 2191932 chore: автообновление CLAUDE.md через git post-commit хук
 
 ## Последний цикл
 - **Дата:** 2026-03-03-19
