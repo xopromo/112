@@ -88,13 +88,26 @@ if [ "$STATUS" != "completed" ]; then
     exit 1
 fi
 
-# Read results from search-results branch via raw.githubusercontent.com
+# Read results via GitHub API (bypasses CDN cache on raw.githubusercontent.com)
 log "Fetching results..."
-RESULT=$(curl -s \
-    -H "$AUTH_H" \
-    "https://raw.githubusercontent.com/$REPO/search-results/results.json")
+SHA=$(curl -s -H "$AUTH_H" -H "$ACCEPT_H" \
+    "$API/repos/$REPO/branches/search-results" | \
+    python3 -c "import json,sys; print(json.load(sys.stdin)['commit']['sha'])" 2>/dev/null)
 
-if [ -z "$RESULT" ] || echo "$RESULT" | grep -q "404: Not Found"; then
+if [ -z "$SHA" ]; then
+    echo '{"error": "search-results branch not found"}'
+    exit 1
+fi
+
+RESULT=$(curl -s -H "$AUTH_H" -H "$ACCEPT_H" \
+    "$API/repos/$REPO/contents/results.json?ref=$SHA" | \
+    python3 -c "
+import json, sys, base64
+d = json.load(sys.stdin)
+print(base64.b64decode(d['content']).decode())
+" 2>/dev/null)
+
+if [ -z "$RESULT" ]; then
     echo '{"error": "results.json not found on search-results branch"}'
     exit 1
 fi
