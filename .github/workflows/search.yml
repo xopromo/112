@@ -19,53 +19,92 @@ jobs:
 
       - name: Search
         run: |
-          pip install duckduckgo-search -q 2>/dev/null
+          pip install duckduckgo-search requests beautifulsoup4 -q 2>/dev/null
 
           python3 << 'PYEOF'
-          import json, sys, os
+          import json, sys, os, time
 
           query = os.environ['SEARCH_QUERY']
           results = []
-          error_msg = None
+          errors = []
 
+          UA = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+
+          # Method 1: duckduckgo-search package
           try:
               from duckduckgo_search import DDGS
-              with DDGS() as d:
+              with DDGS(headers={'User-Agent': UA}) as d:
                   for r in d.text(query, max_results=10):
                       results.append({
                           'title':   r.get('title', ''),
                           'url':     r.get('href', ''),
                           'content': r.get('body', '')
                       })
+              print(f"Method 1 (DDGS): {len(results)} results")
           except Exception as e:
-              error_msg = str(e)
+              errors.append(f'DDGS: {e}')
+              print(f"Method 1 failed: {e}", file=sys.stderr)
+
+          # Method 2: DDG HTML scrape (if method 1 got nothing)
+          if not results:
               try:
-                  import urllib.request, urllib.parse
-                  q = urllib.parse.quote(query)
-                  req = urllib.request.Request(
-                      f'https://api.duckduckgo.com/?q={q}&format=json&no_html=1&skip_disambig=1',
-                      headers={'User-Agent': 'Mozilla/5.0'}
+                  import requests, urllib.parse
+                  from bs4 import BeautifulSoup
+                  q = urllib.parse.quote_plus(query)
+                  r = requests.get(
+                      f'https://html.duckduckgo.com/html/?q={q}',
+                      headers={'User-Agent': UA},
+                      timeout=15
                   )
-                  with urllib.request.urlopen(req, timeout=10) as resp:
-                      data = json.loads(resp.read())
-                  for item in data.get('RelatedTopics', []):
-                      if 'FirstURL' in item and 'Text' in item:
+                  soup = BeautifulSoup(r.text, 'html.parser')
+                  for tag in soup.find_all('div', class_='result'):
+                      a = tag.find('a', class_='result__a')
+                      snip = tag.find('a', class_='result__snippet')
+                      if a:
                           results.append({
-                              'title': item['Text'][:120],
-                              'url': item['FirstURL'],
-                              'content': item['Text']
+                              'title':   a.get_text(strip=True),
+                              'url':     a.get('href', ''),
+                              'content': snip.get_text(strip=True) if snip else ''
                           })
-              except Exception as e2:
-                  error_msg += f' | fallback: {e2}'
+                  print(f"Method 2 (DDG HTML): {len(results)} results")
+              except Exception as e:
+                  errors.append(f'DDG HTML: {e}')
+                  print(f"Method 2 failed: {e}", file=sys.stderr)
+
+          # Method 3: Bing HTML scrape (last resort)
+          if not results:
+              try:
+                  import requests, urllib.parse
+                  from bs4 import BeautifulSoup
+                  q = urllib.parse.quote_plus(query)
+                  r = requests.get(
+                      f'https://www.bing.com/search?q={q}',
+                      headers={'User-Agent': UA},
+                      timeout=15
+                  )
+                  soup = BeautifulSoup(r.text, 'html.parser')
+                  for li in soup.find_all('li', class_='b_algo')[:10]:
+                      h2 = li.find('h2')
+                      p = li.find('p')
+                      if h2 and h2.find('a'):
+                          results.append({
+                              'title':   h2.get_text(strip=True),
+                              'url':     h2.find('a').get('href', ''),
+                              'content': p.get_text(strip=True) if p else ''
+                          })
+                  print(f"Method 3 (Bing): {len(results)} results")
+              except Exception as e:
+                  errors.append(f'Bing: {e}')
+                  print(f"Method 3 failed: {e}", file=sys.stderr)
 
           output = {'query': query, 'results': results}
-          if error_msg and not results:
-              output['error'] = error_msg
+          if errors and not results:
+              output['errors'] = errors
 
           with open('search_results.json', 'w', encoding='utf-8') as f:
               json.dump(output, f, ensure_ascii=False, indent=2)
 
-          print(f"Query: {query!r}  →  {len(results)} results")
+          print(f"Final: {len(results)} results for {query!r}")
           PYEOF
         env:
           SEARCH_QUERY: ${{ inputs.query }}
