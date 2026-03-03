@@ -135,30 +135,58 @@ bash agent/setup.sh
 
 ---
 
-## Веб-поиск (SearXNG)
+## Веб-поиск — ОБЯЗАТЕЛЬНОЕ ПРАВИЛО
 
-Бесплатный веб-поиск через self-hosted SearXNG вместо платного WebSearch.
+> ⚠️ **ВСЕГДА использовать GitHub Actions для любого поиска.**
+> Никогда не использовать встроенный инструмент `WebSearch` или MCP SearXNG.
+> Единственное исключение — если пользователь явно разрешил.
 
-- **MCP-инструмент:** `mcp__searxng__searxng_web_search` (предпочитать встроенному WebSearch)
-- **SearXNG URL:** `http://localhost:8888`
-- **Docker контейнер:** `searxng` (restart: unless-stopped)
+### Как запустить поиск
 
-### Запуск SearXNG (если не запущен)
-<!-- НЕ ВЫПОЛНЯТЬ АВТОМАТИЧЕСКИ — только по явной просьбе пользователя
 ```bash
-bash /home/user/112/agent/setup_searxng.sh
-# или просто:
-docker start searxng
-```
--->
+# Запустить поиск через GitHub Actions (бесплатно, без ключей)
+gh workflow run search.yml \
+  --repo xopromo/112 \
+  -f query="твой запрос" \
+  -f mode="summarize" \
+  -f max_urls=5
 
-### Установка на новой машине
-<!-- НЕ ВЫПОЛНЯТЬ АВТОМАТИЧЕСКИ — только по явной просьбе пользователя
-```bash
-bash /home/user/112/agent/setup_searxng.sh
-# Скрипт: запускает Docker, прописывает mcpServers в ~/.claude/settings.json
-# После этого — перезапустить Claude Code
+# Подождать завершения (~60-90 сек)
+gh run list --repo xopromo/112 --workflow=search.yml --limit 1
+
+# Получить результаты (из ветки search-results через GitHub API)
+bash /home/user/112/agent/gh_search.sh "твой запрос" summarize 5
 ```
+
+### Режимы поиска (mode)
+
+| Mode | Когда использовать |
+|------|--------------------|
+| `snippets_only` | Нужно быстро посмотреть что вообще есть по теме |
+| `summarize` | Нужен обзор темы — 3-5 пунктов на статью |
+| `analyze` | Оценка применимости к USE Optimizer (1-10, идеи, файл) |
+| `extract` | Нужны конкретные формулы / числа / алгоритмы |
+| `full_text` | Нужен полный текст без обработки LLM |
+| `custom` | Любая другая задача — задать свой промпт |
+
+### Дедупликация
+
+Workflow автоматически исключает URL из предыдущих поисков.
+История хранится в `seen_urls.json` в ветке `search-results`.
+Поле `new_results` в итоговом JSON содержит только новые результаты.
+
+### Получение результатов
+
+Результаты сохраняются в `results.json` в ветке `search-results`.
+Для чтения — GitHub API (без checkout):
+```bash
+bash /home/user/112/agent/gh_search.sh <query> <mode> <max_urls>
+```
+
+### SearXNG (устарело, не использовать)
+<!-- SearXNG был заменён на GitHub Actions search. Оставлен как справка.
+- MCP: mcp__searxng__searxng_web_search
+- URL: http://localhost:8888
 -->
 
 ---
