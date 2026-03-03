@@ -111,11 +111,25 @@ bash agent/setup.sh
   - `opt.js`: `_calcGTScore()`, чекбокс `c_use_gt`, score = GT вместо P/DD
   - `ui.js`: колонка GT-Score, зелёный ≥5, красный <2, фильтр + сортировка
   - Формула: `(pnl/dd) × sig_mult × consistency_mult`
+- [x] **UPI** — Ulcer Performance Index (pnl/ulcerIdx, sqrt(mean(dd²)))
+  - `opt.js`: `_calcUlcerIdx(eq)`, поле `upi` в results.push()
+  - `ui.js`: колонка UPI, зелёный ≥5, жёлтый 2-5, красный <2
+- [x] **CPCV** — блочная walk-forward валидация (5 блоков, ленивый вызов)
+  - `opt.js`: `_calcCPCVScore(cfg)` — НЕ в results.push(), только в showDetail
+  - `ui.js`: секция «📊 CPCV» первой в detail-модале
 
 ### Очередь (приоритет по порядку)
-1. **CPCV валидация** — combinatorial IS/OOS вместо одного split
-2. **WASM** — перевод backtest-цикла на Rust+WASM для x15 ускорения
-3. **TradingAgents** — LLM multi-agent анализ стратегий
+1. **Sortino Ratio** — `pnl/downside_vol`, только equity[], ~15 строк в opt.js
+   - downside_dev = sqrt(mean(min(Δeq_i, 0)²)); Sortino > 2 = хорошо
+   - Источник: research_reports/2026030320.md (поиск 2026-03-03-20)
+2. **K-Ratio** — линейная регрессия log(equity), измеряет равномерность роста
+   - K = slope/se(slope); OLS ~25 строк; без изменений backtest()
+   - Источник: research_reports/2026030320.md
+3. **SQN + per-trade array** — добавить `trades:[{pnl}]` в backtest() return (core.js)
+   - SQN = (mean_trade/std_trade)*sqrt(n); открывает MC permutation test
+   - Источник: research_reports/2026030320.md
+4. **WASM** — перевод backtest-цикла на Rust+WASM для x15 ускорения
+5. **TradingAgents** — LLM multi-agent анализ стратегий
 
 ---
 
