@@ -297,13 +297,18 @@ jobs:
           git config user.email "actions@github.com"
           git config user.name "GitHub Actions"
 
+          # Save files to /tmp before switching branch
+          cp search_results.json /tmp/results.json
+          cp seen_urls.json /tmp/seen_urls.json
+
           git fetch origin search-results 2>/dev/null && \
               git checkout -B search-results origin/search-results || \
               git checkout --orphan search-results
 
           git rm -rf . --quiet 2>/dev/null || true
-          cp search_results.json results.json
-          cp seen_urls.json seen_urls.json
+
+          cp /tmp/results.json results.json
+          cp /tmp/seen_urls.json seen_urls.json
 
           git add results.json seen_urls.json
           git commit -m "search[${{ inputs.mode }}]: ${{ inputs.query }}" --allow-empty
