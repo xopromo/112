@@ -1,0 +1,77 @@
+name: Web Search
+
+on:
+  workflow_dispatch:
+    inputs:
+      query:
+        description: 'Search query'
+        required: true
+        type: string
+
+jobs:
+  search:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Search
+        run: |
+          pip install duckduckgo-search -q 2>/dev/null
+
+          python3 << 'PYEOF'
+          import json, sys, os
+
+          query = os.environ['SEARCH_QUERY']
+          results = []
+          error_msg = None
+
+          try:
+              from duckduckgo_search import DDGS
+              with DDGS() as d:
+                  for r in d.text(query, max_results=10):
+                      results.append({
+                          'title': r.get('title', ''),
+                          'url':   r.get('href', ''),
+                          'content': r.get('body', '')
+                      })
+          except Exception as e:
+              error_msg = str(e)
+              # fallback: DDG instant answer API
+              try:
+                  import urllib.request, urllib.parse
+                  q = urllib.parse.quote(query)
+                  req = urllib.request.Request(
+                      f'https://api.duckduckgo.com/?q={q}&format=json&no_html=1&skip_disambig=1',
+                      headers={'User-Agent': 'Mozilla/5.0'}
+                  )
+                  with urllib.request.urlopen(req, timeout=10) as resp:
+                      data = json.loads(resp.read())
+                  for item in data.get('RelatedTopics', []):
+                      if 'FirstURL' in item and 'Text' in item:
+                          results.append({
+                              'title': item['Text'][:120],
+                              'url': item['FirstURL'],
+                              'content': item['Text']
+                          })
+              except Exception as e2:
+                  error_msg += f' | fallback: {e2}'
+
+          output = {
+              'query': query,
+              'results': results,
+          }
+          if error_msg and not results:
+              output['error'] = error_msg
+
+          with open('results.json', 'w', encoding='utf-8') as f:
+              json.dump(output, f, ensure_ascii=False, indent=2)
+
+          print(f"Query: {query!r}  →  {len(results)} results")
+          PYEOF
+        env:
+          SEARCH_QUERY: ${{ inputs.query }}
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: search-results
+          path: results.json
+          retention-days: 1
