@@ -4,14 +4,14 @@
 > Также обновляй вручную когда вливаешь ветки в main.
 
 ## Последняя ручная сессия
-- **Дата:** 2026-03-03 18:43
+- **Дата:** 2026-03-03 19:27
 - **Ветка:** `main`
 - **Последние коммиты:**
+  - 91efb7b docs: форматы объектов в CLAUDE.md + Stop hook для STATE.md
   - 25aafe2 fix: убрать несуществующую _hcBuildOOS из карты CLAUDE.md (функция не реализована)
   - 2191932 chore: автообновление CLAUDE.md через git post-commit хук
   - 419e1ad fix: HC results теперь имеют IS/OOS данные (split-линия, TV метрики, вторая строка)
   - fa4e11d fix: HC neighbor cfgs inherited stale _oos from parent, causing false IS>TV display
-  - 4cb0e94 fix: IS>TV trades bug + missing indicators in MC/TPE btCfg
 
 ## Последний цикл
 - **Дата:** 2026-03-03-07
