@@ -3336,6 +3336,86 @@ function _hcRunBacktest(cfg) {
   } catch(e) { return null; }
 }
 
+// Вычисляет _oos и IS-статы для HC соседа.
+// Запускает IS-бэктест (70%) и полный (100%), строит cfg._oos аналогично _attachOOS в opt.js.
+// Возвращает { _oos, isStats } — isStats содержат метрики IS-периода для строки детальной статистики.
+function _hcBuildOOS(cfg) {
+  if (!DATA || DATA.length < 100) return null;
+  const N = DATA.length;
+  const isN = Math.round(N * 0.70);
+  const origData = DATA;
+
+  // Внутренний прогон без взаимодействия с _robSliceCache:
+  // смена DATA при использовании _hcRunBacktest сбрасывает весь кеш,
+  // поэтому используем прямой вызов _calcIndicators + buildBtCfg + backtest.
+  function _runDirect(slice) {
+    if (!slice || slice.length < 40) return null;
+    DATA = slice;
+    try {
+      const ind = _calcIndicators(cfg);
+      const btCfg = buildBtCfg(cfg, ind);
+      return backtest(ind.pvLo, ind.pvHi, ind.atrArr, btCfg);
+    } catch(e) { return null; }
+    finally { DATA = origData; }
+  }
+
+  // IS-прогон: только первые 70% данных
+  const rIS = _runDirect(origData.slice(0, isN));
+
+  // Полный TV-прогон: все 100% данных (используем кеш если доступен)
+  const rFull = _hcRunBacktest(cfg);
+
+  if (!rFull || !rFull.eq || rFull.eq.length < isN + 5) return null;
+
+  // Делим equity-кривую по splitIdx (аналогично _attachOOS в opt.js)
+  const eq = rFull.eq;
+  const N_eq = eq.length;
+  const splitIdx = Math.min(isN - 1, N_eq - 2);
+  const isGain  = eq[splitIdx];
+  const oosGain = eq[N_eq - 1] - isGain;
+  const isRate  = splitIdx > 0 ? isGain / (splitIdx + 1) : 0;
+  const oosBars = N_eq - 1 - splitIdx;
+  const oosRate = oosBars > 0 ? oosGain / oosBars : 0;
+
+  const totalGain = eq[N_eq - 1];
+  const minIsGain = totalGain > 0 ? Math.max(totalGain * 0.4, 0.1) : 0.1;
+  let retention;
+  if (isGain < minIsGain) {
+    retention = -1;
+  } else if (oosGain <= 0) {
+    retention = Math.max(isRate > 0 ? oosRate / isRate : -2, -2.0);
+  } else {
+    retention = Math.min(isRate > 0 ? oosRate / isRate : 2, 2.0);
+  }
+
+  const pddFull = rFull.dd > 0 ? rFull.pnl / rFull.dd : (rFull.pnl > 0 ? 50 : 0);
+
+  const _oos = {
+    isPct: Math.round(isN / N * 100),
+    forward: {
+      pnl: oosGain, retention, isGain, n: rFull.n, wr: rFull.wr, dd: rFull.dd,
+      pnlFull: rFull.pnl, avg: rFull.avg, pdd: pddFull,
+      dwr: rFull.dwr, p1: rFull.p1, p2: rFull.p2, c1: rFull.c1, c2: rFull.c2,
+      wrL: rFull.wrL ?? null, nL: rFull.nL || 0, wrS: rFull.wrS ?? null, nS: rFull.nS || 0,
+      dwrLS: rFull.dwrLS ?? null, cvr: _calcCVR(rFull.eq)
+    }
+  };
+
+  // IS-статы для первой строки детальной статистики
+  // Если IS-прогон успешен — используем его метрики; иначе fallback на IS-часть полной equity
+  const isStats = rIS ? {
+    pnl: rIS.pnl, wr: rIS.wr, n: rIS.n, dd: rIS.dd,
+    pdd: rIS.dd > 0 ? rIS.pnl / rIS.dd : (rIS.pnl > 0 ? 50 : 0),
+    avg: rIS.avg || 0, dwr: rIS.dwr || 0,
+    p1: rIS.p1 || 0, p2: rIS.p2 || 0, c1: rIS.c1 || 0, c2: rIS.c2 || 0,
+    nL: rIS.nL || 0, pL: rIS.pL || 0, wrL: rIS.wrL ?? null,
+    nS: rIS.nS || 0, pS: rIS.pS || 0, wrS: rIS.wrS ?? null,
+    dwrLS: rIS.dwrLS ?? null, cvr: _calcCVR(rIS.eq)
+  } : null;
+
+  return { _oos, isStats, eq: rFull.eq };
+}
+
 // ── MULTI-START: генерирует N случайных стартовых точек ──────────────────────
 // Берёт структуру (паттерны, фильтры) из шаблона, рандомизирует числовые параметры
 function _hcMultiStartPoints(template, n, opts) {
@@ -3999,8 +4079,19 @@ async function runHillClimbing() {
     // Фильтр: в rob режиме показываем только >= threshold (0 = показать все)
     if (_robFilterThresh > 0 && (x.robScore === undefined || x.robScore < _robFilterThresh)) continue;
     const raw = x.r;
-    const pdd = raw.dd > 0 ? raw.pnl / raw.dd : (raw.pnl > 0 ? 999 : 0);
     const c = x.cfg;
+    // Вычисляем IS/OOS данные для HC соседа — строим _oos и IS-статы
+    const _oosData = _hcBuildOOS(c);
+    if (_oosData) {
+      c._oos = _oosData._oos;
+      // Обновляем equity полным прогоном чтобы график показывал IS/OOS split
+      if (_oosData.eq) x.r.eq = _oosData.eq;
+    }
+    // IS-статы: из IS-прогона (70%) если доступны, иначе из HC full-data прогона
+    const _is = _oosData?.isStats || null;
+    const pdd = _is
+      ? _is.pdd
+      : (raw.dd > 0 ? raw.pnl / raw.dd : (raw.pnl > 0 ? 999 : 0));
     // Строим имя через buildName — как в основных результатах
     let slStr = ''; let tpStr = '';
     if (c.slPair) { slStr = (c.slPair.combo ? `SL(ATR×${c.slPair.a?.m||0}|${c.slLogic==='or'?'OR':'AND'}|${c.slPair.p?.m||0}%)` : c.slPair.a ? `SL×${c.slPair.a.m}ATR` : `SL${c.slPair.p?.m||0}%`); }
@@ -4008,16 +4099,18 @@ async function runHillClimbing() {
     const name = typeof buildName === 'function'
       ? buildName(c, c.pvL, c.pvR, slStr, tpStr, {}, {maP: c.maP, maType: c.maType||'EMA', stw: c.sTrendWin, atrP: c.atrPeriod, adxL: c.adxLen})
       : ['SL('+slStr+')', 'TP('+tpStr+')', 'pv(L'+c.pvL+'R'+c.pvR+')', 'ATR'+c.atrPeriod].filter(Boolean).join(' ');
+    // IS-статы для первой строки в таблице и детальной статистике
+    const _isR = _is || raw;
     _hcTableResults.push({
       name, cfg: x.cfg,
-      pnl: raw.pnl, wr: raw.wr, n: raw.n, dd: raw.dd, pdd,
-      avg: raw.avg||0, dwr: raw.dwr||0,
-      p1: raw.p1||0, p2: raw.p2||0, c1: raw.c1||0, c2: raw.c2||0,
-      sig: _calcStatSig(raw), gt: _calcGTScore(raw), cvr: _calcCVR(raw.eq),
+      pnl: _isR.pnl, wr: _isR.wr, n: _isR.n, dd: _isR.dd, pdd,
+      avg: _isR.avg||0, dwr: _isR.dwr||0,
+      p1: _isR.p1||0, p2: _isR.p2||0, c1: _isR.c1||0, c2: _isR.c2||0,
+      sig: _calcStatSig(_isR), gt: _calcGTScore(_isR), cvr: _isR.cvr != null ? _isR.cvr : _calcCVR(_isR.eq),
       robScore: x.robScore, robMax: x.robMax, robDetails: x.robDetails,
-      eq: raw.eq,
-      nL: raw.nL||0, pL: raw.pL||0, wrL: raw.wrL,
-      nS: raw.nS||0, pS: raw.pS||0, wrS: raw.wrS, dwrLS: raw.dwrLS,
+      eq: x.r.eq,
+      nL: _isR.nL||0, pL: _isR.pL||0, wrL: _isR.wrL,
+      nS: _isR.nS||0, pS: _isR.pS||0, wrS: _isR.wrS, dwrLS: _isR.dwrLS,
       _hcScore: x.score, _hcDelta: x.delta
     });
     if (_hcTableResults.length >= _hcMaxRes) break;
@@ -4298,6 +4391,14 @@ function _hcRenderResults(found, metric) {
 function _hcOpenDetail(idx) {
   const x = _hcFoundResults[idx];
   if (!x) return;
+  // Прикрепляем IS/OOS данные лениво — только при открытии деталей
+  if (!x.cfg._oos) {
+    const _oosData = _hcBuildOOS(x.cfg);
+    if (_oosData) {
+      x.cfg._oos = _oosData._oos;
+      if (_oosData.eq) x.r.eq = _oosData.eq; // полная equity для графика
+    }
+  }
   const raw = x.r;
   // showDetail ожидает pdd и dwr — досчитываем
   const pdd = raw.dd > 0 ? raw.pnl / raw.dd : (raw.pnl > 0 ? 999 : 0);

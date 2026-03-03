@@ -259,6 +259,12 @@ Builded HTML генерируется из них — он дублирует в
 - `backtest(pvLo, pvHi, atrArr, cfg)` — основной бэктест-цикл
 - `_calcIndicators(cfg)` — вычисляет индикаторы
 
+**ui.js** (HC OOS):
+| Функция | Строка | Описание |
+|---------|--------|----------|
+| `_hcBuildOOS` | ~3342 | Вычисляет IS/OOS данные для HC соседа (IS 70% + полный 100%) |
+| `_hcOpenDetail` | ~4391 | Открывает детали HC результата (с ленивым _hcBuildOOS) |
+
 ### Известные баги (зафиксированы)
 - **_stopCheck() bug**: `_stopCheck = () => !_massRobRunning && !_hcRobRunning` — возвращает true если оба флага false. При запуске тестов всегда нужно установить один из флагов.
   - ✅ Исправлено для: HC doRobFilter Phase 2, HC rob-metric Phase 2, OOS scan, runHillClimbing (строки 3776, 3930).
