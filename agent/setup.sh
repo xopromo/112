@@ -36,7 +36,31 @@ chmod +x "$AGENT_DIR/groq_helper.sh"
 chmod +x "$AGENT_DIR/research_pipeline.sh"
 chmod +x "$AGENT_DIR/night_research.sh"
 chmod +x "$AGENT_DIR/setup.sh"
+chmod +x "$AGENT_DIR/sync_claude_md.sh" 2>/dev/null || true
 ok "chmod +x для всех скриптов"
+
+# =============================================================================
+# 1b. Git post-commit хук (автообновление CLAUDE.md)
+# =============================================================================
+header "Git post-commit хук"
+HOOK_FILE="$REPO_DIR/.git/hooks/post-commit"
+HOOK_SRC="$AGENT_DIR/sync_claude_md.sh"
+HOOK_CONTENT='#!/usr/bin/env bash
+# Автообновление номеров строк в CLAUDE.md после каждого коммита.
+REPO_DIR="$(git rev-parse --show-toplevel 2>/dev/null)"
+SCRIPT="$REPO_DIR/agent/sync_claude_md.sh"
+if [[ ! -f "$SCRIPT" ]]; then exit 0; fi
+output=$(bash "$SCRIPT" 2>&1) || true
+if echo "$output" | grep -q "обновлено"; then
+  echo "[post-commit] $output"
+  git -C "$REPO_DIR" add CLAUDE.md
+  git -C "$REPO_DIR" -c commit.gpgsign=false commit --amend --no-edit --quiet
+  echo "[post-commit] CLAUDE.md добавлен в коммит"
+fi'
+
+echo "$HOOK_CONTENT" > "$HOOK_FILE"
+chmod +x "$HOOK_FILE"
+ok "post-commit хук установлен: $HOOK_FILE"
 
 # =============================================================================
 # 2. Симлинки
