@@ -268,10 +268,13 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
   let p1 = 0, c1 = 0, w1 = 0, p2 = 0, c2 = 0, w2 = 0;
   let nL = 0, wL = 0, pL = 0, nS = 0, wS = 0, pS = 0; // лонг/шорт стат
   const eq = new Float32Array(N);
-  // ##SQN_START## — collectTrades для SQN в showDetail; НЕ задаётся в горячем цикле
+  // ##SQN_LAZY## — collectTrades для per-trade анализа в showDetail (не в горячем цикле)
   // Откат: удалить эти 2 строки + tradePnl в return ниже
   const _trPnl = cfg.collectTrades ? [] : null;
-  // ##SQN_END##
+  // ##SQN_HOT_START## — SQN без аллокации через сумму квадратов (O(1) per trade, нет GC)
+  // Откат: удалить sumPnl2 здесь + +=tradePnl² в trade close + sqn в return
+  let sumPnl2 = 0;
+  // ##SQN_HOT_END##
   const start = cfg.start || 50;
   const volAvg = cfg.volAvg;
   const bodyAvg = cfg.bodyAvg;
@@ -459,7 +462,8 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
       if (frc || hsl || htp || htr) {
         const tradePnl = (dir*(exitPrice-entry)/entry*100 - comm)*posSize;
         pnl += tradePnl; trades++;
-        if (_trPnl) _trPnl.push(tradePnl); // ##SQN##
+        sumPnl2 += tradePnl * tradePnl; // ##SQN_HOT##
+        if (_trPnl) _trPnl.push(tradePnl); // ##SQN_LAZY##
         if (tradePnl > 0) wins++;
         if (i <= split) { p1+=tradePnl; c1++; if(tradePnl>0) w1++; }
         else { p2+=tradePnl; c2++; if(tradePnl>0) w2++; }
@@ -751,10 +755,18 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
   const wr=trades>0?wins/trades*100:0;
   const wr1=c1>0?w1/c1*100:0, wr2=c2>0?w2/c2*100:0;
   const wrL=nL>0?wL/nL*100:null, wrS=nS>0?wS/nS*100:null;
+  // ##SQN_HOT_START## вычисляем SQN аналитически из суммы квадратов
+  const _sqnAvg = trades > 0 ? pnl / trades : 0;
+  const _sqnVar = trades > 1 ? sumPnl2 / trades - _sqnAvg * _sqnAvg : 0;
+  const sqn = trades >= 10 && _sqnVar > 1e-10
+    ? Math.round(_sqnAvg / Math.sqrt(_sqnVar) * Math.sqrt(trades) * 10) / 10
+    : null;
+  // ##SQN_HOT_END##
   return { pnl, wr, n:trades, dd, p1, w1:wr1, c1, p2, w2:wr2, c2, eq,
            dwr:Math.abs(wr1-wr2), avg:trades>0?pnl/trades:0,
            nL, pL, wrL, nS, pS, wrS,
            dwrLS: (wrL!==null&&wrS!==null) ? Math.abs(wrL-wrS) : null,
-           tradePnl: _trPnl??[] }; // ##SQN## пусто если collectTrades не задан
+           sqn, // ##SQN_HOT## всегда вычисляется
+           tradePnl: _trPnl??[] }; // ##SQN_LAZY## пусто если collectTrades не задан
 }
 

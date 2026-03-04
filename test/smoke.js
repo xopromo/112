@@ -189,6 +189,13 @@ console.log('5b. backtest tradePnl');
   btCfg.collectTrades = true;
   const r2 = backtest(ind.pvLo, ind.pvHi, ind.atrArr, btCfg);
   assert(Array.isArray(r2.tradePnl), `tradePnl с collectTrades — массив (${typeof r2.tradePnl})`);
+  // sqn поле: NO_TRADE_CFG не создаёт сделок → sqn должен быть null
+  assert(r.sqn === null, `sqn при 0 сделках → null (${r.sqn})`);
+  // proxyTest с makeFakeBacktest: проверяем sqn вычисляется если trades >= 10
+  // (через _calcSQN, т.к. не запускаем реальный бэктест с торгами в smoke)
+  const _fakeTrades = Array.from({length:20}, (_,i) => (i % 3 === 0 ? -1.0 : 0.5));
+  const sqnFake = _calcSQN(_fakeTrades);
+  assert(sqnFake !== null && !isNaN(sqnFake), `_calcSQN с 20 сделками → число (${sqnFake})`);
 }
 
 // ════════════════════════════════════════════════════════════

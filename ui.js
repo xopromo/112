@@ -416,7 +416,7 @@ function applyFiltersDebounced() {
 
 function resetAllFilters() {
   // Сбрасываем все текстовые/числовые инпуты
-  ['f_name','f_pnl','f_wr','f_n','f_dd','f_pdd','f_sig','f_gt','f_cvr','f_sortino','f_avg','f_p1','f_p2','f_dwr', // ##SOR f_sortino
+  ['f_name','f_pnl','f_wr','f_n','f_dd','f_pdd','f_sig','f_gt','f_cvr','f_sortino','f_kr','f_sqn','f_cpcv','f_avg','f_p1','f_p2','f_dwr',
    'f_tv_dpnl','f_tv_ddd','f_tv_dpdd'].forEach(id => {
     const el = $(id); if (el) el.value = '';
   });
@@ -441,6 +441,9 @@ function applyFilters() {
   const fGt    = parseFloat($('f_gt').value);
   const fCvr     = parseFloat($('f_cvr').value);
   const fSortino = parseFloat($('f_sortino').value); // ##SOR
+  const fKR      = parseFloat($('f_kr').value);      // ##KR
+  const fSqn     = parseFloat($('f_sqn').value);     // ##SQN
+  const fCpcv    = parseFloat($('f_cpcv').value);    // ##CPCV
   const fAvg   = parseFloat($('f_avg').value);
   const fP1    = parseFloat($('f_p1').value);
   const fP2    = parseFloat($('f_p2').value);
@@ -467,8 +470,11 @@ function applyFilters() {
     if (!isNaN(fPdd) && r.pdd < fPdd) return false;
     if (!isNaN(fSig) && (r.sig??0) < fSig) return false;
     if (!isNaN(fGt)  && (r.gt??-2) < fGt)  return false;
-    if (!isNaN(fCvr) && (r.cvr??-1) < fCvr) return false;
-    if (!isNaN(fSortino) && (r.sortino??-99) < fSortino) return false; // ##SOR
+    if (!isNaN(fCvr)     && (r.cvr??-1)      < fCvr)     return false;
+    if (!isNaN(fSortino) && (r.sortino??-99)  < fSortino) return false; // ##SOR
+    if (!isNaN(fKR)      && (r.kRatio??-99)   < fKR)      return false; // ##KR
+    if (!isNaN(fSqn)     && (r.sqn??-99)      < fSqn)     return false; // ##SQN
+    if (!isNaN(fCpcv)    && (r.cpcvScore??-1) < fCpcv)    return false; // ##CPCV
     if (!isNaN(fAvg) && r.avg < fAvg) return false;
     if (!isNaN(fP1)  && r.p1  < fP1)  return false;
     if (!isNaN(fP2)  && r.p2  < fP2)  return false;
@@ -632,7 +638,10 @@ function renderVisibleResults() {
       (()=>{ const s=r.sig??0; const sc=s>=90?'pos':s>=70?'':'neg'; return `<td class="col-sig ${sc}" title="Статистическая значимость WR (z-тест)\n≥90% = значима ✅\n70–90% = под вопросом\n&lt;70% = вероятно случайно">${s}%</td>`; })() +
       (()=>{ const g=r.gt??-2; const gc=g>=5?'pos':g>=2?'':'neg'; return `<td class="col-gt ${gc}" title="GT-Score = (P/DD) × sig_mult × consistency_mult\nАнтиовефиттинг метрика: штрафует за мало сделок и нестабильный WR">${g.toFixed(2)}</td>`; })() +
       (()=>{ const v=r.cvr??null; if(v===null) return '<td class="col-cvr muted">—</td>'; const vc=v>=80?'pos':v>=50?'':'neg'; return `<td class="col-cvr ${vc}" title="CVR% — Temporal Cross-Validation Robustness\nПроцент из 6 временных окон, где стратегия прибыльна.\n≥80% = устойчива ✅ | 50–80% = умеренно | &lt;50% = нестабильна">${v}%</td>`; })() +
-      (()=>{ const v=r.sortino??null; if(v===null) return '<td class="col-sor muted">—</td>'; const vc=v>=3?'pos':v>=2?'warn':'neg'; return `<td class="col-sor ${vc}" title="Sortino Ratio = PnL / downside_vol\ndownside_vol = sqrt(mean(min(Δeq,0)²)) — только отриц. движения.\n≥3 = отлично ✅ | ≥2 = хорошо | &lt;1 = нестабильно">${v.toFixed(1)}</td>`; })() + // ##SOR
+      (()=>{ const v=r.sortino??null; if(v===null) return '<td class="col-sor muted">—</td>'; const vc=v>=3?'pos':v>=2?'warn':'neg'; return `<td class="col-sor ${vc}" title="Sortino Ratio = PnL / downside_vol\n≥3 = отлично ✅ | ≥2 = хорошо | &lt;1 = нестабильно">${v.toFixed(1)}</td>`; })() + // ##SOR
+      (()=>{ const v=r.kRatio??null; if(v===null) return '<td class="col-kr muted">—</td>'; const vc=v>=2?'pos':v>=1?'warn':'neg'; return `<td class="col-kr ${vc}" title="K-Ratio = slope_OLS(equity) / se(slope)\nМерит равномерность роста equity (OLS регрессия).\n≥2 = отлично ✅ | ≥1 = хорошо | &lt;0.5 = нестабильно">${v.toFixed(1)}</td>`; })() + // ##KR
+      (()=>{ const v=r.sqn??null; if(v===null) return '<td class="col-sqn muted">—</td>'; const vc=v>=3?'pos':v>=1?'warn':'neg'; return `<td class="col-sqn ${vc}" title="SQN = (avg_trade/std_trade)×√n  (Van Tharp)\nМерит качество системы на уровне сделок.\n≥5 = excellent | ≥3 = good | ≥1 = average | &lt;1 = poor">${v.toFixed(1)}</td>`; })() + // ##SQN
+      (()=>{ const v=r.cpcvScore??null; if(v===null) return '<td class="col-cpcv muted">—</td>'; const vc=v>=80?'pos':v>=60?'warn':'neg'; return `<td class="col-cpcv ${vc}" title="CPCV% — блочная валидация: % прибыльных блоков.\nЗаполняется после открытия детали. ≥80% = устойчива ✅">${v}%</td>`; })() + // ##CPCV lazy
       `<td class="col-avg">${r.avg.toFixed(2)}</td>` +
       `<td class="col-p1 ${r.p1 >= 0 ? 'pos' : 'neg'}">${r.p1.toFixed(1)}</td>` +
       `<td class="col-p2 ${r.p2 >= 0 ? 'pos' : 'neg'}">${r.p2.toFixed(1)}</td>` +
@@ -912,6 +921,7 @@ function showDetail(r) {
   filt += row('Дистанция от MA',    c.useMaDist  ? `ВКЛ · не дальше ${c.maDistMax}×ATR от MA` : 'ВЫКЛ',         c.useMaDist?'on':'off');
   filt += row('Размер свечи',       c.useCandleF ? `ВКЛ · от ${c.candleMin}×ATR до ${c.candleMax}×ATR` : 'ВЫКЛ', c.useCandleF?'on':'off');
   filt += row('Серия одноцв. свечей', c.useConsec ? `ВКЛ · блок если ≥ ${c.consecMax} одноцветных подряд` : 'ВЫКЛ', c.useConsec?'on':'off');
+  filt += row('Подтв. МА (вторая)',  c.useConfirm ? `ВКЛ · ${c.confMatType||'EMA'} период=${c.confN} · лонг только если цена > MA, шорт только если цена < MA` : 'ВЫКЛ', c.useConfirm?'on':'off');
   html += section('📊', 'ФИЛЬТРЫ — ТРЕНД И ЦЕНА', filt);
 
   // 5. VOLUME FILTERS
@@ -938,6 +948,7 @@ function showDetail(r) {
   // ##CPCV_START## — удалить этот блок для отката (вместе с _calcCPCVScore в opt.js)
   {
     const _cpcv = _calcCPCVScore(r.cfg);
+    if (_cpcv) r.cpcvScore = _cpcv.score; // ##CPCV кэшируем для колонки таблицы
     let _cpcvHtml = '';
     if (_cpcv) {
       const _sc = _cpcv.score >= 80 ? 'pos' : _cpcv.score >= 60 ? 'warn' : 'neg';
@@ -956,19 +967,20 @@ function showDetail(r) {
   }
   // ##CPCV_END##
 
-  // ##KR_SQN_START## — удалить для отката (вместе с _calcKRatio, _calcSQN в opt.js
-  //                     и collectTrades/_trPnl/tradePnl в core.js)
+  // ##KR_SQN_START## — удалить для отката (вместе с _calcKRatio в opt.js)
+  // SQN теперь из r.sqn (core.js sumPnl2); K-Ratio требует re-run для equity
+  // collectTrades больше не нужен для SQN
   {
     let _rKS = null;
     try {
       const _ind = _calcIndicators(r.cfg);
       const _btc = buildBtCfg(r.cfg, _ind);
-      _btc.collectTrades = true;
       _rKS = backtest(_ind.pvLo, _ind.pvHi, _ind.atrArr, _btc);
     } catch(_) {}
 
-    const _kr  = _rKS ? _calcKRatio(_rKS.eq)          : null;
-    const _sqn = _rKS ? _calcSQN(_rKS.tradePnl)        : null;
+    const _kr  = _rKS ? _calcKRatio(_rKS.eq) : (r.kRatio ?? null);
+    const _sqn = r.sqn ?? (_rKS ? _rKS.sqn : null);
+    if (_rKS && _kr != null) r.kRatio = _kr; // кэшируем для колонки таблицы
 
     let _ksHtml = '';
     if (_kr !== null) {
@@ -2752,6 +2764,12 @@ function doSort(col) {
     arr.sort((a,b) => d * ((a.cvr??-1) - (b.cvr??-1)));
   } else if (col === 26) { // ##SOR
     arr.sort((a,b) => d * ((a.sortino??-99) - (b.sortino??-99)));
+  } else if (col === 27) { // ##KR
+    arr.sort((a,b) => d * ((a.kRatio??-99)  - (b.kRatio??-99)));
+  } else if (col === 28) { // ##SQN
+    arr.sort((a,b) => d * ((a.sqn??-99)     - (b.sqn??-99)));
+  } else if (col === 29) { // ##CPCV
+    arr.sort((a,b) => d * ((a.cpcvScore??-1) - (b.cpcvScore??-1)));
   } else if (col <= 11) {
     const keys = ['name','pnl','wr','n','dd','pdd','avg','p1','p2','dwr','dwr','robScore'];
     const key = keys[col];
@@ -2967,7 +2985,10 @@ const _COL_DEFS = [
   { id: 'col-sig',        label: 'Sig%',                default: true },
   { id: 'col-gt',         label: 'GT-Score',            default: true },
   { id: 'col-cvr',        label: 'CVR%',                default: true },
-  { id: 'col-sor',        label: 'Sortino',             default: true }, // ##SOR
+  { id: 'col-sor',        label: 'Sortino',             default: true },  // ##SOR
+  { id: 'col-kr',         label: 'K-Ratio',             default: true },  // ##KR
+  { id: 'col-sqn',        label: 'SQN',                 default: true },  // ##SQN
+  { id: 'col-cpcv',       label: 'CPCV%',               default: false }, // ##CPCV lazy
   { id: 'col-avg',        label: 'Avg%',                default: true },
   { id: 'col-p1',         label: '1п PnL',              default: true },
   { id: 'col-p2',         label: '2п PnL',              default: false },
@@ -3468,7 +3489,7 @@ function _hcBuildOOS(cfg) {
       dwr: rFull.dwr, p1: rFull.p1, p2: rFull.p2, c1: rFull.c1, c2: rFull.c2,
       wrL: rFull.wrL ?? null, nL: rFull.nL || 0, wrS: rFull.wrS ?? null, nS: rFull.nS || 0,
       dwrLS: rFull.dwrLS ?? null, cvr: _calcCVR(rFull.eq), upi: _calcUlcerIdx(rFull.eq),
-      sortino: _calcSortino(rFull.eq) // ##SOR
+      sortino: _calcSortino(rFull.eq), kRatio: _calcKRatio(rFull.eq), sqn: rFull.sqn??null // ##SOR ##KR ##SQN
     }
   };
 
@@ -3481,7 +3502,10 @@ function _hcBuildOOS(cfg) {
     p1: rIS.p1 || 0, p2: rIS.p2 || 0, c1: rIS.c1 || 0, c2: rIS.c2 || 0,
     nL: rIS.nL || 0, pL: rIS.pL || 0, wrL: rIS.wrL ?? null,
     nS: rIS.nS || 0, pS: rIS.pS || 0, wrS: rIS.wrS ?? null,
-    dwrLS: rIS.dwrLS ?? null, cvr: _calcCVR(rIS.eq), upi: _calcUlcerIdx(rIS.eq)
+    dwrLS: rIS.dwrLS ?? null, cvr: _calcCVR(rIS.eq), upi: _calcUlcerIdx(rIS.eq),
+    sortino: _calcSortino(rIS.eq), // ##SOR
+    kRatio:  _calcKRatio(rIS.eq),  // ##KR
+    sqn:     rIS.sqn ?? null        // ##SQN
   } : null;
 
   return { _oos, isStats, eq: rFull.eq };
@@ -4180,6 +4204,8 @@ async function runHillClimbing() {
       sig: _calcStatSig(_isR), gt: _calcGTScore(_isR), cvr: _isR.cvr != null ? _isR.cvr : _calcCVR(_isR.eq),
       upi: _isR.upi != null ? _isR.upi : _calcUlcerIdx(_isR.eq),
       sortino: _isR.sortino != null ? _isR.sortino : _calcSortino(_isR.eq), // ##SOR
+      kRatio:  _isR.kRatio  != null ? _isR.kRatio  : _calcKRatio(_isR.eq),  // ##KR
+      sqn:     _isR.sqn     != null ? _isR.sqn     : null,                   // ##SQN (нет eq→sqn нет fallback)
       robScore: x.robScore, robMax: x.robMax, robDetails: x.robDetails,
       eq: x.r.eq,
       nL: _isR.nL||0, pL: _isR.pL||0, wrL: _isR.wrL,
