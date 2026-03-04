@@ -4336,6 +4336,9 @@ function buildName(cfg, pvL, pvR, slDesc, tpDesc, filters, extras) {
   if (cfg.useTri)     entries.push('Tri');
   if (entries.length===0) entries.push('NoEntry');
   parts.push(entries.join('+'));
+  // TL pivot params — include in name so variants with different pivots are unique
+  if ((cfg.useTLTouch||cfg.useTLBreak||cfg.useFlag||cfg.useTri) && cfg.tlPvL != null)
+    parts.push(`pv${cfg.tlPvL}/${cfg.tlPvR}`);
 
   // ATR period — always include so variants with different atrP are unique
   if (ex.atrP != null) parts.push(`ATR${ex.atrP}`);
@@ -4436,13 +4439,17 @@ function calcTotal() {
   const _ctAdxL=$c('f_adx')?parseRange('f_adxl'):[$n('f_adxl')||14];
   const _ctStw=$c('f_strend')?parseRange('f_stw'):[$n('f_stw')||10];
   const _ctConf=$c('f_confirm')?parseRange('f_confn'):[100];
+  const _useTF=$c('e_tltch')||$c('e_tlbrk')||$c('e_flag')||$c('e_tri');
+  const _ctTlPvL=_useTF?parseRange('e_tl_pvl'):[5];
+  const _ctTlPvR=_useTF?parseRange('e_tl_pvr'):[3];
   return pvLs.length*pvRs.length*atrPs.length*(maPs.length||1)*
     (adxTs.length||1)*(_ctAdxL.length||1)*rsiCount*(vfMs.length||1)*(mdMaxs.length||1)*
     slCount*tpCount*beCount*(trTrigs.length||1)*(trDists.length||1)*
     (timeBarsA.length||1)*(freshMaxs.length||1)*(wtTs.length||1)*
     (vsaMs.length||1)*(atrBoMs.length||1)*(revBarsA.length||1)*
     (revSkipA.length||1)*(revCooldownA.length||1)*
-    (_ctConf.length||1)*(_ctStw.length||1);
+    (_ctConf.length||1)*(_ctStw.length||1)*
+    (_ctTlPvL.length||1)*(_ctTlPvR.length||1);
 }
 
 function updatePreview() {
@@ -4815,145 +4822,82 @@ async function runOpt() {
   // Все четыре паттерна вычисляются один раз перед основным циклом.
   // tfSigL[i] / tfSigS[i] — бит-флаг: какие именно фигуры дали сигнал
   // бит 0 = TL-touch, бит 1 = TL-break, бит 2 = flag, бит 3 = triangle
+  // tlPvLs/tlPvRs — диапазоны пивотов для TL, добавляются в _mcDims как измерения
+  const tlPvLs = useTrendFigures ? parseRange('e_tl_pvl') : [5];
+  const tlPvRs = useTrendFigures ? parseRange('e_tl_pvr') : [3];
   const TF_TOUCH=1, TF_BREAK=2, TF_FLAG=4, TF_TRI=8;
-  let tfSigL=null, tfSigS=null;
+  // Параметры TL, не зависящие от tlPvL/tlPvR — вычисляются один раз
+  const _tlZone        = useTrendFigures ? ($n('e_tl_zone')||0.3)/100 : 0;
+  const _tlFlagImpMin  = useTrendFigures ? $n('e_flag_imp')||2.0   : 0;
+  const _tlFlagMaxBars = useTrendFigures ? $n('e_flag_bars')||20    : 0;
+  const _tlFlagRetrace = useTrendFigures ? $n('e_flag_ret')||0.618  : 0;
+  const _tlAtrBase     = useTrendFigures ? calcRMA_ATR(14) : null;
+  const _tlSigCache    = {}; // кэш {sigL,sigS} по ключу tlPvL+'_'+tlPvR
 
-  if (useTrendFigures) {
-    const tlPvL = $n('e_tl_pvl')||5;
-    const tlPvR = $n('e_tl_pvr')||3;
-    const tlZone = ($n('e_tl_zone')||0.3) / 100;
-    const flagImpMin = $n('e_flag_imp')||2.0;
-    const flagMaxBars = $n('e_flag_bars')||20;
-    const flagRetrace = $n('e_flag_ret')||0.618;
-    const atrBase = calcRMA_ATR(14); // ATR для расчёта импульса флага
+  function _getTfSig(tlPvL, tlPvR) {
+    if (!useTrendFigures) return {sigL:null, sigS:null};
+    const key=tlPvL+'_'+tlPvR;
+    if (_tlSigCache[key]) return _tlSigCache[key];
+    const tlZone=_tlZone, flagImpMin=_tlFlagImpMin, flagMaxBars=_tlFlagMaxBars;
+    const flagRetrace=_tlFlagRetrace, atrBase=_tlAtrBase;
+    const sigL=new Uint8Array(N), sigS=new Uint8Array(N);
+    const tfPvLo=calcPivotLow(tlPvL,tlPvR), tfPvHi=calcPivotHigh(tlPvL,tlPvR);
 
-    tfSigL = new Uint8Array(N);
-    tfSigS = new Uint8Array(N);
-
-    // Вычисляем pivot highs/lows для трендовых линий
-    const tfPvLo = calcPivotLow(tlPvL, tlPvR);
-    const tfPvHi = calcPivotHigh(tlPvL, tlPvR);
-
-    // Запоминаем последние два пивота для построения линий
-    let sl1b=0,sl1v=0,sl2b=0,sl2v=0; // support line pivot bars/vals
-    let rl1b=0,rl1v=0,rl2b=0,rl2v=0; // resistance line
-
-    // Флаг-состояние
-    let flagActive=false, flagBull=false;
-    let flagStartBar=0, flagImpHi=0, flagImpLo=0;
-
-    const warm = Math.max(tlPvL+tlPvR+2, 20);
-
+    let sl1b=0,sl1v=0,sl2b=0,sl2v=0, rl1b=0,rl1v=0,rl2b=0,rl2v=0;
+    let flagActive=false, flagBull=false, flagStartBar=0, flagImpHi=0, flagImpLo=0;
+    const warm=Math.max(tlPvL+tlPvR+2,20);
     for (let i=warm; i<N; i++) {
       const bar=DATA[i], prev=DATA[i-1];
-
-      // Обновляем пивоты (они подтверждаются с задержкой tlPvR)
-      if (tfPvLo[i]===1) {
-        sl2b=sl1b; sl2v=sl1v;
-        sl1b=i-tlPvR; sl1v=DATA[i-tlPvR].l;
-      }
-      if (tfPvHi[i]===1) {
-        rl2b=rl1b; rl2v=rl1v;
-        rl1b=i-tlPvR; rl1v=DATA[i-tlPvR].h;
-      }
-
-      // ── Уровень линии поддержки/сопротивления на баре i
+      if (tfPvLo[i]===1) { sl2b=sl1b;sl2v=sl1v; sl1b=i-tlPvR;sl1v=DATA[i-tlPvR].l; }
+      if (tfPvHi[i]===1) { rl2b=rl1b;rl2v=rl1v; rl1b=i-tlPvR;rl1v=DATA[i-tlPvR].h; }
       let supLevel=NaN, resLevel=NaN;
-      if (sl1b>0 && sl2b>0 && sl1b!==sl2b) {
-        const slope=(sl1v-sl2v)/(sl1b-sl2b);
-        supLevel=sl1v+slope*(i-sl1b);
-      }
-      if (rl1b>0 && rl2b>0 && rl1b!==rl2b) {
-        const slope=(rl1v-rl2v)/(rl1b-rl2b);
-        resLevel=rl1v+slope*(i-rl1b);
-      }
-
-      // ── TL Touch & Break ────────────────────────────────────
-      // Соглашение: сигнал пишем на бар i — вход на открытии бара i.
-      // Касание:  бар i-1 коснулся линии своим low/high — вход сразу без подтверждения.
-      // Пробой:   бар i-1 закрылся за линией, бар i-2 был по эту сторону.
-      if (!isNaN(supLevel) && supLevel>0) {
+      if (sl1b>0&&sl2b>0&&sl1b!==sl2b) { const s=(sl1v-sl2v)/(sl1b-sl2b); supLevel=sl1v+s*(i-sl1b); }
+      if (rl1b>0&&rl2b>0&&rl1b!==rl2b) { const s=(rl1v-rl2v)/(rl1b-rl2b); resLevel=rl1v+s*(i-rl1b); }
+      if (!isNaN(supLevel)&&supLevel>0) {
         const zone=supLevel*tlZone;
-        // Касание поддержки — лонг
-        if (useTLTouch && DATA[i-1].l<=supLevel+zone && DATA[i-1].l>=supLevel-zone)
-          tfSigL[i] |= TF_TOUCH;
-        // Пробой поддержки вверх — лонг
-        if (useTLBreak && i>=2 && DATA[i-1].c>supLevel+zone && DATA[i-2].c<=supLevel+zone)
-          tfSigL[i] |= TF_BREAK;
-        // Пробой поддержки вниз — шорт
-        if (useTLBreak && i>=2 && DATA[i-1].c<supLevel-zone && DATA[i-2].c>=supLevel-zone)
-          tfSigS[i] |= TF_BREAK;
+        if (useTLTouch&&DATA[i-1].l<=supLevel+zone&&DATA[i-1].l>=supLevel-zone) sigL[i]|=TF_TOUCH;
+        if (useTLBreak&&i>=2&&DATA[i-1].c>supLevel+zone&&DATA[i-2].c<=supLevel+zone) sigL[i]|=TF_BREAK;
+        if (useTLBreak&&i>=2&&DATA[i-1].c<supLevel-zone&&DATA[i-2].c>=supLevel-zone) sigS[i]|=TF_BREAK;
       }
-      if (!isNaN(resLevel) && resLevel>0) {
+      if (!isNaN(resLevel)&&resLevel>0) {
         const zone=resLevel*tlZone;
-        // Касание сопротивления — шорт
-        if (useTLTouch && DATA[i-1].h>=resLevel-zone && DATA[i-1].h<=resLevel+zone)
-          tfSigS[i] |= TF_TOUCH;
-        // Пробой сопротивления вверх — лонг
-        if (useTLBreak && i>=2 && DATA[i-1].c>resLevel+zone && DATA[i-2].c<=resLevel+zone)
-          tfSigL[i] |= TF_BREAK;
-        // Пробой сопротивления вниз — шорт
-        if (useTLBreak && i>=2 && DATA[i-1].c<resLevel-zone && DATA[i-2].c>=resLevel-zone)
-          tfSigS[i] |= TF_BREAK;
+        if (useTLTouch&&DATA[i-1].h>=resLevel-zone&&DATA[i-1].h<=resLevel+zone) sigS[i]|=TF_TOUCH;
+        if (useTLBreak&&i>=2&&DATA[i-1].c>resLevel+zone&&DATA[i-2].c<=resLevel+zone) sigL[i]|=TF_BREAK;
+        if (useTLBreak&&i>=2&&DATA[i-1].c<resLevel-zone&&DATA[i-2].c>=resLevel-zone) sigS[i]|=TF_BREAK;
       }
-
-      // ── Flag ────────────────────────────────────────────────
       if (useFlag) {
         const atr=atrBase[i]||0.001;
-        // Начало импульса: тело свечи > flagImpMin×ATR
         if (!flagActive) {
-          const bullImp=(DATA[i-1].h-DATA[i-6>0?i-6:0].l)>atr*flagImpMin && prev.c>prev.o;
-          const bearImp=(DATA[i-6>0?i-6:0].h-DATA[i-1].l)>atr*flagImpMin && prev.c<prev.o;
-          if (bullImp) {
-            flagActive=true; flagBull=true; flagStartBar=i;
-            flagImpHi=prev.h; flagImpLo=DATA[Math.max(i-6,0)].l;
-          } else if (bearImp) {
-            flagActive=true; flagBull=false; flagStartBar=i;
-            flagImpHi=DATA[Math.max(i-6,0)].h; flagImpLo=prev.l;
-          }
+          const bullImp=(DATA[i-1].h-DATA[i-6>0?i-6:0].l)>atr*flagImpMin&&prev.c>prev.o;
+          const bearImp=(DATA[i-6>0?i-6:0].h-DATA[i-1].l)>atr*flagImpMin&&prev.c<prev.o;
+          if (bullImp) { flagActive=true;flagBull=true;flagStartBar=i;flagImpHi=prev.h;flagImpLo=DATA[Math.max(i-6,0)].l; }
+          else if (bearImp) { flagActive=true;flagBull=false;flagStartBar=i;flagImpHi=DATA[Math.max(i-6,0)].h;flagImpLo=prev.l; }
         }
         if (flagActive) {
           const elapsed=i-flagStartBar;
           const impRange=Math.max(flagImpHi-flagImpLo,0.0000001);
-          const retPct=flagBull
-            ?(flagImpHi-Math.min(bar.l,prev.l))/impRange
-            :(Math.max(bar.h,prev.h)-flagImpLo)/impRange;
-
-          if (retPct>flagRetrace||elapsed>flagMaxBars) {
-            flagActive=false; // слишком глубокий откат или устарел
-          } else if (elapsed>=2) {
-            // Пробой консолидации в направлении импульса
-            if (flagBull && bar.c>flagImpHi*(1-tlZone)) {
-              tfSigL[i] |= TF_FLAG;
-              flagActive=false;
-            } else if (!flagBull && bar.c<flagImpLo*(1+tlZone)) {
-              tfSigS[i] |= TF_FLAG;
-              flagActive=false;
-            }
+          const retPct=flagBull?(flagImpHi-Math.min(bar.l,prev.l))/impRange:(Math.max(bar.h,prev.h)-flagImpLo)/impRange;
+          if (retPct>flagRetrace||elapsed>flagMaxBars) { flagActive=false; }
+          else if (elapsed>=2) {
+            if (flagBull&&bar.c>flagImpHi*(1-tlZone)) { sigL[i]|=TF_FLAG; flagActive=false; }
+            else if (!flagBull&&bar.c<flagImpLo*(1+tlZone)) { sigS[i]|=TF_FLAG; flagActive=false; }
           }
         }
       }
-
-      // ── Triangle ────────────────────────────────────────────
-      if (useTri && sl1b>0 && sl2b>0 && rl1b>0 && rl2b>0) {
-        const resFalling=rl1v<rl2v;
-        const supRising=sl1v>sl2v;
+      if (useTri&&sl1b>0&&sl2b>0&&rl1b>0&&rl2b>0) {
+        const resFalling=rl1v<rl2v, supRising=sl1v>sl2v;
         const symTri=resFalling&&supRising;
         const ascTri=Math.abs(rl1v-rl2v)/Math.max(rl1v,0.0001)<0.005&&supRising;
         const descTri=resFalling&&Math.abs(sl1v-sl2v)/Math.max(sl1v,0.0001)<0.005;
-        if ((symTri||ascTri||descTri) && !isNaN(resLevel) && !isNaN(supLevel)) {
+        if ((symTri||ascTri||descTri)&&!isNaN(resLevel)&&!isNaN(supLevel)) {
           const zone2=resLevel*tlZone;
-          // Пробой вверх
-          if (prev.c>resLevel+zone2 && DATA[i-2] && DATA[i-2].c<=resLevel+zone2) {
-            tfSigL[i] |= TF_TRI;
-          }
-          // Пробой вниз
-          if (prev.c<supLevel-supLevel*tlZone && DATA[i-2] && DATA[i-2].c>=supLevel-supLevel*tlZone) {
-            tfSigS[i] |= TF_TRI;
-          }
+          if (prev.c>resLevel+zone2&&DATA[i-2]&&DATA[i-2].c<=resLevel+zone2) sigL[i]|=TF_TRI;
+          if (prev.c<supLevel-supLevel*tlZone&&DATA[i-2]&&DATA[i-2].c>=supLevel-supLevel*tlZone) sigS[i]|=TF_TRI;
         }
       }
     }
+    _tlSigCache[key]={sigL,sigS};
+    return _tlSigCache[key];
   }
   // ── End Trendline Figures ─────────────────────────────────────
 
@@ -4968,7 +4912,8 @@ async function runOpt() {
     (timeBarsArr.length||1)*(freshMaxs.length||1)*(wtThreshs.length||1)*
     (vsaMs.length||1)*(atrBoMults.length||1)*(confNArr.length||1)*(revBarsArr.length||1)*
     (revSkipArr.length||1)*(revCooldownArr.length||1)*
-    (_adxLArr.length||1)*(_sTrendArr.length||1);
+    (_adxLArr.length||1)*(_sTrendArr.length||1)*
+    (tlPvLs.length||1)*(tlPvRs.length||1);
 
   // Monte Carlo: shuffle and limit
   let mcTotal = total;
@@ -4986,7 +4931,8 @@ async function runOpt() {
       (timeBarsArr.length||1)*(freshMaxs.length||1)*(wtThreshs.length||1)*
       (vsaMs.length||1)*(atrBoMults.length||1)*(confNArr.length||1)*(revBarsArr.length||1)*
     (revSkipArr.length||1)*(revCooldownArr.length||1)*
-    (_adxLArr.length||1)*(_sTrendArr.length||1);
+    (_adxLArr.length||1)*(_sTrendArr.length||1)*
+    (tlPvLs.length||1)*(tlPvRs.length||1);
     // ── ИДЕЯ 7: Latin Hypercube Sampling — равномерное покрытие пространства
     // Делим [0, realTotal) на mcTotal равных страт, из каждой берём 1 случайную точку.
     // Гарантирует что каждая зона пространства представлена, нет кластеризации.
@@ -5030,7 +4976,8 @@ async function runOpt() {
       (timeBarsArr.length||1)*(freshMaxs.length||1)*(wtThreshs.length||1)*
       (vsaMs.length||1)*(atrBoMults.length||1)*(confNArr.length||1)*(revBarsArr.length||1)*
     (revSkipArr.length||1)*(revCooldownArr.length||1)*
-    (_adxLArr.length||1)*(_sTrendArr.length||1);
+    (_adxLArr.length||1)*(_sTrendArr.length||1)*
+    (tlPvLs.length||1)*(tlPvRs.length||1);
     const _mcEffective = Math.min(mcTotal, _mcRealTotal);
     if (_mcRealTotal <= mcTotal) {
       setMcPhase('⚠️ Пространство (' + _mcRealTotal + ') < N (' + mcTotal + ') — полный перебор, результаты одинаковы каждый раз');
@@ -5078,7 +5025,8 @@ async function runOpt() {
     (wtThreshs.length?wtThreshs:[0]), (vsaMs.length?vsaMs:[0]),
     (atrBoMults.length?atrBoMults:[2.0]), slPairs, tpPairs,
     beOffs, beTrigs, trTrigs, trDists, (timeBarsArr.length?timeBarsArr:[50]),
-    window._ipCombos
+    window._ipCombos,
+    (tlPvLs.length?tlPvLs:[5]), (tlPvRs.length?tlPvRs:[3])
   ];
   const _mcDimSizes = _mcDims.map(d => d.length || 1);
 
@@ -5154,12 +5102,15 @@ async function runOpt() {
       const trDist   = _dims[_d][_di[_d++]];
       const timeBars = _dims[_d][_di[_d++]];
       const _ip      = _dims[_d][_di[_d++]];
+      const tlPvL    = _dims[_d][_di[_d++]];
+      const tlPvR    = _dims[_d][_di[_d++]];
       const adxL        = _ip.adxL        ?? window._ipDef.adxL;
       const sTrendWin   = _ip.sTrendWin   ?? window._ipDef.sTrendWin;
       const confN       = _ip.confN       ?? window._ipDef.confN;
       const revBars     = _ip.revBars     ?? window._ipDef.revBars;
       const revSkip     = _ip.revSkip     ?? window._ipDef.revSkip;
       const revCooldown = _ip.revCooldown ?? window._ipDef.revCooldown;
+      const {sigL:tfSigL, sigS:tfSigS} = _getTfSig(tlPvL, tlPvR);
 
       // Пропускаем невалидные BE комбинации
       if (useBE && beOff >= beTrig) { continue; }
@@ -5192,7 +5143,7 @@ async function runOpt() {
         useAtrBo,atrBoMA,atrBoATR:atrBoATR2,atrBoMult:atrBoM,
         useMaTouch:useMaT,matMA,matZone,
         useSqueeze:useSqz,sqzOn,sqzCount,sqzMinBars,
-        useTLTouch,useTLBreak,useFlag,useTri,tfSigL,tfSigS,
+        useTLTouch,useTLBreak,useFlag,useTri,tfSigL,tfSigS,tlPvL,tlPvR,
         hasSLA:!!(slPair.a),slMult:slPair.a?slPair.a.m:0,hasSLB:!!(slPair.p),slPctMult:slPair.p?slPair.p.m:0,slLogic,
         hasTPA:!!(tpPair.a),tpMult:tpPair.a?tpPair.a.m:0,tpMode:tpPair.a?tpPair.a.type:'rr',
         hasTPB:!!(tpPair.b),tpMultB:tpPair.b?tpPair.b.m:0,tpModeB:tpPair.b?tpPair.b.type:'rr',tpLogic,
@@ -5245,7 +5196,7 @@ async function runOpt() {
               useMaTouch:useMaT,matType:$v('e_matt'),matPeriod:$n('e_matp')||20,matZone:$n('e_matz')||0.2,
               useSqueeze:useSqz,sqzBBLen:$n('e_sqbl')||20,sqzKCMult:$n('e_sqkm')||1.5,sqzMinBars,
               useTLTouch,useTLBreak,useFlag,useTri,
-              tlPvL:$n('e_tl_pvl')||5,tlPvR:$n('e_tl_pvr')||3,tlZonePct:$n('e_tl_zone')||0.3,
+              tlPvL,tlPvR,tlZonePct:$n('e_tl_zone')||0.3,
               flagImpMin:$n('e_flag_imp')||2.0,flagMaxBars:$n('e_flag_bars')||20,flagRetrace:$n('e_flag_ret')||0.618,
               slPair,slLogic,tpPair,tpLogic,
               useSLPiv,slPivOff,slPivMax,slPivL,slPivR,slPivTrail,
@@ -5353,12 +5304,15 @@ async function runOpt() {
       const trDist   = _dims[_d][dimIndices[_d++]];
       const timeBars = _dims[_d][dimIndices[_d++]];
       const _ip      = _dims[_d][dimIndices[_d++]];
+      const tlPvL    = _dims[_d][dimIndices[_d++]];
+      const tlPvR    = _dims[_d][dimIndices[_d++]];
       const adxL        = _ip.adxL        ?? window._ipDef.adxL;
       const sTrendWin   = _ip.sTrendWin   ?? window._ipDef.sTrendWin;
       const confN       = _ip.confN       ?? window._ipDef.confN;
       const revBars     = _ip.revBars     ?? window._ipDef.revBars;
       const revSkip     = _ip.revSkip     ?? window._ipDef.revSkip;
       const revCooldown = _ip.revCooldown ?? window._ipDef.revCooldown;
+      const {sigL:tfSigL, sigS:tfSigS} = _getTfSig(tlPvL, tlPvR);
 
       // Пропускаем невалидные BE комбинации
       if (useBE && beOff >= beTrig) { return 0; }
@@ -5394,7 +5348,7 @@ async function runOpt() {
         useAtrBo,atrBoMA,atrBoATR:atrBoATR2,atrBoMult:atrBoM,
         useMaTouch:useMaT,matMA,matZone,
         useSqueeze:useSqz,sqzOn,sqzCount,sqzMinBars,
-        useTLTouch,useTLBreak,useFlag,useTri,tfSigL,tfSigS,
+        useTLTouch,useTLBreak,useFlag,useTri,tfSigL,tfSigS,tlPvL,tlPvR,
         hasSLA:!!(slPair.a),slMult:slPair.a?slPair.a.m:0,hasSLB:!!(slPair.p),slPctMult:slPair.p?slPair.p.m:0,slLogic,
         hasTPA:!!(tpPair.a),tpMult:tpPair.a?tpPair.a.m:0,tpMode:tpPair.a?tpPair.a.type:'rr',
         hasTPB:!!(tpPair.b),tpMultB:tpPair.b?tpPair.b.m:0,tpModeB:tpPair.b?tpPair.b.type:'rr',tpLogic,
@@ -5460,7 +5414,7 @@ async function runOpt() {
               useMaTouch:useMaT,matType:$v('e_matt'),matPeriod:$n('e_matp')||20,matZone:$n('e_matz')||0.2,
               useSqueeze:useSqz,sqzBBLen:$n('e_sqbl')||20,sqzKCMult:$n('e_sqkm')||1.5,sqzMinBars,
               useTLTouch,useTLBreak,useFlag,useTri,
-              tlPvL:$n('e_tl_pvl')||5,tlPvR:$n('e_tl_pvr')||3,tlZonePct:$n('e_tl_zone')||0.3,
+              tlPvL,tlPvR,tlZonePct:$n('e_tl_zone')||0.3,
               flagImpMin:$n('e_flag_imp')||2.0,flagMaxBars:$n('e_flag_bars')||20,flagRetrace:$n('e_flag_ret')||0.618,
               slPair,slLogic,tpPair,tpLogic,
               useSLPiv,slPivOff,slPivMax,slPivL,slPivR,slPivTrail,
