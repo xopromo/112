@@ -1962,6 +1962,83 @@ function _calcIndicators(cfg) {
     pivSLLo = r.lo; pivSLHi = r.hi;
   }
 
+  // ── Trendline Figures (TL touch/break, flag, triangle) ────
+  // Вычисляем tfSigL/tfSigS на основе cfg — чтобы buildBtCfg,
+  // _runOOS, _hcRunBacktest и drawEquityForResult работали корректно.
+  let tfSigL = null, tfSigS = null;
+  const _useTF = cfg.useTLTouch || cfg.useTLBreak || cfg.useFlag || cfg.useTri;
+  if (_useTF) {
+    const tlPvL      = cfg.tlPvL      || 5;
+    const tlPvR      = cfg.tlPvR      || 3;
+    const tlZone     = (cfg.tlZonePct || 0.3) / 100;
+    const flagImpMin = cfg.flagImpMin || 2.0;
+    const flagMaxBars= cfg.flagMaxBars|| 20;
+    const flagRetrace= cfg.flagRetrace|| 0.618;
+    const atrBase    = calcRMA_ATR(14);
+    const tfPvLo     = calcPivotLow(tlPvL, tlPvR);
+    const tfPvHi     = calcPivotHigh(tlPvL, tlPvR);
+
+    tfSigL = new Uint8Array(N);
+    tfSigS = new Uint8Array(N);
+
+    let sl1b=0,sl1v=0,sl2b=0,sl2v=0;
+    let rl1b=0,rl1v=0,rl2b=0,rl2v=0;
+    let flagActive=false, flagBull=false;
+    let flagStartBar=0, flagImpHi=0, flagImpLo=0;
+    const warm = Math.max(tlPvL+tlPvR+2, 20);
+
+    for (let i=warm; i<N; i++) {
+      const bar=DATA[i], prev=DATA[i-1];
+      if (tfPvLo[i]===1) { sl2b=sl1b; sl2v=sl1v; sl1b=i-tlPvR; sl1v=DATA[i-tlPvR].l; }
+      if (tfPvHi[i]===1) { rl2b=rl1b; rl2v=rl1v; rl1b=i-tlPvR; rl1v=DATA[i-tlPvR].h; }
+      let supLevel=NaN, resLevel=NaN;
+      if (sl1b>0&&sl2b>0&&sl1b!==sl2b) { const slope=(sl1v-sl2v)/(sl1b-sl2b); supLevel=sl1v+slope*(i-sl1b); }
+      if (rl1b>0&&rl2b>0&&rl1b!==rl2b) { const slope=(rl1v-rl2v)/(rl1b-rl2b); resLevel=rl1v+slope*(i-rl1b); }
+      if (!isNaN(supLevel)&&supLevel>0) {
+        const zone=supLevel*tlZone;
+        if (cfg.useTLTouch&&DATA[i-1].l<=supLevel+zone&&DATA[i-1].l>=supLevel-zone) tfSigL[i]|=1;
+        if (cfg.useTLBreak&&i>=2&&DATA[i-1].c>supLevel+zone&&DATA[i-2].c<=supLevel+zone) tfSigL[i]|=2;
+        if (cfg.useTLBreak&&i>=2&&DATA[i-1].c<supLevel-zone&&DATA[i-2].c>=supLevel-zone) tfSigS[i]|=2;
+      }
+      if (!isNaN(resLevel)&&resLevel>0) {
+        const zone=resLevel*tlZone;
+        if (cfg.useTLTouch&&DATA[i-1].h>=resLevel-zone&&DATA[i-1].h<=resLevel+zone) tfSigS[i]|=1;
+        if (cfg.useTLBreak&&i>=2&&DATA[i-1].c>resLevel+zone&&DATA[i-2].c<=resLevel+zone) tfSigL[i]|=2;
+        if (cfg.useTLBreak&&i>=2&&DATA[i-1].c<resLevel-zone&&DATA[i-2].c>=resLevel-zone) tfSigS[i]|=2;
+      }
+      if (cfg.useFlag) {
+        const atr=atrBase[i]||0.001;
+        if (!flagActive) {
+          const bullImp=(DATA[i-1].h-DATA[i-6>0?i-6:0].l)>atr*flagImpMin&&prev.c>prev.o;
+          const bearImp=(DATA[i-6>0?i-6:0].h-DATA[i-1].l)>atr*flagImpMin&&prev.c<prev.o;
+          if (bullImp) { flagActive=true; flagBull=true; flagStartBar=i; flagImpHi=prev.h; flagImpLo=DATA[Math.max(i-6,0)].l; }
+          else if (bearImp) { flagActive=true; flagBull=false; flagStartBar=i; flagImpHi=DATA[Math.max(i-6,0)].h; flagImpLo=prev.l; }
+        }
+        if (flagActive) {
+          const elapsed=i-flagStartBar;
+          const impRange=Math.max(flagImpHi-flagImpLo,0.0000001);
+          const retPct=flagBull?(flagImpHi-Math.min(bar.l,prev.l))/impRange:(Math.max(bar.h,prev.h)-flagImpLo)/impRange;
+          if (retPct>flagRetrace||elapsed>flagMaxBars) { flagActive=false; }
+          else if (elapsed>=2) {
+            if (flagBull&&bar.c>flagImpHi*(1-tlZone)) { tfSigL[i]|=4; flagActive=false; }
+            else if (!flagBull&&bar.c<flagImpLo*(1+tlZone)) { tfSigS[i]|=4; flagActive=false; }
+          }
+        }
+      }
+      if (cfg.useTri&&sl1b>0&&sl2b>0&&rl1b>0&&rl2b>0) {
+        const resFalling=rl1v<rl2v, supRising=sl1v>sl2v;
+        const symTri=resFalling&&supRising;
+        const ascTri=Math.abs(rl1v-rl2v)/Math.max(rl1v,0.0001)<0.005&&supRising;
+        const descTri=resFalling&&Math.abs(sl1v-sl2v)/Math.max(sl1v,0.0001)<0.005;
+        if ((symTri||ascTri||descTri)&&!isNaN(resLevel)&&!isNaN(supLevel)) {
+          const zone2=resLevel*tlZone;
+          if (prev.c>resLevel+zone2&&DATA[i-2]&&DATA[i-2].c<=resLevel+zone2) tfSigL[i]|=8;
+          if (prev.c<supLevel-supLevel*tlZone&&DATA[i-2]&&DATA[i-2].c>=supLevel-supLevel*tlZone) tfSigS[i]|=8;
+        }
+      }
+    }
+  }
+
   return {
     pvLo, pvHi, atrArr, atrAvg,
     maArr, maArrConfirm, adxArr, rsiArr,
@@ -1973,6 +2050,7 @@ function _calcIndicators(cfg) {
     wtScores,
     structBull, structBear,
     pivSLLo, pivSLHi,
+    tfSigL, tfSigS,
   };
 }
 
@@ -2014,10 +2092,12 @@ function buildBtCfg(cfg, ind) {
     sqzOn:      ind.sqzOn,
     sqzCount:   ind.sqzCount,
     sqzMinBars: cfg.sqzMinBars || 1,
-    // TL/Flag/Triangle — не оптимизируются, всегда false
-    useTLTouch: false, useTLBreak: false,
-    useFlag:    false, useTri:     false,
-    tfSigL:     null,  tfSigS:     null,
+    useTLTouch: cfg.useTLTouch || false,
+    useTLBreak: cfg.useTLBreak || false,
+    useFlag:    cfg.useFlag    || false,
+    useTri:     cfg.useTri     || false,
+    tfSigL:     ind.tfSigL     || null,
+    tfSigS:     ind.tfSigS     || null,
 
     // ── SL / TP ───────────────────────────────────────────────
     hasSLA:    !!(slPair.a),
