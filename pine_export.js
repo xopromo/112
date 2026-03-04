@@ -75,12 +75,12 @@ function generatePineScript(r) {
   lines.push(`use_pinbar   = input.bool(${b(c.usePinBar)}, "Pin Bar",            group=grp_entry)`);
   lines.push(`pin_ratio    = input.float(${f(c.pinRatio||1.5,1)}, "Pin Bar тень/тело",  step=0.5, group=grp_entry)`);
   lines.push(`use_donch    = input.bool(${b(c.useDonch)},  "Пробой Дончиана",    group=grp_entry)`);
-  lines.push(`donch_len    = input.int(${c.donLen||20}, "Дончиан период",     minval=5, maxval=200, group=grp_entry)`);
+  lines.push(`donch_len    = input.int(${Math.max(5, c.donLen||20)}, "Дончиан период",     minval=5, maxval=200, group=grp_entry)`);
   lines.push(`use_boll     = input.bool(${b(c.useBoll)},   "Пробой Боллинджера", group=grp_entry)`);
-  lines.push(`boll_len     = input.int(${c.bbLen||20}, "Боллинджер период",  minval=5, maxval=200, group=grp_entry)`);
+  lines.push(`boll_len     = input.int(${Math.max(5, c.bbLen||20)}, "Боллинджер период",  minval=5, maxval=200, group=grp_entry)`);
   lines.push(`boll_mult    = input.float(${f(c.bbMult||2.0,1)}, "Боллинджер σ",       step=0.1, group=grp_entry)`);
   lines.push(`use_atr_bo   = input.bool(${b(c.useAtrBo)},  "Пробой ATR-канала",  group=grp_entry)`);
-  lines.push(`atr_bo_len   = input.int(${c.atrBoLen||14}, "ATR-канал EMA",      minval=5, maxval=200, group=grp_entry)`);
+  lines.push(`atr_bo_len   = input.int(${Math.max(5, c.atrBoLen||14)}, "ATR-канал EMA",      minval=5, maxval=200, group=grp_entry)`);
   lines.push(`atr_bo_mult  = input.float(${f(c.atrBoMult||2.0,1)}, "ATR-канал множитель", step=0.1, group=grp_entry)`);
   lines.push(`use_ma_touch = input.bool(${b(c.useMaTouch)}, "Касание MA",         group=grp_entry)`);
   lines.push(`ma_touch_bars= input.int(3, "  Баров от касания", minval=1, maxval=10, group=grp_entry)`);
@@ -92,7 +92,7 @@ function generatePineScript(r) {
   lines.push(`tl_pv_r      = input.int(${Math.max(1, c.tlPvR||3)},  "TL Pivot Right", minval=1, maxval=10, group=grp_entry)`);
   lines.push(`tl_zone_pct  = input.float(${f(c.tlZonePct||0.3,1)}, "TL Зона ±%",      step=0.1,  group=grp_entry)`);
   lines.push(`flag_imp_atr = input.float(${f(c.flagImpMin||2.0,1)}, "Флаг Импульс ×ATR", step=0.5, group=grp_entry)`);
-  lines.push(`flag_max_b   = input.int(${c.flagMaxBars||20}, "Флаг Макс баров",   minval=5, maxval=50, group=grp_entry)`);
+  lines.push(`flag_max_b   = input.int(${Math.max(5, c.flagMaxBars||20)}, "Флаг Макс баров",   minval=5, maxval=50, group=grp_entry)`);
   lines.push(`flag_ret     = input.float(${f(c.flagRetrace||0.618,3)}, "Флаг Откат",  step=0.01, group=grp_entry)`);
   lines.push(``);
 
@@ -107,7 +107,7 @@ function generatePineScript(r) {
   // Simple trend
   lines.push(`grp_wtrend = "📊 ПРОСТОЙ ТРЕНД"`);
   lines.push(`use_simple_trend = input.bool(${b(c.useSTrend)}, "Свечи выше/ниже MA", group=grp_wtrend)`);
-  lines.push(`st_depth   = input.int(${c.sTrendWin||10}, "Период (баров)", minval=3, maxval=50, group=grp_wtrend)`);
+  lines.push(`st_depth   = input.int(${Math.max(3, c.sTrendWin||10)}, "Период (баров)", minval=3, maxval=50, group=grp_wtrend)`);
   lines.push(``);
 
   // MA distance
@@ -131,7 +131,7 @@ function generatePineScript(r) {
   lines.push(`use_liq_f  = input.bool(${b(c.useLiq)},  "Фильтр ликвидности", group=grp_vsa)`);
   lines.push(`liq_min_mult = input.float(${f(c.liqMin||0.5,1)}, "Мин объём / средний", step=0.1, group=grp_vsa)`);
   lines.push(`use_vol_dir = input.bool(${b(c.useVolDir)}, "Направление объёма", group=grp_vsa)`);
-  lines.push(`vol_dir_len = input.int(${c.volDirPeriod||10}, "Период направления", minval=3, maxval=50, group=grp_vsa)`);
+  lines.push(`vol_dir_len = input.int(${Math.max(3, c.volDirPeriod||10)}, "Период направления", minval=3, maxval=50, group=grp_vsa)`);
   lines.push(``);
 
   // Candle filter
@@ -151,8 +151,8 @@ function generatePineScript(r) {
   // Market structure
   lines.push(`grp_struct = "🏗️ СТРУКТУРА"`);
   lines.push(`use_struct   = input.bool(${b(c.useStruct)}, "Структура рынка HH/HL", group=grp_struct)`);
-  lines.push(`struct_pv_l  = input.int(${c.strPvL||5}, "Pivot left",  minval=2, maxval=100, group=grp_struct)`);
-  lines.push(`struct_pv_r  = input.int(${c.strPvR||2}, "Pivot right", minval=1, maxval=5,   group=grp_struct)`);
+  lines.push(`struct_pv_l  = input.int(${Math.max(2, c.strPvL||5)}, "Pivot left",  minval=2, maxval=100, group=grp_struct)`);
+  lines.push(`struct_pv_r  = input.int(${Math.max(1, c.strPvR||2)}, "Pivot right", minval=1, maxval=5,   group=grp_struct)`);
   lines.push(``);
 
   // SL / TP
@@ -204,7 +204,7 @@ function generatePineScript(r) {
   lines.push(`sig_ex_min_bars = input.int(${c.revBars||2}, "Мин баров в сделке", minval=1, maxval=50, group=grp_exit)`);
   lines.push(`sig_ex_mode     = input.string("${c.revMode||'any'}", "Режим выхода (any/plus/minus)", options=["any","plus","minus"], group=grp_exit)`);
   lines.push(`use_time_ex = input.bool(${b(c.useTime)}, "Выход по времени", group=grp_exit)`);
-  lines.push(`max_bars_in = input.int(${c.timeBars||50}, "Макс баров в сделке", minval=2, maxval=500, group=grp_exit)`);
+  lines.push(`max_bars_in = input.int(${Math.max(2, c.timeBars||50)}, "Макс баров в сделке", minval=2, maxval=500, group=grp_exit)`);
   lines.push(`use_climax  = input.bool(${b(c.useClimax)}, "Climax выход (только в плюс)", group=grp_exit)`);
   lines.push(`use_clx_any = input.bool(false, "Climax± (любой)", group=grp_exit)`);
   lines.push(``);

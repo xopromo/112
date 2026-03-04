@@ -1845,12 +1845,12 @@ function generatePineScript(r) {
   lines.push(`use_pinbar   = input.bool(${b(c.usePinBar)}, "Pin Bar",            group=grp_entry)`);
   lines.push(`pin_ratio    = input.float(${f(c.pinRatio||1.5,1)}, "Pin Bar тень/тело",  step=0.5, group=grp_entry)`);
   lines.push(`use_donch    = input.bool(${b(c.useDonch)},  "Пробой Дончиана",    group=grp_entry)`);
-  lines.push(`donch_len    = input.int(${c.donLen||20}, "Дончиан период",     minval=5, maxval=200, group=grp_entry)`);
+  lines.push(`donch_len    = input.int(${Math.max(5, c.donLen||20)}, "Дончиан период",     minval=5, maxval=200, group=grp_entry)`);
   lines.push(`use_boll     = input.bool(${b(c.useBoll)},   "Пробой Боллинджера", group=grp_entry)`);
-  lines.push(`boll_len     = input.int(${c.bbLen||20}, "Боллинджер период",  minval=5, maxval=200, group=grp_entry)`);
+  lines.push(`boll_len     = input.int(${Math.max(5, c.bbLen||20)}, "Боллинджер период",  minval=5, maxval=200, group=grp_entry)`);
   lines.push(`boll_mult    = input.float(${f(c.bbMult||2.0,1)}, "Боллинджер σ",       step=0.1, group=grp_entry)`);
   lines.push(`use_atr_bo   = input.bool(${b(c.useAtrBo)},  "Пробой ATR-канала",  group=grp_entry)`);
-  lines.push(`atr_bo_len   = input.int(${c.atrBoLen||14}, "ATR-канал EMA",      minval=5, maxval=200, group=grp_entry)`);
+  lines.push(`atr_bo_len   = input.int(${Math.max(5, c.atrBoLen||14)}, "ATR-канал EMA",      minval=5, maxval=200, group=grp_entry)`);
   lines.push(`atr_bo_mult  = input.float(${f(c.atrBoMult||2.0,1)}, "ATR-канал множитель", step=0.1, group=grp_entry)`);
   lines.push(`use_ma_touch = input.bool(${b(c.useMaTouch)}, "Касание MA",         group=grp_entry)`);
   lines.push(`ma_touch_bars= input.int(3, "  Баров от касания", minval=1, maxval=10, group=grp_entry)`);
@@ -1862,7 +1862,7 @@ function generatePineScript(r) {
   lines.push(`tl_pv_r      = input.int(${Math.max(1, c.tlPvR||3)},  "TL Pivot Right", minval=1, maxval=10, group=grp_entry)`);
   lines.push(`tl_zone_pct  = input.float(${f(c.tlZonePct||0.3,1)}, "TL Зона ±%",      step=0.1,  group=grp_entry)`);
   lines.push(`flag_imp_atr = input.float(${f(c.flagImpMin||2.0,1)}, "Флаг Импульс ×ATR", step=0.5, group=grp_entry)`);
-  lines.push(`flag_max_b   = input.int(${c.flagMaxBars||20}, "Флаг Макс баров",   minval=5, maxval=50, group=grp_entry)`);
+  lines.push(`flag_max_b   = input.int(${Math.max(5, c.flagMaxBars||20)}, "Флаг Макс баров",   minval=5, maxval=50, group=grp_entry)`);
   lines.push(`flag_ret     = input.float(${f(c.flagRetrace||0.618,3)}, "Флаг Откат",  step=0.01, group=grp_entry)`);
   lines.push(``);
 
@@ -1877,7 +1877,7 @@ function generatePineScript(r) {
   // Simple trend
   lines.push(`grp_wtrend = "📊 ПРОСТОЙ ТРЕНД"`);
   lines.push(`use_simple_trend = input.bool(${b(c.useSTrend)}, "Свечи выше/ниже MA", group=grp_wtrend)`);
-  lines.push(`st_depth   = input.int(${c.sTrendWin||10}, "Период (баров)", minval=3, maxval=50, group=grp_wtrend)`);
+  lines.push(`st_depth   = input.int(${Math.max(3, c.sTrendWin||10)}, "Период (баров)", minval=3, maxval=50, group=grp_wtrend)`);
   lines.push(``);
 
   // MA distance
@@ -1901,7 +1901,7 @@ function generatePineScript(r) {
   lines.push(`use_liq_f  = input.bool(${b(c.useLiq)},  "Фильтр ликвидности", group=grp_vsa)`);
   lines.push(`liq_min_mult = input.float(${f(c.liqMin||0.5,1)}, "Мин объём / средний", step=0.1, group=grp_vsa)`);
   lines.push(`use_vol_dir = input.bool(${b(c.useVolDir)}, "Направление объёма", group=grp_vsa)`);
-  lines.push(`vol_dir_len = input.int(${c.volDirPeriod||10}, "Период направления", minval=3, maxval=50, group=grp_vsa)`);
+  lines.push(`vol_dir_len = input.int(${Math.max(3, c.volDirPeriod||10)}, "Период направления", minval=3, maxval=50, group=grp_vsa)`);
   lines.push(``);
 
   // Candle filter
@@ -1921,8 +1921,8 @@ function generatePineScript(r) {
   // Market structure
   lines.push(`grp_struct = "🏗️ СТРУКТУРА"`);
   lines.push(`use_struct   = input.bool(${b(c.useStruct)}, "Структура рынка HH/HL", group=grp_struct)`);
-  lines.push(`struct_pv_l  = input.int(${c.strPvL||5}, "Pivot left",  minval=2, maxval=100, group=grp_struct)`);
-  lines.push(`struct_pv_r  = input.int(${c.strPvR||2}, "Pivot right", minval=1, maxval=5,   group=grp_struct)`);
+  lines.push(`struct_pv_l  = input.int(${Math.max(2, c.strPvL||5)}, "Pivot left",  minval=2, maxval=100, group=grp_struct)`);
+  lines.push(`struct_pv_r  = input.int(${Math.max(1, c.strPvR||2)}, "Pivot right", minval=1, maxval=5,   group=grp_struct)`);
   lines.push(``);
 
   // SL / TP
@@ -1974,7 +1974,7 @@ function generatePineScript(r) {
   lines.push(`sig_ex_min_bars = input.int(${c.revBars||2}, "Мин баров в сделке", minval=1, maxval=50, group=grp_exit)`);
   lines.push(`sig_ex_mode     = input.string("${c.revMode||'any'}", "Режим выхода (any/plus/minus)", options=["any","plus","minus"], group=grp_exit)`);
   lines.push(`use_time_ex = input.bool(${b(c.useTime)}, "Выход по времени", group=grp_exit)`);
-  lines.push(`max_bars_in = input.int(${c.timeBars||50}, "Макс баров в сделке", minval=2, maxval=500, group=grp_exit)`);
+  lines.push(`max_bars_in = input.int(${Math.max(2, c.timeBars||50)}, "Макс баров в сделке", minval=2, maxval=500, group=grp_exit)`);
   lines.push(`use_climax  = input.bool(${b(c.useClimax)}, "Climax выход (только в плюс)", group=grp_exit)`);
   lines.push(`use_clx_any = input.bool(false, "Climax± (любой)", group=grp_exit)`);
   lines.push(``);
@@ -3615,7 +3615,7 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
   let pnl = 0, trades = 0, wins = 0, maxPnl = 0, dd = 0;
   let p1 = 0, c1 = 0, w1 = 0, p2 = 0, c2 = 0, w2 = 0;
   let nL = 0, wL = 0, pL = 0, nS = 0, wS = 0, pS = 0; // лонг/шорт стат
-  const eq = new Float32Array(N);
+  const eq = cfg.skipEq ? null : new Float32Array(N);
   // ##SQN_LAZY## — collectTrades для per-trade анализа в showDetail (не в горячем цикле)
   // Откат: удалить эти 2 строки + tradePnl в return ниже
   const _trPnl = cfg.collectTrades ? [] : null;
@@ -3665,8 +3665,23 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
       // --- Шаг 1: Rev signal → frc ---
       let frc = false, revNewDir = 0;
       if (cfg.useRev && (i-entryBar) >= cfg.revBars) {
-        const baseSig = dir===1 ? pvHi[i]===1 : pvLo[i]===1;
-        const oppSig = baseSig; // 'same'/'base'/'any'/'pat' — в оптимизаторе один тип
+        // oppSig: сигнал противоположного направления (те же типы входа, что включены)
+        // Pivot: только если pivot-вход включён
+        let oppSig = cfg.usePivot && (dir===1 ? pvHi[i]===1 : pvLo[i]===1);
+        // TL-фигуры: tfSigS для длинной позиции, tfSigL для короткой
+        if (!oppSig && cfg.tfSigL && cfg.tfSigS) {
+          const tfM=(cfg.useTLTouch?1:0)|(cfg.useTLBreak?2:0)|(cfg.useFlag?4:0)|(cfg.useTri?8:0);
+          if (tfM) {
+            if (dir===1  && (cfg.tfSigS[i]&tfM)) oppSig=true;
+            if (dir===-1 && (cfg.tfSigL[i]&tfM)) oppSig=true;
+          }
+        }
+        // Engulf reverse
+        if (!oppSig && cfg.useEngulf) {
+          const bPrev=Math.abs(prev.o-prev.c), bCur=Math.abs(bar.o-bar.c);
+          if (dir===1  && prev.c>prev.o && bar.c<bar.o && bCur>=bPrev*0.7 && bar.c<=prev.o && bar.o>=prev.c) oppSig=true;
+          if (dir===-1 && prev.c<prev.o && bar.c>bar.o && bCur>=bPrev*0.7 && bar.c>=prev.o && bar.o<=prev.c) oppSig=true;
+        }
         if (oppSig) {
           if (cfg.revCooldown > 0) {
             if (revCooldownBar < 0) revCooldownBar = i;
@@ -3835,7 +3850,7 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
           if (hasTPB) { tp2 = cfg.tpModeB==='rr' ? entry+dir*slDist2*cfg.tpMultB : cfg.tpModeB==='atr' ? entry+dir*ac2*cfg.tpMultB : entry*(1+dir*cfg.tpMultB/100); }
           inTrade = true; entryBar = i; posSize = 1.0;
           beActive = false; trailActive = false; partialDone = false;
-          eq[i] = pnl;
+          if (eq) eq[i] = pnl;
           continue;
         }
       }
@@ -4097,7 +4112,7 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
         else { tp1=entry+dir*slDist*2; hasTP2=false; }
       }
     }
-    eq[i] = pnl;
+    if (eq) eq[i] = pnl;
   }
 
   const wr=trades>0?wins/trades*100:0;
@@ -4315,6 +4330,10 @@ function buildName(cfg, pvL, pvR, slDesc, tpDesc, filters, extras) {
   if (cfg.useAtrBo) entries.push(`ATRbo×${cfg.atrBoMult}`);
   if (cfg.useMaTouch) entries.push('MAToch');
   if (cfg.useSqueeze) entries.push('Squeeze');
+  if (cfg.useTLTouch) entries.push('TLtch');
+  if (cfg.useTLBreak) entries.push('TLbrk');
+  if (cfg.useFlag)    entries.push('Flag');
+  if (cfg.useTri)     entries.push('Tri');
   if (entries.length===0) entries.push('NoEntry');
   parts.push(entries.join('+'));
 
@@ -5397,7 +5416,7 @@ async function runOpt() {
         useLiq,liqMin,useVolDir,volDirPeriod:volDirP,
         useWT:useWT&&wtT>0,wtScores,wtThresh:wtT,
         useFat,fatConsec,fatVolDrop,bodyAvg:bodyAvgArr,
-        start:Math.max(maP||0,50)+2,pruning:false,maxDDLimit:maxDD
+        start:Math.max(maP||0,50)+2,pruning:false,maxDDLimit:maxDD,skipEq:true
       };
 
       if (_useOOS) DATA = _isData;
@@ -5518,7 +5537,13 @@ async function runOpt() {
     // Предвычисленная матрица [dimIdx][histIdx] — обновляем только при изменении good/bad
     let _goodMat = null, _badMat = null, _lastGoodLen = -1, _lastBadLen = -1;
 
+    let _tiSinceLastDone = 0, _donePrev = 0;
     for (let ti = 0; results.length < tpeTarget && done < tpeMaxIter && !stopped; ti++) {
+      // Антизамерзание: если 500 внешних итераций без нового done → пространство исчерпано
+      // Сбрасываем _tpeSeen чтобы разрешить повторное исследование
+      if (done === _donePrev) { _tiSinceLastDone++; } else { _tiSinceLastDone = 0; _donePrev = done; }
+      if (_tiSinceLastDone >= 500) { _tpeSeen.clear(); _tiSinceLastDone = 0; }
+
       const progress = Math.min(1, done / Math.max(tpeMaxIter - 1, 1));
       const gamma = 0.25 - 0.10 * progress;
 
@@ -5610,19 +5635,32 @@ async function runOpt() {
       }
     }
 
-    // TPE завершён — батч метрик (CVR/UPI/Sortino/kRatio)
-    // Вынесены из горячего цикла чтобы не замедлять TPE по мере роста pass-rate
+    // TPE завершён — батч метрик (CVR/UPI/Sortino/kRatio) + пересчёт equity
+    // skipEq:true в горячем цикле → equities[name]=null. Здесь пересчитываем equity
+    // на IS-данных и вычисляем метрики. O(results.length × N_is) — разово, не на каждой итерации.
     if (results.length > 0) {
       setMcPhase(`⏳ Расчёт метрик ${results.length} результатов…`);
+      const _eqDATA = _useOOS ? _isData : DATA;
       for (let oi = 0; oi < results.length; oi++) {
-        const _eq = equities[results[oi].name];
-        if (_eq) {
-          results[oi].cvr     = _calcCVR(_eq);
-          results[oi].upi     = _calcUlcerIdx(_eq);
-          results[oi].sortino = _calcSortino(_eq);
-          results[oi].kRatio  = _calcKRatio(_eq);
+        const _res = results[oi];
+        // Пересчитываем equity (была null из-за skipEq:true в горячем цикле)
+        let _eq = equities[_res.name];
+        if (!_eq) {
+          const origDATA = DATA; DATA = _eqDATA;
+          try {
+            const _ind2 = _calcIndicators(_res.cfg);
+            const _bt2  = buildBtCfg(_res.cfg, _ind2);
+            const _r2   = backtest(_ind2.pvLo, _ind2.pvHi, _ind2.atrArr, _bt2);
+            if (_r2 && _r2.eq) { _eq = _r2.eq; equities[_res.name] = _eq; }
+          } catch(_) {} finally { DATA = origDATA; }
         }
-        if (oi % 200 === 0) { await yieldToUI(); }
+        if (_eq) {
+          _res.cvr     = _calcCVR(_eq);
+          _res.upi     = _calcUlcerIdx(_eq);
+          _res.sortino = _calcSortino(_eq);
+          _res.kRatio  = _calcKRatio(_eq);
+        }
+        if (oi % 50 === 0) { await yieldToUI(); }
       }
     }
     // TPE завершён — батч OOS для всех найденных результатов

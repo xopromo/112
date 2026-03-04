@@ -267,7 +267,7 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
   let pnl = 0, trades = 0, wins = 0, maxPnl = 0, dd = 0;
   let p1 = 0, c1 = 0, w1 = 0, p2 = 0, c2 = 0, w2 = 0;
   let nL = 0, wL = 0, pL = 0, nS = 0, wS = 0, pS = 0; // лонг/шорт стат
-  const eq = new Float32Array(N);
+  const eq = cfg.skipEq ? null : new Float32Array(N);
   // ##SQN_LAZY## — collectTrades для per-trade анализа в showDetail (не в горячем цикле)
   // Откат: удалить эти 2 строки + tradePnl в return ниже
   const _trPnl = cfg.collectTrades ? [] : null;
@@ -317,8 +317,23 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
       // --- Шаг 1: Rev signal → frc ---
       let frc = false, revNewDir = 0;
       if (cfg.useRev && (i-entryBar) >= cfg.revBars) {
-        const baseSig = dir===1 ? pvHi[i]===1 : pvLo[i]===1;
-        const oppSig = baseSig; // 'same'/'base'/'any'/'pat' — в оптимизаторе один тип
+        // oppSig: сигнал противоположного направления (те же типы входа, что включены)
+        // Pivot: только если pivot-вход включён
+        let oppSig = cfg.usePivot && (dir===1 ? pvHi[i]===1 : pvLo[i]===1);
+        // TL-фигуры: tfSigS для длинной позиции, tfSigL для короткой
+        if (!oppSig && cfg.tfSigL && cfg.tfSigS) {
+          const tfM=(cfg.useTLTouch?1:0)|(cfg.useTLBreak?2:0)|(cfg.useFlag?4:0)|(cfg.useTri?8:0);
+          if (tfM) {
+            if (dir===1  && (cfg.tfSigS[i]&tfM)) oppSig=true;
+            if (dir===-1 && (cfg.tfSigL[i]&tfM)) oppSig=true;
+          }
+        }
+        // Engulf reverse
+        if (!oppSig && cfg.useEngulf) {
+          const bPrev=Math.abs(prev.o-prev.c), bCur=Math.abs(bar.o-bar.c);
+          if (dir===1  && prev.c>prev.o && bar.c<bar.o && bCur>=bPrev*0.7 && bar.c<=prev.o && bar.o>=prev.c) oppSig=true;
+          if (dir===-1 && prev.c<prev.o && bar.c>bar.o && bCur>=bPrev*0.7 && bar.c>=prev.o && bar.o<=prev.c) oppSig=true;
+        }
         if (oppSig) {
           if (cfg.revCooldown > 0) {
             if (revCooldownBar < 0) revCooldownBar = i;
@@ -487,7 +502,7 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
           if (hasTPB) { tp2 = cfg.tpModeB==='rr' ? entry+dir*slDist2*cfg.tpMultB : cfg.tpModeB==='atr' ? entry+dir*ac2*cfg.tpMultB : entry*(1+dir*cfg.tpMultB/100); }
           inTrade = true; entryBar = i; posSize = 1.0;
           beActive = false; trailActive = false; partialDone = false;
-          eq[i] = pnl;
+          if (eq) eq[i] = pnl;
           continue;
         }
       }
@@ -749,7 +764,7 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
         else { tp1=entry+dir*slDist*2; hasTP2=false; }
       }
     }
-    eq[i] = pnl;
+    if (eq) eq[i] = pnl;
   }
 
   const wr=trades>0?wins/trades*100:0;

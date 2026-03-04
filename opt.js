@@ -233,6 +233,10 @@ function buildName(cfg, pvL, pvR, slDesc, tpDesc, filters, extras) {
   if (cfg.useAtrBo) entries.push(`ATRbo×${cfg.atrBoMult}`);
   if (cfg.useMaTouch) entries.push('MAToch');
   if (cfg.useSqueeze) entries.push('Squeeze');
+  if (cfg.useTLTouch) entries.push('TLtch');
+  if (cfg.useTLBreak) entries.push('TLbrk');
+  if (cfg.useFlag)    entries.push('Flag');
+  if (cfg.useTri)     entries.push('Tri');
   if (entries.length===0) entries.push('NoEntry');
   parts.push(entries.join('+'));
 
@@ -1315,7 +1319,7 @@ async function runOpt() {
         useLiq,liqMin,useVolDir,volDirPeriod:volDirP,
         useWT:useWT&&wtT>0,wtScores,wtThresh:wtT,
         useFat,fatConsec,fatVolDrop,bodyAvg:bodyAvgArr,
-        start:Math.max(maP||0,50)+2,pruning:false,maxDDLimit:maxDD
+        start:Math.max(maP||0,50)+2,pruning:false,maxDDLimit:maxDD,skipEq:true
       };
 
       if (_useOOS) DATA = _isData;
@@ -1436,7 +1440,13 @@ async function runOpt() {
     // Предвычисленная матрица [dimIdx][histIdx] — обновляем только при изменении good/bad
     let _goodMat = null, _badMat = null, _lastGoodLen = -1, _lastBadLen = -1;
 
+    let _tiSinceLastDone = 0, _donePrev = 0;
     for (let ti = 0; results.length < tpeTarget && done < tpeMaxIter && !stopped; ti++) {
+      // Антизамерзание: если 500 внешних итераций без нового done → пространство исчерпано
+      // Сбрасываем _tpeSeen чтобы разрешить повторное исследование
+      if (done === _donePrev) { _tiSinceLastDone++; } else { _tiSinceLastDone = 0; _donePrev = done; }
+      if (_tiSinceLastDone >= 500) { _tpeSeen.clear(); _tiSinceLastDone = 0; }
+
       const progress = Math.min(1, done / Math.max(tpeMaxIter - 1, 1));
       const gamma = 0.25 - 0.10 * progress;
 
@@ -1528,19 +1538,32 @@ async function runOpt() {
       }
     }
 
-    // TPE завершён — батч метрик (CVR/UPI/Sortino/kRatio)
-    // Вынесены из горячего цикла чтобы не замедлять TPE по мере роста pass-rate
+    // TPE завершён — батч метрик (CVR/UPI/Sortino/kRatio) + пересчёт equity
+    // skipEq:true в горячем цикле → equities[name]=null. Здесь пересчитываем equity
+    // на IS-данных и вычисляем метрики. O(results.length × N_is) — разово, не на каждой итерации.
     if (results.length > 0) {
       setMcPhase(`⏳ Расчёт метрик ${results.length} результатов…`);
+      const _eqDATA = _useOOS ? _isData : DATA;
       for (let oi = 0; oi < results.length; oi++) {
-        const _eq = equities[results[oi].name];
-        if (_eq) {
-          results[oi].cvr     = _calcCVR(_eq);
-          results[oi].upi     = _calcUlcerIdx(_eq);
-          results[oi].sortino = _calcSortino(_eq);
-          results[oi].kRatio  = _calcKRatio(_eq);
+        const _res = results[oi];
+        // Пересчитываем equity (была null из-за skipEq:true в горячем цикле)
+        let _eq = equities[_res.name];
+        if (!_eq) {
+          const origDATA = DATA; DATA = _eqDATA;
+          try {
+            const _ind2 = _calcIndicators(_res.cfg);
+            const _bt2  = buildBtCfg(_res.cfg, _ind2);
+            const _r2   = backtest(_ind2.pvLo, _ind2.pvHi, _ind2.atrArr, _bt2);
+            if (_r2 && _r2.eq) { _eq = _r2.eq; equities[_res.name] = _eq; }
+          } catch(_) {} finally { DATA = origDATA; }
         }
-        if (oi % 200 === 0) { await yieldToUI(); }
+        if (_eq) {
+          _res.cvr     = _calcCVR(_eq);
+          _res.upi     = _calcUlcerIdx(_eq);
+          _res.sortino = _calcSortino(_eq);
+          _res.kRatio  = _calcKRatio(_eq);
+        }
+        if (oi % 50 === 0) { await yieldToUI(); }
       }
     }
     // TPE завершён — батч OOS для всех найденных результатов
