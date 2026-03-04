@@ -4,14 +4,14 @@
 > Также обновляй вручную когда вливаешь ветки в main.
 
 ## Последняя ручная сессия
-- **Дата:** 2026-03-03 20:40
+- **Дата:** 2026-03-04 04:25
 - **Ветка:** `main`
 - **Последние коммиты:**
+  - 26bd6be fix+feat: K-Ratio/SQN table columns, Sortino Neighbors fix, Confirm MA
+  - a56e774 build: rebuild USE_Optimizer_v6_built.html (Sortino + K-Ratio + SQN)
+  - 7bbd251 chore: update STATE.md
   - e344441 feat: Sortino Ratio + K-Ratio + SQN (поиск 2026-03-03-20)
   - cc736dc research: 3 новые задачи из поиска 2026-03-03-20
-  - 32dfe75 chore: update STATE.md
-  - 0291806 feat: CPCV блочная валидация (Hyp 1)
-  - be96cc3 chore: update STATE.md after research 2026-03-03-19
 
 ## Последний цикл
 - **Дата:** 2026-03-03-20 (ручной исследовательский цикл)
