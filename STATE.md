@@ -4,14 +4,14 @@
 > Также обновляй вручную когда вливаешь ветки в main.
 
 ## Последняя ручная сессия
-- **Дата:** 2026-03-04 07:43
+- **Дата:** 2026-03-04 08:36
 - **Ветка:** `main`
 - **Последние коммиты:**
+  - 7698ab7 fix: 3 критических бага — TPE slowdown, Pine minval, результаты ≠ TV
+  - 77db51c perf: fix progressive TPE slowdown — 3 optimizations
+  - 4357121 chore: update STATE.md
   - 37aac7a perf: cache tfSigL/tfSigS in _calcIndicators to fix TPE slowdown
   - b64ff96 chore: update STATE.md
-  - d50d7e8 fix: clamp tlPvL/tlPvR to minval before generating Pine input.int
-  - 65eb73c build: rebuild USE_Optimizer_v6_built.html
-  - d4258e3 chore: update STATE.md
 
 ## Последний цикл
 - **Дата:** 2026-03-03-20 (ручной исследовательский цикл)
