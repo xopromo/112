@@ -267,7 +267,7 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
   let pnl = 0, trades = 0, wins = 0, maxPnl = 0, dd = 0;
   let p1 = 0, c1 = 0, w1 = 0, p2 = 0, c2 = 0, w2 = 0;
   let nL = 0, wL = 0, pL = 0, nS = 0, wS = 0, pS = 0; // лонг/шорт стат
-  const eq = cfg.skipEq ? null : new Float32Array(N);
+  const eq = new Float32Array(N);
   // ##SQN_LAZY## — collectTrades для per-trade анализа в showDetail (не в горячем цикле)
   // Откат: удалить эти 2 строки + tradePnl в return ниже
   const _trPnl = cfg.collectTrades ? [] : null;
@@ -502,7 +502,7 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
           if (hasTPB) { tp2 = cfg.tpModeB==='rr' ? entry+dir*slDist2*cfg.tpMultB : cfg.tpModeB==='atr' ? entry+dir*ac2*cfg.tpMultB : entry*(1+dir*cfg.tpMultB/100); }
           inTrade = true; entryBar = i; posSize = 1.0;
           beActive = false; trailActive = false; partialDone = false;
-          if (eq) eq[i] = pnl;
+          eq[i] = pnl;
           continue;
         }
       }
@@ -764,7 +764,7 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
         else { tp1=entry+dir*slDist*2; hasTP2=false; }
       }
     }
-    if (eq) eq[i] = pnl;
+    eq[i] = pnl;
   }
 
   const wr=trades>0?wins/trades*100:0;

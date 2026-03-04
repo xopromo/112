@@ -1319,7 +1319,7 @@ async function runOpt() {
         useLiq,liqMin,useVolDir,volDirPeriod:volDirP,
         useWT:useWT&&wtT>0,wtScores,wtThresh:wtT,
         useFat,fatConsec,fatVolDrop,bodyAvg:bodyAvgArr,
-        start:Math.max(maP||0,50)+2,pruning:false,maxDDLimit:maxDD,skipEq:true
+        start:Math.max(maP||0,50)+2,pruning:false,maxDDLimit:maxDD
       };
 
       if (_useOOS) DATA = _isData;
@@ -1538,32 +1538,19 @@ async function runOpt() {
       }
     }
 
-    // TPE завершён — батч метрик (CVR/UPI/Sortino/kRatio) + пересчёт equity
-    // skipEq:true в горячем цикле → equities[name]=null. Здесь пересчитываем equity
-    // на IS-данных и вычисляем метрики. O(results.length × N_is) — разово, не на каждой итерации.
+    // TPE завершён — батч метрик (CVR/UPI/Sortino/kRatio)
+    // Вынесены из горячего цикла чтобы не замедлять TPE по мере роста pass-rate.
     if (results.length > 0) {
       setMcPhase(`⏳ Расчёт метрик ${results.length} результатов…`);
-      const _eqDATA = _useOOS ? _isData : DATA;
       for (let oi = 0; oi < results.length; oi++) {
-        const _res = results[oi];
-        // Пересчитываем equity (была null из-за skipEq:true в горячем цикле)
-        let _eq = equities[_res.name];
-        if (!_eq) {
-          const origDATA = DATA; DATA = _eqDATA;
-          try {
-            const _ind2 = _calcIndicators(_res.cfg);
-            const _bt2  = buildBtCfg(_res.cfg, _ind2);
-            const _r2   = backtest(_ind2.pvLo, _ind2.pvHi, _ind2.atrArr, _bt2);
-            if (_r2 && _r2.eq) { _eq = _r2.eq; equities[_res.name] = _eq; }
-          } catch(_) {} finally { DATA = origDATA; }
-        }
+        const _eq = equities[results[oi].name];
         if (_eq) {
-          _res.cvr     = _calcCVR(_eq);
-          _res.upi     = _calcUlcerIdx(_eq);
-          _res.sortino = _calcSortino(_eq);
-          _res.kRatio  = _calcKRatio(_eq);
+          results[oi].cvr     = _calcCVR(_eq);
+          results[oi].upi     = _calcUlcerIdx(_eq);
+          results[oi].sortino = _calcSortino(_eq);
+          results[oi].kRatio  = _calcKRatio(_eq);
         }
-        if (oi % 50 === 0) { await yieldToUI(); }
+        if (oi % 100 === 0) { await yieldToUI(); }
       }
     }
     // TPE завершён — батч OOS для всех найденных результатов
