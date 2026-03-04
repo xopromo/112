@@ -5879,6 +5879,10 @@ async function runOpt() {
 }
 
 // ============================================================
+// Кэш TF-сигналов (tfSigL/tfSigS) для _calcIndicators.
+// При батч-OOS (1000+ вызовов с одинаковым DATA и параметрами) вычисляется 1 раз.
+let _tfSigCache = null; // {key, dataLen, dataFirst, dataLast, tfSigL, tfSigS}
+
 // _calcIndicators / buildBtCfg — восстановлены из истории
 // Используются тестами устойчивости (runOnSlice)
 // ============================================================
@@ -6047,15 +6051,25 @@ function _calcIndicators(cfg) {
   // ── Trendline Figures (TL touch/break, flag, triangle) ────
   // Вычисляем tfSigL/tfSigS на основе cfg — чтобы buildBtCfg,
   // _runOOS, _hcRunBacktest и drawEquityForResult работали корректно.
+  // Кэшируем: при батч-OOS (1000+ вызовов с одним DATA) вычисляем 1 раз.
   let tfSigL = null, tfSigS = null;
   const _useTF = cfg.useTLTouch || cfg.useTLBreak || cfg.useFlag || cfg.useTri;
   if (_useTF) {
-    const tlPvL      = cfg.tlPvL      || 5;
-    const tlPvR      = cfg.tlPvR      || 3;
+    const tlPvL      = Math.max(2, cfg.tlPvL      || 5);
+    const tlPvR      = Math.max(1, cfg.tlPvR      || 3);
     const tlZone     = (cfg.tlZonePct || 0.3) / 100;
     const flagImpMin = cfg.flagImpMin || 2.0;
     const flagMaxBars= cfg.flagMaxBars|| 20;
     const flagRetrace= cfg.flagRetrace|| 0.618;
+    const _tfKey = `${cfg.useTLTouch}|${cfg.useTLBreak}|${cfg.useFlag}|${cfg.useTri}|${tlPvL}|${tlPvR}|${tlZone}|${flagImpMin}|${flagMaxBars}|${flagRetrace}`;
+    const _dLen = DATA.length;
+    const _d0c  = DATA[0]?.c;
+    const _dNc  = DATA[_dLen - 1]?.c;
+    if (_tfSigCache && _tfSigCache.key === _tfKey && _tfSigCache.dataLen === _dLen &&
+        _tfSigCache.dataFirst === _d0c && _tfSigCache.dataLast === _dNc) {
+      tfSigL = _tfSigCache.tfSigL;
+      tfSigS = _tfSigCache.tfSigS;
+    } else {
     const atrBase    = calcRMA_ATR(14);
     const tfPvLo     = calcPivotLow(tlPvL, tlPvR);
     const tfPvHi     = calcPivotHigh(tlPvL, tlPvR);
@@ -6119,6 +6133,8 @@ function _calcIndicators(cfg) {
         }
       }
     }
+    _tfSigCache = {key:_tfKey, dataLen:_dLen, dataFirst:_d0c, dataLast:_dNc, tfSigL, tfSigS};
+    } // end else (cache miss)
   }
 
   return {
