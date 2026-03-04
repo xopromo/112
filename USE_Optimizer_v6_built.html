@@ -1858,8 +1858,8 @@ function generatePineScript(r) {
   lines.push(`use_tl_break = input.bool(${b(c.useTLBreak)}, "Пробой TL (линия)",  group=grp_entry)`);
   lines.push(`use_flag     = input.bool(${b(c.useFlag)},    "Флаг",               group=grp_entry)`);
   lines.push(`use_tri      = input.bool(${b(c.useTri)},     "Треугольник",        group=grp_entry)`);
-  lines.push(`tl_pv_l      = input.int(${c.tlPvL||5},  "TL Pivot Left",  minval=2, maxval=20, group=grp_entry)`);
-  lines.push(`tl_pv_r      = input.int(${c.tlPvR||3},  "TL Pivot Right", minval=1, maxval=10, group=grp_entry)`);
+  lines.push(`tl_pv_l      = input.int(${Math.max(2, c.tlPvL||5)},  "TL Pivot Left",  minval=2, maxval=20, group=grp_entry)`);
+  lines.push(`tl_pv_r      = input.int(${Math.max(1, c.tlPvR||3)},  "TL Pivot Right", minval=1, maxval=10, group=grp_entry)`);
   lines.push(`tl_zone_pct  = input.float(${f(c.tlZonePct||0.3,1)}, "TL Зона ±%",      step=0.1,  group=grp_entry)`);
   lines.push(`flag_imp_atr = input.float(${f(c.flagImpMin||2.0,1)}, "Флаг Импульс ×ATR", step=0.5, group=grp_entry)`);
   lines.push(`flag_max_b   = input.int(${c.flagMaxBars||20}, "Флаг Макс баров",   minval=5, maxval=50, group=grp_entry)`);
