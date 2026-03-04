@@ -4,14 +4,14 @@
 > Также обновляй вручную когда вливаешь ветки в main.
 
 ## Последняя ручная сессия
-- **Дата:** 2026-03-04 06:00
+- **Дата:** 2026-03-04 06:27
 - **Ветка:** `main`
 - **Последние коммиты:**
+  - 524df47 fix: TL/Flag/Triangle equity flat-line after TPE search
+  - a7ecf71 feat: trendline figures (TL touch/break, flag, triangle) in Pine export
   - 247a0a4 chore: update STATE.md
   - 26bd6be fix+feat: K-Ratio/SQN table columns, Sortino Neighbors fix, Confirm MA
   - a56e774 build: rebuild USE_Optimizer_v6_built.html (Sortino + K-Ratio + SQN)
-  - 7bbd251 chore: update STATE.md
-  - e344441 feat: Sortino Ratio + K-Ratio + SQN (поиск 2026-03-03-20)
 
 ## Последний цикл
 - **Дата:** 2026-03-03-20 (ручной исследовательский цикл)
