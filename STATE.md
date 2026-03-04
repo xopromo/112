@@ -4,14 +4,14 @@
 > Также обновляй вручную когда вливаешь ветки в main.
 
 ## Последняя ручная сессия
-- **Дата:** 2026-03-04 06:27
+- **Дата:** 2026-03-04 06:54
 - **Ветка:** `main`
 - **Последние коммиты:**
+  - d50d7e8 fix: clamp tlPvL/tlPvR to minval before generating Pine input.int
+  - 65eb73c build: rebuild USE_Optimizer_v6_built.html
+  - d4258e3 chore: update STATE.md
   - 524df47 fix: TL/Flag/Triangle equity flat-line after TPE search
   - a7ecf71 feat: trendline figures (TL touch/break, flag, triangle) in Pine export
-  - 247a0a4 chore: update STATE.md
-  - 26bd6be fix+feat: K-Ratio/SQN table columns, Sortino Neighbors fix, Confirm MA
-  - a56e774 build: rebuild USE_Optimizer_v6_built.html (Sortino + K-Ratio + SQN)
 
 ## Последний цикл
 - **Дата:** 2026-03-03-20 (ручной исследовательский цикл)
