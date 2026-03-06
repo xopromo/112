@@ -4,14 +4,14 @@
 > Также обновляй вручную когда вливаешь ветки в main.
 
 ## Последняя ручная сессия
-- **Дата:** 2026-03-06 17:08
+- **Дата:** 2026-03-06 19:38
 - **Ветка:** `main`
 - **Последние коммиты:**
+  - 243dcc8 Fix CPCV batch, maxDD unrealized DD, Pine Script new entries
+  - 8d37d4d fix: correct TL checkbox IDs in calcTotal and entry_registry
+  - 7b38a0b feat: registry pattern + 8 new entry types
   - 578740a feat: add tlPvL/tlPvR as optimization dimensions for TL Touch/Break
   - 39b3ccf fix: restore live charts + fix fewer results after skipEq
-  - a3c6b08 chore: update STATE.md
-  - 7698ab7 fix: 3 критических бага — TPE slowdown, Pine minval, результаты ≠ TV
-  - 77db51c perf: fix progressive TPE slowdown — 3 optimizations
 
 ## Последний цикл
 - **Дата:** 2026-03-03-20 (ручной исследовательский цикл)
