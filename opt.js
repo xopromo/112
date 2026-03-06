@@ -725,17 +725,23 @@ async function runOpt() {
   const volAvgArr=HAS_VOLUME?calcVolSMA(vsaP):null;
   const bodyAvgArr=HAS_VOLUME?calcBodySMA(20):null;
 
-  // ── New entry indicators ───────────────────────────────────────
-  const rsiExitArr = useRsiExit  ? calcRSI($n('e_rsix_p')||14) : null;
-  const maCrossArr = useMaCross  ? calcMA(closes, $n('e_macr_p')||20, $v('e_macr_t')||'EMA') : null;
-  let _newMacdLine=null,_newMacdSignal=null;
-  if (useMacd) { const _m=calcMACD($n('e_macd_f')||12,$n('e_macd_s')||26,$n('e_macd_sg')||9); _newMacdLine=_m.line; _newMacdSignal=_m.signal; }
-  const macdLine=_newMacdLine, macdSignal=_newMacdSignal;
-  let _newStochD=null;
-  if (useStochExit) { const _s=calcStochastic($n('e_stx_k')||14,$n('e_stx_d')||3); _newStochD=_s.d; }
-  const newStochD=_newStochD;
-  const volMoveMult = $n('e_volmv_m')||1.5;
-  const nReversalN  = $n('e_nrev_n') ||3;
+  // ── New entry param ranges (support "from:to:step" ranges) ──────────
+  const maCrossType  = $v('e_macr_t') || 'EMA';
+  const rsiExitPers  = useRsiExit    ? parseRange('e_rsix_p')  : [$n('e_rsix_p') ||14];
+  const rsiExitOSA   = useRsiExit    ? parseRange('e_rsix_os') : [$n('e_rsix_os')||30];
+  const rsiExitOBA   = useRsiExit    ? parseRange('e_rsix_ob') : [$n('e_rsix_ob')||70];
+  const maCrossPArr  = useMaCross    ? parseRange('e_macr_p')  : [$n('e_macr_p') ||20];
+  const macdFastArr  = useMacd       ? parseRange('e_macd_f')  : [$n('e_macd_f') ||12];
+  const macdSlowArr  = useMacd       ? parseRange('e_macd_s')  : [$n('e_macd_s') ||26];
+  const macdSigPArr  = useMacd       ? parseRange('e_macd_sg') : [$n('e_macd_sg')||9];
+  const stochKPArr   = useStochExit  ? parseRange('e_stx_k')   : [$n('e_stx_k')  ||14];
+  const stochDPArr   = useStochExit  ? parseRange('e_stx_d')   : [$n('e_stx_d')  ||3];
+  const stochOSA     = useStochExit  ? parseRange('e_stx_os')  : [$n('e_stx_os') ||20];
+  const stochOBA     = useStochExit  ? parseRange('e_stx_ob')  : [$n('e_stx_ob') ||80];
+  const volMoveMultA = useVolMove     ? parseRange('e_volmv_m') : [$n('e_volmv_m')||1.5];
+  const nRevNArr     = useNReversal  ? parseRange('e_nrev_n')  : [$n('e_nrev_n') ||3];
+  // ── Per-iteration indicator caches ─────────────────────────────────
+  const rsiExitCache = {}, maCrossNewCache = {}, macdNewCache = {}, stochNewCache = {};
 
   // ── Trendline Figures Precompute ─────────────────────────────
   // Все четыре паттерна вычисляются один раз перед основным циклом.
@@ -916,12 +922,25 @@ async function runOpt() {
   {
     // Collect [name, array] only for params that actually vary
     const _allIp = [
-      ['adxL',     _adxLArr],
-      ['sTrendWin',_sTrendArr],
-      ['confN',    confNArr.length ? confNArr : [2]],
-      ['revBars',  revBarsArr],
-      ['revSkip',  revSkipArr],
+      ['adxL',        _adxLArr],
+      ['sTrendWin',   _sTrendArr],
+      ['confN',       confNArr.length ? confNArr : [2]],
+      ['revBars',     revBarsArr],
+      ['revSkip',     revSkipArr],
       ['revCooldown', revCooldownArr],
+      ['rsiExitPer',  rsiExitPers],
+      ['rsiExitOS',   rsiExitOSA],
+      ['rsiExitOB',   rsiExitOBA],
+      ['maCrossP',    maCrossPArr],
+      ['macdFast',    macdFastArr],
+      ['macdSlow',    macdSlowArr],
+      ['macdSigP',    macdSigPArr],
+      ['stochKP',     stochKPArr],
+      ['stochDP',     stochDPArr],
+      ['stochOS',     stochOSA],
+      ['stochOB',     stochOBA],
+      ['volMoveMult', volMoveMultA],
+      ['nReversalN',  nRevNArr],
     ];
     // Defaults for all params (first element of each array)
     window._ipDef = Object.fromEntries(_allIp.map(([n,a])=>[n,a[0]]));
@@ -1029,6 +1048,25 @@ async function runOpt() {
       const revBars     = _ip.revBars     ?? window._ipDef.revBars;
       const revSkip     = _ip.revSkip     ?? window._ipDef.revSkip;
       const revCooldown = _ip.revCooldown ?? window._ipDef.revCooldown;
+      const rsiExitPer  = _ip.rsiExitPer  ?? window._ipDef.rsiExitPer;
+      const rsiExitOS   = _ip.rsiExitOS   ?? window._ipDef.rsiExitOS;
+      const rsiExitOB   = _ip.rsiExitOB   ?? window._ipDef.rsiExitOB;
+      const maCrossP    = _ip.maCrossP    ?? window._ipDef.maCrossP;
+      const macdFast    = _ip.macdFast    ?? window._ipDef.macdFast;
+      const macdSlow    = _ip.macdSlow    ?? window._ipDef.macdSlow;
+      const macdSigP    = _ip.macdSigP    ?? window._ipDef.macdSigP;
+      const stochKP     = _ip.stochKP     ?? window._ipDef.stochKP;
+      const stochDP     = _ip.stochDP     ?? window._ipDef.stochDP;
+      const stochOS     = _ip.stochOS     ?? window._ipDef.stochOS;
+      const stochOB     = _ip.stochOB     ?? window._ipDef.stochOB;
+      const volMoveMult = _ip.volMoveMult ?? window._ipDef.volMoveMult;
+      const nReversalN  = _ip.nReversalN  ?? window._ipDef.nReversalN;
+      const rsiExitArr = useRsiExit   ? (rsiExitCache[rsiExitPer]||(rsiExitCache[rsiExitPer]=calcRSI(rsiExitPer))) : null;
+      const maCrossArr = useMaCross   ? (()=>{const k=maCrossType+'_'+maCrossP;return maCrossNewCache[k]||(maCrossNewCache[k]=calcMA(closes,maCrossP,maCrossType));})() : null;
+      let macdLine=null,macdSignal=null;
+      if(useMacd){const mk=macdFast+'_'+macdSlow+'_'+macdSigP;if(!macdNewCache[mk]){const m=calcMACD(macdFast,macdSlow,macdSigP);macdNewCache[mk]=m;}macdLine=macdNewCache[mk].line;macdSignal=macdNewCache[mk].signal;}
+      let stochD=null;
+      if(useStochExit){const sk=stochKP+'_'+stochDP;if(!stochNewCache[sk])stochNewCache[sk]=calcStochastic(stochKP,stochDP);stochD=stochNewCache[sk].d;}
       const {sigL:tfSigL, sigS:tfSigS} = _getTfSig(tlPvL, tlPvR);
 
       // Пропускаем невалидные BE комбинации
@@ -1063,11 +1101,11 @@ async function runOpt() {
         useMaTouch:useMaT,matMA,matZone,
         useSqueeze:useSqz,sqzOn,sqzCount,sqzMinBars,
         useTLTouch,useTLBreak,useFlag,useTri,tfSigL,tfSigS,tlPvL,tlPvR,
-        useRsiExit,rsiExitArr,rsiExitPeriod:$n('e_rsix_p')||14,rsiExitOS:$n('e_rsix_os')||30,rsiExitOB:$n('e_rsix_ob')||70,
-        useMaCross,maCrossArr,maCrossP:$n('e_macr_p')||20,maCrossType:$v('e_macr_t')||'EMA',
+        useRsiExit,rsiExitArr,rsiExitPeriod:rsiExitPer,rsiExitOS,rsiExitOB,
+        useMaCross,maCrossArr,maCrossP,maCrossType,
         useFreeEntry,
-        useMacd,macdLine,macdSignal,macdFast:$n('e_macd_f')||12,macdSlow:$n('e_macd_s')||26,macdSignalP:$n('e_macd_sg')||9,
-        useStochExit,stochD:newStochD,stochKP:$n('e_stx_k')||14,stochDP:$n('e_stx_d')||3,stochOS:$n('e_stx_os')||20,stochOB:$n('e_stx_ob')||80,
+        useMacd,macdLine,macdSignal,macdFast,macdSlow,macdSignalP:macdSigP,
+        useStochExit,stochD,stochKP,stochDP,stochOS,stochOB,
         useVolMove,volMoveMult,
         useInsideBar,
         useNReversal,nReversalN,
@@ -1125,11 +1163,11 @@ async function runOpt() {
               useTLTouch,useTLBreak,useFlag,useTri,
               tlPvL,tlPvR,tlZonePct:$n('e_tl_zone')||0.3,
               flagImpMin:$n('e_flag_imp')||2.0,flagMaxBars:$n('e_flag_bars')||20,flagRetrace:$n('e_flag_ret')||0.618,
-              useRsiExit,rsiExitPeriod:$n('e_rsix_p')||14,rsiExitOS:$n('e_rsix_os')||30,rsiExitOB:$n('e_rsix_ob')||70,
-              useMaCross,maCrossP:$n('e_macr_p')||20,maCrossType:$v('e_macr_t')||'EMA',
+              useRsiExit,rsiExitPeriod:rsiExitPer,rsiExitOS,rsiExitOB,
+              useMaCross,maCrossP,maCrossType,
               useFreeEntry,
-              useMacd,macdFast:$n('e_macd_f')||12,macdSlow:$n('e_macd_s')||26,macdSignalP:$n('e_macd_sg')||9,
-              useStochExit,stochKP:$n('e_stx_k')||14,stochDP:$n('e_stx_d')||3,stochOS:$n('e_stx_os')||20,stochOB:$n('e_stx_ob')||80,
+              useMacd,macdFast,macdSlow,macdSignalP:macdSigP,
+              useStochExit,stochKP,stochDP,stochOS,stochOB,
               useVolMove,volMoveMult,
               useInsideBar,
               useNReversal,nReversalN,
@@ -1248,6 +1286,25 @@ async function runOpt() {
       const revBars     = _ip.revBars     ?? window._ipDef.revBars;
       const revSkip     = _ip.revSkip     ?? window._ipDef.revSkip;
       const revCooldown = _ip.revCooldown ?? window._ipDef.revCooldown;
+      const rsiExitPer  = _ip.rsiExitPer  ?? window._ipDef.rsiExitPer;
+      const rsiExitOS   = _ip.rsiExitOS   ?? window._ipDef.rsiExitOS;
+      const rsiExitOB   = _ip.rsiExitOB   ?? window._ipDef.rsiExitOB;
+      const maCrossP    = _ip.maCrossP    ?? window._ipDef.maCrossP;
+      const macdFast    = _ip.macdFast    ?? window._ipDef.macdFast;
+      const macdSlow    = _ip.macdSlow    ?? window._ipDef.macdSlow;
+      const macdSigP    = _ip.macdSigP    ?? window._ipDef.macdSigP;
+      const stochKP     = _ip.stochKP     ?? window._ipDef.stochKP;
+      const stochDP     = _ip.stochDP     ?? window._ipDef.stochDP;
+      const stochOS     = _ip.stochOS     ?? window._ipDef.stochOS;
+      const stochOB     = _ip.stochOB     ?? window._ipDef.stochOB;
+      const volMoveMult = _ip.volMoveMult ?? window._ipDef.volMoveMult;
+      const nReversalN  = _ip.nReversalN  ?? window._ipDef.nReversalN;
+      const rsiExitArr = useRsiExit   ? (rsiExitCache[rsiExitPer]||(rsiExitCache[rsiExitPer]=calcRSI(rsiExitPer))) : null;
+      const maCrossArr = useMaCross   ? (()=>{const k=maCrossType+'_'+maCrossP;return maCrossNewCache[k]||(maCrossNewCache[k]=calcMA(closes,maCrossP,maCrossType));})() : null;
+      let macdLine=null,macdSignal=null;
+      if(useMacd){const mk=macdFast+'_'+macdSlow+'_'+macdSigP;if(!macdNewCache[mk]){const m=calcMACD(macdFast,macdSlow,macdSigP);macdNewCache[mk]=m;}macdLine=macdNewCache[mk].line;macdSignal=macdNewCache[mk].signal;}
+      let stochD=null;
+      if(useStochExit){const sk=stochKP+'_'+stochDP;if(!stochNewCache[sk])stochNewCache[sk]=calcStochastic(stochKP,stochDP);stochD=stochNewCache[sk].d;}
       const {sigL:tfSigL, sigS:tfSigS} = _getTfSig(tlPvL, tlPvR);
 
       // Пропускаем невалидные BE комбинации
@@ -1285,11 +1342,11 @@ async function runOpt() {
         useMaTouch:useMaT,matMA,matZone,
         useSqueeze:useSqz,sqzOn,sqzCount,sqzMinBars,
         useTLTouch,useTLBreak,useFlag,useTri,tfSigL,tfSigS,tlPvL,tlPvR,
-        useRsiExit,rsiExitArr,rsiExitPeriod:$n('e_rsix_p')||14,rsiExitOS:$n('e_rsix_os')||30,rsiExitOB:$n('e_rsix_ob')||70,
-        useMaCross,maCrossArr,maCrossP:$n('e_macr_p')||20,maCrossType:$v('e_macr_t')||'EMA',
+        useRsiExit,rsiExitArr,rsiExitPeriod:rsiExitPer,rsiExitOS,rsiExitOB,
+        useMaCross,maCrossArr,maCrossP,maCrossType,
         useFreeEntry,
-        useMacd,macdLine,macdSignal,macdFast:$n('e_macd_f')||12,macdSlow:$n('e_macd_s')||26,macdSignalP:$n('e_macd_sg')||9,
-        useStochExit,stochD:newStochD,stochKP:$n('e_stx_k')||14,stochDP:$n('e_stx_d')||3,stochOS:$n('e_stx_os')||20,stochOB:$n('e_stx_ob')||80,
+        useMacd,macdLine,macdSignal,macdFast,macdSlow,macdSignalP:macdSigP,
+        useStochExit,stochD,stochKP,stochDP,stochOS,stochOB,
         useVolMove,volMoveMult,
         useInsideBar,
         useNReversal,nReversalN,
@@ -1360,11 +1417,11 @@ async function runOpt() {
               useTLTouch,useTLBreak,useFlag,useTri,
               tlPvL,tlPvR,tlZonePct:$n('e_tl_zone')||0.3,
               flagImpMin:$n('e_flag_imp')||2.0,flagMaxBars:$n('e_flag_bars')||20,flagRetrace:$n('e_flag_ret')||0.618,
-              useRsiExit,rsiExitPeriod:$n('e_rsix_p')||14,rsiExitOS:$n('e_rsix_os')||30,rsiExitOB:$n('e_rsix_ob')||70,
-              useMaCross,maCrossP:$n('e_macr_p')||20,maCrossType:$v('e_macr_t')||'EMA',
+              useRsiExit,rsiExitPeriod:rsiExitPer,rsiExitOS,rsiExitOB,
+              useMaCross,maCrossP,maCrossType,
               useFreeEntry,
-              useMacd,macdFast:$n('e_macd_f')||12,macdSlow:$n('e_macd_s')||26,macdSignalP:$n('e_macd_sg')||9,
-              useStochExit,stochKP:$n('e_stx_k')||14,stochDP:$n('e_stx_d')||3,stochOS:$n('e_stx_os')||20,stochOB:$n('e_stx_ob')||80,
+              useMacd,macdFast,macdSlow,macdSignalP:macdSigP,
+              useStochExit,stochKP,stochDP,stochOS,stochOB,
               useVolMove,volMoveMult,
               useInsideBar,
               useNReversal,nReversalN,
@@ -1637,6 +1694,25 @@ async function runOpt() {
                                     const revBars  = _ip.revBars  ?? window._ipDef.revBars;
                                     const revSkip  = _ip.revSkip  ?? window._ipDef.revSkip;
                                     const revCooldown = _ip.revCooldown ?? window._ipDef.revCooldown;
+                                    const rsiExitPer  = _ip.rsiExitPer  ?? window._ipDef.rsiExitPer;
+                                    const rsiExitOS   = _ip.rsiExitOS   ?? window._ipDef.rsiExitOS;
+                                    const rsiExitOB   = _ip.rsiExitOB   ?? window._ipDef.rsiExitOB;
+                                    const maCrossP    = _ip.maCrossP    ?? window._ipDef.maCrossP;
+                                    const macdFast    = _ip.macdFast    ?? window._ipDef.macdFast;
+                                    const macdSlow    = _ip.macdSlow    ?? window._ipDef.macdSlow;
+                                    const macdSigP    = _ip.macdSigP    ?? window._ipDef.macdSigP;
+                                    const stochKP     = _ip.stochKP     ?? window._ipDef.stochKP;
+                                    const stochDP     = _ip.stochDP     ?? window._ipDef.stochDP;
+                                    const stochOS     = _ip.stochOS     ?? window._ipDef.stochOS;
+                                    const stochOB     = _ip.stochOB     ?? window._ipDef.stochOB;
+                                    const volMoveMult = _ip.volMoveMult ?? window._ipDef.volMoveMult;
+                                    const nReversalN  = _ip.nReversalN  ?? window._ipDef.nReversalN;
+                                    const rsiExitArr = useRsiExit   ? (rsiExitCache[rsiExitPer]||(rsiExitCache[rsiExitPer]=calcRSI(rsiExitPer))) : null;
+                                    const maCrossArr = useMaCross   ? (()=>{const k=maCrossType+'_'+maCrossP;return maCrossNewCache[k]||(maCrossNewCache[k]=calcMA(closes,maCrossP,maCrossType));})() : null;
+                                    let macdLine=null,macdSignal=null;
+                                    if(useMacd){const mk=macdFast+'_'+macdSlow+'_'+macdSigP;if(!macdNewCache[mk]){const m=calcMACD(macdFast,macdSlow,macdSigP);macdNewCache[mk]=m;}macdLine=macdNewCache[mk].line;macdSignal=macdNewCache[mk].signal;}
+                                    let stochD=null;
+                                    if(useStochExit){const sk=stochKP+'_'+stochDP;if(!stochNewCache[sk])stochNewCache[sk]=calcStochastic(stochKP,stochDP);stochD=stochNewCache[sk].d;}
                                     if(stopped) break;
 
                                     // Вторая MA для фильтра (confMatType + confN)
@@ -1658,11 +1734,11 @@ async function runOpt() {
                                       // Trendline Figures
                                       useTLTouch,useTLBreak,useFlag,useTri,
                                       tfSigL,tfSigS,
-                                      useRsiExit,rsiExitArr,rsiExitPeriod:$n('e_rsix_p')||14,rsiExitOS:$n('e_rsix_os')||30,rsiExitOB:$n('e_rsix_ob')||70,
-                                      useMaCross,maCrossArr,maCrossP:$n('e_macr_p')||20,maCrossType:$v('e_macr_t')||'EMA',
+                                      useRsiExit,rsiExitArr,rsiExitPeriod:rsiExitPer,rsiExitOS,rsiExitOB,
+                                      useMaCross,maCrossArr,maCrossP,maCrossType,
                                       useFreeEntry,
-                                      useMacd,macdLine,macdSignal,macdFast:$n('e_macd_f')||12,macdSlow:$n('e_macd_s')||26,macdSignalP:$n('e_macd_sg')||9,
-                                      useStochExit,stochD:newStochD,stochKP:$n('e_stx_k')||14,stochDP:$n('e_stx_d')||3,stochOS:$n('e_stx_os')||20,stochOB:$n('e_stx_ob')||80,
+                                      useMacd,macdLine,macdSignal,macdFast,macdSlow,macdSignalP:macdSigP,
+                                      useStochExit,stochD,stochKP,stochDP,stochOS,stochOB,
                                       useVolMove,volMoveMult,
                                       useInsideBar,
                                       useNReversal,nReversalN,
@@ -1758,11 +1834,11 @@ async function runOpt() {
                                           useTLTouch, useTLBreak, useFlag, useTri,
                                           tlPvL:$n('e_tl_pvl')||5, tlPvR:$n('e_tl_pvr')||3, tlZonePct:$n('e_tl_zone')||0.3,
                                           flagImpMin:$n('e_flag_imp')||2.0, flagMaxBars:$n('e_flag_bars')||20, flagRetrace:$n('e_flag_ret')||0.618,
-                                          useRsiExit,rsiExitPeriod:$n('e_rsix_p')||14,rsiExitOS:$n('e_rsix_os')||30,rsiExitOB:$n('e_rsix_ob')||70,
-                                          useMaCross,maCrossP:$n('e_macr_p')||20,maCrossType:$v('e_macr_t')||'EMA',
+                                          useRsiExit,rsiExitPeriod:rsiExitPer,rsiExitOS,rsiExitOB,
+                                          useMaCross,maCrossP,maCrossType,
                                           useFreeEntry,
-                                          useMacd,macdFast:$n('e_macd_f')||12,macdSlow:$n('e_macd_s')||26,macdSignalP:$n('e_macd_sg')||9,
-                                          useStochExit,stochKP:$n('e_stx_k')||14,stochDP:$n('e_stx_d')||3,stochOS:$n('e_stx_os')||20,stochOB:$n('e_stx_ob')||80,
+                                          useMacd,macdFast,macdSlow,macdSignalP:macdSigP,
+                                          useStochExit,stochKP,stochDP,stochOS,stochOB,
                                           useVolMove,volMoveMult,
                                           useInsideBar,
                                           useNReversal,nReversalN,

@@ -883,6 +883,14 @@ function showDetail(r) {
   ent += row('Пробой трендовой линии',  c.useTLBreak ? `ВКЛ · пивот ${c.tlPvL}/${c.tlPvR}, зона ±${c.tlZonePct}%` : 'ВЫКЛ', c.useTLBreak?'on':'off');
   ent += row('Флаг (Flag)',             c.useFlag    ? `ВКЛ · импульс ≥${c.flagImpMin}×ATR, макс ${c.flagMaxBars} баров, откат ≤${c.flagRetrace}` : 'ВЫКЛ', c.useFlag?'on':'off');
   ent += row('Треугольник (Triangle)',  c.useTri     ? 'ВКЛ · симм./восх./нисх., пробой' : 'ВЫКЛ', c.useTri?'on':'off');
+  ent += row('RSI выход из зоны',   c.useRsiExit  ? `ВКЛ · период=${c.rsiExitPeriod||14}, OS=${c.rsiExitOS||30} / OB=${c.rsiExitOB||70}` : 'ВЫКЛ', c.useRsiExit?'on':'off');
+  ent += row('МА кросс-овер',       c.useMaCross  ? `ВКЛ · ${c.maCrossType||'EMA'} период=${c.maCrossP||20}` : 'ВЫКЛ', c.useMaCross?'on':'off');
+  ent += row('Свободный вход',      c.useFreeEntry? 'ВКЛ · сигнал на каждом баре' : 'ВЫКЛ', c.useFreeEntry?'on':'off');
+  ent += row('MACD кросс',          c.useMacd     ? `ВКЛ · ${c.macdFast||12}/${c.macdSlow||26}/${c.macdSignalP||9}` : 'ВЫКЛ', c.useMacd?'on':'off');
+  ent += row('Stochastic выход',    c.useStochExit? `ВКЛ · K=${c.stochKP||14} D=${c.stochDP||3}, OS=${c.stochOS||20} / OB=${c.stochOB||80}` : 'ВЫКЛ', c.useStochExit?'on':'off');
+  ent += row('Объём + движение',    c.useVolMove  ? `ВКЛ · объём ≥ ${c.volMoveMult||1.5}×avg` : 'ВЫКЛ', c.useVolMove?'on':'off');
+  ent += row('Inside Bar пробой',   c.useInsideBar? 'ВКЛ' : 'ВЫКЛ', c.useInsideBar?'on':'off');
+  ent += row('Разворот N свечей',   c.useNReversal? `ВКЛ · серия ≥ ${c.nReversalN||3} свечей` : 'ВЫКЛ', c.useNReversal?'on':'off');
   html += section('🎯', 'ПАТТЕРНЫ ВХОДА', ent);
 
   // 2. SL / TP
