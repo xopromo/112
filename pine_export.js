@@ -506,7 +506,7 @@ function generatePineScript(r) {
   lines.push(``);
 
   lines.push(`bool pat_l = pivot_l or (use_engulf and bull_engulf[1]) or (use_pinbar and bull_pin[1]) or donch_l or boll_l or atr_bo_l or (use_ma_touch and ma_touch_l) or tl_touch_l or tl_break_l or flag_l or tri_l or rsix_l or macr_l or free_l or macd_l or stx_l or volmv_l or inb_l or nrev_l`);
-  lines.push(`bool pat_s = pivot_s or (use_engulf and bear_engulf[1]) or (use_pinbar and bear_pin[1]) or donch_s or boll_s or atr_bo_s or (use_ma_touch and ma_touch_s) or tl_touch_s or tl_break_s or flag_s or tri_s or rsix_s or macr_s or free_s or macd_s or stx_s or volmv_s or inb_s or nrev_s`;
+  lines.push(`bool pat_s = pivot_s or (use_engulf and bear_engulf[1]) or (use_pinbar and bear_pin[1]) or donch_s or boll_s or atr_bo_s or (use_ma_touch and ma_touch_s) or tl_touch_s or tl_break_s or flag_s or tri_s or rsix_s or macr_s or free_s or macd_s or stx_s or volmv_s or inb_s or nrev_s`);
   lines.push(``);
   lines.push(`// SL pivot for dynamic SL`);
   lines.push(`sl_pv_lo = ta.pivotlow(low,  sl_piv_look, sl_piv_right_v)`);
