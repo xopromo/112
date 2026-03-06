@@ -602,6 +602,15 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
         else { tp1=entry+dir*slDist*2; hasTP2=false; }
       }
     }
+    // Track unrealized drawdown during open trades (mark-to-market, matches TradingView equity)
+    if (inTrade && i > entryBar) {
+      const bestPrice  = dir === 1 ? bar.h : bar.l;
+      const worstPrice = dir === 1 ? bar.l : bar.h;
+      const unrealBest  = pnl + dir*(bestPrice-entry)/entry*100 * posSize;
+      const unrealWorst = pnl + dir*(worstPrice-entry)/entry*100 * posSize;
+      maxPnl = Math.max(maxPnl, unrealBest);
+      dd = Math.max(dd, maxPnl - unrealWorst);
+    }
     eq[i] = pnl;
   }
 

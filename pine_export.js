@@ -451,8 +451,62 @@ function generatePineScript(r) {
   lines.push(`            tri_s := true`);
   lines.push(``);
 
-  lines.push(`bool pat_l = pivot_l or (use_engulf and bull_engulf[1]) or (use_pinbar and bull_pin[1]) or donch_l or boll_l or atr_bo_l or (use_ma_touch and ma_touch_l) or tl_touch_l or tl_break_l or flag_l or tri_l`);
-  lines.push(`bool pat_s = pivot_s or (use_engulf and bear_engulf[1]) or (use_pinbar and bear_pin[1]) or donch_s or boll_s or atr_bo_s or (use_ma_touch and ma_touch_s) or tl_touch_s or tl_break_s or flag_s or tri_s`);
+  // ── RSI выход из зоны OB/OS ──────────────────────────────
+  lines.push(`float rsi_exit_val = ta.rsi(close, rsi_exit_per)`);
+  lines.push(`bool rsix_l = use_rsi_exit and rsi_exit_val[2] < rsi_exit_os and rsi_exit_val[1] >= rsi_exit_os`);
+  lines.push(`bool rsix_s = use_rsi_exit and rsi_exit_val[2] > rsi_exit_ob and rsi_exit_val[1] <= rsi_exit_ob`);
+  lines.push(``);
+
+  // ── MA кросс-овер ────────────────────────────────────────
+  lines.push(`float ma_cross_val = ma_cross_type == "EMA" ? ta.ema(close, ma_cross_p) : ma_cross_type == "SMA" ? ta.sma(close, ma_cross_p) : ta.wma(close, ma_cross_p)`);
+  lines.push(`bool macr_l = use_ma_cross and close[2] <= ma_cross_val[2] and close[1] > ma_cross_val[1]`);
+  lines.push(`bool macr_s = use_ma_cross and close[2] >= ma_cross_val[2] and close[1] < ma_cross_val[1]`);
+  lines.push(``);
+
+  // ── Свободный вход ───────────────────────────────────────
+  lines.push(`bool free_l = use_free_entry`);
+  lines.push(`bool free_s = use_free_entry`);
+  lines.push(``);
+
+  // ── MACD кросс-овер ──────────────────────────────────────
+  lines.push(`[macd_line_val, macd_sig_val, _macd_hist] = ta.macd(close, macd_fast, macd_slow, macd_signal)`);
+  lines.push(`bool macd_l = use_macd and macd_line_val[2] <= macd_sig_val[2] and macd_line_val[1] > macd_sig_val[1]`);
+  lines.push(`bool macd_s = use_macd and macd_line_val[2] >= macd_sig_val[2] and macd_line_val[1] < macd_sig_val[1]`);
+  lines.push(``);
+
+  // ── Stochastic выход из зоны OB/OS ───────────────────────
+  lines.push(`float stoch_k_raw = ta.stoch(close, high, low, stoch_k_per)`);
+  lines.push(`float stoch_d_val = ta.sma(stoch_k_raw, stoch_d_per)`);
+  lines.push(`bool stx_l = use_stoch_exit and stoch_d_val[2] < stoch_os and stoch_d_val[1] >= stoch_os`);
+  lines.push(`bool stx_s = use_stoch_exit and stoch_d_val[2] > stoch_ob and stoch_d_val[1] <= stoch_ob`);
+  lines.push(``);
+
+  // ── Объём + движение ─────────────────────────────────────
+  lines.push(`float vol_move_avg = ta.sma(volume, 20)`);
+  lines.push(`bool volmv_l = use_vol_move and volume[1] > vol_move_avg[1] * vol_move_mult and close[1] > open[1] and (close[1] - low[1]) > (high[1] - close[1])`);
+  lines.push(`bool volmv_s = use_vol_move and volume[1] > vol_move_avg[1] * vol_move_mult and close[1] < open[1] and (high[1] - close[1]) > (close[1] - low[1])`);
+  lines.push(``);
+
+  // ── Inside Bar пробой ────────────────────────────────────
+  lines.push(`bool inb_l = use_inside_bar and high[2] < high[3] and low[2] > low[3] and close[1] > high[3]`);
+  lines.push(`bool inb_s = use_inside_bar and high[2] < high[3] and low[2] > low[3] and close[1] < low[3]`);
+  lines.push(``);
+
+  // ── Разворот после N свечей ──────────────────────────────
+  lines.push(`bool nrev_bear = true`);
+  lines.push(`bool nrev_bull = true`);
+  lines.push(`if use_n_reversal`);
+  lines.push(`    for j = 2 to n_reversal_n + 1`);
+  lines.push(`        if close[j] >= open[j]`);
+  lines.push(`            nrev_bear := false`);
+  lines.push(`        if close[j] <= open[j]`);
+  lines.push(`            nrev_bull := false`);
+  lines.push(`bool nrev_l = use_n_reversal and close[1] > open[1] and nrev_bear`);
+  lines.push(`bool nrev_s = use_n_reversal and close[1] < open[1] and nrev_bull`);
+  lines.push(``);
+
+  lines.push(`bool pat_l = pivot_l or (use_engulf and bull_engulf[1]) or (use_pinbar and bull_pin[1]) or donch_l or boll_l or atr_bo_l or (use_ma_touch and ma_touch_l) or tl_touch_l or tl_break_l or flag_l or tri_l or rsix_l or macr_l or free_l or macd_l or stx_l or volmv_l or inb_l or nrev_l`);
+  lines.push(`bool pat_s = pivot_s or (use_engulf and bear_engulf[1]) or (use_pinbar and bear_pin[1]) or donch_s or boll_s or atr_bo_s or (use_ma_touch and ma_touch_s) or tl_touch_s or tl_break_s or flag_s or tri_s or rsix_s or macr_s or free_s or macd_s or stx_s or volmv_s or inb_s or nrev_s`;
   lines.push(``);
   lines.push(`// SL pivot for dynamic SL`);
   lines.push(`sl_pv_lo = ta.pivotlow(low,  sl_piv_look, sl_piv_right_v)`);

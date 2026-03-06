@@ -176,6 +176,20 @@ function _calcSQN(tradePnlArr) {
 }
 // ─────────────────────────────────────────────────────────────
 
+// ── CPCV batch: вычисляет CPCV для топ-N результатов (асинхронно) ──
+async function _batchCPCV(arr, limit) {
+  const n = Math.min(arr.length, limit || 200);
+  if (n === 0 || !DATA || DATA.length < 300) return;
+  if (typeof setMcPhase === 'function') setMcPhase(`⏳ CPCV ${n} результатов…`);
+  for (let i = 0; i < n; i++) {
+    if (!arr[i].cfg) continue;
+    const _c = _calcCPCVScore(arr[i].cfg);
+    if (_c) arr[i].cpcvScore = _c.score;
+    if (i % 30 === 0) await yieldToUI();
+  }
+  if (typeof setMcPhase === 'function') setMcPhase(null);
+}
+
 // ── CPCV: Block Walk-Forward Score (Hyp 1 — CPCV валидация) ──
 // Делит DATA на K равных временных блоков, запускает backtest
 // независимо на каждом. Надёжнее CVR: отдельный прогрев
@@ -1162,6 +1176,7 @@ async function runOpt() {
       }
     }
     results.sort((a,b) => b.pdd-a.pdd);
+    await _batchCPCV(results, 200);
     if (typeof setMcPhase === 'function') setMcPhase(null);
     _curPage = 0;
     renderVisibleResults(); showBestStats(); updateETA(done, mcTotal, results.length);
@@ -1550,6 +1565,7 @@ async function runOpt() {
       }
     }
     results.sort((a,b)=>b.pdd-a.pdd);
+    await _batchCPCV(results, 200);
     if (typeof setMcPhase==='function') setMcPhase(null);
     _curPage=0;
     renderVisibleResults(); showBestStats(); updateETA(done, tpeMaxIter, results.length);
@@ -1820,6 +1836,7 @@ async function runOpt() {
     }
   }
   results.sort((a,b)=>b.pdd-a.pdd);
+  await _batchCPCV(results, 200);
   if (typeof setMcPhase === 'function') setMcPhase(null);
   _curPage = 0;
   renderResults();
