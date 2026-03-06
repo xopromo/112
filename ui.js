@@ -901,6 +901,7 @@ function showDetail(r) {
     sltp += row('Логика SL (И/ИЛИ)', c.slLogic==='or' ? 'ИЛИ — выход по первому (ближнему) SL' : 'И — выход только когда оба SL пробиты', 'warn');
   if (c.tpPair && c.tpPair.combo)
     sltp += row('Логика TP (И/ИЛИ)', c.tpLogic==='or' ? 'ИЛИ — выход по первому (ближнему) TP' : 'И — выход только когда оба TP пробиты', 'warn');
+  sltp += row('SL Pivot (динам)', c.useSLPiv ? `ВКЛ · Left=${c.slPivL||3}, Right=${c.slPivR||1}, оффсет=${c.slPivOff||0.2}×ATR, макс=${c.slPivMax||3}×ATR${c.slPivTrail?' · трейлинг':''}` : 'ВЫКЛ', c.useSLPiv?'on':'off');
   html += section('🛑', 'СТОП-ЛОСС И ТЕЙК-ПРОФИТ', sltp);
 
   // 3. EXIT MECHANICS

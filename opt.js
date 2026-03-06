@@ -586,13 +586,19 @@ async function runOpt() {
   const structLen=$n('f_strl')||20;
   const strPvL=$n('f_strpvl')||5;
   const strPvR=$n('f_strpvr')||2;
-  // SL Pivot
-  const useSLPiv=$c('s_piv');
-  const slPivOff=$n('s_pivoff')||0.2;
-  const slPivMax=$n('s_pivmax')||3.0;
-  const slPivL=$n('s_pivl')||3;
-  const slPivR=$n('s_pivr')||1;
-  const slPivTrail=$c('s_pivtr');
+  // SL Pivot — диапазоны параметров + кэш pivot-массивов
+  const useSLPiv  = $c('s_piv');
+  const slPivTrail= $c('s_pivtr');
+  const slPivOffA = useSLPiv ? parseRange('s_pivoff') : [$n('s_pivoff')||0.2];
+  const slPivMaxA = useSLPiv ? parseRange('s_pivmax') : [$n('s_pivmax')||3.0];
+  const slPivLArr = useSLPiv ? parseRange('s_pivl')   : [$n('s_pivl')  ||3];
+  const slPivRArr = useSLPiv ? parseRange('s_pivr')   : [$n('s_pivr')  ||1];
+  const pivSLCache = {}; // ключ: slPivL+'_'+slPivR
+  function _getPivSL(l, r) {
+    const k = l + '_' + r;
+    if (!pivSLCache[k]) { const _p = calcPivotLoHi(DATA, l, r); pivSLCache[k] = _p; }
+    return pivSLCache[k];
+  }
   const vsaMult=$n('f_vsam')||1.5;
   const vsaP=$n('f_vsap')||20;
   const liqMin=$n('f_liqm')||0.5;
@@ -660,12 +666,7 @@ async function runOpt() {
     }
   }
 
-  // SL Pivot — предрасчёт pivot lo/hi массивов
-  let pivSLLo=null, pivSLHi=null;
-  if(useSLPiv) {
-    const r=calcPivotLoHi(DATA, slPivL, slPivR);
-    pivSLLo=r.lo; pivSLHi=r.hi;
-  }
+
 
   let bbB=null,bbD=null,bbWarm=0;
   if(useBol) {
@@ -928,6 +929,10 @@ async function runOpt() {
       ['revBars',     revBarsArr],
       ['revSkip',     revSkipArr],
       ['revCooldown', revCooldownArr],
+      ['slPivOff',    slPivOffA],
+      ['slPivMax',    slPivMaxA],
+      ['slPivL',      slPivLArr],
+      ['slPivR',      slPivRArr],
       ['rsiExitPer',  rsiExitPers],
       ['rsiExitOS',   rsiExitOSA],
       ['rsiExitOB',   rsiExitOBA],
@@ -1048,6 +1053,10 @@ async function runOpt() {
       const revBars     = _ip.revBars     ?? window._ipDef.revBars;
       const revSkip     = _ip.revSkip     ?? window._ipDef.revSkip;
       const revCooldown = _ip.revCooldown ?? window._ipDef.revCooldown;
+      const slPivOff    = _ip.slPivOff    ?? window._ipDef.slPivOff;
+      const slPivMax    = _ip.slPivMax    ?? window._ipDef.slPivMax;
+      const slPivL      = _ip.slPivL      ?? window._ipDef.slPivL;
+      const slPivR      = _ip.slPivR      ?? window._ipDef.slPivR;
       const rsiExitPer  = _ip.rsiExitPer  ?? window._ipDef.rsiExitPer;
       const rsiExitOS   = _ip.rsiExitOS   ?? window._ipDef.rsiExitOS;
       const rsiExitOB   = _ip.rsiExitOB   ?? window._ipDef.rsiExitOB;
@@ -1061,6 +1070,7 @@ async function runOpt() {
       const stochOB     = _ip.stochOB     ?? window._ipDef.stochOB;
       const volMoveMult = _ip.volMoveMult ?? window._ipDef.volMoveMult;
       const nReversalN  = _ip.nReversalN  ?? window._ipDef.nReversalN;
+      const {lo:pivSLLo, hi:pivSLHi} = useSLPiv ? _getPivSL(slPivL, slPivR) : {lo:null, hi:null};
       const rsiExitArr = useRsiExit   ? (rsiExitCache[rsiExitPer]||(rsiExitCache[rsiExitPer]=calcRSI(rsiExitPer))) : null;
       const maCrossArr = useMaCross   ? (()=>{const k=maCrossType+'_'+maCrossP;return maCrossNewCache[k]||(maCrossNewCache[k]=calcMA(closes,maCrossP,maCrossType));})() : null;
       let macdLine=null,macdSignal=null;
@@ -1150,6 +1160,7 @@ async function runOpt() {
         const sig = _calcStatSig(r);
         const gt = _calcGTScore(r);
         let slDesc = slPair.combo ? `SL(ATR×${slPair.a.m}${slLogic==='or'?'|OR|':'|AND|'}${slPair.p.m}%)` : slPair.a ? `SL×${slPair.a.m}ATR` : `SL${slPair.p.m}%`;
+        if(useSLPiv) slDesc+=`+SPiv(L${slPivL}/R${slPivR}×${slPivOff})`;
         let tpDesc = tpPair.combo ? (()=>{const n1=tpPair.a.type==='rr'?`RR${tpPair.a.m}`:tpPair.a.type==='atr'?`TP×${tpPair.a.m}ATR`:`TP${tpPair.a.m}%`;const n2=tpPair.b.type==='rr'?`RR${tpPair.b.m}`:tpPair.b.type==='atr'?`TP×${tpPair.b.m}ATR`:`TP${tpPair.b.m}%`;return `TP(${n1}${tpLogic==='or'?'|OR|':'|AND|'}${n2})`;})() : tpPair.a ? (tpPair.a.type==='rr'?`RR×${tpPair.a.m}`:tpPair.a.type==='atr'?`TP×${tpPair.a.m}ATR`:`TP${tpPair.a.m}%`) : '';
         const name = buildName(btCfg, pvL, pvR, slDesc, tpDesc, {}, {maP, maType:_mType, stw:sTrendWin, atrP, adxL});
         if (!_resultNames.has(name)) {
@@ -1286,6 +1297,10 @@ async function runOpt() {
       const revBars     = _ip.revBars     ?? window._ipDef.revBars;
       const revSkip     = _ip.revSkip     ?? window._ipDef.revSkip;
       const revCooldown = _ip.revCooldown ?? window._ipDef.revCooldown;
+      const slPivOff    = _ip.slPivOff    ?? window._ipDef.slPivOff;
+      const slPivMax    = _ip.slPivMax    ?? window._ipDef.slPivMax;
+      const slPivL      = _ip.slPivL      ?? window._ipDef.slPivL;
+      const slPivR      = _ip.slPivR      ?? window._ipDef.slPivR;
       const rsiExitPer  = _ip.rsiExitPer  ?? window._ipDef.rsiExitPer;
       const rsiExitOS   = _ip.rsiExitOS   ?? window._ipDef.rsiExitOS;
       const rsiExitOB   = _ip.rsiExitOB   ?? window._ipDef.rsiExitOB;
@@ -1299,6 +1314,7 @@ async function runOpt() {
       const stochOB     = _ip.stochOB     ?? window._ipDef.stochOB;
       const volMoveMult = _ip.volMoveMult ?? window._ipDef.volMoveMult;
       const nReversalN  = _ip.nReversalN  ?? window._ipDef.nReversalN;
+      const {lo:pivSLLo, hi:pivSLHi} = useSLPiv ? _getPivSL(slPivL, slPivR) : {lo:null, hi:null};
       const rsiExitArr = useRsiExit   ? (rsiExitCache[rsiExitPer]||(rsiExitCache[rsiExitPer]=calcRSI(rsiExitPer))) : null;
       const maCrossArr = useMaCross   ? (()=>{const k=maCrossType+'_'+maCrossP;return maCrossNewCache[k]||(maCrossNewCache[k]=calcMA(closes,maCrossP,maCrossType));})() : null;
       let macdLine=null,macdSignal=null;
@@ -1404,6 +1420,7 @@ async function runOpt() {
 
       if (r && r.n >= minTrades && r.dd <= maxDD) {
         let slDesc = slPair.combo ? `SL(ATR×${slPair.a.m}${slLogic==='or'?'|OR|':'|AND|'}${slPair.p.m}%)` : slPair.a ? `SL×${slPair.a.m}ATR` : `SL${slPair.p.m}%`;
+        if(useSLPiv) slDesc+=`+SPiv(L${slPivL}/R${slPivR}×${slPivOff})`;
         let tpDesc = tpPair.combo ? (()=>{const n1=tpPair.a.type==='rr'?`RR${tpPair.a.m}`:tpPair.a.type==='atr'?`TP×${tpPair.a.m}ATR`:`TP${tpPair.a.m}%`;const n2=tpPair.b.type==='rr'?`RR${tpPair.b.m}`:tpPair.b.type==='atr'?`TP×${tpPair.b.m}ATR`:`TP${tpPair.b.m}%`;return `TP(${n1}${tpLogic==='or'?'|OR|':'|AND|'}${n2})`;})() : tpPair.a ? (tpPair.a.type==='rr'?`RR×${tpPair.a.m}`:tpPair.a.type==='atr'?`TP×${tpPair.a.m}ATR`:`TP${tpPair.a.m}%`) : '';
         const name = buildName(btCfg, pvL, pvR, slDesc, tpDesc, {}, {maP, maType:_mType, stw:sTrendWin, atrP, adxL});
         if (!_resultNames.has(name)) {
@@ -1694,6 +1711,11 @@ async function runOpt() {
                                     const revBars  = _ip.revBars  ?? window._ipDef.revBars;
                                     const revSkip  = _ip.revSkip  ?? window._ipDef.revSkip;
                                     const revCooldown = _ip.revCooldown ?? window._ipDef.revCooldown;
+                                    const slPivOff    = _ip.slPivOff    ?? window._ipDef.slPivOff;
+                                    const slPivMax    = _ip.slPivMax    ?? window._ipDef.slPivMax;
+                                    const slPivL      = _ip.slPivL      ?? window._ipDef.slPivL;
+                                    const slPivR      = _ip.slPivR      ?? window._ipDef.slPivR;
+                                    const {lo:pivSLLo, hi:pivSLHi} = useSLPiv ? _getPivSL(slPivL, slPivR) : {lo:null, hi:null};
                                     const rsiExitPer  = _ip.rsiExitPer  ?? window._ipDef.rsiExitPer;
                                     const rsiExitOS   = _ip.rsiExitOS   ?? window._ipDef.rsiExitOS;
                                     const rsiExitOB   = _ip.rsiExitOB   ?? window._ipDef.rsiExitOB;
@@ -1808,6 +1830,7 @@ async function runOpt() {
                                       } else {
                                         slDesc=`SL${slPair.p.m}%`;
                                       }
+                                      if(useSLPiv) slDesc+=`+SPiv(L${slPivL}/R${slPivR}×${slPivOff})`;
                                       // Build TP description
                                       let tpDesc='';
                                       if(tpPair.combo) {
