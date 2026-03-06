@@ -322,7 +322,7 @@ function calcTotal() {
   const _ctAdxL=$c('f_adx')?parseRange('f_adxl'):[$n('f_adxl')||14];
   const _ctStw=$c('f_strend')?parseRange('f_stw'):[$n('f_stw')||10];
   const _ctConf=$c('f_confirm')?parseRange('f_confn'):[100];
-  const _useTF=$c('e_tltch')||$c('e_tlbrk')||$c('e_flag')||$c('e_tri');
+  const _useTF=$c('e_tl_touch')||$c('e_tl_break')||$c('e_flag')||$c('e_tri');
   const _ctTlPvL=_useTF?parseRange('e_tl_pvl'):[5];
   const _ctTlPvR=_useTF?parseRange('e_tl_pvr'):[3];
   return pvLs.length*pvRs.length*atrPs.length*(maPs.length||1)*

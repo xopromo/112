@@ -188,7 +188,7 @@ const ENTRY_REGISTRY = [
   {
     id:        'tltouch',
     flag:      'useTLTouch',
-    htmlId:    'e_tltch',
+    htmlId:    'e_tl_touch',
     shortName: () => 'TLtch',
     detectL: (cfg, i) => !!(cfg.tfSigL && (cfg.tfSigL[i] & 1)),
     detectS: (cfg, i) => !!(cfg.tfSigS && (cfg.tfSigS[i] & 1)),
@@ -201,7 +201,7 @@ const ENTRY_REGISTRY = [
   {
     id:        'tlbreak',
     flag:      'useTLBreak',
-    htmlId:    'e_tlbrk',
+    htmlId:    'e_tl_break',
     shortName: () => 'TLbrk',
     detectL: (cfg, i) => !!(cfg.tfSigL && (cfg.tfSigL[i] & 2)),
     detectS: (cfg, i) => !!(cfg.tfSigS && (cfg.tfSigS[i] & 2)),
