@@ -26,6 +26,10 @@ global.$n          = () => 0;
 function load(file) {
   vm.runInThisContext(fs.readFileSync(path.join(root, file), 'utf8'), { filename: file });
 }
+load('entry_registry.js');
+load('filter_registry.js');
+load('exit_registry.js');
+load('sl_tp_registry.js');
 load('core.js');
 load('opt.js');
 

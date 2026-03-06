@@ -1,0 +1,278 @@
+// ============================================================
+// filter_registry.js — реестр фильтров входа
+// ============================================================
+// FILTER_REGISTRY: массив объектов, описывающих каждый фильтр.
+// Единственный источник правды для:
+//   • core.js   — blocksL/blocksS (применение фильтров)
+//   • opt.js    — buildName (части названия результата)
+//
+// ДОБАВИТЬ НОВЫЙ ФИЛЬТР: добавить 1 объект в FILTER_REGISTRY + чекбокс в shell.html
+// + индикатор в _calcIndicators (если нужен) + поля в buildBtCfg. core/buildName — автоматически.
+//
+// blocksL(cfg, i) → true: блокировать лонг-сигнал
+// blocksS(cfg, i) → true: блокировать шорт-сигнал
+// Некоторые фильтры блокируют оба направления одновременно (blocksL = blocksS = true).
+// ============================================================
+
+const FILTER_REGISTRY = [
+  // ── MA Direction ─────────────────────────────────────────
+  // Pine: close[1] > ma_val где ma_val = EMA[i-1]
+  {
+    id:       'ma',
+    flag:     'useMA',
+    blocksL:  (cfg, i) => cfg.maArr && cfg.maArr[i-1] > 0 && DATA[i-1].c <= cfg.maArr[i-1],
+    blocksS:  (cfg, i) => cfg.maArr && cfg.maArr[i-1] > 0 && DATA[i-1].c >= cfg.maArr[i-1],
+    nameLabel: (cfg, ex) => ex && ex.maP ? `${ex.maType||'EMA'}${ex.maP}` : null,
+  },
+
+  // ── ADX Strength ─────────────────────────────────────────
+  {
+    id:       'adx',
+    flag:     'useADX',
+    blocksL:  (cfg, i) => cfg.adxArr && cfg.adxArr[i-1] < cfg.adxThresh,
+    blocksS:  (cfg, i) => cfg.adxArr && cfg.adxArr[i-1] < cfg.adxThresh,
+    nameLabel: (cfg, ex) => `ADX(${(ex&&ex.adxL)||cfg.adxLen||14}>${cfg.adxThresh})`,
+  },
+
+  // ── RSI Extremes ──────────────────────────────────────────
+  {
+    id:       'rsi',
+    flag:     'useRSI',
+    blocksL:  (cfg, i) => cfg.rsiArr && cfg.rsiArr[i-1] >= cfg.rsiOS,
+    blocksS:  (cfg, i) => cfg.rsiArr && cfg.rsiArr[i-1] <= cfg.rsiOB,
+    nameLabel: (cfg) => `RSI(${cfg.rsiOS}-${cfg.rsiOB})`,
+  },
+
+  // ── Volume / ATR Filter ───────────────────────────────────
+  {
+    id:       'volf',
+    flag:     'useVolF',
+    blocksL:  (cfg, i, ac) => cfg.atrAvg && ac > cfg.atrAvg[i-1] * cfg.volFMult,
+    blocksS:  (cfg, i, ac) => cfg.atrAvg && ac > cfg.atrAvg[i-1] * cfg.volFMult,
+    nameLabel: (cfg) => `VFilt<${cfg.volFMult}×`,
+  },
+
+  // ── Market Structure (HH/HL) ──────────────────────────────
+  {
+    id:       'struct',
+    flag:     'useStruct',
+    blocksL:  (cfg, i) => cfg.structBull && !cfg.structBull[i],
+    blocksS:  (cfg, i) => cfg.structBear && !cfg.structBear[i],
+    nameLabel: () => 'Struct',
+  },
+
+  // ── MA Distance ───────────────────────────────────────────
+  // Pine: abs(close[1] - ma_val) / atr_v
+  {
+    id:       'madist',
+    flag:     'useMaDist',
+    blocksL:  (cfg, i, ac) => {
+      if (!cfg.maArr || ac <= 0) return false;
+      return Math.abs(DATA[i-1].c - cfg.maArr[i-1]) / ac > cfg.maDistMax;
+    },
+    blocksS:  (cfg, i, ac) => {
+      if (!cfg.maArr || ac <= 0) return false;
+      return Math.abs(DATA[i-1].c - cfg.maArr[i-1]) / ac > cfg.maDistMax;
+    },
+    nameLabel: (cfg) => `MaDist<${cfg.maDistMax}×ATR`,
+  },
+
+  // ── Candle Size ───────────────────────────────────────────
+  // Pine: ТЕКУЩАЯ свеча (bar confirmed = close[0])
+  {
+    id:       'candlef',
+    flag:     'useCandleF',
+    blocksL:  (cfg, i, ac) => {
+      if (ac <= 0) return false;
+      const cs = DATA[i].h - DATA[i].l;
+      return cs < ac * cfg.candleMin || cs > ac * cfg.candleMax;
+    },
+    blocksS:  (cfg, i, ac) => {
+      if (ac <= 0) return false;
+      const cs = DATA[i].h - DATA[i].l;
+      return cs < ac * cfg.candleMin || cs > ac * cfg.candleMax;
+    },
+    nameLabel: (cfg) => `Candle(${cfg.candleMin}-${cfg.candleMax})`,
+  },
+
+  // ── Consecutive Bars ─────────────────────────────────────
+  {
+    id:       'consec',
+    flag:     'useConsec',
+    blocksL:  (cfg, i) => {
+      if (i < cfg.consecMax + 1) return false;
+      let bc = 0;
+      for (let j = 1; j <= cfg.consecMax + 1; j++) {
+        if (DATA[i-j].c > DATA[i-j].o) bc++; else { bc = 0; break; }
+      }
+      return bc >= cfg.consecMax;
+    },
+    blocksS:  (cfg, i) => {
+      if (i < cfg.consecMax + 1) return false;
+      let bca = 0;
+      for (let j = 1; j <= cfg.consecMax + 1; j++) {
+        if (DATA[i-j].c < DATA[i-j].o) bca++; else { bca = 0; break; }
+      }
+      return bca >= cfg.consecMax;
+    },
+    nameLabel: (cfg) => `Consec<${cfg.consecMax}`,
+  },
+
+  // ── SMA Trend (STrend) ────────────────────────────────────
+  // Pine: close[1..N] vs одно значение EMA[i-1]
+  {
+    id:       'strend',
+    flag:     'useSTrend',
+    blocksL:  (cfg, i) => {
+      if (!cfg.maArr || i < cfg.sTrendWin + 1) return false;
+      const maRef = cfg.maArr[i-1];
+      let ab = 0, bl = 0;
+      for (let j = 1; j <= cfg.sTrendWin; j++) {
+        if (DATA[i-j].c > maRef) ab++; else bl++;
+      }
+      return ab <= bl;
+    },
+    blocksS:  (cfg, i) => {
+      if (!cfg.maArr || i < cfg.sTrendWin + 1) return false;
+      const maRef = cfg.maArr[i-1];
+      let ab = 0, bl = 0;
+      for (let j = 1; j <= cfg.sTrendWin; j++) {
+        if (DATA[i-j].c > maRef) ab++; else bl++;
+      }
+      return bl <= ab;
+    },
+    nameLabel: (cfg, ex) => `STrend${(ex&&ex.stw)||cfg.sTrendWin||''}`,
+  },
+
+  // ── Secondary MA Confirm ──────────────────────────────────
+  {
+    id:       'confirm',
+    flag:     'useConfirm',
+    blocksL:  (cfg, i) => {
+      if (!cfg.maArrConfirm || i < 1) return false;
+      const secMA = cfg.maArrConfirm[i-1];
+      return secMA > 0 && DATA[i-1].c <= secMA;
+    },
+    blocksS:  (cfg, i) => {
+      if (!cfg.maArrConfirm || i < 1) return false;
+      const secMA = cfg.maArrConfirm[i-1];
+      return secMA > 0 && DATA[i-1].c >= secMA;
+    },
+    nameLabel: (cfg) => `Conf${cfg.confMatType||'EMA'}${cfg.confN}`,
+  },
+
+  // ── Trend Freshness ───────────────────────────────────────
+  // Pine: непрерывная серия баров подряд где close > MA
+  {
+    id:       'fresh',
+    flag:     'useFresh',
+    blocksL:  (cfg, i) => {
+      if (!cfg.maArr) return false;
+      let age = 0;
+      for (let j = 1; j < Math.min(i, cfg.freshMax + 2); j++) {
+        if (DATA[i-j].c > cfg.maArr[i-j-1]) age++; else break;
+      }
+      return age >= cfg.freshMax;
+    },
+    blocksS:  (cfg, i) => {
+      if (!cfg.maArr) return false;
+      let age = 0;
+      for (let j = 1; j < Math.min(i, cfg.freshMax + 2); j++) {
+        if (DATA[i-j].c < cfg.maArr[i-j-1]) age++; else break;
+      }
+      return age >= cfg.freshMax;
+    },
+    nameLabel: (cfg) => `Fresh<${cfg.freshMax}`,
+  },
+
+  // ── VSA — Volume Spike ────────────────────────────────────
+  {
+    id:       'vsa',
+    flag:     'useVSA',
+    volRequired: true,
+    blocksL:  (cfg, i) => HAS_VOLUME && cfg.volAvg && DATA[i-1].v < cfg.volAvg[i-1] * cfg.vsaMult,
+    blocksS:  (cfg, i) => HAS_VOLUME && cfg.volAvg && DATA[i-1].v < cfg.volAvg[i-1] * cfg.vsaMult,
+    nameLabel: (cfg) => `Vol>${cfg.vsaMult}×`,
+  },
+
+  // ── Liquidity ─────────────────────────────────────────────
+  {
+    id:       'liq',
+    flag:     'useLiq',
+    volRequired: true,
+    blocksL:  (cfg, i) => HAS_VOLUME && cfg.volAvg && DATA[i-1].v < cfg.volAvg[i-1] * cfg.liqMin,
+    blocksS:  (cfg, i) => HAS_VOLUME && cfg.volAvg && DATA[i-1].v < cfg.volAvg[i-1] * cfg.liqMin,
+    nameLabel: (cfg) => `Liq>${cfg.liqMin}×`,
+  },
+
+  // ── Volume Direction ──────────────────────────────────────
+  {
+    id:       'voldir',
+    flag:     'useVolDir',
+    volRequired: true,
+    blocksL:  (cfg, i) => {
+      if (!HAS_VOLUME || !cfg.volAvg || i < cfg.volDirPeriod) return false;
+      let bullVol = 0, bearVol = 0;
+      for (let j = 1; j <= cfg.volDirPeriod; j++) {
+        if (DATA[i-j].c > DATA[i-j].o) bullVol += DATA[i-j].v; else bearVol += DATA[i-j].v;
+      }
+      return bullVol <= bearVol;
+    },
+    blocksS:  (cfg, i) => {
+      if (!HAS_VOLUME || !cfg.volAvg || i < cfg.volDirPeriod) return false;
+      let bullVol = 0, bearVol = 0;
+      for (let j = 1; j <= cfg.volDirPeriod; j++) {
+        if (DATA[i-j].c > DATA[i-j].o) bullVol += DATA[i-j].v; else bearVol += DATA[i-j].v;
+      }
+      return bearVol <= bullVol;
+    },
+    nameLabel: () => 'VolDir',
+  },
+
+  // ── Weighted Trend ────────────────────────────────────────
+  {
+    id:       'wt',
+    flag:     'useWT',
+    blocksL:  (cfg, i) => cfg.wtScores && cfg.wtScores[i] <= cfg.wtThresh,
+    blocksS:  (cfg, i) => cfg.wtScores && cfg.wtScores[i] >= -cfg.wtThresh,
+    nameLabel: (cfg) => `WT>${cfg.wtThresh}`,
+  },
+
+  // ── Fat Volume (Exhaustion) ───────────────────────────────
+  {
+    id:       'fat',
+    flag:     'useFat',
+    volRequired: true,
+    blocksL:  (cfg, i) => {
+      if (!HAS_VOLUME || !cfg.volAvg || i < 10) return false;
+      const volRecent = (DATA[i].v + DATA[i-1].v + DATA[i-2].v) / 3;
+      let volPrev10 = 0;
+      for (let k = 0; k < 10; k++) volPrev10 += DATA[i-k].v;
+      volPrev10 /= 10;
+      const fatVol = volRecent < volPrev10 * cfg.fatVolDrop;
+      let bullConsec = 0;
+      for (let j = 1; j <= cfg.fatConsec + 1; j++) {
+        if (DATA[i-j].c > DATA[i-j].o) {
+          if (j === 1 || DATA[i-j+1].c > DATA[i-j+1].o) bullConsec++; else break;
+        } else break;
+      }
+      return bullConsec >= cfg.fatConsec && fatVol;
+    },
+    blocksS:  (cfg, i) => {
+      if (!HAS_VOLUME || !cfg.volAvg || i < 10) return false;
+      const volRecent = (DATA[i].v + DATA[i-1].v + DATA[i-2].v) / 3;
+      let volPrev10 = 0;
+      for (let k = 0; k < 10; k++) volPrev10 += DATA[i-k].v;
+      volPrev10 /= 10;
+      const fatVol = volRecent < volPrev10 * cfg.fatVolDrop;
+      let bearConsec = 0;
+      for (let j = 1; j <= cfg.fatConsec + 1; j++) {
+        if (DATA[i-j].c < DATA[i-j].o) {
+          if (j === 1 || DATA[i-j+1].c < DATA[i-j+1].o) bearConsec++; else break;
+        } else break;
+      }
+      return bearConsec >= cfg.fatConsec && fatVol;
+    },
+    nameLabel: (cfg) => `Fat(${cfg.fatConsec}sv)`,
+  },
+];

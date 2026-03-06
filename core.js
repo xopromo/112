@@ -222,6 +222,32 @@ function calcBodySMA(period) {
   const bodies = DATA.map(d => Math.abs(d.c - d.o));
   return calcSMA(bodies, period);
 }
+// MACD: line = EMA(fast) - EMA(slow), signal = EMA(line, signalP)
+function calcMACD(fast, slow, signalP) {
+  const closes = DATA.map(d => d.c);
+  const emaFast = calcEMA(closes, fast);
+  const emaSlow = calcEMA(closes, slow);
+  const N = DATA.length;
+  const line = new Float64Array(N);
+  for (let i = 0; i < N; i++) line[i] = emaFast[i] - emaSlow[i];
+  const signal = calcEMA(Array.from(line), signalP);
+  return { line, signal };
+}
+// Stochastic %K и %D (SMA of %K)
+function calcStochastic(kPeriod, dPeriod) {
+  const N = DATA.length;
+  const kArr = new Float64Array(N);
+  for (let i = kPeriod - 1; i < N; i++) {
+    let lo = DATA[i].l, hi = DATA[i].h;
+    for (let j = i - kPeriod + 1; j < i; j++) {
+      if (DATA[j].l < lo) lo = DATA[j].l;
+      if (DATA[j].h > hi) hi = DATA[j].h;
+    }
+    kArr[i] = hi > lo ? (DATA[i].c - lo) / (hi - lo) * 100 : 50;
+  }
+  const dArr = calcSMA(Array.from(kArr), dPeriod);
+  return { kArr, dArr };
+}
 
 // ============================================================
 // WEIGHTED TREND SCORE
@@ -317,22 +343,18 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
       // --- Шаг 1: Rev signal → frc ---
       let frc = false, revNewDir = 0;
       if (cfg.useRev && (i-entryBar) >= cfg.revBars) {
-        // oppSig: сигнал противоположного направления (те же типы входа, что включены)
-        // Pivot: только если pivot-вход включён
-        let oppSig = cfg.usePivot && (dir===1 ? pvHi[i]===1 : pvLo[i]===1);
-        // TL-фигуры: tfSigS для длинной позиции, tfSigL для короткой
-        if (!oppSig && cfg.tfSigL && cfg.tfSigS) {
-          const tfM=(cfg.useTLTouch?1:0)|(cfg.useTLBreak?2:0)|(cfg.useFlag?4:0)|(cfg.useTri?8:0);
-          if (tfM) {
-            if (dir===1  && (cfg.tfSigS[i]&tfM)) oppSig=true;
-            if (dir===-1 && (cfg.tfSigL[i]&tfM)) oppSig=true;
+        // oppSig: сигнал противоположного направления из любого включённого типа входа
+        let oppSig = false;
+        for (let _ei = 0; _ei < ENTRY_REGISTRY.length && !oppSig; _ei++) {
+          const _e = ENTRY_REGISTRY[_ei];
+          if (!cfg[_e.flag]) continue;
+          if (dir === 1) {
+            const fn = _e.revDetectS || _e.detectS;
+            if (fn(cfg, i)) oppSig = true;
+          } else {
+            const fn = _e.revDetectL || _e.detectL;
+            if (fn(cfg, i)) oppSig = true;
           }
-        }
-        // Engulf reverse
-        if (!oppSig && cfg.useEngulf) {
-          const bPrev=Math.abs(prev.o-prev.c), bCur=Math.abs(bar.o-bar.c);
-          if (dir===1  && prev.c>prev.o && bar.c<bar.o && bCur>=bPrev*0.7 && bar.c<=prev.o && bar.o>=prev.c) oppSig=true;
-          if (dir===-1 && prev.c<prev.o && bar.c>bar.o && bCur>=bPrev*0.7 && bar.c>=prev.o && bar.o<=prev.c) oppSig=true;
         }
         if (oppSig) {
           if (cfg.revCooldown > 0) {
@@ -363,20 +385,13 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
         }
       }
 
-      // --- Шаг 2: Climax → frc ---
-      if (!frc && cfg.useClimax && HAS_VOLUME && volAvg && bodyAvg) {
-        const isClimaxBar = prev.v > volAvg[i-1]*cfg.clxVolMult &&
-          Math.abs(prev.c - prev.o) > bodyAvg[i-1]*cfg.clxBodyMult;
-        if (isClimaxBar) {
-          const cpnl = dir*(bar.c - entry)/entry*100;
-          if (cfg.clxMode==='any' || cpnl > 0) frc = true;
+      // --- Шаги 2-3: Forced exits (Climax, Time) из EXIT_REGISTRY ---
+      if (!frc) {
+        const _ts = { dir, entry, entryBar };
+        for (let _xi = 0; _xi < EXIT_REGISTRY.length && !frc; _xi++) {
+          const _ex = EXIT_REGISTRY[_xi];
+          if (cfg[_ex.flag] && _ex.check(cfg, i, _ts)) frc = true;
         }
-      }
-
-      // --- Шаг 3: Time → frc ---
-      if (!frc && cfg.useTime && (i-entryBar) >= cfg.timeBars) {
-        if (cfg.timeMode==='any') frc = true;
-        else { const cpnl = dir*(bar.c-entry)/entry*100; if (cfg.timeMode==='plus'&&cpnl>0) frc=true; }
       }
 
       // --- Шаг 4: BE Ветка 1 (beOff >= beTrig, !frc) → немедленный выход ---
@@ -498,8 +513,8 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
           if (hasSL2) sl2 = entry*(1-dir*cfg.slPctMult/100);
           const slDist2 = Math.abs(entry-sl1)||ac2;
           hasTP2 = hasTPA && hasTPB;
-          if (hasTPA) { tp1 = cfg.tpMode==='rr' ? entry+dir*slDist2*cfg.tpMult : cfg.tpMode==='atr' ? entry+dir*ac2*cfg.tpMult : entry*(1+dir*cfg.tpMult/100); }
-          if (hasTPB) { tp2 = cfg.tpModeB==='rr' ? entry+dir*slDist2*cfg.tpMultB : cfg.tpModeB==='atr' ? entry+dir*ac2*cfg.tpMultB : entry*(1+dir*cfg.tpMultB/100); }
+          if (hasTPA) tp1 = _calcTP(entry, dir, slDist2, ac2, cfg.tpMode,  cfg.tpMult);
+          if (hasTPB) tp2 = _calcTP(entry, dir, slDist2, ac2, cfg.tpModeB, cfg.tpMultB);
           inTrade = true; entryBar = i; posSize = 1.0;
           beActive = false; trailActive = false; partialDone = false;
           eq[i] = pnl;
@@ -523,175 +538,20 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
     if (!inTrade && i > exitBar) {
       let sigL = false, sigS = false;
 
-      if (cfg.usePivot) {
-        if (pvLo[i]===1) sigL=true;
-        if (pvHi[i]===1) sigS=true;
-      }
-      if (cfg.useEngulf && i>=3) {
-        const bp=Math.abs(DATA[i-2].c-DATA[i-2].o), bc=Math.abs(prev.c-prev.o);
-        if (DATA[i-2].c<DATA[i-2].o && prev.c>prev.o && bc>=bp*0.7 && prev.c>=DATA[i-2].o) sigL=true;
-        if (DATA[i-2].c>DATA[i-2].o && prev.c<prev.o && bc>=bp*0.7 && prev.c<=DATA[i-2].o) sigS=true;
-      }
-      if (cfg.usePinBar && i>=2) {
-        const body=Math.abs(prev.c-prev.o)||0.0000001;
-        const lw=Math.min(prev.c,prev.o)-prev.l, uw=prev.h-Math.max(prev.c,prev.o);
-        if (lw>body*cfg.pinRatio && uw<body) sigL=true;
-        if (uw>body*cfg.pinRatio && lw<body) sigS=true;
-      }
-      if (cfg.useBoll && cfg.bbB && cfg.bbD[i-1]>0) {
-        if (prev.c>cfg.bbB[i-1]+cfg.bbD[i-1]) sigL=true;
-        if (prev.c<cfg.bbB[i-1]-cfg.bbD[i-1]) sigS=true;
-      }
-      if (cfg.useDonch && cfg.donH) {
-        if (prev.h>cfg.donH[i]) sigL=true;
-        if (prev.l<cfg.donL[i]) sigS=true;
-      }
-      if (cfg.useAtrBo && cfg.atrBoMA && cfg.atrBoATR[i-1]>0) {
-        if (prev.c>cfg.atrBoMA[i-1]+cfg.atrBoATR[i-1]*cfg.atrBoMult) sigL=true;
-        if (prev.c<cfg.atrBoMA[i-1]-cfg.atrBoATR[i-1]*cfg.atrBoMult) sigS=true;
-      }
-      if (cfg.useMaTouch && cfg.matMA && i>=3) {
-        const crossUp=DATA[i-1].c>cfg.matMA[i-1]&&DATA[i-2].c<=cfg.matMA[i-2];
-        const crossDn=DATA[i-1].c<cfg.matMA[i-1]&&DATA[i-2].c>=cfg.matMA[i-2];
-        const zone=cfg.matMA[i-1]*cfg.matZone/100;
-        if (crossUp&&DATA[i-1].l<=cfg.matMA[i-1]+zone) sigL=true;
-        if (crossDn&&DATA[i-1].h>=cfg.matMA[i-1]-zone) sigS=true;
-      }
-      if (cfg.useSqueeze && cfg.sqzOn) {
-        const minBars = cfg.sqzMinBars||1;
-        if (!cfg.sqzOn[i] && cfg.sqzCount[i-1]>=minBars) {
-          if (bar.c>bar.o) sigL=true;
-          if (bar.c<bar.o) sigS=true;
-        }
-      }
-      // Trendline Figures — TL touch, TL break, Flag, Triangle
-      if (cfg.tfSigL && cfg.tfSigS) {
-        if (cfg.useTLTouch && (cfg.tfSigL[i]&1)) sigL=true;
-        if (cfg.useTLTouch && (cfg.tfSigS[i]&1)) sigS=true;
-        if (cfg.useTLBreak && (cfg.tfSigL[i]&2)) sigL=true;
-        if (cfg.useTLBreak && (cfg.tfSigS[i]&2)) sigS=true;
-        if (cfg.useFlag    && (cfg.tfSigL[i]&4)) sigL=true;
-        if (cfg.useFlag    && (cfg.tfSigS[i]&4)) sigS=true;
-        if (cfg.useTri     && (cfg.tfSigL[i]&8)) sigL=true;
-        if (cfg.useTri     && (cfg.tfSigS[i]&8)) sigS=true;
+      // ENTRY SIGNALS — из ENTRY_REGISTRY
+      for (let _ei = 0; _ei < ENTRY_REGISTRY.length; _ei++) {
+        const _e = ENTRY_REGISTRY[_ei];
+        if (!cfg[_e.flag]) continue;
+        if (!sigL && _e.detectL(cfg, i)) sigL = true;
+        if (!sigS && _e.detectS(cfg, i)) sigS = true;
       }
 
-      // FILTERS
-      // MA фильтр: Pine проверяет close[1] > ma_val где ma_val = EMA[i-1]
-      // → DATA[i-1].c > maArr[i-1], а не текущий бар
-      if (cfg.useMA && cfg.maArr && cfg.maArr[i-1]>0) {
-        if (prev.c<=cfg.maArr[i-1]) sigL=false;
-        if (prev.c>=cfg.maArr[i-1]) sigS=false;
-      }
-      if (cfg.useADX && cfg.adxArr) {
-        if (cfg.adxArr[i-1]<cfg.adxThresh) { sigL=false; sigS=false; }
-      }
-      if (cfg.useRSI && cfg.rsiArr) {
-        if (cfg.rsiArr[i-1]>=cfg.rsiOS) sigL=false;
-        if (cfg.rsiArr[i-1]<=cfg.rsiOB) sigS=false;
-      }
-      if (cfg.useVolF && cfg.atrAvg) {
-        if (ac>cfg.atrAvg[i-1]*cfg.volFMult) { sigL=false; sigS=false; }
-      }
-      if (cfg.useStruct && cfg.structBull) {
-        if (!cfg.structBull[i]) sigL=false;
-        if (!cfg.structBear[i]) sigS=false;
-      }
-      // MA дистанция: Pine проверяет abs(close[1] - ma_val) / atr_v → [i-1] bars
-      if (cfg.useMaDist && cfg.maArr && ac>0) {
-        const dist=Math.abs(prev.c-cfg.maArr[i-1])/ac;
-        if (dist>cfg.maDistMax) { sigL=false; sigS=false; }
-      }
-      // Размер свечи: Pine проверяет ТЕКУЩУЮ свечу (bar confirmed = close[0])
-      // body_size = abs(close-open), candle_size = high-low — всё на текущем баре
-      if (cfg.useCandleF && ac>0) {
-        const cs=bar.h-bar.l;
-        if (cs<ac*cfg.candleMin||cs>ac*cfg.candleMax) { sigL=false; sigS=false; }
-      }
-      if (cfg.useConsec && i>=cfg.consecMax+1) {
-        let bc=0, bca=0;
-        for (let j=1;j<=cfg.consecMax+1;j++) {
-          if(DATA[i-j].c>DATA[i-j].o) bc++; else {bc=0;break;}
-        }
-        for (let j=1;j<=cfg.consecMax+1;j++) {
-          if(DATA[i-j].c<DATA[i-j].o) bca++; else {bca=0;break;}
-        }
-        if(bc>=cfg.consecMax) sigL=false;
-        if(bca>=cfg.consecMax) sigS=false;
-      }
-      // STrend: Pine сравнивает close[1..N] с ОДНИМ значением ma_val = EMA[i-1]
-      // (не каждый бар со своей исторической EMA)
-      if (cfg.useSTrend && cfg.maArr && i>=cfg.sTrendWin+1) {
-        const maRef = cfg.maArr[i-1]; // одно фиксированное значение EMA
-        let ab=0, bl2=0;
-        for (let j=1;j<=cfg.sTrendWin;j++) {
-          if(DATA[i-j].c>maRef) ab++; else bl2++;
-        }
-        if(ab<=bl2) sigL=false;
-        if(bl2<=ab) sigS=false;
-      }
-      // Вторая MA (аналог MTF MA в USE): close > secondaryMA → Long OK, close < secondaryMA → Short OK
-      if (cfg.useConfirm && cfg.maArrConfirm && cfg.maArrConfirm[i]>0 && i>=1) {
-        const secMA = cfg.maArrConfirm[i-1];
-        if (secMA > 0) {
-          if (DATA[i-1].c <= secMA) sigL=false;
-          if (DATA[i-1].c >= secMA) sigS=false;
-        }
-      }
-      // Свежесть тренда: Pine считает непрерывную серию баров подряд где close > MA
-      // trend_age_l += 1 пока close > ma_val, блокирует если trend_age_l >= fresh_max
-      // MA для сравнения = EMA[i-1] (предыдущий бар)
-      if (cfg.useFresh && cfg.maArr) {
-        let ageL=0;
-        for (let j=1;j<Math.min(i,cfg.freshMax+2);j++) {
-          if(DATA[i-j].c>cfg.maArr[i-j-1]) ageL++;
-          else break; // серия прервалась
-        }
-        if(ageL>=cfg.freshMax) sigL=false;
-        let ageS=0;
-        for (let j=1;j<Math.min(i,cfg.freshMax+2);j++) {
-          if(DATA[i-j].c<cfg.maArr[i-j-1]) ageS++;
-          else break;
-        }
-        if(ageS>=cfg.freshMax) sigS=false;
-      }
-      // VOLUME FILTERS
-      if (HAS_VOLUME && cfg.useVSA && volAvg) {
-        if (prev.v < volAvg[i-1]*cfg.vsaMult) { sigL=false; sigS=false; }
-      }
-      if (HAS_VOLUME && cfg.useLiq && volAvg) {
-        if (prev.v < volAvg[i-1]*cfg.liqMin) { sigL=false; sigS=false; }
-      }
-      if (HAS_VOLUME && cfg.useVolDir && volAvg && i>=cfg.volDirPeriod) {
-        let bullVol=0, bearVol=0;
-        for (let j=1;j<=cfg.volDirPeriod;j++) {
-          if(DATA[i-j].c>DATA[i-j].o) bullVol+=DATA[i-j].v; else bearVol+=DATA[i-j].v;
-        }
-        if(bullVol<=bearVol) sigL=false;
-        if(bearVol<=bullVol) sigS=false;
-      }
-      if (cfg.useWT && cfg.wtScores) {
-        if(cfg.wtScores[i]<=cfg.wtThresh) sigL=false;
-        if(cfg.wtScores[i]>=-cfg.wtThresh) sigS=false;
-      }
-      if (HAS_VOLUME && cfg.useFat && volAvg && i>=10) {
-        // Pine: fat_vol_recent = ta.sma(volume, 3) — включает текущий бар
-        // fat_vol_prev = ta.sma(volume, 10) — включает текущий бар
-        const volRecent = (bar.v + DATA[i-1].v + DATA[i-2].v) / 3;
-        const volPrev10 = (bar.v + DATA[i-1].v + DATA[i-2].v + DATA[i-3].v + DATA[i-4].v +
-                           DATA[i-5].v + DATA[i-6].v + DATA[i-7].v + DATA[i-8].v + DATA[i-9].v) / 10;
-        const fatVol = volRecent < volPrev10 * cfg.fatVolDrop;
-        let bullConsec=0, bearConsec=0;
-        for(let j=1;j<=cfg.fatConsec+1;j++) {
-          if(DATA[i-j].c>DATA[i-j].o) { if(j===1||DATA[i-j+1].c>DATA[i-j+1].o) bullConsec++; else break; }
-          else break;
-        }
-        for(let j=1;j<=cfg.fatConsec+1;j++) {
-          if(DATA[i-j].c<DATA[i-j].o) { if(j===1||DATA[i-j+1].c<DATA[i-j+1].o) bearConsec++; else break; }
-          else break;
-        }
-        if(bullConsec>=cfg.fatConsec && fatVol) sigL=false;
-        if(bearConsec>=cfg.fatConsec && fatVol) sigS=false;
+      // FILTERS — из FILTER_REGISTRY
+      for (let _fi = 0; _fi < FILTER_REGISTRY.length && (sigL || sigS); _fi++) {
+        const _f = FILTER_REGISTRY[_fi];
+        if (!cfg[_f.flag]) continue;
+        if (sigL && _f.blocksL(cfg, i, ac)) sigL = false;
+        if (sigS && _f.blocksS(cfg, i, ac)) sigS = false;
       }
 
       // ENTRY EXECUTION
@@ -701,25 +561,11 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
         beActive=false; trailActive=false; partialDone=false; posSize=1.0;
         revSkipCount=0; revCooldownBar=-1;
 
-        // Compute SL levels
-        let slA = NaN, slB = NaN, slC = NaN;
-        if (cfg.hasSLA) slA = entry - dir*ac*cfg.slMult;
-        if (cfg.hasSLB) slB = entry*(1 - dir*cfg.slPctMult/100);
-        // SL Pivot: ставим на ближайший pivot + отступ, ограничиваем maxDist
-        if (cfg.useSLPiv && cfg.pivSLLo && cfg.pivSLHi) {
-          const pivLevel = dir===1 ? cfg.pivSLLo[i] : cfg.pivSLHi[i];
-          if (!isNaN(pivLevel)) {
-            const rawSL = dir===1 ? pivLevel - ac*cfg.slPivOff : pivLevel + ac*cfg.slPivOff;
-            const maxDist = ac * cfg.slPivMax;
-            const dist = Math.abs(entry - rawSL);
-            slC = dist > maxDist ? entry - dir*maxDist : rawSL;
-            // Проверяем что SL в правильную сторону
-            if ((dir===1 && slC >= entry) || (dir===-1 && slC <= entry)) slC = NaN;
-          }
-        }
-
-        // Собираем все SL в массив
-        const slCandidates = [slA, slB, slC].filter(v => !isNaN(v));
+        // Compute SL levels — из SL_REGISTRY
+        const slCandidates = SL_REGISTRY
+          .filter(s => cfg[s.flag])
+          .map(s => s.calc(cfg, entry, dir, ac, i))
+          .filter(v => !isNaN(v));
 
         // Resolve SL by logic
         if (slCandidates.length >= 2) {
@@ -737,19 +583,11 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
         } else if (slCandidates.length===1) { sl1=slCandidates[0]; hasSL2=false; }
         else { sl1=entry-dir*ac*1.5; hasSL2=false; }
 
-        // Compute TP levels
+        // Compute TP levels — через _calcTP из sl_tp_registry.js
         const slDist = Math.abs(entry-sl1);
         let tpA = NaN, tpB = NaN;
-        if (cfg.hasTPA) {
-          if (cfg.tpMode==='rr') tpA=entry+dir*slDist*cfg.tpMult;
-          else if (cfg.tpMode==='atr') tpA=entry+dir*ac*cfg.tpMult;
-          else tpA=entry*(1+dir*cfg.tpMult/100);
-        }
-        if (cfg.hasTPB) {
-          if (cfg.tpModeB==='rr') tpB=entry+dir*slDist*cfg.tpMultB;
-          else if (cfg.tpModeB==='atr') tpB=entry+dir*ac*cfg.tpMultB;
-          else tpB=entry*(1+dir*cfg.tpMultB/100);
-        }
+        if (cfg.hasTPA) tpA = _calcTP(entry, dir, slDist, ac, cfg.tpMode,  cfg.tpMult);
+        if (cfg.hasTPB) tpB = _calcTP(entry, dir, slDist, ac, cfg.tpModeB, cfg.tpMultB);
 
         if (!isNaN(tpA) && !isNaN(tpB)) {
           const distA=Math.abs(tpA-entry), distB=Math.abs(tpB-entry);

@@ -25,6 +25,18 @@ opt   = open(os.path.join(base, 'opt.js'),     encoding='utf-8').read()
 ui    = open(os.path.join(base, 'ui.js'),      encoding='utf-8').read()
 pine  = open(os.path.join(base, 'pine_export.js'), encoding='utf-8').read()
 
+# ── registry files: объединяем в один блок ────────────────────────────────
+REGISTRY_FILES = [
+    'entry_registry.js',
+    'filter_registry.js',
+    'exit_registry.js',
+    'sl_tp_registry.js',
+]
+registries = '\n'.join(
+    open(os.path.join(base, f), encoding='utf-8').read()
+    for f in REGISTRY_FILES
+)
+
 # ── opt.js: разрезаем по маркерам секций ──────────────────────────────────
 SECS = ['// ##SECTION_A##\n', '// ##SECTION_B##\n',
         '// ##SECTION_C##\n', '// ##SECTION_D##\n']
@@ -46,9 +58,10 @@ HDR_END = '// ============================================================\n\n'
 assert HDR_END in core, "Header end marker not found in core.js"
 core_code = core[core.rindex(HDR_END) + len(HDR_END):].rstrip('\n') + '\n'
 
-# ── Шаг 1: подставляем секции opt/core в ui.js ────────────────────────────
+# ── Шаг 1: подставляем секции opt/core/registries в ui.js ────────────────
 ui_built = ui
 for ph, content in [
+    ('/* ##REGISTRIES## */', registries),
     ('/* ##OPT_A## */', opt_A),
     ('/* ##CORE## */',  core_code),
     ('/* ##OPT_B## */', opt_B),

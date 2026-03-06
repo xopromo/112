@@ -223,21 +223,13 @@ function buildName(cfg, pvL, pvR, slDesc, tpDesc, filters, extras) {
   const parts = [];
   const ex = extras||{};
 
-  // Entry patterns
+  // Entry patterns — из ENTRY_REGISTRY
   const entries = [];
-  if (cfg.usePivot) entries.push(`Pv(L${pvL}R${pvR})`);
-  if (cfg.useEngulf) entries.push('Engulf');
-  if (cfg.usePinBar) entries.push(`PinBar×${cfg.pinRatio}`);
-  if (cfg.useBoll) entries.push('BBproboj');
-  if (cfg.useDonch) entries.push('Donch');
-  if (cfg.useAtrBo) entries.push(`ATRbo×${cfg.atrBoMult}`);
-  if (cfg.useMaTouch) entries.push('MAToch');
-  if (cfg.useSqueeze) entries.push('Squeeze');
-  if (cfg.useTLTouch) entries.push('TLtch');
-  if (cfg.useTLBreak) entries.push('TLbrk');
-  if (cfg.useFlag)    entries.push('Flag');
-  if (cfg.useTri)     entries.push('Tri');
-  if (entries.length===0) entries.push('NoEntry');
+  const _cfgForName = Object.assign({}, cfg, { pvL, pvR }); // pvL/pvR доступны как параметры buildName
+  for (const _e of ENTRY_REGISTRY) {
+    if (cfg[_e.flag]) entries.push(_e.shortName(_cfgForName, ex));
+  }
+  if (entries.length === 0) entries.push('NoEntry');
   parts.push(entries.join('+'));
   // TL pivot params — include in name so variants with different pivots are unique
   if ((cfg.useTLTouch||cfg.useTLBreak||cfg.useFlag||cfg.useTri) && cfg.tlPvL != null)
@@ -262,26 +254,14 @@ function buildName(cfg, pvL, pvR, slDesc, tpDesc, filters, extras) {
   if (cfg.useClimax) exits.push('Clmx');
   if (exits.length>0) parts.push(exits.join('+'));
 
-  // Filters
+  // Filters — из FILTER_REGISTRY
   const filts = [];
-  if (cfg.useMA && ex.maP) filts.push(`${ex.maType}${ex.maP}`);
-  if (cfg.useADX) filts.push(`ADX(${ex.adxL||cfg.adxLen}>${cfg.adxThresh})`);
-  if (cfg.useRSI) filts.push(`RSI(${cfg.rsiOS}-${cfg.rsiOB})`);
-  if (cfg.useVolF) filts.push(`VFilt<${cfg.volFMult}×`);
-  if (cfg.useStruct) filts.push('Struct');
-  if (cfg.useMaDist) filts.push(`MaDist<${cfg.maDistMax}×ATR`);
-  if (cfg.useCandleF) filts.push(`Candle(${cfg.candleMin}-${cfg.candleMax})`);
-  if (cfg.useConsec) filts.push(`Consec<${cfg.consecMax}`);
-  if (cfg.useSTrend) filts.push(`STrend${ex.stw||cfg.sTrendWin||''}`);
-  if (cfg.useFresh) filts.push(`Fresh<${cfg.freshMax}`);
-  if (cfg.useConfirm && cfg.confN) filts.push(`Conf${cfg.confMatType||'EMA'}${cfg.confN}`);
-  // Volume filters
-  if (cfg.useVSA) filts.push(`Vol>${cfg.vsaMult}×`);
-  if (cfg.useLiq) filts.push(`Liq>${cfg.liqMin}×`);
-  if (cfg.useVolDir) filts.push('VolDir');
-  if (cfg.useWT) filts.push(`WT>${cfg.wtThresh}`);
-  if (cfg.useFat) filts.push(`Fat(${cfg.fatConsec}sv)`);
-  if (filts.length>0) parts.push('['+filts.join('|')+']');
+  for (const _f of FILTER_REGISTRY) {
+    if (!cfg[_f.flag]) continue;
+    const _label = _f.nameLabel(cfg, ex);
+    if (_label) filts.push(_label);
+  }
+  if (filts.length > 0) parts.push('[' + filts.join('|') + ']');
 
   return parts.join(' ');
 }
@@ -481,6 +461,16 @@ async function runOpt() {
   const useFlag=$c('e_flag');
   const useTri=$c('e_tri');
   const useTrendFigures=useTLTouch||useTLBreak||useFlag||useTri;
+
+  // New entry flags
+  const useRsiExit  = $c('e_rsix');
+  const useMaCross  = $c('e_macr');
+  const useFreeEntry= $c('e_free');
+  const useMacd     = $c('e_macd');
+  const useStochExit= $c('e_stx');
+  const useVolMove  = HAS_VOLUME && $c('e_volmv');
+  const useInsideBar= $c('e_inb');
+  const useNReversal= $c('e_nrev');
 
   // Filter flags
   const useMa=$c('f_ma'),useAdx=$c('f_adx'),useRsi=$c('f_rsi');
@@ -720,6 +710,18 @@ async function runOpt() {
   const sqzMinBars=$n('e_sqzb')||1;
   const volAvgArr=HAS_VOLUME?calcVolSMA(vsaP):null;
   const bodyAvgArr=HAS_VOLUME?calcBodySMA(20):null;
+
+  // ── New entry indicators ───────────────────────────────────────
+  const rsiExitArr = useRsiExit  ? calcRSI($n('e_rsix_p')||14) : null;
+  const maCrossArr = useMaCross  ? calcMA(closes, $n('e_macr_p')||20, $v('e_macr_t')||'EMA') : null;
+  let _newMacdLine=null,_newMacdSignal=null;
+  if (useMacd) { const _m=calcMACD($n('e_macd_f')||12,$n('e_macd_s')||26,$n('e_macd_sg')||9); _newMacdLine=_m.line; _newMacdSignal=_m.signal; }
+  const macdLine=_newMacdLine, macdSignal=_newMacdSignal;
+  let _newStochD=null;
+  if (useStochExit) { const _s=calcStochastic($n('e_stx_k')||14,$n('e_stx_d')||3); _newStochD=_s.d; }
+  const newStochD=_newStochD;
+  const volMoveMult = $n('e_volmv_m')||1.5;
+  const nReversalN  = $n('e_nrev_n') ||3;
 
   // ── Trendline Figures Precompute ─────────────────────────────
   // Все четыре паттерна вычисляются один раз перед основным циклом.
@@ -1047,6 +1049,14 @@ async function runOpt() {
         useMaTouch:useMaT,matMA,matZone,
         useSqueeze:useSqz,sqzOn,sqzCount,sqzMinBars,
         useTLTouch,useTLBreak,useFlag,useTri,tfSigL,tfSigS,tlPvL,tlPvR,
+        useRsiExit,rsiExitArr,rsiExitPeriod:$n('e_rsix_p')||14,rsiExitOS:$n('e_rsix_os')||30,rsiExitOB:$n('e_rsix_ob')||70,
+        useMaCross,maCrossArr,maCrossP:$n('e_macr_p')||20,maCrossType:$v('e_macr_t')||'EMA',
+        useFreeEntry,
+        useMacd,macdLine,macdSignal,macdFast:$n('e_macd_f')||12,macdSlow:$n('e_macd_s')||26,macdSignalP:$n('e_macd_sg')||9,
+        useStochExit,stochD:newStochD,stochKP:$n('e_stx_k')||14,stochDP:$n('e_stx_d')||3,stochOS:$n('e_stx_os')||20,stochOB:$n('e_stx_ob')||80,
+        useVolMove,volMoveMult,
+        useInsideBar,
+        useNReversal,nReversalN,
         hasSLA:!!(slPair.a),slMult:slPair.a?slPair.a.m:0,hasSLB:!!(slPair.p),slPctMult:slPair.p?slPair.p.m:0,slLogic,
         hasTPA:!!(tpPair.a),tpMult:tpPair.a?tpPair.a.m:0,tpMode:tpPair.a?tpPair.a.type:'rr',
         hasTPB:!!(tpPair.b),tpMultB:tpPair.b?tpPair.b.m:0,tpModeB:tpPair.b?tpPair.b.type:'rr',tpLogic,
@@ -1101,6 +1111,14 @@ async function runOpt() {
               useTLTouch,useTLBreak,useFlag,useTri,
               tlPvL,tlPvR,tlZonePct:$n('e_tl_zone')||0.3,
               flagImpMin:$n('e_flag_imp')||2.0,flagMaxBars:$n('e_flag_bars')||20,flagRetrace:$n('e_flag_ret')||0.618,
+              useRsiExit,rsiExitPeriod:$n('e_rsix_p')||14,rsiExitOS:$n('e_rsix_os')||30,rsiExitOB:$n('e_rsix_ob')||70,
+              useMaCross,maCrossP:$n('e_macr_p')||20,maCrossType:$v('e_macr_t')||'EMA',
+              useFreeEntry,
+              useMacd,macdFast:$n('e_macd_f')||12,macdSlow:$n('e_macd_s')||26,macdSignalP:$n('e_macd_sg')||9,
+              useStochExit,stochKP:$n('e_stx_k')||14,stochDP:$n('e_stx_d')||3,stochOS:$n('e_stx_os')||20,stochOB:$n('e_stx_ob')||80,
+              useVolMove,volMoveMult,
+              useInsideBar,
+              useNReversal,nReversalN,
               slPair,slLogic,tpPair,tpLogic,
               useSLPiv,slPivOff,slPivMax,slPivL,slPivR,slPivTrail,
               useBE,beTrig,beOff,useTrail,trTrig,trDist,
@@ -1252,6 +1270,14 @@ async function runOpt() {
         useMaTouch:useMaT,matMA,matZone,
         useSqueeze:useSqz,sqzOn,sqzCount,sqzMinBars,
         useTLTouch,useTLBreak,useFlag,useTri,tfSigL,tfSigS,tlPvL,tlPvR,
+        useRsiExit,rsiExitArr,rsiExitPeriod:$n('e_rsix_p')||14,rsiExitOS:$n('e_rsix_os')||30,rsiExitOB:$n('e_rsix_ob')||70,
+        useMaCross,maCrossArr,maCrossP:$n('e_macr_p')||20,maCrossType:$v('e_macr_t')||'EMA',
+        useFreeEntry,
+        useMacd,macdLine,macdSignal,macdFast:$n('e_macd_f')||12,macdSlow:$n('e_macd_s')||26,macdSignalP:$n('e_macd_sg')||9,
+        useStochExit,stochD:newStochD,stochKP:$n('e_stx_k')||14,stochDP:$n('e_stx_d')||3,stochOS:$n('e_stx_os')||20,stochOB:$n('e_stx_ob')||80,
+        useVolMove,volMoveMult,
+        useInsideBar,
+        useNReversal,nReversalN,
         hasSLA:!!(slPair.a),slMult:slPair.a?slPair.a.m:0,hasSLB:!!(slPair.p),slPctMult:slPair.p?slPair.p.m:0,slLogic,
         hasTPA:!!(tpPair.a),tpMult:tpPair.a?tpPair.a.m:0,tpMode:tpPair.a?tpPair.a.type:'rr',
         hasTPB:!!(tpPair.b),tpMultB:tpPair.b?tpPair.b.m:0,tpModeB:tpPair.b?tpPair.b.type:'rr',tpLogic,
@@ -1319,6 +1345,14 @@ async function runOpt() {
               useTLTouch,useTLBreak,useFlag,useTri,
               tlPvL,tlPvR,tlZonePct:$n('e_tl_zone')||0.3,
               flagImpMin:$n('e_flag_imp')||2.0,flagMaxBars:$n('e_flag_bars')||20,flagRetrace:$n('e_flag_ret')||0.618,
+              useRsiExit,rsiExitPeriod:$n('e_rsix_p')||14,rsiExitOS:$n('e_rsix_os')||30,rsiExitOB:$n('e_rsix_ob')||70,
+              useMaCross,maCrossP:$n('e_macr_p')||20,maCrossType:$v('e_macr_t')||'EMA',
+              useFreeEntry,
+              useMacd,macdFast:$n('e_macd_f')||12,macdSlow:$n('e_macd_s')||26,macdSignalP:$n('e_macd_sg')||9,
+              useStochExit,stochKP:$n('e_stx_k')||14,stochDP:$n('e_stx_d')||3,stochOS:$n('e_stx_os')||20,stochOB:$n('e_stx_ob')||80,
+              useVolMove,volMoveMult,
+              useInsideBar,
+              useNReversal,nReversalN,
               slPair,slLogic,tpPair,tpLogic,
               useSLPiv,slPivOff,slPivMax,slPivL,slPivR,slPivTrail,
               useBE,beTrig,beOff,useTrail,trTrig,trDist,
@@ -1608,6 +1642,14 @@ async function runOpt() {
                                       // Trendline Figures
                                       useTLTouch,useTLBreak,useFlag,useTri,
                                       tfSigL,tfSigS,
+                                      useRsiExit,rsiExitArr,rsiExitPeriod:$n('e_rsix_p')||14,rsiExitOS:$n('e_rsix_os')||30,rsiExitOB:$n('e_rsix_ob')||70,
+                                      useMaCross,maCrossArr,maCrossP:$n('e_macr_p')||20,maCrossType:$v('e_macr_t')||'EMA',
+                                      useFreeEntry,
+                                      useMacd,macdLine,macdSignal,macdFast:$n('e_macd_f')||12,macdSlow:$n('e_macd_s')||26,macdSignalP:$n('e_macd_sg')||9,
+                                      useStochExit,stochD:newStochD,stochKP:$n('e_stx_k')||14,stochDP:$n('e_stx_d')||3,stochOS:$n('e_stx_os')||20,stochOB:$n('e_stx_ob')||80,
+                                      useVolMove,volMoveMult,
+                                      useInsideBar,
+                                      useNReversal,nReversalN,
                                       // SL
                                       hasSLA:!!slPair.a,
                                       slMult:slPair.a?slPair.a.m:0,
@@ -1700,6 +1742,14 @@ async function runOpt() {
                                           useTLTouch, useTLBreak, useFlag, useTri,
                                           tlPvL:$n('e_tl_pvl')||5, tlPvR:$n('e_tl_pvr')||3, tlZonePct:$n('e_tl_zone')||0.3,
                                           flagImpMin:$n('e_flag_imp')||2.0, flagMaxBars:$n('e_flag_bars')||20, flagRetrace:$n('e_flag_ret')||0.618,
+                                          useRsiExit,rsiExitPeriod:$n('e_rsix_p')||14,rsiExitOS:$n('e_rsix_os')||30,rsiExitOB:$n('e_rsix_ob')||70,
+                                          useMaCross,maCrossP:$n('e_macr_p')||20,maCrossType:$v('e_macr_t')||'EMA',
+                                          useFreeEntry,
+                                          useMacd,macdFast:$n('e_macd_f')||12,macdSlow:$n('e_macd_s')||26,macdSignalP:$n('e_macd_sg')||9,
+                                          useStochExit,stochKP:$n('e_stx_k')||14,stochDP:$n('e_stx_d')||3,stochOS:$n('e_stx_os')||20,stochOB:$n('e_stx_ob')||80,
+                                          useVolMove,volMoveMult,
+                                          useInsideBar,
+                                          useNReversal,nReversalN,
                                           slPair, slLogic, tpPair, tpLogic,
                                           useSLPiv, slPivOff, slPivMax, slPivL, slPivR, slPivTrail,
                                           useBE, beTrig, beOff,
@@ -1945,6 +1995,32 @@ function _calcIndicators(cfg) {
     }
   }
 
+  // ── RSI Exit (выход из OB/OS зон) ────────────────────────
+  const rsiExitArr = cfg.useRsiExit
+    ? calcRSI(cfg.rsiExitPeriod || 14)
+    : null;
+
+  // ── MA Crossover (пересечение МА) ────────────────────────
+  const maCrossArr = cfg.useMaCross
+    ? calcMA(closes, cfg.maCrossP || 20, cfg.maCrossType || 'EMA')
+    : null;
+
+  // ── MACD ──────────────────────────────────────────────────
+  let macdLine = null, macdSignal = null;
+  if (cfg.useMacd) {
+    const _macd = calcMACD(cfg.macdFast || 12, cfg.macdSlow || 26, cfg.macdSignalP || 9);
+    macdLine   = _macd.line;
+    macdSignal = _macd.signal;
+  }
+
+  // ── Stochastic ────────────────────────────────────────────
+  let stochK = null, stochD = null;
+  if (cfg.useStochExit) {
+    const _stoch = calcStochastic(cfg.stochKP || 14, cfg.stochDP || 3);
+    stochK = _stoch.k;
+    stochD = _stoch.d;
+  }
+
   // ── SL Pivot ──────────────────────────────────────────────
   let pivSLLo = null, pivSLHi = null;
   if (cfg.useSLPiv) {
@@ -2055,6 +2131,9 @@ function _calcIndicators(cfg) {
     structBull, structBear,
     pivSLLo, pivSLHi,
     tfSigL, tfSigS,
+    rsiExitArr, maCrossArr,
+    macdLine, macdSignal,
+    stochK, stochD,
   };
 }
 
@@ -2102,6 +2181,35 @@ function buildBtCfg(cfg, ind) {
     useTri:     cfg.useTri     || false,
     tfSigL:     ind.tfSigL     || null,
     tfSigS:     ind.tfSigS     || null,
+
+    // ── Новые точки входа ─────────────────────────────────────
+    useRsiExit:    cfg.useRsiExit    || false,
+    rsiExitArr:    ind.rsiExitArr,
+    rsiExitPeriod: cfg.rsiExitPeriod || 14,
+    rsiExitOS:     cfg.rsiExitOS     || 30,
+    rsiExitOB:     cfg.rsiExitOB     || 70,
+    useMaCross:    cfg.useMaCross    || false,
+    maCrossArr:    ind.maCrossArr,
+    maCrossP:      cfg.maCrossP      || 20,
+    maCrossType:   cfg.maCrossType   || 'EMA',
+    useFreeEntry:  cfg.useFreeEntry  || false,
+    useMacd:       cfg.useMacd       || false,
+    macdLine:      ind.macdLine,
+    macdSignal:    ind.macdSignal,
+    macdFast:      cfg.macdFast      || 12,
+    macdSlow:      cfg.macdSlow      || 26,
+    macdSignalP:   cfg.macdSignalP   || 9,
+    useStochExit:  cfg.useStochExit  || false,
+    stochD:        ind.stochD,
+    stochKP:       cfg.stochKP       || 14,
+    stochDP:       cfg.stochDP       || 3,
+    stochOS:       cfg.stochOS       || 20,
+    stochOB:       cfg.stochOB       || 80,
+    useVolMove:    cfg.useVolMove     || false,
+    volMoveMult:   cfg.volMoveMult    || 1.5,
+    useInsideBar:  cfg.useInsideBar  || false,
+    useNReversal:  cfg.useNReversal  || false,
+    nReversalN:    cfg.nReversalN    || 3,
 
     // ── SL / TP ───────────────────────────────────────────────
     hasSLA:    !!(slPair.a),

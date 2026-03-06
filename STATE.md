@@ -4,14 +4,14 @@
 > Также обновляй вручную когда вливаешь ветки в main.
 
 ## Последняя ручная сессия
-- **Дата:** 2026-03-04 08:36
+- **Дата:** 2026-03-06 17:08
 - **Ветка:** `main`
 - **Последние коммиты:**
+  - 578740a feat: add tlPvL/tlPvR as optimization dimensions for TL Touch/Break
+  - 39b3ccf fix: restore live charts + fix fewer results after skipEq
+  - a3c6b08 chore: update STATE.md
   - 7698ab7 fix: 3 критических бага — TPE slowdown, Pine minval, результаты ≠ TV
   - 77db51c perf: fix progressive TPE slowdown — 3 optimizations
-  - 4357121 chore: update STATE.md
-  - 37aac7a perf: cache tfSigL/tfSigS in _calcIndicators to fix TPE slowdown
-  - b64ff96 chore: update STATE.md
 
 ## Последний цикл
 - **Дата:** 2026-03-03-20 (ручной исследовательский цикл)

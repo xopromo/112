@@ -60,40 +60,12 @@ function generatePineScript(r) {
   lines.push(`// 1. ВХОДНЫЕ ДАННЫЕ`);
   lines.push(`// ==========================================`);
 
-  // Entry patterns
+  // Entry patterns — из ENTRY_REGISTRY
   lines.push(`grp_entry = "🎯 ПАТТЕРНЫ ВХОДА"`);
-  if (c.usePivot) {
-    lines.push(`use_pivot    = input.bool(${b(c.usePivot)},   "Pivot Points",       group=grp_entry)`);
-    lines.push(`pivot_left   = input.int(${c.pvL},  "Pivot — баров слева",  minval=1, maxval=20,  group=grp_entry)`);
-    lines.push(`pivot_right  = input.int(${c.pvR},  "Pivot — баров справа", minval=1, maxval=10,  group=grp_entry)`);
-  } else {
-    lines.push(`use_pivot    = input.bool(false,   "Pivot Points",       group=grp_entry)`);
-    lines.push(`pivot_left   = input.int(5,  "Pivot — баров слева",  minval=1, maxval=20,  group=grp_entry)`);
-    lines.push(`pivot_right  = input.int(2,  "Pivot — баров справа", minval=1, maxval=10,  group=grp_entry)`);
+  for (const _e of ENTRY_REGISTRY) {
+    const _entryLines = _e.pineLines(c, b, f);
+    for (const _l of _entryLines) lines.push(_l);
   }
-  lines.push(`use_engulf   = input.bool(${b(c.useEngulf)}, "Engulfing",          group=grp_entry)`);
-  lines.push(`use_pinbar   = input.bool(${b(c.usePinBar)}, "Pin Bar",            group=grp_entry)`);
-  lines.push(`pin_ratio    = input.float(${f(c.pinRatio||1.5,1)}, "Pin Bar тень/тело",  step=0.5, group=grp_entry)`);
-  lines.push(`use_donch    = input.bool(${b(c.useDonch)},  "Пробой Дончиана",    group=grp_entry)`);
-  lines.push(`donch_len    = input.int(${Math.max(5, c.donLen||20)}, "Дончиан период",     minval=5, maxval=200, group=grp_entry)`);
-  lines.push(`use_boll     = input.bool(${b(c.useBoll)},   "Пробой Боллинджера", group=grp_entry)`);
-  lines.push(`boll_len     = input.int(${Math.max(5, c.bbLen||20)}, "Боллинджер период",  minval=5, maxval=200, group=grp_entry)`);
-  lines.push(`boll_mult    = input.float(${f(c.bbMult||2.0,1)}, "Боллинджер σ",       step=0.1, group=grp_entry)`);
-  lines.push(`use_atr_bo   = input.bool(${b(c.useAtrBo)},  "Пробой ATR-канала",  group=grp_entry)`);
-  lines.push(`atr_bo_len   = input.int(${Math.max(5, c.atrBoLen||14)}, "ATR-канал EMA",      minval=5, maxval=200, group=grp_entry)`);
-  lines.push(`atr_bo_mult  = input.float(${f(c.atrBoMult||2.0,1)}, "ATR-канал множитель", step=0.1, group=grp_entry)`);
-  lines.push(`use_ma_touch = input.bool(${b(c.useMaTouch)}, "Касание MA",         group=grp_entry)`);
-  lines.push(`ma_touch_bars= input.int(3, "  Баров от касания", minval=1, maxval=10, group=grp_entry)`);
-  lines.push(`use_tl_touch = input.bool(${b(c.useTLTouch)}, "Касание TL (линия)", group=grp_entry)`);
-  lines.push(`use_tl_break = input.bool(${b(c.useTLBreak)}, "Пробой TL (линия)",  group=grp_entry)`);
-  lines.push(`use_flag     = input.bool(${b(c.useFlag)},    "Флаг",               group=grp_entry)`);
-  lines.push(`use_tri      = input.bool(${b(c.useTri)},     "Треугольник",        group=grp_entry)`);
-  lines.push(`tl_pv_l      = input.int(${Math.max(2, c.tlPvL||5)},  "TL Pivot Left",  minval=2, maxval=20, group=grp_entry)`);
-  lines.push(`tl_pv_r      = input.int(${Math.max(1, c.tlPvR||3)},  "TL Pivot Right", minval=1, maxval=10, group=grp_entry)`);
-  lines.push(`tl_zone_pct  = input.float(${f(c.tlZonePct||0.3,1)}, "TL Зона ±%",      step=0.1,  group=grp_entry)`);
-  lines.push(`flag_imp_atr = input.float(${f(c.flagImpMin||2.0,1)}, "Флаг Импульс ×ATR", step=0.5, group=grp_entry)`);
-  lines.push(`flag_max_b   = input.int(${Math.max(5, c.flagMaxBars||20)}, "Флаг Макс баров",   minval=5, maxval=50, group=grp_entry)`);
-  lines.push(`flag_ret     = input.float(${f(c.flagRetrace||0.618,3)}, "Флаг Откат",  step=0.01, group=grp_entry)`);
   lines.push(``);
 
   // MA filter

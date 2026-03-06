@@ -875,6 +875,41 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
   <div class="sep"></div>
   <div class="cb"><input type="checkbox" id="e_tri"><label data-tip="Паттерн Треугольник: сжимающийся ценовой диапазон. Сигнал при пробое верхней или нижней границы">Треугольник (Triangle)</label></div>
   <div class="hint">Симметричный, восходящий или нисходящий. Сигнал при пробое.</div>
+
+  <div class="cb"><input type="checkbox" id="e_rsix"><label data-tip="RSI выходит из зоны перекупленности/перепроданности. Лонг: RSI пересекает уровень OS снизу вверх. Шорт: пересекает OB сверху вниз">RSI Exit OB/OS</label></div>
+  <div class="g2">
+    <div class="field"><label>Период RSI</label><input id="e_rsix_p" value="14" data-tip="Период RSI для сигнала входа"></div>
+    <div class="field"><label>OS / OB</label><input id="e_rsix_os" value="30" data-tip="Уровень перепроданности (OS). Лонг при выходе выше этого уровня"><input id="e_rsix_ob" value="70" data-tip="Уровень перекупленности (OB). Шорт при выходе ниже этого уровня"></div>
+  </div>
+
+  <div class="cb"><input type="checkbox" id="e_macr"><label data-tip="Пересечение MA: цена пересекает скользящую среднюю (закрытие выше после закрытия ниже = лонг). В отличие от MA Touch — без требования касания зоны">MA Crossover</label></div>
+  <div class="g2">
+    <div class="field"><label>Период MA</label><input id="e_macr_p" value="20" data-tip="Период скользящей средней для пересечения"></div>
+    <div class="field"><label>Тип MA</label><select id="e_macr_t"><option value="EMA">EMA</option><option value="SMA">SMA</option><option value="WMA">WMA</option><option value="RMA">RMA</option></select></div>
+  </div>
+
+  <div class="cb"><input type="checkbox" id="e_free"><label data-tip="Свободный вход: вход разрешён после каждой закрытой свечи (если позволяют фильтры). Полезно для тестирования чистой работы фильтров">Свободный вход (Free)</label></div>
+
+  <div class="cb"><input type="checkbox" id="e_macd"><label data-tip="MACD пересечение: MACD-линия пересекает сигнальную линию. Лонг: MACD выше сигнала после того как был ниже. Шорт: наоборот">MACD Crossover</label></div>
+  <div class="g3">
+    <div class="field"><label>Fast</label><input id="e_macd_f" value="12" data-tip="Период быстрой EMA для MACD"></div>
+    <div class="field"><label>Slow</label><input id="e_macd_s" value="26" data-tip="Период медленной EMA для MACD"></div>
+    <div class="field"><label>Signal</label><input id="e_macd_sg" value="9" data-tip="Период сигнальной линии MACD"></div>
+  </div>
+
+  <div class="cb"><input type="checkbox" id="e_stx"><label data-tip="Stochastic Exit OB/OS: %D выходит из зоны перекупленности или перепроданности. Лонг: %D пересекает OS снизу вверх">Stochastic OB/OS</label></div>
+  <div class="g2">
+    <div class="field"><label>K / D период</label><input id="e_stx_k" value="14" data-tip="Период %K Stochastic"><input id="e_stx_d" value="3" data-tip="Период %D (SMA от %K)"></div>
+    <div class="field"><label>OS / OB</label><input id="e_stx_os" value="20" data-tip="Уровень перепроданности Stochastic"><input id="e_stx_ob" value="80" data-tip="Уровень перекупленности Stochastic"></div>
+  </div>
+
+  <div class="cb"><input type="checkbox" id="e_volmv"><label data-tip="Объём + движение: объём выше среднего И направленная свеча. Лонг: объём > avg×N и бычья свеча с большим телом снизу. Требует данных объёма">Volume + Move</label></div>
+  <div class="field"><label>Объём ×avg</label><input id="e_volmv_m" value="1.5" data-tip="Объём должен превышать среднее за vsaPeriod в N раз"></div>
+
+  <div class="cb"><input type="checkbox" id="e_inb"><label data-tip="Inside Bar пробой: свеча-мать, внутренняя свеча (H/L внутри матери), затем пробой закрытием выше максимума матери = лонг. Отражает накопление перед пробоем">Inside Bar Breakout</label></div>
+
+  <div class="cb"><input type="checkbox" id="e_nrev"><label data-tip="Разворот после N свечей: N последовательных медвежьих свечей, затем бычья = лонг. N последовательных бычьих свечей, затем медвежья = шорт">N-Candle Reversal</label></div>
+  <div class="field"><label>N свечей</label><input id="e_nrev_n" value="3" data-tip="Количество последовательных направленных свечей перед разворотом"></div>
 </div>
 
 <!-- SL/TP -->
@@ -1830,40 +1865,12 @@ function generatePineScript(r) {
   lines.push(`// 1. ВХОДНЫЕ ДАННЫЕ`);
   lines.push(`// ==========================================`);
 
-  // Entry patterns
+  // Entry patterns — из ENTRY_REGISTRY
   lines.push(`grp_entry = "🎯 ПАТТЕРНЫ ВХОДА"`);
-  if (c.usePivot) {
-    lines.push(`use_pivot    = input.bool(${b(c.usePivot)},   "Pivot Points",       group=grp_entry)`);
-    lines.push(`pivot_left   = input.int(${c.pvL},  "Pivot — баров слева",  minval=1, maxval=20,  group=grp_entry)`);
-    lines.push(`pivot_right  = input.int(${c.pvR},  "Pivot — баров справа", minval=1, maxval=10,  group=grp_entry)`);
-  } else {
-    lines.push(`use_pivot    = input.bool(false,   "Pivot Points",       group=grp_entry)`);
-    lines.push(`pivot_left   = input.int(5,  "Pivot — баров слева",  minval=1, maxval=20,  group=grp_entry)`);
-    lines.push(`pivot_right  = input.int(2,  "Pivot — баров справа", minval=1, maxval=10,  group=grp_entry)`);
+  for (const _e of ENTRY_REGISTRY) {
+    const _entryLines = _e.pineLines(c, b, f);
+    for (const _l of _entryLines) lines.push(_l);
   }
-  lines.push(`use_engulf   = input.bool(${b(c.useEngulf)}, "Engulfing",          group=grp_entry)`);
-  lines.push(`use_pinbar   = input.bool(${b(c.usePinBar)}, "Pin Bar",            group=grp_entry)`);
-  lines.push(`pin_ratio    = input.float(${f(c.pinRatio||1.5,1)}, "Pin Bar тень/тело",  step=0.5, group=grp_entry)`);
-  lines.push(`use_donch    = input.bool(${b(c.useDonch)},  "Пробой Дончиана",    group=grp_entry)`);
-  lines.push(`donch_len    = input.int(${Math.max(5, c.donLen||20)}, "Дончиан период",     minval=5, maxval=200, group=grp_entry)`);
-  lines.push(`use_boll     = input.bool(${b(c.useBoll)},   "Пробой Боллинджера", group=grp_entry)`);
-  lines.push(`boll_len     = input.int(${Math.max(5, c.bbLen||20)}, "Боллинджер период",  minval=5, maxval=200, group=grp_entry)`);
-  lines.push(`boll_mult    = input.float(${f(c.bbMult||2.0,1)}, "Боллинджер σ",       step=0.1, group=grp_entry)`);
-  lines.push(`use_atr_bo   = input.bool(${b(c.useAtrBo)},  "Пробой ATR-канала",  group=grp_entry)`);
-  lines.push(`atr_bo_len   = input.int(${Math.max(5, c.atrBoLen||14)}, "ATR-канал EMA",      minval=5, maxval=200, group=grp_entry)`);
-  lines.push(`atr_bo_mult  = input.float(${f(c.atrBoMult||2.0,1)}, "ATR-канал множитель", step=0.1, group=grp_entry)`);
-  lines.push(`use_ma_touch = input.bool(${b(c.useMaTouch)}, "Касание MA",         group=grp_entry)`);
-  lines.push(`ma_touch_bars= input.int(3, "  Баров от касания", minval=1, maxval=10, group=grp_entry)`);
-  lines.push(`use_tl_touch = input.bool(${b(c.useTLTouch)}, "Касание TL (линия)", group=grp_entry)`);
-  lines.push(`use_tl_break = input.bool(${b(c.useTLBreak)}, "Пробой TL (линия)",  group=grp_entry)`);
-  lines.push(`use_flag     = input.bool(${b(c.useFlag)},    "Флаг",               group=grp_entry)`);
-  lines.push(`use_tri      = input.bool(${b(c.useTri)},     "Треугольник",        group=grp_entry)`);
-  lines.push(`tl_pv_l      = input.int(${Math.max(2, c.tlPvL||5)},  "TL Pivot Left",  minval=2, maxval=20, group=grp_entry)`);
-  lines.push(`tl_pv_r      = input.int(${Math.max(1, c.tlPvR||3)},  "TL Pivot Right", minval=1, maxval=10, group=grp_entry)`);
-  lines.push(`tl_zone_pct  = input.float(${f(c.tlZonePct||0.3,1)}, "TL Зона ±%",      step=0.1,  group=grp_entry)`);
-  lines.push(`flag_imp_atr = input.float(${f(c.flagImpMin||2.0,1)}, "Флаг Импульс ×ATR", step=0.5, group=grp_entry)`);
-  lines.push(`flag_max_b   = input.int(${Math.max(5, c.flagMaxBars||20)}, "Флаг Макс баров",   minval=5, maxval=50, group=grp_entry)`);
-  lines.push(`flag_ret     = input.float(${f(c.flagRetrace||0.618,3)}, "Флаг Откат",  step=0.01, group=grp_entry)`);
   lines.push(``);
 
   // MA filter
@@ -3367,6 +3374,858 @@ function updateVolStatus() {
 }
 
 // ============================================================
+// ============================================================
+// entry_registry.js — реестр точек входа
+// ============================================================
+// ENTRY_REGISTRY: массив объектов, описывающих каждый тип входа.
+// Единственный источник правды для:
+//   • core.js   — detectL/detectS (вход), revDetectS/revDetectL (обратный сигнал)
+//   • opt.js    — buildName (части названия результата)
+//   • pine_export.js — pineLines (Pine Script inputs)
+//
+// ДОБАВИТЬ НОВЫЙ ВХОд: добавить 1 объект в ENTRY_REGISTRY + чекбокс в shell.html
+// + индикатор в _calcIndicators + поля в buildBtCfg. core/buildName/pine — автоматически.
+// ============================================================
+
+const ENTRY_REGISTRY = [
+  // ── Pivot Low / High ─────────────────────────────────────
+  {
+    id:        'pivot',
+    flag:      'usePivot',
+    htmlId:    'e_pv',
+    shortName: c => `Pv(L${c.pvL||5}R${c.pvR||2})`,
+    detectL:   (cfg, i) => cfg.pvLo && cfg.pvLo[i] === 1,
+    detectS:   (cfg, i) => cfg.pvHi_ && cfg.pvHi_[i] === 1,
+    // reverse: same timing as entry (pivot already "confirmed")
+    pineLines: (c, b, f) => {
+      const on = c.usePivot;
+      return [
+        `use_pivot    = input.bool(${b(on)},   "Pivot Points",       group=grp_entry)`,
+        `pivot_left   = input.int(${on?c.pvL:5},  "Pivot — баров слева",  minval=1, maxval=20,  group=grp_entry)`,
+        `pivot_right  = input.int(${on?c.pvR:2},  "Pivot — баров справа", minval=1, maxval=10,  group=grp_entry)`,
+      ];
+    },
+  },
+
+  // ── Engulfing ────────────────────────────────────────────
+  {
+    id:        'engulf',
+    flag:      'useEngulf',
+    htmlId:    'e_eng',
+    shortName: () => 'Engulf',
+    detectL: (cfg, i) => {
+      if (i < 3) return false;
+      const d = DATA, d2 = d[i-2], p = d[i-1];
+      const bp = Math.abs(d2.c-d2.o), bc = Math.abs(p.c-p.o);
+      return d2.c < d2.o && p.c > p.o && bc >= bp*0.7 && p.c >= d2.o;
+    },
+    detectS: (cfg, i) => {
+      if (i < 3) return false;
+      const d = DATA, d2 = d[i-2], p = d[i-1];
+      const bp = Math.abs(d2.c-d2.o), bc = Math.abs(p.c-p.o);
+      return d2.c > d2.o && p.c < p.o && bc >= bp*0.7 && p.c <= d2.o;
+    },
+    // Обратный сигнал: паттерн engulf на текущем баре (i-1 и i), не на prev
+    revDetectS: (cfg, i) => {
+      if (i < 1) return false;
+      const p = DATA[i-1], bar = DATA[i];
+      const bPrev = Math.abs(p.o-p.c), bCur = Math.abs(bar.o-bar.c);
+      return p.c > p.o && bar.c < bar.o && bCur >= bPrev*0.7 && bar.c <= p.o && bar.o >= p.c;
+    },
+    revDetectL: (cfg, i) => {
+      if (i < 1) return false;
+      const p = DATA[i-1], bar = DATA[i];
+      const bPrev = Math.abs(p.o-p.c), bCur = Math.abs(bar.o-bar.c);
+      return p.c < p.o && bar.c > bar.o && bCur >= bPrev*0.7 && bar.c >= p.o && bar.o <= p.c;
+    },
+    pineLines: (c, b) => [
+      `use_engulf   = input.bool(${b(c.useEngulf)}, "Engulfing",          group=grp_entry)`,
+    ],
+  },
+
+  // ── Pin Bar ──────────────────────────────────────────────
+  {
+    id:        'pinbar',
+    flag:      'usePinBar',
+    htmlId:    'e_pin',
+    shortName: c => `PinBar×${c.pinRatio||2}`,
+    detectL: (cfg, i) => {
+      if (i < 2) return false;
+      const p = DATA[i-1];
+      const body = Math.abs(p.c-p.o) || 0.0000001;
+      const lw = Math.min(p.c,p.o)-p.l, uw = p.h-Math.max(p.c,p.o);
+      return lw > body*cfg.pinRatio && uw < body;
+    },
+    detectS: (cfg, i) => {
+      if (i < 2) return false;
+      const p = DATA[i-1];
+      const body = Math.abs(p.c-p.o) || 0.0000001;
+      const lw = Math.min(p.c,p.o)-p.l, uw = p.h-Math.max(p.c,p.o);
+      return uw > body*cfg.pinRatio && lw < body;
+    },
+    pineLines: (c, b, f) => [
+      `use_pinbar   = input.bool(${b(c.usePinBar)}, "Pin Bar",            group=grp_entry)`,
+      `pin_ratio    = input.float(${f(c.pinRatio||1.5,1)}, "Pin Bar тень/тело",  step=0.5, group=grp_entry)`,
+    ],
+  },
+
+  // ── Bollinger Band Breakout ───────────────────────────────
+  {
+    id:        'boll',
+    flag:      'useBoll',
+    htmlId:    'e_bol',
+    shortName: () => 'BBproboj',
+    detectL: (cfg, i) => cfg.bbB && cfg.bbD[i-1] > 0 && DATA[i-1].c > cfg.bbB[i-1]+cfg.bbD[i-1],
+    detectS: (cfg, i) => cfg.bbB && cfg.bbD[i-1] > 0 && DATA[i-1].c < cfg.bbB[i-1]-cfg.bbD[i-1],
+    pineLines: (c, b, f) => [
+      `use_boll     = input.bool(${b(c.useBoll)},   "Пробой Боллинджера", group=grp_entry)`,
+      `boll_len     = input.int(${Math.max(5, c.bbLen||20)}, "Боллинджер период",  minval=5, maxval=200, group=grp_entry)`,
+      `boll_mult    = input.float(${f(c.bbMult||2.0,1)}, "Боллинджер σ",       step=0.1, group=grp_entry)`,
+    ],
+  },
+
+  // ── Donchian Breakout ────────────────────────────────────
+  {
+    id:        'donch',
+    flag:      'useDonch',
+    htmlId:    'e_don',
+    shortName: () => 'Donch',
+    detectL: (cfg, i) => cfg.donH && DATA[i-1].h > cfg.donH[i],
+    detectS: (cfg, i) => cfg.donL && DATA[i-1].l < cfg.donL[i],
+    pineLines: (c, b, f) => [
+      `use_donch    = input.bool(${b(c.useDonch)},  "Пробой Дончиана",    group=grp_entry)`,
+      `donch_len    = input.int(${Math.max(5, c.donLen||20)}, "Дончиан период",     minval=5, maxval=200, group=grp_entry)`,
+    ],
+  },
+
+  // ── ATR Channel Breakout ─────────────────────────────────
+  {
+    id:        'atrbo',
+    flag:      'useAtrBo',
+    htmlId:    'e_atrbo',
+    shortName: c => `ATRbo×${c.atrBoMult||2}`,
+    detectL: (cfg, i) => cfg.atrBoMA && cfg.atrBoATR[i-1] > 0 &&
+      DATA[i-1].c > cfg.atrBoMA[i-1]+cfg.atrBoATR[i-1]*cfg.atrBoMult,
+    detectS: (cfg, i) => cfg.atrBoMA && cfg.atrBoATR[i-1] > 0 &&
+      DATA[i-1].c < cfg.atrBoMA[i-1]-cfg.atrBoATR[i-1]*cfg.atrBoMult,
+    pineLines: (c, b, f) => [
+      `use_atr_bo   = input.bool(${b(c.useAtrBo)},  "Пробой ATR-канала",  group=grp_entry)`,
+      `atr_bo_len   = input.int(${Math.max(5, c.atrBoLen||14)}, "ATR-канал EMA",      minval=5, maxval=200, group=grp_entry)`,
+      `atr_bo_mult  = input.float(${f(c.atrBoMult||2.0,1)}, "ATR-канал множитель", step=0.1, group=grp_entry)`,
+    ],
+  },
+
+  // ── MA Touch ─────────────────────────────────────────────
+  {
+    id:        'matouch',
+    flag:      'useMaTouch',
+    htmlId:    'e_mat',
+    shortName: () => 'MAToch',
+    detectL: (cfg, i) => {
+      if (!cfg.matMA || i < 3) return false;
+      const crossUp = DATA[i-1].c > cfg.matMA[i-1] && DATA[i-2].c <= cfg.matMA[i-2];
+      const zone = cfg.matMA[i-1] * cfg.matZone / 100;
+      return crossUp && DATA[i-1].l <= cfg.matMA[i-1] + zone;
+    },
+    detectS: (cfg, i) => {
+      if (!cfg.matMA || i < 3) return false;
+      const crossDn = DATA[i-1].c < cfg.matMA[i-1] && DATA[i-2].c >= cfg.matMA[i-2];
+      const zone = cfg.matMA[i-1] * cfg.matZone / 100;
+      return crossDn && DATA[i-1].h >= cfg.matMA[i-1] - zone;
+    },
+    pineLines: (c, b) => [
+      `use_ma_touch = input.bool(${b(c.useMaTouch)}, "Касание MA",         group=grp_entry)`,
+      `ma_touch_bars= input.int(3, "  Баров от касания", minval=1, maxval=10, group=grp_entry)`,
+    ],
+  },
+
+  // ── Squeeze (BB + Keltner) ───────────────────────────────
+  {
+    id:        'squeeze',
+    flag:      'useSqueeze',
+    htmlId:    'e_sqz',
+    shortName: () => 'Squeeze',
+    detectL: (cfg, i) => {
+      if (!cfg.sqzOn) return false;
+      const minBars = cfg.sqzMinBars || 1;
+      return !cfg.sqzOn[i] && cfg.sqzCount[i-1] >= minBars && DATA[i].c > DATA[i].o;
+    },
+    detectS: (cfg, i) => {
+      if (!cfg.sqzOn) return false;
+      const minBars = cfg.sqzMinBars || 1;
+      return !cfg.sqzOn[i] && cfg.sqzCount[i-1] >= minBars && DATA[i].c < DATA[i].o;
+    },
+    pineLines: (c, b) => [
+      `use_squeeze  = input.bool(${b(c.useSqueeze)}, "Squeeze (BB+Keltner)", group=grp_entry)`,
+    ],
+  },
+
+  // ── Trendline Touch ──────────────────────────────────────
+  {
+    id:        'tltouch',
+    flag:      'useTLTouch',
+    htmlId:    'e_tltch',
+    shortName: () => 'TLtch',
+    detectL: (cfg, i) => !!(cfg.tfSigL && (cfg.tfSigL[i] & 1)),
+    detectS: (cfg, i) => !!(cfg.tfSigS && (cfg.tfSigS[i] & 1)),
+    pineLines: (c, b) => [
+      `use_tl_touch = input.bool(${b(c.useTLTouch)}, "Касание TL (линия)", group=grp_entry)`,
+    ],
+  },
+
+  // ── Trendline Breakout ───────────────────────────────────
+  {
+    id:        'tlbreak',
+    flag:      'useTLBreak',
+    htmlId:    'e_tlbrk',
+    shortName: () => 'TLbrk',
+    detectL: (cfg, i) => !!(cfg.tfSigL && (cfg.tfSigL[i] & 2)),
+    detectS: (cfg, i) => !!(cfg.tfSigS && (cfg.tfSigS[i] & 2)),
+    pineLines: (c, b) => [
+      `use_tl_break = input.bool(${b(c.useTLBreak)}, "Пробой TL (линия)",  group=grp_entry)`,
+    ],
+  },
+
+  // ── Flag Pattern ─────────────────────────────────────────
+  {
+    id:        'flag',
+    flag:      'useFlag',
+    htmlId:    'e_flag',
+    shortName: () => 'Flag',
+    detectL: (cfg, i) => !!(cfg.tfSigL && (cfg.tfSigL[i] & 4)),
+    detectS: (cfg, i) => !!(cfg.tfSigS && (cfg.tfSigS[i] & 4)),
+    pineLines: (c, b) => [
+      `use_flag     = input.bool(${b(c.useFlag)},    "Флаг",               group=grp_entry)`,
+    ],
+  },
+
+  // ── Triangle Pattern ──────────────────────────────────────
+  {
+    id:        'triangle',
+    flag:      'useTri',
+    htmlId:    'e_tri',
+    shortName: () => 'Tri',
+    detectL: (cfg, i) => !!(cfg.tfSigL && (cfg.tfSigL[i] & 8)),
+    detectS: (cfg, i) => !!(cfg.tfSigS && (cfg.tfSigS[i] & 8)),
+    pineLines: (c, b, f) => {
+      // Shared TL params: only emit once (after Triangle, as last TL type)
+      const on = c.useTLTouch || c.useTLBreak || c.useFlag || c.useTri;
+      return [
+        `use_tri      = input.bool(${b(c.useTri)},     "Треугольник",        group=grp_entry)`,
+        `tl_pv_l      = input.int(${Math.max(2, c.tlPvL||5)},  "TL Pivot Left",  minval=2, maxval=20, group=grp_entry)`,
+        `tl_pv_r      = input.int(${Math.max(1, c.tlPvR||3)},  "TL Pivot Right", minval=1, maxval=10, group=grp_entry)`,
+        `tl_zone_pct  = input.float(${f(c.tlZonePct||0.3,1)}, "TL Зона ±%",      step=0.1,  group=grp_entry)`,
+        `flag_imp_atr = input.float(${f(c.flagImpMin||2.0,1)}, "Флаг Импульс ×ATR", step=0.5, group=grp_entry)`,
+        `flag_max_b   = input.int(${Math.max(5, c.flagMaxBars||20)}, "Флаг Макс баров",   minval=5, maxval=50, group=grp_entry)`,
+        `flag_ret     = input.float(${f(c.flagRetrace||0.618,3)}, "Флаг Откат",  step=0.01, group=grp_entry)`,
+      ];
+    },
+  },
+
+  // ── RSI выход из зоны OB/OS ──────────────────────────────
+  // Лонг: RSI пересекает уровень перепроданности СНИЗУ ВВЕРХ
+  // Шорт: RSI пересекает уровень перекупленности СВЕРХУ ВНИЗ
+  {
+    id:        'rsiexit',
+    flag:      'useRsiExit',
+    htmlId:    'e_rsix',
+    shortName: c => `RSIexit(${c.rsiExitPeriod||14},${c.rsiExitOS||30}/${c.rsiExitOB||70})`,
+    detectL: (cfg, i) => {
+      if (!cfg.rsiExitArr || i < 2) return false;
+      return cfg.rsiExitArr[i-2] < cfg.rsiExitOS && cfg.rsiExitArr[i-1] >= cfg.rsiExitOS;
+    },
+    detectS: (cfg, i) => {
+      if (!cfg.rsiExitArr || i < 2) return false;
+      return cfg.rsiExitArr[i-2] > cfg.rsiExitOB && cfg.rsiExitArr[i-1] <= cfg.rsiExitOB;
+    },
+    pineLines: (c, b) => [
+      `use_rsi_exit  = input.bool(${b(c.useRsiExit)}, "RSI выход из зоны", group=grp_entry)`,
+      `rsi_exit_per  = input.int(${c.rsiExitPeriod||14}, "  RSI период", minval=2, maxval=50, group=grp_entry)`,
+      `rsi_exit_os   = input.int(${c.rsiExitOS||30}, "  RSI OS уровень", minval=5, maxval=49, group=grp_entry)`,
+      `rsi_exit_ob   = input.int(${c.rsiExitOB||70}, "  RSI OB уровень", minval=51, maxval=95, group=grp_entry)`,
+    ],
+  },
+
+  // ── МА кросс-овер (пересечение) ──────────────────────────
+  // Отличие от MA Touch: НЕ требует касания зоны MA.
+  // Лонг: свеча [i-1] закрылась выше MA, [i-2] закрылась ниже или на MA.
+  {
+    id:        'macross',
+    flag:      'useMaCross',
+    htmlId:    'e_macr',
+    shortName: c => `${c.maCrossType||'EMA'}cross(${c.maCrossP||20})`,
+    detectL: (cfg, i) => {
+      if (!cfg.maCrossArr || i < 2) return false;
+      return DATA[i-1].c > cfg.maCrossArr[i-1] && DATA[i-2].c <= cfg.maCrossArr[i-2];
+    },
+    detectS: (cfg, i) => {
+      if (!cfg.maCrossArr || i < 2) return false;
+      return DATA[i-1].c < cfg.maCrossArr[i-1] && DATA[i-2].c >= cfg.maCrossArr[i-2];
+    },
+    pineLines: (c, b) => [
+      `use_ma_cross  = input.bool(${b(c.useMaCross)}, "МА кросс-овер", group=grp_entry)`,
+      `ma_cross_type = input.string("${c.maCrossType||'EMA'}", "  МА тип", options=["EMA","SMA","WMA"], group=grp_entry)`,
+      `ma_cross_p    = input.int(${c.maCrossP||20}, "  МА период", minval=2, maxval=500, group=grp_entry)`,
+    ],
+  },
+
+  // ── Свободный вход (Free Entry) ───────────────────────────
+  // Вход разрешён всегда. Ограничивают только фильтры (AND-логика).
+  // Полезно: тест чистой системы фильтров без сигнала входа.
+  {
+    id:        'free',
+    flag:      'useFreeEntry',
+    htmlId:    'e_free',
+    shortName: () => 'Free',
+    detectL:   () => true,
+    detectS:   () => true,
+    pineLines: (c, b) => [
+      `use_free_entry = input.bool(${b(c.useFreeEntry)}, "Свободный вход", group=grp_entry)`,
+    ],
+  },
+
+  // ── MACD кросс-овер ───────────────────────────────────────
+  // Лонг: MACD линия пересекает сигнальную СНИЗУ ВВЕРХ
+  // Шорт: MACD линия пересекает сигнальную СВЕРХУ ВНИЗ
+  {
+    id:        'macd',
+    flag:      'useMacd',
+    htmlId:    'e_macd',
+    shortName: c => `MACD(${c.macdFast||12}/${c.macdSlow||26}/${c.macdSignalP||9})`,
+    detectL: (cfg, i) => {
+      if (!cfg.macdLine || !cfg.macdSignal || i < 2) return false;
+      return cfg.macdLine[i-1] > cfg.macdSignal[i-1] && cfg.macdLine[i-2] <= cfg.macdSignal[i-2];
+    },
+    detectS: (cfg, i) => {
+      if (!cfg.macdLine || !cfg.macdSignal || i < 2) return false;
+      return cfg.macdLine[i-1] < cfg.macdSignal[i-1] && cfg.macdLine[i-2] >= cfg.macdSignal[i-2];
+    },
+    pineLines: (c, b) => [
+      `use_macd      = input.bool(${b(c.useMacd)}, "MACD кросс", group=grp_entry)`,
+      `macd_fast     = input.int(${c.macdFast||12}, "  MACD быстрый", minval=2, maxval=100, group=grp_entry)`,
+      `macd_slow     = input.int(${c.macdSlow||26}, "  MACD медленный", minval=3, maxval=200, group=grp_entry)`,
+      `macd_signal   = input.int(${c.macdSignalP||9}, "  MACD сигнал", minval=2, maxval=50, group=grp_entry)`,
+    ],
+  },
+
+  // ── Stochastic выход из зоны OB/OS ───────────────────────
+  // Используется %D (сглаженный). Лонг: %D выходит из OS снизу вверх.
+  {
+    id:        'stochexit',
+    flag:      'useStochExit',
+    htmlId:    'e_stx',
+    shortName: c => `Stoch(${c.stochKP||14}/${c.stochDP||3},${c.stochOS||20}/${c.stochOB||80})`,
+    detectL: (cfg, i) => {
+      if (!cfg.stochD || i < 2) return false;
+      return cfg.stochD[i-2] < cfg.stochOS && cfg.stochD[i-1] >= cfg.stochOS;
+    },
+    detectS: (cfg, i) => {
+      if (!cfg.stochD || i < 2) return false;
+      return cfg.stochD[i-2] > cfg.stochOB && cfg.stochD[i-1] <= cfg.stochOB;
+    },
+    pineLines: (c, b) => [
+      `use_stoch_exit = input.bool(${b(c.useStochExit)}, "Stochastic выход из зоны", group=grp_entry)`,
+      `stoch_k_per   = input.int(${c.stochKP||14}, "  Stoch K период", minval=2, maxval=100, group=grp_entry)`,
+      `stoch_d_per   = input.int(${c.stochDP||3},  "  Stoch D период", minval=2, maxval=20, group=grp_entry)`,
+      `stoch_os      = input.int(${c.stochOS||20}, "  Stoch OS уровень", minval=5, maxval=49, group=grp_entry)`,
+      `stoch_ob      = input.int(${c.stochOB||80}, "  Stoch OB уровень", minval=51, maxval=95, group=grp_entry)`,
+    ],
+  },
+
+  // ── Объём + направленное движение ────────────────────────
+  // Лонг: предыдущая свеча бычья + объём > avg×mult + закрытие в верхней половине
+  // Шорт: предыдущая свеча медвежья + объём > avg×mult + закрытие в нижней половине
+  {
+    id:        'volmove',
+    flag:      'useVolMove',
+    htmlId:    'e_volmv',
+    shortName: c => `VolMove(${c.volMoveMult||1.5}×)`,
+    detectL: (cfg, i) => {
+      if (!HAS_VOLUME || !cfg.volAvg || i < 1) return false;
+      const p = DATA[i-1];
+      return p.v > cfg.volAvg[i-1] * cfg.volMoveMult &&
+             p.c > p.o && (p.c - p.l) > (p.h - p.c);
+    },
+    detectS: (cfg, i) => {
+      if (!HAS_VOLUME || !cfg.volAvg || i < 1) return false;
+      const p = DATA[i-1];
+      return p.v > cfg.volAvg[i-1] * cfg.volMoveMult &&
+             p.c < p.o && (p.h - p.c) > (p.c - p.l);
+    },
+    pineLines: (c, b, f) => [
+      `use_vol_move  = input.bool(${b(c.useVolMove)}, "Объём + движение", group=grp_entry)`,
+      `vol_move_mult = input.float(${f(c.volMoveMult||1.5,1)}, "  Объём ×avg", step=0.1, group=grp_entry)`,
+    ],
+  },
+
+  // ── Inside Bar пробой ─────────────────────────────────────
+  // mother bar [i-3], inside bar [i-2], breakout bar [i-1] закрылся за пределами mother.
+  // Лонг: закрытие выше хая mother bar. Шорт: ниже лоу mother bar.
+  {
+    id:        'insidebar',
+    flag:      'useInsideBar',
+    htmlId:    'e_inb',
+    shortName: () => 'InsideBar',
+    detectL: (cfg, i) => {
+      if (i < 4) return false;
+      const m = DATA[i-3], ins = DATA[i-2], brk = DATA[i-1];
+      return ins.h < m.h && ins.l > m.l && brk.c > m.h;
+    },
+    detectS: (cfg, i) => {
+      if (i < 4) return false;
+      const m = DATA[i-3], ins = DATA[i-2], brk = DATA[i-1];
+      return ins.h < m.h && ins.l > m.l && brk.c < m.l;
+    },
+    pineLines: (c, b) => [
+      `use_inside_bar = input.bool(${b(c.useInsideBar)}, "Inside Bar пробой", group=grp_entry)`,
+    ],
+  },
+
+  // ── Разворот после N однонаправленных свечей ─────────────
+  // Лонг: N (или более) медвежьих свечей подряд, затем бычья → разворот вверх
+  // Шорт: N (или более) бычьих свечей подряд, затем медвежья → разворот вниз
+  {
+    id:        'nreversal',
+    flag:      'useNReversal',
+    htmlId:    'e_nrev',
+    shortName: c => `NRev(${c.nReversalN||3})`,
+    detectL: (cfg, i) => {
+      const n = cfg.nReversalN || 3;
+      if (i < n + 1) return false;
+      if (DATA[i-1].c <= DATA[i-1].o) return false; // prev должна быть бычьей
+      for (let j = 2; j <= n + 1; j++) {
+        if (DATA[i-j].c >= DATA[i-j].o) return false; // серия медвежьих
+      }
+      return true;
+    },
+    detectS: (cfg, i) => {
+      const n = cfg.nReversalN || 3;
+      if (i < n + 1) return false;
+      if (DATA[i-1].c >= DATA[i-1].o) return false; // prev должна быть медвежьей
+      for (let j = 2; j <= n + 1; j++) {
+        if (DATA[i-j].c <= DATA[i-j].o) return false; // серия бычьих
+      }
+      return true;
+    },
+    pineLines: (c, b) => [
+      `use_n_reversal = input.bool(${b(c.useNReversal)}, "Разворот после N свечей", group=grp_entry)`,
+      `n_reversal_n  = input.int(${c.nReversalN||3}, "  Мин свечей серии", minval=2, maxval=20, group=grp_entry)`,
+    ],
+  },
+];
+
+// ============================================================
+// filter_registry.js — реестр фильтров входа
+// ============================================================
+// FILTER_REGISTRY: массив объектов, описывающих каждый фильтр.
+// Единственный источник правды для:
+//   • core.js   — blocksL/blocksS (применение фильтров)
+//   • opt.js    — buildName (части названия результата)
+//
+// ДОБАВИТЬ НОВЫЙ ФИЛЬТР: добавить 1 объект в FILTER_REGISTRY + чекбокс в shell.html
+// + индикатор в _calcIndicators (если нужен) + поля в buildBtCfg. core/buildName — автоматически.
+//
+// blocksL(cfg, i) → true: блокировать лонг-сигнал
+// blocksS(cfg, i) → true: блокировать шорт-сигнал
+// Некоторые фильтры блокируют оба направления одновременно (blocksL = blocksS = true).
+// ============================================================
+
+const FILTER_REGISTRY = [
+  // ── MA Direction ─────────────────────────────────────────
+  // Pine: close[1] > ma_val где ma_val = EMA[i-1]
+  {
+    id:       'ma',
+    flag:     'useMA',
+    blocksL:  (cfg, i) => cfg.maArr && cfg.maArr[i-1] > 0 && DATA[i-1].c <= cfg.maArr[i-1],
+    blocksS:  (cfg, i) => cfg.maArr && cfg.maArr[i-1] > 0 && DATA[i-1].c >= cfg.maArr[i-1],
+    nameLabel: (cfg, ex) => ex && ex.maP ? `${ex.maType||'EMA'}${ex.maP}` : null,
+  },
+
+  // ── ADX Strength ─────────────────────────────────────────
+  {
+    id:       'adx',
+    flag:     'useADX',
+    blocksL:  (cfg, i) => cfg.adxArr && cfg.adxArr[i-1] < cfg.adxThresh,
+    blocksS:  (cfg, i) => cfg.adxArr && cfg.adxArr[i-1] < cfg.adxThresh,
+    nameLabel: (cfg, ex) => `ADX(${(ex&&ex.adxL)||cfg.adxLen||14}>${cfg.adxThresh})`,
+  },
+
+  // ── RSI Extremes ──────────────────────────────────────────
+  {
+    id:       'rsi',
+    flag:     'useRSI',
+    blocksL:  (cfg, i) => cfg.rsiArr && cfg.rsiArr[i-1] >= cfg.rsiOS,
+    blocksS:  (cfg, i) => cfg.rsiArr && cfg.rsiArr[i-1] <= cfg.rsiOB,
+    nameLabel: (cfg) => `RSI(${cfg.rsiOS}-${cfg.rsiOB})`,
+  },
+
+  // ── Volume / ATR Filter ───────────────────────────────────
+  {
+    id:       'volf',
+    flag:     'useVolF',
+    blocksL:  (cfg, i, ac) => cfg.atrAvg && ac > cfg.atrAvg[i-1] * cfg.volFMult,
+    blocksS:  (cfg, i, ac) => cfg.atrAvg && ac > cfg.atrAvg[i-1] * cfg.volFMult,
+    nameLabel: (cfg) => `VFilt<${cfg.volFMult}×`,
+  },
+
+  // ── Market Structure (HH/HL) ──────────────────────────────
+  {
+    id:       'struct',
+    flag:     'useStruct',
+    blocksL:  (cfg, i) => cfg.structBull && !cfg.structBull[i],
+    blocksS:  (cfg, i) => cfg.structBear && !cfg.structBear[i],
+    nameLabel: () => 'Struct',
+  },
+
+  // ── MA Distance ───────────────────────────────────────────
+  // Pine: abs(close[1] - ma_val) / atr_v
+  {
+    id:       'madist',
+    flag:     'useMaDist',
+    blocksL:  (cfg, i, ac) => {
+      if (!cfg.maArr || ac <= 0) return false;
+      return Math.abs(DATA[i-1].c - cfg.maArr[i-1]) / ac > cfg.maDistMax;
+    },
+    blocksS:  (cfg, i, ac) => {
+      if (!cfg.maArr || ac <= 0) return false;
+      return Math.abs(DATA[i-1].c - cfg.maArr[i-1]) / ac > cfg.maDistMax;
+    },
+    nameLabel: (cfg) => `MaDist<${cfg.maDistMax}×ATR`,
+  },
+
+  // ── Candle Size ───────────────────────────────────────────
+  // Pine: ТЕКУЩАЯ свеча (bar confirmed = close[0])
+  {
+    id:       'candlef',
+    flag:     'useCandleF',
+    blocksL:  (cfg, i, ac) => {
+      if (ac <= 0) return false;
+      const cs = DATA[i].h - DATA[i].l;
+      return cs < ac * cfg.candleMin || cs > ac * cfg.candleMax;
+    },
+    blocksS:  (cfg, i, ac) => {
+      if (ac <= 0) return false;
+      const cs = DATA[i].h - DATA[i].l;
+      return cs < ac * cfg.candleMin || cs > ac * cfg.candleMax;
+    },
+    nameLabel: (cfg) => `Candle(${cfg.candleMin}-${cfg.candleMax})`,
+  },
+
+  // ── Consecutive Bars ─────────────────────────────────────
+  {
+    id:       'consec',
+    flag:     'useConsec',
+    blocksL:  (cfg, i) => {
+      if (i < cfg.consecMax + 1) return false;
+      let bc = 0;
+      for (let j = 1; j <= cfg.consecMax + 1; j++) {
+        if (DATA[i-j].c > DATA[i-j].o) bc++; else { bc = 0; break; }
+      }
+      return bc >= cfg.consecMax;
+    },
+    blocksS:  (cfg, i) => {
+      if (i < cfg.consecMax + 1) return false;
+      let bca = 0;
+      for (let j = 1; j <= cfg.consecMax + 1; j++) {
+        if (DATA[i-j].c < DATA[i-j].o) bca++; else { bca = 0; break; }
+      }
+      return bca >= cfg.consecMax;
+    },
+    nameLabel: (cfg) => `Consec<${cfg.consecMax}`,
+  },
+
+  // ── SMA Trend (STrend) ────────────────────────────────────
+  // Pine: close[1..N] vs одно значение EMA[i-1]
+  {
+    id:       'strend',
+    flag:     'useSTrend',
+    blocksL:  (cfg, i) => {
+      if (!cfg.maArr || i < cfg.sTrendWin + 1) return false;
+      const maRef = cfg.maArr[i-1];
+      let ab = 0, bl = 0;
+      for (let j = 1; j <= cfg.sTrendWin; j++) {
+        if (DATA[i-j].c > maRef) ab++; else bl++;
+      }
+      return ab <= bl;
+    },
+    blocksS:  (cfg, i) => {
+      if (!cfg.maArr || i < cfg.sTrendWin + 1) return false;
+      const maRef = cfg.maArr[i-1];
+      let ab = 0, bl = 0;
+      for (let j = 1; j <= cfg.sTrendWin; j++) {
+        if (DATA[i-j].c > maRef) ab++; else bl++;
+      }
+      return bl <= ab;
+    },
+    nameLabel: (cfg, ex) => `STrend${(ex&&ex.stw)||cfg.sTrendWin||''}`,
+  },
+
+  // ── Secondary MA Confirm ──────────────────────────────────
+  {
+    id:       'confirm',
+    flag:     'useConfirm',
+    blocksL:  (cfg, i) => {
+      if (!cfg.maArrConfirm || i < 1) return false;
+      const secMA = cfg.maArrConfirm[i-1];
+      return secMA > 0 && DATA[i-1].c <= secMA;
+    },
+    blocksS:  (cfg, i) => {
+      if (!cfg.maArrConfirm || i < 1) return false;
+      const secMA = cfg.maArrConfirm[i-1];
+      return secMA > 0 && DATA[i-1].c >= secMA;
+    },
+    nameLabel: (cfg) => `Conf${cfg.confMatType||'EMA'}${cfg.confN}`,
+  },
+
+  // ── Trend Freshness ───────────────────────────────────────
+  // Pine: непрерывная серия баров подряд где close > MA
+  {
+    id:       'fresh',
+    flag:     'useFresh',
+    blocksL:  (cfg, i) => {
+      if (!cfg.maArr) return false;
+      let age = 0;
+      for (let j = 1; j < Math.min(i, cfg.freshMax + 2); j++) {
+        if (DATA[i-j].c > cfg.maArr[i-j-1]) age++; else break;
+      }
+      return age >= cfg.freshMax;
+    },
+    blocksS:  (cfg, i) => {
+      if (!cfg.maArr) return false;
+      let age = 0;
+      for (let j = 1; j < Math.min(i, cfg.freshMax + 2); j++) {
+        if (DATA[i-j].c < cfg.maArr[i-j-1]) age++; else break;
+      }
+      return age >= cfg.freshMax;
+    },
+    nameLabel: (cfg) => `Fresh<${cfg.freshMax}`,
+  },
+
+  // ── VSA — Volume Spike ────────────────────────────────────
+  {
+    id:       'vsa',
+    flag:     'useVSA',
+    volRequired: true,
+    blocksL:  (cfg, i) => HAS_VOLUME && cfg.volAvg && DATA[i-1].v < cfg.volAvg[i-1] * cfg.vsaMult,
+    blocksS:  (cfg, i) => HAS_VOLUME && cfg.volAvg && DATA[i-1].v < cfg.volAvg[i-1] * cfg.vsaMult,
+    nameLabel: (cfg) => `Vol>${cfg.vsaMult}×`,
+  },
+
+  // ── Liquidity ─────────────────────────────────────────────
+  {
+    id:       'liq',
+    flag:     'useLiq',
+    volRequired: true,
+    blocksL:  (cfg, i) => HAS_VOLUME && cfg.volAvg && DATA[i-1].v < cfg.volAvg[i-1] * cfg.liqMin,
+    blocksS:  (cfg, i) => HAS_VOLUME && cfg.volAvg && DATA[i-1].v < cfg.volAvg[i-1] * cfg.liqMin,
+    nameLabel: (cfg) => `Liq>${cfg.liqMin}×`,
+  },
+
+  // ── Volume Direction ──────────────────────────────────────
+  {
+    id:       'voldir',
+    flag:     'useVolDir',
+    volRequired: true,
+    blocksL:  (cfg, i) => {
+      if (!HAS_VOLUME || !cfg.volAvg || i < cfg.volDirPeriod) return false;
+      let bullVol = 0, bearVol = 0;
+      for (let j = 1; j <= cfg.volDirPeriod; j++) {
+        if (DATA[i-j].c > DATA[i-j].o) bullVol += DATA[i-j].v; else bearVol += DATA[i-j].v;
+      }
+      return bullVol <= bearVol;
+    },
+    blocksS:  (cfg, i) => {
+      if (!HAS_VOLUME || !cfg.volAvg || i < cfg.volDirPeriod) return false;
+      let bullVol = 0, bearVol = 0;
+      for (let j = 1; j <= cfg.volDirPeriod; j++) {
+        if (DATA[i-j].c > DATA[i-j].o) bullVol += DATA[i-j].v; else bearVol += DATA[i-j].v;
+      }
+      return bearVol <= bullVol;
+    },
+    nameLabel: () => 'VolDir',
+  },
+
+  // ── Weighted Trend ────────────────────────────────────────
+  {
+    id:       'wt',
+    flag:     'useWT',
+    blocksL:  (cfg, i) => cfg.wtScores && cfg.wtScores[i] <= cfg.wtThresh,
+    blocksS:  (cfg, i) => cfg.wtScores && cfg.wtScores[i] >= -cfg.wtThresh,
+    nameLabel: (cfg) => `WT>${cfg.wtThresh}`,
+  },
+
+  // ── Fat Volume (Exhaustion) ───────────────────────────────
+  {
+    id:       'fat',
+    flag:     'useFat',
+    volRequired: true,
+    blocksL:  (cfg, i) => {
+      if (!HAS_VOLUME || !cfg.volAvg || i < 10) return false;
+      const volRecent = (DATA[i].v + DATA[i-1].v + DATA[i-2].v) / 3;
+      let volPrev10 = 0;
+      for (let k = 0; k < 10; k++) volPrev10 += DATA[i-k].v;
+      volPrev10 /= 10;
+      const fatVol = volRecent < volPrev10 * cfg.fatVolDrop;
+      let bullConsec = 0;
+      for (let j = 1; j <= cfg.fatConsec + 1; j++) {
+        if (DATA[i-j].c > DATA[i-j].o) {
+          if (j === 1 || DATA[i-j+1].c > DATA[i-j+1].o) bullConsec++; else break;
+        } else break;
+      }
+      return bullConsec >= cfg.fatConsec && fatVol;
+    },
+    blocksS:  (cfg, i) => {
+      if (!HAS_VOLUME || !cfg.volAvg || i < 10) return false;
+      const volRecent = (DATA[i].v + DATA[i-1].v + DATA[i-2].v) / 3;
+      let volPrev10 = 0;
+      for (let k = 0; k < 10; k++) volPrev10 += DATA[i-k].v;
+      volPrev10 /= 10;
+      const fatVol = volRecent < volPrev10 * cfg.fatVolDrop;
+      let bearConsec = 0;
+      for (let j = 1; j <= cfg.fatConsec + 1; j++) {
+        if (DATA[i-j].c < DATA[i-j].o) {
+          if (j === 1 || DATA[i-j+1].c < DATA[i-j+1].o) bearConsec++; else break;
+        } else break;
+      }
+      return bearConsec >= cfg.fatConsec && fatVol;
+    },
+    nameLabel: (cfg) => `Fat(${cfg.fatConsec}sv)`,
+  },
+];
+
+// ============================================================
+// exit_registry.js — реестр принудительных выходов из сделки
+// ============================================================
+// EXIT_REGISTRY: массив объектов для статeless forced exits.
+//
+// Покрывает: Climax, Time (проверки без внутреннего состояния).
+// НЕ покрывает: Rev (сложная state-machine со skip/cooldown/revNewDir).
+// НЕ покрывает: BE, Trailing, Partial (не forced exits, а управление SL).
+//
+// ДОБАВИТЬ НОВЫЙ FORCED EXIT: добавить 1 объект ниже + чекбокс в shell.html
+// + поля в buildBtCfg. core.js выход применяется автоматически.
+//
+// check(cfg, i, tradeState) → true: выход (frc = true)
+//   tradeState: { dir, entry, entryBar }
+//   ВАЖНО: check вызывается только если !frc (предыдущий exit не сработал)
+// ============================================================
+
+const EXIT_REGISTRY = [
+  // ── Climax Bar Exit ──────────────────────────────────────
+  // Огромный объём + большое тело на предыдущем баре → выход
+  {
+    id:    'climax',
+    flag:  'useClimax',
+    check: (cfg, i, ts) => {
+      if (!HAS_VOLUME || !cfg.volAvg || !cfg.bodyAvg) return false;
+      const prev = DATA[i-1];
+      const isClimaxBar = prev.v > cfg.volAvg[i-1] * cfg.clxVolMult &&
+        Math.abs(prev.c - prev.o) > cfg.bodyAvg[i-1] * cfg.clxBodyMult;
+      if (!isClimaxBar) return false;
+      const cpnl = ts.dir * (DATA[i].c - ts.entry) / ts.entry * 100;
+      return cfg.clxMode === 'any' || cpnl > 0;
+    },
+  },
+
+  // ── Time-Based Exit ───────────────────────────────────────
+  // Выход через N баров после входа
+  {
+    id:    'time',
+    flag:  'useTime',
+    check: (cfg, i, ts) => {
+      if ((i - ts.entryBar) < cfg.timeBars) return false;
+      if (cfg.timeMode === 'any') return true;
+      const cpnl = ts.dir * (DATA[i].c - ts.entry) / ts.entry * 100;
+      return cfg.timeMode === 'plus' && cpnl > 0;
+    },
+  },
+];
+
+// ============================================================
+// sl_tp_registry.js — реестры типов стоп-лосса и тейк-профита
+// ============================================================
+//
+// SL_REGISTRY: массив типов стоп-лосса.
+//   flag: поле в cfg, которое включает этот тип SL
+//   calc(cfg, entry, dir, ac, i): вычислить уровень SL (NaN если не применимо)
+//
+// TP_REGISTRY: массив режимов расчёта тейк-профита.
+//   mode: строка ('rr', 'atr', 'pct') — значение cfg.tpMode / cfg.tpModeB
+//   calc(entry, dir, slDist, ac, mult): вычислить уровень TP
+//
+// Использование в core.js:
+//   SL: const slCandidates = SL_REGISTRY.filter(s => cfg[s.flag]).map(s => s.calc(...)).filter(v => !isNaN(v));
+//   TP: const tpA = _calcTP(entry, dir, slDist, ac, cfg.tpMode, cfg.tpMult);
+//
+// ДОБАВИТЬ НОВЫЙ ТИП SL: добавить объект в SL_REGISTRY + UI + buildBtCfg.
+// ДОБАВИТЬ НОВЫЙ РЕЖИМ TP: добавить объект в TP_REGISTRY + UI + buildBtCfg.
+// ============================================================
+
+const SL_REGISTRY = [
+  // ── ATR-based SL ─────────────────────────────────────────
+  {
+    id:   'atr',
+    flag: 'hasSLA',
+    calc: (cfg, entry, dir, ac, i) => entry - dir * ac * cfg.slMult,
+  },
+
+  // ── Percent-based SL ─────────────────────────────────────
+  {
+    id:   'pct',
+    flag: 'hasSLB',
+    calc: (cfg, entry, dir, ac, i) => entry * (1 - dir * cfg.slPctMult / 100),
+  },
+
+  // ── Pivot-based SL ───────────────────────────────────────
+  {
+    id:   'pivot',
+    flag: 'useSLPiv',
+    calc: (cfg, entry, dir, ac, i) => {
+      if (!cfg.pivSLLo || !cfg.pivSLHi) return NaN;
+      const pivLevel = dir === 1 ? cfg.pivSLLo[i] : cfg.pivSLHi[i];
+      if (isNaN(pivLevel)) return NaN;
+      const rawSL = dir === 1
+        ? pivLevel - ac * cfg.slPivOff
+        : pivLevel + ac * cfg.slPivOff;
+      const dist = Math.abs(entry - rawSL);
+      const sl = dist > ac * cfg.slPivMax ? entry - dir * ac * cfg.slPivMax : rawSL;
+      if ((dir === 1 && sl >= entry) || (dir === -1 && sl <= entry)) return NaN;
+      return sl;
+    },
+  },
+];
+
+// ─────────────────────────────────────────────────────────────
+// TP_REGISTRY: режимы расчёта тейк-профита
+// ─────────────────────────────────────────────────────────────
+const TP_REGISTRY = [
+  // ── Risk/Reward ratio ─────────────────────────────────────
+  {
+    mode: 'rr',
+    calc: (entry, dir, slDist, ac, mult) => entry + dir * slDist * mult,
+  },
+
+  // ── ATR multiplier ────────────────────────────────────────
+  {
+    mode: 'atr',
+    calc: (entry, dir, slDist, ac, mult) => entry + dir * ac * mult,
+  },
+
+  // ── Percent from entry ────────────────────────────────────
+  {
+    mode: 'pct',
+    calc: (entry, dir, slDist, ac, mult) => entry * (1 + dir * mult / 100),
+  },
+];
+
+// Хелпер: вычислить TP по режиму и множителю
+function _calcTP(entry, dir, slDist, ac, mode, mult) {
+  const t = TP_REGISTRY.find(t => t.mode === mode);
+  return t ? t.calc(entry, dir, slDist, ac, mult) : NaN;
+}
+
+
+// ============================================================
 // RANGE PARSER
 // ============================================================
 function parseRange(id) {
@@ -3570,6 +4429,32 @@ function calcBodySMA(period) {
   const bodies = DATA.map(d => Math.abs(d.c - d.o));
   return calcSMA(bodies, period);
 }
+// MACD: line = EMA(fast) - EMA(slow), signal = EMA(line, signalP)
+function calcMACD(fast, slow, signalP) {
+  const closes = DATA.map(d => d.c);
+  const emaFast = calcEMA(closes, fast);
+  const emaSlow = calcEMA(closes, slow);
+  const N = DATA.length;
+  const line = new Float64Array(N);
+  for (let i = 0; i < N; i++) line[i] = emaFast[i] - emaSlow[i];
+  const signal = calcEMA(Array.from(line), signalP);
+  return { line, signal };
+}
+// Stochastic %K и %D (SMA of %K)
+function calcStochastic(kPeriod, dPeriod) {
+  const N = DATA.length;
+  const kArr = new Float64Array(N);
+  for (let i = kPeriod - 1; i < N; i++) {
+    let lo = DATA[i].l, hi = DATA[i].h;
+    for (let j = i - kPeriod + 1; j < i; j++) {
+      if (DATA[j].l < lo) lo = DATA[j].l;
+      if (DATA[j].h > hi) hi = DATA[j].h;
+    }
+    kArr[i] = hi > lo ? (DATA[i].c - lo) / (hi - lo) * 100 : 50;
+  }
+  const dArr = calcSMA(Array.from(kArr), dPeriod);
+  return { kArr, dArr };
+}
 
 // ============================================================
 // WEIGHTED TREND SCORE
@@ -3665,22 +4550,18 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
       // --- Шаг 1: Rev signal → frc ---
       let frc = false, revNewDir = 0;
       if (cfg.useRev && (i-entryBar) >= cfg.revBars) {
-        // oppSig: сигнал противоположного направления (те же типы входа, что включены)
-        // Pivot: только если pivot-вход включён
-        let oppSig = cfg.usePivot && (dir===1 ? pvHi[i]===1 : pvLo[i]===1);
-        // TL-фигуры: tfSigS для длинной позиции, tfSigL для короткой
-        if (!oppSig && cfg.tfSigL && cfg.tfSigS) {
-          const tfM=(cfg.useTLTouch?1:0)|(cfg.useTLBreak?2:0)|(cfg.useFlag?4:0)|(cfg.useTri?8:0);
-          if (tfM) {
-            if (dir===1  && (cfg.tfSigS[i]&tfM)) oppSig=true;
-            if (dir===-1 && (cfg.tfSigL[i]&tfM)) oppSig=true;
+        // oppSig: сигнал противоположного направления из любого включённого типа входа
+        let oppSig = false;
+        for (let _ei = 0; _ei < ENTRY_REGISTRY.length && !oppSig; _ei++) {
+          const _e = ENTRY_REGISTRY[_ei];
+          if (!cfg[_e.flag]) continue;
+          if (dir === 1) {
+            const fn = _e.revDetectS || _e.detectS;
+            if (fn(cfg, i)) oppSig = true;
+          } else {
+            const fn = _e.revDetectL || _e.detectL;
+            if (fn(cfg, i)) oppSig = true;
           }
-        }
-        // Engulf reverse
-        if (!oppSig && cfg.useEngulf) {
-          const bPrev=Math.abs(prev.o-prev.c), bCur=Math.abs(bar.o-bar.c);
-          if (dir===1  && prev.c>prev.o && bar.c<bar.o && bCur>=bPrev*0.7 && bar.c<=prev.o && bar.o>=prev.c) oppSig=true;
-          if (dir===-1 && prev.c<prev.o && bar.c>bar.o && bCur>=bPrev*0.7 && bar.c>=prev.o && bar.o<=prev.c) oppSig=true;
         }
         if (oppSig) {
           if (cfg.revCooldown > 0) {
@@ -3711,20 +4592,13 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
         }
       }
 
-      // --- Шаг 2: Climax → frc ---
-      if (!frc && cfg.useClimax && HAS_VOLUME && volAvg && bodyAvg) {
-        const isClimaxBar = prev.v > volAvg[i-1]*cfg.clxVolMult &&
-          Math.abs(prev.c - prev.o) > bodyAvg[i-1]*cfg.clxBodyMult;
-        if (isClimaxBar) {
-          const cpnl = dir*(bar.c - entry)/entry*100;
-          if (cfg.clxMode==='any' || cpnl > 0) frc = true;
+      // --- Шаги 2-3: Forced exits (Climax, Time) из EXIT_REGISTRY ---
+      if (!frc) {
+        const _ts = { dir, entry, entryBar };
+        for (let _xi = 0; _xi < EXIT_REGISTRY.length && !frc; _xi++) {
+          const _ex = EXIT_REGISTRY[_xi];
+          if (cfg[_ex.flag] && _ex.check(cfg, i, _ts)) frc = true;
         }
-      }
-
-      // --- Шаг 3: Time → frc ---
-      if (!frc && cfg.useTime && (i-entryBar) >= cfg.timeBars) {
-        if (cfg.timeMode==='any') frc = true;
-        else { const cpnl = dir*(bar.c-entry)/entry*100; if (cfg.timeMode==='plus'&&cpnl>0) frc=true; }
       }
 
       // --- Шаг 4: BE Ветка 1 (beOff >= beTrig, !frc) → немедленный выход ---
@@ -3846,8 +4720,8 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
           if (hasSL2) sl2 = entry*(1-dir*cfg.slPctMult/100);
           const slDist2 = Math.abs(entry-sl1)||ac2;
           hasTP2 = hasTPA && hasTPB;
-          if (hasTPA) { tp1 = cfg.tpMode==='rr' ? entry+dir*slDist2*cfg.tpMult : cfg.tpMode==='atr' ? entry+dir*ac2*cfg.tpMult : entry*(1+dir*cfg.tpMult/100); }
-          if (hasTPB) { tp2 = cfg.tpModeB==='rr' ? entry+dir*slDist2*cfg.tpMultB : cfg.tpModeB==='atr' ? entry+dir*ac2*cfg.tpMultB : entry*(1+dir*cfg.tpMultB/100); }
+          if (hasTPA) tp1 = _calcTP(entry, dir, slDist2, ac2, cfg.tpMode,  cfg.tpMult);
+          if (hasTPB) tp2 = _calcTP(entry, dir, slDist2, ac2, cfg.tpModeB, cfg.tpMultB);
           inTrade = true; entryBar = i; posSize = 1.0;
           beActive = false; trailActive = false; partialDone = false;
           eq[i] = pnl;
@@ -3871,175 +4745,20 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
     if (!inTrade && i > exitBar) {
       let sigL = false, sigS = false;
 
-      if (cfg.usePivot) {
-        if (pvLo[i]===1) sigL=true;
-        if (pvHi[i]===1) sigS=true;
-      }
-      if (cfg.useEngulf && i>=3) {
-        const bp=Math.abs(DATA[i-2].c-DATA[i-2].o), bc=Math.abs(prev.c-prev.o);
-        if (DATA[i-2].c<DATA[i-2].o && prev.c>prev.o && bc>=bp*0.7 && prev.c>=DATA[i-2].o) sigL=true;
-        if (DATA[i-2].c>DATA[i-2].o && prev.c<prev.o && bc>=bp*0.7 && prev.c<=DATA[i-2].o) sigS=true;
-      }
-      if (cfg.usePinBar && i>=2) {
-        const body=Math.abs(prev.c-prev.o)||0.0000001;
-        const lw=Math.min(prev.c,prev.o)-prev.l, uw=prev.h-Math.max(prev.c,prev.o);
-        if (lw>body*cfg.pinRatio && uw<body) sigL=true;
-        if (uw>body*cfg.pinRatio && lw<body) sigS=true;
-      }
-      if (cfg.useBoll && cfg.bbB && cfg.bbD[i-1]>0) {
-        if (prev.c>cfg.bbB[i-1]+cfg.bbD[i-1]) sigL=true;
-        if (prev.c<cfg.bbB[i-1]-cfg.bbD[i-1]) sigS=true;
-      }
-      if (cfg.useDonch && cfg.donH) {
-        if (prev.h>cfg.donH[i]) sigL=true;
-        if (prev.l<cfg.donL[i]) sigS=true;
-      }
-      if (cfg.useAtrBo && cfg.atrBoMA && cfg.atrBoATR[i-1]>0) {
-        if (prev.c>cfg.atrBoMA[i-1]+cfg.atrBoATR[i-1]*cfg.atrBoMult) sigL=true;
-        if (prev.c<cfg.atrBoMA[i-1]-cfg.atrBoATR[i-1]*cfg.atrBoMult) sigS=true;
-      }
-      if (cfg.useMaTouch && cfg.matMA && i>=3) {
-        const crossUp=DATA[i-1].c>cfg.matMA[i-1]&&DATA[i-2].c<=cfg.matMA[i-2];
-        const crossDn=DATA[i-1].c<cfg.matMA[i-1]&&DATA[i-2].c>=cfg.matMA[i-2];
-        const zone=cfg.matMA[i-1]*cfg.matZone/100;
-        if (crossUp&&DATA[i-1].l<=cfg.matMA[i-1]+zone) sigL=true;
-        if (crossDn&&DATA[i-1].h>=cfg.matMA[i-1]-zone) sigS=true;
-      }
-      if (cfg.useSqueeze && cfg.sqzOn) {
-        const minBars = cfg.sqzMinBars||1;
-        if (!cfg.sqzOn[i] && cfg.sqzCount[i-1]>=minBars) {
-          if (bar.c>bar.o) sigL=true;
-          if (bar.c<bar.o) sigS=true;
-        }
-      }
-      // Trendline Figures — TL touch, TL break, Flag, Triangle
-      if (cfg.tfSigL && cfg.tfSigS) {
-        if (cfg.useTLTouch && (cfg.tfSigL[i]&1)) sigL=true;
-        if (cfg.useTLTouch && (cfg.tfSigS[i]&1)) sigS=true;
-        if (cfg.useTLBreak && (cfg.tfSigL[i]&2)) sigL=true;
-        if (cfg.useTLBreak && (cfg.tfSigS[i]&2)) sigS=true;
-        if (cfg.useFlag    && (cfg.tfSigL[i]&4)) sigL=true;
-        if (cfg.useFlag    && (cfg.tfSigS[i]&4)) sigS=true;
-        if (cfg.useTri     && (cfg.tfSigL[i]&8)) sigL=true;
-        if (cfg.useTri     && (cfg.tfSigS[i]&8)) sigS=true;
+      // ENTRY SIGNALS — из ENTRY_REGISTRY
+      for (let _ei = 0; _ei < ENTRY_REGISTRY.length; _ei++) {
+        const _e = ENTRY_REGISTRY[_ei];
+        if (!cfg[_e.flag]) continue;
+        if (!sigL && _e.detectL(cfg, i)) sigL = true;
+        if (!sigS && _e.detectS(cfg, i)) sigS = true;
       }
 
-      // FILTERS
-      // MA фильтр: Pine проверяет close[1] > ma_val где ma_val = EMA[i-1]
-      // → DATA[i-1].c > maArr[i-1], а не текущий бар
-      if (cfg.useMA && cfg.maArr && cfg.maArr[i-1]>0) {
-        if (prev.c<=cfg.maArr[i-1]) sigL=false;
-        if (prev.c>=cfg.maArr[i-1]) sigS=false;
-      }
-      if (cfg.useADX && cfg.adxArr) {
-        if (cfg.adxArr[i-1]<cfg.adxThresh) { sigL=false; sigS=false; }
-      }
-      if (cfg.useRSI && cfg.rsiArr) {
-        if (cfg.rsiArr[i-1]>=cfg.rsiOS) sigL=false;
-        if (cfg.rsiArr[i-1]<=cfg.rsiOB) sigS=false;
-      }
-      if (cfg.useVolF && cfg.atrAvg) {
-        if (ac>cfg.atrAvg[i-1]*cfg.volFMult) { sigL=false; sigS=false; }
-      }
-      if (cfg.useStruct && cfg.structBull) {
-        if (!cfg.structBull[i]) sigL=false;
-        if (!cfg.structBear[i]) sigS=false;
-      }
-      // MA дистанция: Pine проверяет abs(close[1] - ma_val) / atr_v → [i-1] bars
-      if (cfg.useMaDist && cfg.maArr && ac>0) {
-        const dist=Math.abs(prev.c-cfg.maArr[i-1])/ac;
-        if (dist>cfg.maDistMax) { sigL=false; sigS=false; }
-      }
-      // Размер свечи: Pine проверяет ТЕКУЩУЮ свечу (bar confirmed = close[0])
-      // body_size = abs(close-open), candle_size = high-low — всё на текущем баре
-      if (cfg.useCandleF && ac>0) {
-        const cs=bar.h-bar.l;
-        if (cs<ac*cfg.candleMin||cs>ac*cfg.candleMax) { sigL=false; sigS=false; }
-      }
-      if (cfg.useConsec && i>=cfg.consecMax+1) {
-        let bc=0, bca=0;
-        for (let j=1;j<=cfg.consecMax+1;j++) {
-          if(DATA[i-j].c>DATA[i-j].o) bc++; else {bc=0;break;}
-        }
-        for (let j=1;j<=cfg.consecMax+1;j++) {
-          if(DATA[i-j].c<DATA[i-j].o) bca++; else {bca=0;break;}
-        }
-        if(bc>=cfg.consecMax) sigL=false;
-        if(bca>=cfg.consecMax) sigS=false;
-      }
-      // STrend: Pine сравнивает close[1..N] с ОДНИМ значением ma_val = EMA[i-1]
-      // (не каждый бар со своей исторической EMA)
-      if (cfg.useSTrend && cfg.maArr && i>=cfg.sTrendWin+1) {
-        const maRef = cfg.maArr[i-1]; // одно фиксированное значение EMA
-        let ab=0, bl2=0;
-        for (let j=1;j<=cfg.sTrendWin;j++) {
-          if(DATA[i-j].c>maRef) ab++; else bl2++;
-        }
-        if(ab<=bl2) sigL=false;
-        if(bl2<=ab) sigS=false;
-      }
-      // Вторая MA (аналог MTF MA в USE): close > secondaryMA → Long OK, close < secondaryMA → Short OK
-      if (cfg.useConfirm && cfg.maArrConfirm && cfg.maArrConfirm[i]>0 && i>=1) {
-        const secMA = cfg.maArrConfirm[i-1];
-        if (secMA > 0) {
-          if (DATA[i-1].c <= secMA) sigL=false;
-          if (DATA[i-1].c >= secMA) sigS=false;
-        }
-      }
-      // Свежесть тренда: Pine считает непрерывную серию баров подряд где close > MA
-      // trend_age_l += 1 пока close > ma_val, блокирует если trend_age_l >= fresh_max
-      // MA для сравнения = EMA[i-1] (предыдущий бар)
-      if (cfg.useFresh && cfg.maArr) {
-        let ageL=0;
-        for (let j=1;j<Math.min(i,cfg.freshMax+2);j++) {
-          if(DATA[i-j].c>cfg.maArr[i-j-1]) ageL++;
-          else break; // серия прервалась
-        }
-        if(ageL>=cfg.freshMax) sigL=false;
-        let ageS=0;
-        for (let j=1;j<Math.min(i,cfg.freshMax+2);j++) {
-          if(DATA[i-j].c<cfg.maArr[i-j-1]) ageS++;
-          else break;
-        }
-        if(ageS>=cfg.freshMax) sigS=false;
-      }
-      // VOLUME FILTERS
-      if (HAS_VOLUME && cfg.useVSA && volAvg) {
-        if (prev.v < volAvg[i-1]*cfg.vsaMult) { sigL=false; sigS=false; }
-      }
-      if (HAS_VOLUME && cfg.useLiq && volAvg) {
-        if (prev.v < volAvg[i-1]*cfg.liqMin) { sigL=false; sigS=false; }
-      }
-      if (HAS_VOLUME && cfg.useVolDir && volAvg && i>=cfg.volDirPeriod) {
-        let bullVol=0, bearVol=0;
-        for (let j=1;j<=cfg.volDirPeriod;j++) {
-          if(DATA[i-j].c>DATA[i-j].o) bullVol+=DATA[i-j].v; else bearVol+=DATA[i-j].v;
-        }
-        if(bullVol<=bearVol) sigL=false;
-        if(bearVol<=bullVol) sigS=false;
-      }
-      if (cfg.useWT && cfg.wtScores) {
-        if(cfg.wtScores[i]<=cfg.wtThresh) sigL=false;
-        if(cfg.wtScores[i]>=-cfg.wtThresh) sigS=false;
-      }
-      if (HAS_VOLUME && cfg.useFat && volAvg && i>=10) {
-        // Pine: fat_vol_recent = ta.sma(volume, 3) — включает текущий бар
-        // fat_vol_prev = ta.sma(volume, 10) — включает текущий бар
-        const volRecent = (bar.v + DATA[i-1].v + DATA[i-2].v) / 3;
-        const volPrev10 = (bar.v + DATA[i-1].v + DATA[i-2].v + DATA[i-3].v + DATA[i-4].v +
-                           DATA[i-5].v + DATA[i-6].v + DATA[i-7].v + DATA[i-8].v + DATA[i-9].v) / 10;
-        const fatVol = volRecent < volPrev10 * cfg.fatVolDrop;
-        let bullConsec=0, bearConsec=0;
-        for(let j=1;j<=cfg.fatConsec+1;j++) {
-          if(DATA[i-j].c>DATA[i-j].o) { if(j===1||DATA[i-j+1].c>DATA[i-j+1].o) bullConsec++; else break; }
-          else break;
-        }
-        for(let j=1;j<=cfg.fatConsec+1;j++) {
-          if(DATA[i-j].c<DATA[i-j].o) { if(j===1||DATA[i-j+1].c<DATA[i-j+1].o) bearConsec++; else break; }
-          else break;
-        }
-        if(bullConsec>=cfg.fatConsec && fatVol) sigL=false;
-        if(bearConsec>=cfg.fatConsec && fatVol) sigS=false;
+      // FILTERS — из FILTER_REGISTRY
+      for (let _fi = 0; _fi < FILTER_REGISTRY.length && (sigL || sigS); _fi++) {
+        const _f = FILTER_REGISTRY[_fi];
+        if (!cfg[_f.flag]) continue;
+        if (sigL && _f.blocksL(cfg, i, ac)) sigL = false;
+        if (sigS && _f.blocksS(cfg, i, ac)) sigS = false;
       }
 
       // ENTRY EXECUTION
@@ -4049,25 +4768,11 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
         beActive=false; trailActive=false; partialDone=false; posSize=1.0;
         revSkipCount=0; revCooldownBar=-1;
 
-        // Compute SL levels
-        let slA = NaN, slB = NaN, slC = NaN;
-        if (cfg.hasSLA) slA = entry - dir*ac*cfg.slMult;
-        if (cfg.hasSLB) slB = entry*(1 - dir*cfg.slPctMult/100);
-        // SL Pivot: ставим на ближайший pivot + отступ, ограничиваем maxDist
-        if (cfg.useSLPiv && cfg.pivSLLo && cfg.pivSLHi) {
-          const pivLevel = dir===1 ? cfg.pivSLLo[i] : cfg.pivSLHi[i];
-          if (!isNaN(pivLevel)) {
-            const rawSL = dir===1 ? pivLevel - ac*cfg.slPivOff : pivLevel + ac*cfg.slPivOff;
-            const maxDist = ac * cfg.slPivMax;
-            const dist = Math.abs(entry - rawSL);
-            slC = dist > maxDist ? entry - dir*maxDist : rawSL;
-            // Проверяем что SL в правильную сторону
-            if ((dir===1 && slC >= entry) || (dir===-1 && slC <= entry)) slC = NaN;
-          }
-        }
-
-        // Собираем все SL в массив
-        const slCandidates = [slA, slB, slC].filter(v => !isNaN(v));
+        // Compute SL levels — из SL_REGISTRY
+        const slCandidates = SL_REGISTRY
+          .filter(s => cfg[s.flag])
+          .map(s => s.calc(cfg, entry, dir, ac, i))
+          .filter(v => !isNaN(v));
 
         // Resolve SL by logic
         if (slCandidates.length >= 2) {
@@ -4085,19 +4790,11 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
         } else if (slCandidates.length===1) { sl1=slCandidates[0]; hasSL2=false; }
         else { sl1=entry-dir*ac*1.5; hasSL2=false; }
 
-        // Compute TP levels
+        // Compute TP levels — через _calcTP из sl_tp_registry.js
         const slDist = Math.abs(entry-sl1);
         let tpA = NaN, tpB = NaN;
-        if (cfg.hasTPA) {
-          if (cfg.tpMode==='rr') tpA=entry+dir*slDist*cfg.tpMult;
-          else if (cfg.tpMode==='atr') tpA=entry+dir*ac*cfg.tpMult;
-          else tpA=entry*(1+dir*cfg.tpMult/100);
-        }
-        if (cfg.hasTPB) {
-          if (cfg.tpModeB==='rr') tpB=entry+dir*slDist*cfg.tpMultB;
-          else if (cfg.tpModeB==='atr') tpB=entry+dir*ac*cfg.tpMultB;
-          else tpB=entry*(1+dir*cfg.tpMultB/100);
-        }
+        if (cfg.hasTPA) tpA = _calcTP(entry, dir, slDist, ac, cfg.tpMode,  cfg.tpMult);
+        if (cfg.hasTPB) tpB = _calcTP(entry, dir, slDist, ac, cfg.tpModeB, cfg.tpMultB);
 
         if (!isNaN(tpA) && !isNaN(tpB)) {
           const distA=Math.abs(tpA-entry), distB=Math.abs(tpB-entry);
@@ -4320,21 +5017,13 @@ function buildName(cfg, pvL, pvR, slDesc, tpDesc, filters, extras) {
   const parts = [];
   const ex = extras||{};
 
-  // Entry patterns
+  // Entry patterns — из ENTRY_REGISTRY
   const entries = [];
-  if (cfg.usePivot) entries.push(`Pv(L${pvL}R${pvR})`);
-  if (cfg.useEngulf) entries.push('Engulf');
-  if (cfg.usePinBar) entries.push(`PinBar×${cfg.pinRatio}`);
-  if (cfg.useBoll) entries.push('BBproboj');
-  if (cfg.useDonch) entries.push('Donch');
-  if (cfg.useAtrBo) entries.push(`ATRbo×${cfg.atrBoMult}`);
-  if (cfg.useMaTouch) entries.push('MAToch');
-  if (cfg.useSqueeze) entries.push('Squeeze');
-  if (cfg.useTLTouch) entries.push('TLtch');
-  if (cfg.useTLBreak) entries.push('TLbrk');
-  if (cfg.useFlag)    entries.push('Flag');
-  if (cfg.useTri)     entries.push('Tri');
-  if (entries.length===0) entries.push('NoEntry');
+  const _cfgForName = Object.assign({}, cfg, { pvL, pvR }); // pvL/pvR доступны как параметры buildName
+  for (const _e of ENTRY_REGISTRY) {
+    if (cfg[_e.flag]) entries.push(_e.shortName(_cfgForName, ex));
+  }
+  if (entries.length === 0) entries.push('NoEntry');
   parts.push(entries.join('+'));
   // TL pivot params — include in name so variants with different pivots are unique
   if ((cfg.useTLTouch||cfg.useTLBreak||cfg.useFlag||cfg.useTri) && cfg.tlPvL != null)
@@ -4359,26 +5048,14 @@ function buildName(cfg, pvL, pvR, slDesc, tpDesc, filters, extras) {
   if (cfg.useClimax) exits.push('Clmx');
   if (exits.length>0) parts.push(exits.join('+'));
 
-  // Filters
+  // Filters — из FILTER_REGISTRY
   const filts = [];
-  if (cfg.useMA && ex.maP) filts.push(`${ex.maType}${ex.maP}`);
-  if (cfg.useADX) filts.push(`ADX(${ex.adxL||cfg.adxLen}>${cfg.adxThresh})`);
-  if (cfg.useRSI) filts.push(`RSI(${cfg.rsiOS}-${cfg.rsiOB})`);
-  if (cfg.useVolF) filts.push(`VFilt<${cfg.volFMult}×`);
-  if (cfg.useStruct) filts.push('Struct');
-  if (cfg.useMaDist) filts.push(`MaDist<${cfg.maDistMax}×ATR`);
-  if (cfg.useCandleF) filts.push(`Candle(${cfg.candleMin}-${cfg.candleMax})`);
-  if (cfg.useConsec) filts.push(`Consec<${cfg.consecMax}`);
-  if (cfg.useSTrend) filts.push(`STrend${ex.stw||cfg.sTrendWin||''}`);
-  if (cfg.useFresh) filts.push(`Fresh<${cfg.freshMax}`);
-  if (cfg.useConfirm && cfg.confN) filts.push(`Conf${cfg.confMatType||'EMA'}${cfg.confN}`);
-  // Volume filters
-  if (cfg.useVSA) filts.push(`Vol>${cfg.vsaMult}×`);
-  if (cfg.useLiq) filts.push(`Liq>${cfg.liqMin}×`);
-  if (cfg.useVolDir) filts.push('VolDir');
-  if (cfg.useWT) filts.push(`WT>${cfg.wtThresh}`);
-  if (cfg.useFat) filts.push(`Fat(${cfg.fatConsec}sv)`);
-  if (filts.length>0) parts.push('['+filts.join('|')+']');
+  for (const _f of FILTER_REGISTRY) {
+    if (!cfg[_f.flag]) continue;
+    const _label = _f.nameLabel(cfg, ex);
+    if (_label) filts.push(_label);
+  }
+  if (filts.length > 0) parts.push('[' + filts.join('|') + ']');
 
   return parts.join(' ');
 }
@@ -4578,6 +5255,16 @@ async function runOpt() {
   const useFlag=$c('e_flag');
   const useTri=$c('e_tri');
   const useTrendFigures=useTLTouch||useTLBreak||useFlag||useTri;
+
+  // New entry flags
+  const useRsiExit  = $c('e_rsix');
+  const useMaCross  = $c('e_macr');
+  const useFreeEntry= $c('e_free');
+  const useMacd     = $c('e_macd');
+  const useStochExit= $c('e_stx');
+  const useVolMove  = HAS_VOLUME && $c('e_volmv');
+  const useInsideBar= $c('e_inb');
+  const useNReversal= $c('e_nrev');
 
   // Filter flags
   const useMa=$c('f_ma'),useAdx=$c('f_adx'),useRsi=$c('f_rsi');
@@ -4817,6 +5504,18 @@ async function runOpt() {
   const sqzMinBars=$n('e_sqzb')||1;
   const volAvgArr=HAS_VOLUME?calcVolSMA(vsaP):null;
   const bodyAvgArr=HAS_VOLUME?calcBodySMA(20):null;
+
+  // ── New entry indicators ───────────────────────────────────────
+  const rsiExitArr = useRsiExit  ? calcRSI($n('e_rsix_p')||14) : null;
+  const maCrossArr = useMaCross  ? calcMA(closes, $n('e_macr_p')||20, $v('e_macr_t')||'EMA') : null;
+  let _newMacdLine=null,_newMacdSignal=null;
+  if (useMacd) { const _m=calcMACD($n('e_macd_f')||12,$n('e_macd_s')||26,$n('e_macd_sg')||9); _newMacdLine=_m.line; _newMacdSignal=_m.signal; }
+  const macdLine=_newMacdLine, macdSignal=_newMacdSignal;
+  let _newStochD=null;
+  if (useStochExit) { const _s=calcStochastic($n('e_stx_k')||14,$n('e_stx_d')||3); _newStochD=_s.d; }
+  const newStochD=_newStochD;
+  const volMoveMult = $n('e_volmv_m')||1.5;
+  const nReversalN  = $n('e_nrev_n') ||3;
 
   // ── Trendline Figures Precompute ─────────────────────────────
   // Все четыре паттерна вычисляются один раз перед основным циклом.
@@ -5144,6 +5843,14 @@ async function runOpt() {
         useMaTouch:useMaT,matMA,matZone,
         useSqueeze:useSqz,sqzOn,sqzCount,sqzMinBars,
         useTLTouch,useTLBreak,useFlag,useTri,tfSigL,tfSigS,tlPvL,tlPvR,
+        useRsiExit,rsiExitArr,rsiExitPeriod:$n('e_rsix_p')||14,rsiExitOS:$n('e_rsix_os')||30,rsiExitOB:$n('e_rsix_ob')||70,
+        useMaCross,maCrossArr,maCrossP:$n('e_macr_p')||20,maCrossType:$v('e_macr_t')||'EMA',
+        useFreeEntry,
+        useMacd,macdLine,macdSignal,macdFast:$n('e_macd_f')||12,macdSlow:$n('e_macd_s')||26,macdSignalP:$n('e_macd_sg')||9,
+        useStochExit,stochD:newStochD,stochKP:$n('e_stx_k')||14,stochDP:$n('e_stx_d')||3,stochOS:$n('e_stx_os')||20,stochOB:$n('e_stx_ob')||80,
+        useVolMove,volMoveMult,
+        useInsideBar,
+        useNReversal,nReversalN,
         hasSLA:!!(slPair.a),slMult:slPair.a?slPair.a.m:0,hasSLB:!!(slPair.p),slPctMult:slPair.p?slPair.p.m:0,slLogic,
         hasTPA:!!(tpPair.a),tpMult:tpPair.a?tpPair.a.m:0,tpMode:tpPair.a?tpPair.a.type:'rr',
         hasTPB:!!(tpPair.b),tpMultB:tpPair.b?tpPair.b.m:0,tpModeB:tpPair.b?tpPair.b.type:'rr',tpLogic,
@@ -5198,6 +5905,14 @@ async function runOpt() {
               useTLTouch,useTLBreak,useFlag,useTri,
               tlPvL,tlPvR,tlZonePct:$n('e_tl_zone')||0.3,
               flagImpMin:$n('e_flag_imp')||2.0,flagMaxBars:$n('e_flag_bars')||20,flagRetrace:$n('e_flag_ret')||0.618,
+              useRsiExit,rsiExitPeriod:$n('e_rsix_p')||14,rsiExitOS:$n('e_rsix_os')||30,rsiExitOB:$n('e_rsix_ob')||70,
+              useMaCross,maCrossP:$n('e_macr_p')||20,maCrossType:$v('e_macr_t')||'EMA',
+              useFreeEntry,
+              useMacd,macdFast:$n('e_macd_f')||12,macdSlow:$n('e_macd_s')||26,macdSignalP:$n('e_macd_sg')||9,
+              useStochExit,stochKP:$n('e_stx_k')||14,stochDP:$n('e_stx_d')||3,stochOS:$n('e_stx_os')||20,stochOB:$n('e_stx_ob')||80,
+              useVolMove,volMoveMult,
+              useInsideBar,
+              useNReversal,nReversalN,
               slPair,slLogic,tpPair,tpLogic,
               useSLPiv,slPivOff,slPivMax,slPivL,slPivR,slPivTrail,
               useBE,beTrig,beOff,useTrail,trTrig,trDist,
@@ -5349,6 +6064,14 @@ async function runOpt() {
         useMaTouch:useMaT,matMA,matZone,
         useSqueeze:useSqz,sqzOn,sqzCount,sqzMinBars,
         useTLTouch,useTLBreak,useFlag,useTri,tfSigL,tfSigS,tlPvL,tlPvR,
+        useRsiExit,rsiExitArr,rsiExitPeriod:$n('e_rsix_p')||14,rsiExitOS:$n('e_rsix_os')||30,rsiExitOB:$n('e_rsix_ob')||70,
+        useMaCross,maCrossArr,maCrossP:$n('e_macr_p')||20,maCrossType:$v('e_macr_t')||'EMA',
+        useFreeEntry,
+        useMacd,macdLine,macdSignal,macdFast:$n('e_macd_f')||12,macdSlow:$n('e_macd_s')||26,macdSignalP:$n('e_macd_sg')||9,
+        useStochExit,stochD:newStochD,stochKP:$n('e_stx_k')||14,stochDP:$n('e_stx_d')||3,stochOS:$n('e_stx_os')||20,stochOB:$n('e_stx_ob')||80,
+        useVolMove,volMoveMult,
+        useInsideBar,
+        useNReversal,nReversalN,
         hasSLA:!!(slPair.a),slMult:slPair.a?slPair.a.m:0,hasSLB:!!(slPair.p),slPctMult:slPair.p?slPair.p.m:0,slLogic,
         hasTPA:!!(tpPair.a),tpMult:tpPair.a?tpPair.a.m:0,tpMode:tpPair.a?tpPair.a.type:'rr',
         hasTPB:!!(tpPair.b),tpMultB:tpPair.b?tpPair.b.m:0,tpModeB:tpPair.b?tpPair.b.type:'rr',tpLogic,
@@ -5416,6 +6139,14 @@ async function runOpt() {
               useTLTouch,useTLBreak,useFlag,useTri,
               tlPvL,tlPvR,tlZonePct:$n('e_tl_zone')||0.3,
               flagImpMin:$n('e_flag_imp')||2.0,flagMaxBars:$n('e_flag_bars')||20,flagRetrace:$n('e_flag_ret')||0.618,
+              useRsiExit,rsiExitPeriod:$n('e_rsix_p')||14,rsiExitOS:$n('e_rsix_os')||30,rsiExitOB:$n('e_rsix_ob')||70,
+              useMaCross,maCrossP:$n('e_macr_p')||20,maCrossType:$v('e_macr_t')||'EMA',
+              useFreeEntry,
+              useMacd,macdFast:$n('e_macd_f')||12,macdSlow:$n('e_macd_s')||26,macdSignalP:$n('e_macd_sg')||9,
+              useStochExit,stochKP:$n('e_stx_k')||14,stochDP:$n('e_stx_d')||3,stochOS:$n('e_stx_os')||20,stochOB:$n('e_stx_ob')||80,
+              useVolMove,volMoveMult,
+              useInsideBar,
+              useNReversal,nReversalN,
               slPair,slLogic,tpPair,tpLogic,
               useSLPiv,slPivOff,slPivMax,slPivL,slPivR,slPivTrail,
               useBE,beTrig,beOff,useTrail,trTrig,trDist,
@@ -5705,6 +6436,14 @@ async function runOpt() {
                                       // Trendline Figures
                                       useTLTouch,useTLBreak,useFlag,useTri,
                                       tfSigL,tfSigS,
+                                      useRsiExit,rsiExitArr,rsiExitPeriod:$n('e_rsix_p')||14,rsiExitOS:$n('e_rsix_os')||30,rsiExitOB:$n('e_rsix_ob')||70,
+                                      useMaCross,maCrossArr,maCrossP:$n('e_macr_p')||20,maCrossType:$v('e_macr_t')||'EMA',
+                                      useFreeEntry,
+                                      useMacd,macdLine,macdSignal,macdFast:$n('e_macd_f')||12,macdSlow:$n('e_macd_s')||26,macdSignalP:$n('e_macd_sg')||9,
+                                      useStochExit,stochD:newStochD,stochKP:$n('e_stx_k')||14,stochDP:$n('e_stx_d')||3,stochOS:$n('e_stx_os')||20,stochOB:$n('e_stx_ob')||80,
+                                      useVolMove,volMoveMult,
+                                      useInsideBar,
+                                      useNReversal,nReversalN,
                                       // SL
                                       hasSLA:!!slPair.a,
                                       slMult:slPair.a?slPair.a.m:0,
@@ -5797,6 +6536,14 @@ async function runOpt() {
                                           useTLTouch, useTLBreak, useFlag, useTri,
                                           tlPvL:$n('e_tl_pvl')||5, tlPvR:$n('e_tl_pvr')||3, tlZonePct:$n('e_tl_zone')||0.3,
                                           flagImpMin:$n('e_flag_imp')||2.0, flagMaxBars:$n('e_flag_bars')||20, flagRetrace:$n('e_flag_ret')||0.618,
+                                          useRsiExit,rsiExitPeriod:$n('e_rsix_p')||14,rsiExitOS:$n('e_rsix_os')||30,rsiExitOB:$n('e_rsix_ob')||70,
+                                          useMaCross,maCrossP:$n('e_macr_p')||20,maCrossType:$v('e_macr_t')||'EMA',
+                                          useFreeEntry,
+                                          useMacd,macdFast:$n('e_macd_f')||12,macdSlow:$n('e_macd_s')||26,macdSignalP:$n('e_macd_sg')||9,
+                                          useStochExit,stochKP:$n('e_stx_k')||14,stochDP:$n('e_stx_d')||3,stochOS:$n('e_stx_os')||20,stochOB:$n('e_stx_ob')||80,
+                                          useVolMove,volMoveMult,
+                                          useInsideBar,
+                                          useNReversal,nReversalN,
                                           slPair, slLogic, tpPair, tpLogic,
                                           useSLPiv, slPivOff, slPivMax, slPivL, slPivR, slPivTrail,
                                           useBE, beTrig, beOff,
@@ -6042,6 +6789,32 @@ function _calcIndicators(cfg) {
     }
   }
 
+  // ── RSI Exit (выход из OB/OS зон) ────────────────────────
+  const rsiExitArr = cfg.useRsiExit
+    ? calcRSI(cfg.rsiExitPeriod || 14)
+    : null;
+
+  // ── MA Crossover (пересечение МА) ────────────────────────
+  const maCrossArr = cfg.useMaCross
+    ? calcMA(closes, cfg.maCrossP || 20, cfg.maCrossType || 'EMA')
+    : null;
+
+  // ── MACD ──────────────────────────────────────────────────
+  let macdLine = null, macdSignal = null;
+  if (cfg.useMacd) {
+    const _macd = calcMACD(cfg.macdFast || 12, cfg.macdSlow || 26, cfg.macdSignalP || 9);
+    macdLine   = _macd.line;
+    macdSignal = _macd.signal;
+  }
+
+  // ── Stochastic ────────────────────────────────────────────
+  let stochK = null, stochD = null;
+  if (cfg.useStochExit) {
+    const _stoch = calcStochastic(cfg.stochKP || 14, cfg.stochDP || 3);
+    stochK = _stoch.k;
+    stochD = _stoch.d;
+  }
+
   // ── SL Pivot ──────────────────────────────────────────────
   let pivSLLo = null, pivSLHi = null;
   if (cfg.useSLPiv) {
@@ -6152,6 +6925,9 @@ function _calcIndicators(cfg) {
     structBull, structBear,
     pivSLLo, pivSLHi,
     tfSigL, tfSigS,
+    rsiExitArr, maCrossArr,
+    macdLine, macdSignal,
+    stochK, stochD,
   };
 }
 
@@ -6199,6 +6975,35 @@ function buildBtCfg(cfg, ind) {
     useTri:     cfg.useTri     || false,
     tfSigL:     ind.tfSigL     || null,
     tfSigS:     ind.tfSigS     || null,
+
+    // ── Новые точки входа ─────────────────────────────────────
+    useRsiExit:    cfg.useRsiExit    || false,
+    rsiExitArr:    ind.rsiExitArr,
+    rsiExitPeriod: cfg.rsiExitPeriod || 14,
+    rsiExitOS:     cfg.rsiExitOS     || 30,
+    rsiExitOB:     cfg.rsiExitOB     || 70,
+    useMaCross:    cfg.useMaCross    || false,
+    maCrossArr:    ind.maCrossArr,
+    maCrossP:      cfg.maCrossP      || 20,
+    maCrossType:   cfg.maCrossType   || 'EMA',
+    useFreeEntry:  cfg.useFreeEntry  || false,
+    useMacd:       cfg.useMacd       || false,
+    macdLine:      ind.macdLine,
+    macdSignal:    ind.macdSignal,
+    macdFast:      cfg.macdFast      || 12,
+    macdSlow:      cfg.macdSlow      || 26,
+    macdSignalP:   cfg.macdSignalP   || 9,
+    useStochExit:  cfg.useStochExit  || false,
+    stochD:        ind.stochD,
+    stochKP:       cfg.stochKP       || 14,
+    stochDP:       cfg.stochDP       || 3,
+    stochOS:       cfg.stochOS       || 20,
+    stochOB:       cfg.stochOB       || 80,
+    useVolMove:    cfg.useVolMove     || false,
+    volMoveMult:   cfg.volMoveMult    || 1.5,
+    useInsideBar:  cfg.useInsideBar  || false,
+    useNReversal:  cfg.useNReversal  || false,
+    nReversalN:    cfg.nReversalN    || 3,
 
     // ── SL / TP ───────────────────────────────────────────────
     hasSLA:    !!(slPair.a),
