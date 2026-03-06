@@ -4,14 +4,14 @@
 > Также обновляй вручную когда вливаешь ветки в main.
 
 ## Последняя ручная сессия
-- **Дата:** 2026-03-06 19:38
+- **Дата:** 2026-03-06 20:57
 - **Ветка:** `main`
 - **Последние коммиты:**
+  - 42cd56f feat: new entry params iterate ranges + showDetail entries section
+  - 8a26e3d fix: missing closing paren in pine_export.js pat_s line
+  - 3e6e401 chore: update STATE.md
   - 243dcc8 Fix CPCV batch, maxDD unrealized DD, Pine Script new entries
   - 8d37d4d fix: correct TL checkbox IDs in calcTotal and entry_registry
-  - 7b38a0b feat: registry pattern + 8 new entry types
-  - 578740a feat: add tlPvL/tlPvR as optimization dimensions for TL Touch/Break
-  - 39b3ccf fix: restore live charts + fix fewer results after skipEq
 
 ## Последний цикл
 - **Дата:** 2026-03-03-20 (ручной исследовательский цикл)
