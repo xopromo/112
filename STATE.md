@@ -4,14 +4,14 @@
 > Также обновляй вручную когда вливаешь ветки в main.
 
 ## Последняя ручная сессия
-- **Дата:** 2026-03-07 10:40
+- **Дата:** 2026-03-07 11:45
 - **Ветка:** `main`
 - **Последние коммиты:**
+  - 0464482 build: обновить USE_Optimizer_v6_built.html
+  - 5af99df docs: правило о прогреве MA-индикаторов в filter_registry.js
+  - 019fdcf chore: update STATE.md
   - 991ebaf fix: MA/confirm/strend фильтры блокируют сигналы во время прогрева MA
   - e4df723 docs: добавить правило — всегда отвечать на русском языке
-  - 1039f9f chore: update STATE.md
-  - 9b363ab perf: pre-filter registries before hot loop + fix Pine solve_core if-body
-  - 95df99e feat: отложенный вход — режимы Bars и Retrace, совместим со всеми входами
 
 ## Последний цикл
 - **Дата:** 2026-03-03-20 (ручной исследовательский цикл)
