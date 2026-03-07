@@ -1915,9 +1915,17 @@ function generatePineScript(r) {
   // MA filter
   lines.push(`grp_ma   = "📈 MA ФИЛЬТР"`);
   lines.push(`use_int_ma = input.bool(${b(c.useMA)}, "Включить MA фильтр", group=grp_ma)`);
-  lines.push(`ma_type    = input.string("${c.maType||'EMA'}", "Тип", options=["SMA","EMA","WMA","HMA","VWMA"], group=grp_ma)`);
-  lines.push(`ma_len     = input.int(${c.maP||200}, "Период", group=grp_ma)`);
-  lines.push(`ma_tf      = input.timeframe("", "Таймфрейм", group=grp_ma)`);
+  lines.push(`ma_type      = input.string("${c.maType||'EMA'}", "Тип", options=["SMA","EMA","WMA","HMA","VWMA"], group=grp_ma)`);
+  lines.push(`ma_len       = input.int(${c.maP||200}, "Период", group=grp_ma)`);
+  lines.push(`ma_htf_ratio = input.int(${c.htfRatio||1}, "HTF ratio (1=текущий ТФ)", minval=1, maxval=1000, group=grp_ma)`);
+  lines.push(``);
+
+  // Confirm MA filter
+  lines.push(`grp_conf     = "🔍 CONFIRM MA"`);
+  lines.push(`use_conf_ma  = input.bool(${b(c.useConfirm)}, "Включить Confirm MA", group=grp_conf)`);
+  lines.push(`conf_ma_type = input.string("${c.confMatType||'EMA'}", "Тип", options=["SMA","EMA","WMA"], group=grp_conf)`);
+  lines.push(`conf_ma_len  = input.int(${c.confN||100}, "Период", group=grp_conf)`);
+  lines.push(`conf_ma_htf  = input.int(${c.confHtfRatio||1}, "HTF ratio (1=текущий ТФ)", minval=1, maxval=1000, group=grp_conf)`);
   lines.push(``);
 
   // Simple trend
@@ -2120,9 +2128,18 @@ function generatePineScript(r) {
   lines.push(`// MA`);
   lines.push(`calc_ma(t, s, l) =>`);
   lines.push(`    t == "SMA" ? ta.sma(s,l) : t == "EMA" ? ta.ema(s,l) : t == "WMA" ? ta.wma(s,l) : t == "VWMA" ? ta.vwma(s,l) : ta.hma(s,l)`);
-  lines.push(`float ma_raw = request.security(syminfo.tickerid, ma_tf, calc_ma(ma_type, close, ma_len)[1], barmerge.gaps_off, barmerge.lookahead_on)`);
+  lines.push(`f_tf_str(int secs) =>`);
+  lines.push(`    secs < 60 ? str.tostring(secs) + "S" : secs < 3600 ? str.tostring(math.round(secs / 60)) : secs < 86400 ? str.tostring(math.round(secs / 3600)) + "H" : str.tostring(math.round(secs / 86400)) + "D"`);
+  lines.push(`string _ma_tf_str   = ma_htf_ratio   <= 1 ? timeframe.period : f_tf_str(timeframe.in_seconds() * ma_htf_ratio)`);
+  lines.push(`string _conf_tf_str = conf_ma_htf <= 1 ? timeframe.period : f_tf_str(timeframe.in_seconds() * conf_ma_htf)`);
+  lines.push(`float ma_raw = request.security(syminfo.tickerid, _ma_tf_str, calc_ma(ma_type, close, ma_len)[1], barmerge.gaps_off, barmerge.lookahead_on)`);
   lines.push(`float ma_val = ma_raw`);
+  lines.push(`float conf_ma_raw = request.security(syminfo.tickerid, _conf_tf_str, calc_ma(conf_ma_type, close, conf_ma_len)[1], barmerge.gaps_off, barmerge.lookahead_on)`);
+  lines.push(`float conf_ma_val = conf_ma_raw`);
+  lines.push(`bool conf_ok_l = not use_conf_ma or (not na(conf_ma_val) and close[1] > conf_ma_val)`);
+  lines.push(`bool conf_ok_s = not use_conf_ma or (not na(conf_ma_val) and close[1] < conf_ma_val)`);
   lines.push(`plot(use_int_ma ? ma_val : na, "MA", color=color.new(color.blue,50), linewidth=2)`);
+  lines.push(`plot(use_conf_ma ? conf_ma_val : na, "Confirm MA", color=color.new(color.orange,50), linewidth=1)`);
   lines.push(``);
   lines.push(`// Simple trend`);
     lines.push(`int st_above = 0`);
@@ -2388,8 +2405,8 @@ function generatePineScript(r) {
   lines.push(`float dyn_sl_short_raw = use_sl_piv and not na(last_pv_hi) and (bar_index - last_pv_hi_bar) <= 30 ? last_pv_hi + atr_v * sl_piv_off : na`);
   lines.push(``);
   lines.push(`// All filters combined`);
-  lines.push(`bool all_filt_l = ma_ok_l and ma_dist_ok and adx_ok and vol_f_ok and candle_f_ok and struct_ok_l and (not use_vsa or is_whale) and liq_ok and vol_dir_ok_l and st_ok_l`);
-  lines.push(`bool all_filt_s = ma_ok_s and ma_dist_ok and adx_ok and vol_f_ok and candle_f_ok and struct_ok_s and (not use_vsa or is_whale) and liq_ok and vol_dir_ok_s and st_ok_s`);
+  lines.push(`bool all_filt_l = ma_ok_l and conf_ok_l and ma_dist_ok and adx_ok and vol_f_ok and candle_f_ok and struct_ok_l and (not use_vsa or is_whale) and liq_ok and vol_dir_ok_l and st_ok_l`);
+  lines.push(`bool all_filt_s = ma_ok_s and conf_ok_s and ma_dist_ok and adx_ok and vol_f_ok and candle_f_ok and struct_ok_s and (not use_vsa or is_whale) and liq_ok and vol_dir_ok_s and st_ok_s`);
   lines.push(``);
   lines.push(`// ПРАВИЛО: сигнал только на закрытии подтверждённой свечи`);
   lines.push(`bool confirmed = barstate.isconfirmed`);
