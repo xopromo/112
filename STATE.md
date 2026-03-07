@@ -4,14 +4,14 @@
 > Также обновляй вручную когда вливаешь ветки в main.
 
 ## Последняя ручная сессия
-- **Дата:** 2026-03-07 15:27
+- **Дата:** 2026-03-07 17:15
 - **Ветка:** `main`
 - **Последние коммиты:**
+  - 5a55af9 fix(filter_registry): add confHtfRatio to confirm MA nameLabel
+  - 567f382 fix(pine_export): add HTF MA support and Confirm MA to Pine export
+  - b1e6bbd fix: показывать HTF ratio в названии результата и детальной статистике
   - 8c25d9f feat: HTF MA поддержка + sweep типов MA
   - 22d6e5c chore: update STATE.md
-  - 0464482 build: обновить USE_Optimizer_v6_built.html
-  - 5af99df docs: правило о прогреве MA-индикаторов в filter_registry.js
-  - 019fdcf chore: update STATE.md
 
 ## Последний цикл
 - **Дата:** 2026-03-03-20 (ручной исследовательский цикл)
