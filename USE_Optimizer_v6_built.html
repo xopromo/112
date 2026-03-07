@@ -2664,30 +2664,30 @@ function generatePineScript(r) {
   lines.push(`                        _do_dir   := _b ? 1 : -1`);
   lines.push(`            // C. Исполнение входа`);
   lines.push(`            if _do_enter`);
-  lines.push(`            if _do_dir == 1`);
-    lines.push(`                _in := true`);
-    lines.push(`                _dir := 1`);
-    lines.push(`                _ep := entry_price`);
-    lines.push(`                _tra := false`);
-    lines.push(`                _bea := false`);
-    lines.push(`                _sig_skip := 0`);
-    lines.push(`                _cd_bar := -1`);
-  lines.push(`                _dsl := _sl_over > 0 ? (entry_price - _ac * _sl_ov) : calc_sl_level(1, entry_price, _ac)`);
-  lines.push(`                float sl_d = math.abs(entry_price - _dsl)`);
-  lines.push(`                _dtp := _tp_over > 0 ? (entry_price + _ac * _tp_ov) : calc_tp_level(1, entry_price, _ac, sl_d)`);
-  lines.push(`                _eb := bar_index`);
-  lines.push(`            else if _do_dir == -1`);
-    lines.push(`                _in := true`);
-    lines.push(`                _dir := -1`);
-    lines.push(`                _ep := entry_price`);
-    lines.push(`                _tra := false`);
-    lines.push(`                _bea := false`);
-    lines.push(`                _sig_skip := 0`);
-    lines.push(`                _cd_bar := -1`);
-  lines.push(`                _dsl := _sl_over > 0 ? (entry_price + _ac * _sl_ov) : calc_sl_level(-1, entry_price, _ac)`);
-  lines.push(`                float sl_d = math.abs(entry_price - _dsl)`);
-  lines.push(`                _dtp := _tp_over > 0 ? (entry_price - _ac * _tp_ov) : calc_tp_level(-1, entry_price, _ac, sl_d)`);
-  lines.push(`                _eb := bar_index`);
+  lines.push(`                if _do_dir == 1`);
+    lines.push(`                    _in := true`);
+    lines.push(`                    _dir := 1`);
+    lines.push(`                    _ep := entry_price`);
+    lines.push(`                    _tra := false`);
+    lines.push(`                    _bea := false`);
+    lines.push(`                    _sig_skip := 0`);
+    lines.push(`                    _cd_bar := -1`);
+  lines.push(`                    _dsl := _sl_over > 0 ? (entry_price - _ac * _sl_ov) : calc_sl_level(1, entry_price, _ac)`);
+  lines.push(`                    float sl_d = math.abs(entry_price - _dsl)`);
+  lines.push(`                    _dtp := _tp_over > 0 ? (entry_price + _ac * _tp_ov) : calc_tp_level(1, entry_price, _ac, sl_d)`);
+  lines.push(`                    _eb := bar_index`);
+  lines.push(`                else if _do_dir == -1`);
+    lines.push(`                    _in := true`);
+    lines.push(`                    _dir := -1`);
+    lines.push(`                    _ep := entry_price`);
+    lines.push(`                    _tra := false`);
+    lines.push(`                    _bea := false`);
+    lines.push(`                    _sig_skip := 0`);
+    lines.push(`                    _cd_bar := -1`);
+  lines.push(`                    _dsl := _sl_over > 0 ? (entry_price + _ac * _sl_ov) : calc_sl_level(-1, entry_price, _ac)`);
+  lines.push(`                    float sl_d = math.abs(entry_price - _dsl)`);
+  lines.push(`                    _dtp := _tp_over > 0 ? (entry_price - _ac * _tp_ov) : calc_tp_level(-1, entry_price, _ac, sl_d)`);
+  lines.push(`                    _eb := bar_index`);
   lines.push(`    float _wr1 = _cnt1 > 0 ? _wins1 * 100.0 / _cnt1 : 0.0`);
   lines.push(`    float _wr2 = _cnt2 > 0 ? _wins2 * 100.0 / _cnt2 : 0.0`);
   lines.push(`    [_pnl, _cnt > 0 ? _wins * 100.0 / _cnt : 0.0, _cnt, _dd, _eq, _pnl1, _wr1, _cnt1, _pnl2, _wr2, _cnt2]`);
@@ -4031,11 +4031,12 @@ const ENTRY_REGISTRY = [
 const FILTER_REGISTRY = [
   // ── MA Direction ─────────────────────────────────────────
   // Pine: close[1] > ma_val где ma_val = EMA[i-1]
+  // FIX: ma <= 0 означает индикатор ещё не прогрелся → блокируем сигнал (как Pine: close[1] > na = false)
   {
     id:       'ma',
     flag:     'useMA',
-    blocksL:  (cfg, i) => cfg.maArr && cfg.maArr[i-1] > 0 && DATA[i-1].c <= cfg.maArr[i-1],
-    blocksS:  (cfg, i) => cfg.maArr && cfg.maArr[i-1] > 0 && DATA[i-1].c >= cfg.maArr[i-1],
+    blocksL:  (cfg, i) => { if (!cfg.maArr) return false; const ma = cfg.maArr[i-1]; return ma <= 0 || DATA[i-1].c <= ma; },
+    blocksS:  (cfg, i) => { if (!cfg.maArr) return false; const ma = cfg.maArr[i-1]; return ma <= 0 || DATA[i-1].c >= ma; },
     nameLabel: (cfg, ex) => ex && ex.maP ? `${ex.maType||'EMA'}${ex.maP}` : null,
   },
 
@@ -4140,6 +4141,7 @@ const FILTER_REGISTRY = [
     blocksL:  (cfg, i) => {
       if (!cfg.maArr || i < cfg.sTrendWin + 1) return false;
       const maRef = cfg.maArr[i-1];
+      if (maRef <= 0) return true; // MA не прогрелась → блокировать
       let ab = 0, bl = 0;
       for (let j = 1; j <= cfg.sTrendWin; j++) {
         if (DATA[i-j].c > maRef) ab++; else bl++;
@@ -4149,6 +4151,7 @@ const FILTER_REGISTRY = [
     blocksS:  (cfg, i) => {
       if (!cfg.maArr || i < cfg.sTrendWin + 1) return false;
       const maRef = cfg.maArr[i-1];
+      if (maRef <= 0) return true; // MA не прогрелась → блокировать
       let ab = 0, bl = 0;
       for (let j = 1; j <= cfg.sTrendWin; j++) {
         if (DATA[i-j].c > maRef) ab++; else bl++;
@@ -4164,13 +4167,13 @@ const FILTER_REGISTRY = [
     flag:     'useConfirm',
     blocksL:  (cfg, i) => {
       if (!cfg.maArrConfirm || i < 1) return false;
-      const secMA = cfg.maArrConfirm[i-1];
-      return secMA > 0 && DATA[i-1].c <= secMA;
+      const ma = cfg.maArrConfirm[i-1];
+      return ma <= 0 || DATA[i-1].c <= ma;
     },
     blocksS:  (cfg, i) => {
       if (!cfg.maArrConfirm || i < 1) return false;
-      const secMA = cfg.maArrConfirm[i-1];
-      return secMA > 0 && DATA[i-1].c >= secMA;
+      const ma = cfg.maArrConfirm[i-1];
+      return ma <= 0 || DATA[i-1].c >= ma;
     },
     nameLabel: (cfg) => `Conf${cfg.confMatType||'EMA'}${cfg.confN}`,
   },
@@ -4752,6 +4755,10 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
   const start = cfg.start || 50;
   const volAvg = cfg.volAvg;
   const bodyAvg = cfg.bodyAvg;
+  // Pre-filter active registries to avoid per-bar flag checks in hot loop
+  const activeEntries = ENTRY_REGISTRY.filter(e => cfg[e.flag]);
+  const activeFilters = FILTER_REGISTRY.filter(f => cfg[f.flag]);
+  const activeExits   = EXIT_REGISTRY.filter(x => cfg[x.flag]);
 
   for (let i = start; i < N; i++) {
     const ac = atrArr[i-1];
@@ -4793,9 +4800,8 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
       if (cfg.useRev && (i-entryBar) >= cfg.revBars) {
         // oppSig: сигнал противоположного направления из любого включённого типа входа
         let oppSig = false;
-        for (let _ei = 0; _ei < ENTRY_REGISTRY.length && !oppSig; _ei++) {
-          const _e = ENTRY_REGISTRY[_ei];
-          if (!cfg[_e.flag]) continue;
+        for (let _ei = 0; _ei < activeEntries.length && !oppSig; _ei++) {
+          const _e = activeEntries[_ei];
           if (dir === 1) {
             const fn = _e.revDetectS || _e.detectS;
             if (fn(cfg, i)) oppSig = true;
@@ -4836,9 +4842,8 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
       // --- Шаги 2-3: Forced exits (Climax, Time) из EXIT_REGISTRY ---
       if (!frc) {
         const _ts = { dir, entry, entryBar };
-        for (let _xi = 0; _xi < EXIT_REGISTRY.length && !frc; _xi++) {
-          const _ex = EXIT_REGISTRY[_xi];
-          if (cfg[_ex.flag] && _ex.check(cfg, i, _ts)) frc = true;
+        for (let _xi = 0; _xi < activeExits.length && !frc; _xi++) {
+          if (activeExits[_xi].check(cfg, i, _ts)) frc = true;
         }
       }
 
@@ -5011,18 +5016,16 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
       if (doDir === 0 && pendingDir === 0) {
         let sigL = false, sigS = false;
 
-        // ENTRY SIGNALS — из ENTRY_REGISTRY
-        for (let _ei = 0; _ei < ENTRY_REGISTRY.length; _ei++) {
-          const _e = ENTRY_REGISTRY[_ei];
-          if (!cfg[_e.flag]) continue;
+        // ENTRY SIGNALS — из activeEntries (pre-filtered)
+        for (let _ei = 0; _ei < activeEntries.length; _ei++) {
+          const _e = activeEntries[_ei];
           if (!sigL && _e.detectL(cfg, i)) sigL = true;
           if (!sigS && _e.detectS(cfg, i)) sigS = true;
         }
 
-        // FILTERS — из FILTER_REGISTRY
-        for (let _fi = 0; _fi < FILTER_REGISTRY.length && (sigL || sigS); _fi++) {
-          const _f = FILTER_REGISTRY[_fi];
-          if (!cfg[_f.flag]) continue;
+        // FILTERS — из activeFilters (pre-filtered)
+        for (let _fi = 0; _fi < activeFilters.length && (sigL || sigS); _fi++) {
+          const _f = activeFilters[_fi];
           if (sigL && _f.blocksL(cfg, i, ac)) sigL = false;
           if (sigS && _f.blocksS(cfg, i, ac)) sigS = false;
         }
