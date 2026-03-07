@@ -937,7 +937,7 @@ function showDetail(r) {
 
   // 4. TREND FILTERS
   let filt = '';
-  filt += row('MA фильтр тренда',   c.useMA      ? `ВКЛ · ${c.maType} период=${c.maP}` : 'ВЫКЛ',               c.useMA?'on':'off');
+  filt += row('MA фильтр тренда',   c.useMA      ? `ВКЛ · ${c.maType} период=${c.maP}${(c.htfRatio&&c.htfRatio>1)?' · HTF ×'+c.htfRatio+'tf':''}` : 'ВЫКЛ',               c.useMA?'on':'off');
   filt += row('ADX (сила тренда)',  c.useADX     ? `ВКЛ · ADX(${c.adxLen||14}) > ${c.adxThresh}` : 'ВЫКЛ',                       c.useADX?'on':'off');
   filt += row('RSI перекуп/перепрод', c.useRSI   ? `ВКЛ · лонг если RSI < ${c.rsiOS}, шорт если RSI > ${c.rsiOB}` : 'ВЫКЛ', c.useRSI?'on':'off');
   filt += row('Простой тренд MA',   c.useSTrend  ? `ВКЛ · окно ${c.sTrendWin} баров` : 'ВЫКЛ',                  c.useSTrend?'on':'off');
@@ -947,7 +947,7 @@ function showDetail(r) {
   filt += row('Дистанция от MA',    c.useMaDist  ? `ВКЛ · не дальше ${c.maDistMax}×ATR от MA` : 'ВЫКЛ',         c.useMaDist?'on':'off');
   filt += row('Размер свечи',       c.useCandleF ? `ВКЛ · от ${c.candleMin}×ATR до ${c.candleMax}×ATR` : 'ВЫКЛ', c.useCandleF?'on':'off');
   filt += row('Серия одноцв. свечей', c.useConsec ? `ВКЛ · блок если ≥ ${c.consecMax} одноцветных подряд` : 'ВЫКЛ', c.useConsec?'on':'off');
-  filt += row('Подтв. МА (вторая)',  c.useConfirm ? `ВКЛ · ${c.confMatType||'EMA'} период=${c.confN} · лонг только если цена > MA, шорт только если цена < MA` : 'ВЫКЛ', c.useConfirm?'on':'off');
+  filt += row('Подтв. МА (вторая)',  c.useConfirm ? `ВКЛ · ${c.confMatType||'EMA'} период=${c.confN}${(c.confHtfRatio&&c.confHtfRatio>1)?' · HTF ×'+c.confHtfRatio+'tf':''} · лонг только если цена > MA, шорт только если цена < MA` : 'ВЫКЛ', c.useConfirm?'on':'off');
   html += section('📊', 'ФИЛЬТРЫ — ТРЕНД И ЦЕНА', filt);
 
   // 5. VOLUME FILTERS
@@ -1103,7 +1103,7 @@ function buildCopyText(r, c, slName, tpName) {
   lines.push('Climax выход:    ' + on(c.useClimax,  'объём>' + c.clxVolMult + 'x, тело>' + c.clxBodyMult + 'x'));
   lines.push('');
   lines.push('--- ФИЛЬТРЫ ТРЕНДА ---');
-  lines.push('MA фильтр:        ' + on(c.useMA,      c.maType + ' период=' + c.maP));
+  lines.push('MA фильтр:        ' + on(c.useMA,      c.maType + ' период=' + c.maP + ((c.htfRatio&&c.htfRatio>1) ? ' HTF×'+c.htfRatio+'tf' : '')));
   lines.push('ADX:              ' + on(c.useADX,     'ADX>' + c.adxThresh));
   lines.push('RSI:              ' + on(c.useRSI,     'лонг<' + c.rsiOS + ', шорт>' + c.rsiOB));
   lines.push('Простой тренд:    ' + on(c.useSTrend,  'окно=' + c.sTrendWin + ' баров'));
@@ -1113,7 +1113,7 @@ function buildCopyText(r, c, slName, tpName) {
   lines.push('Дистанция от MA:  ' + on(c.useMaDist,  'макс=' + c.maDistMax + 'xATR'));
   lines.push('Размер свечи:     ' + on(c.useCandleF, '' + c.candleMin + '-' + c.candleMax + 'xATR'));
   lines.push('Серия свечей:     ' + on(c.useConsec,  'макс=' + c.consecMax + ' одноцветных'));
-  lines.push('Подтв. тренда:    ' + on(c.useConfirm, 'MA тип=' + (c.confMatType||'EMA') + ' период=' + c.confN));
+  lines.push('Подтв. тренда:    ' + on(c.useConfirm, 'MA тип=' + (c.confMatType||'EMA') + ' период=' + c.confN + ((c.confHtfRatio&&c.confHtfRatio>1) ? ' HTF×'+c.confHtfRatio+'tf' : '')));
   lines.push('');
   lines.push('--- ОБЪЁМНЫЕ ФИЛЬТРЫ ---');
   lines.push('VSA (объём):      ' + on(c.useVSA,     'объём>' + c.vsaMult + 'x за ' + c.vsaPeriod + ' баров'));
@@ -4249,7 +4249,7 @@ async function runHillClimbing() {
     if (c.slPair) { slStr = (c.slPair.combo ? `SL(ATR×${c.slPair.a?.m||0}|${c.slLogic==='or'?'OR':'AND'}|${c.slPair.p?.m||0}%)` : c.slPair.a ? `SL×${c.slPair.a.m}ATR` : `SL${c.slPair.p?.m||0}%`); }
     if (c.tpPair) { const ta=c.tpPair.a; const tb=c.tpPair.b; tpStr = c.tpPair.combo ? `TP(${ta?.type==='rr'?'RR'+ta.m:ta?.type==='atr'?'TP×'+ta.m+'ATR':'TP'+ta.m+'%'}|${c.tpLogic==='or'?'OR':'AND'}|${tb?.type==='rr'?'RR'+tb.m:tb?.type==='atr'?'TP×'+tb.m+'ATR':'TP'+tb.m+'%'})` : ta ? (ta.type==='rr'?`RR×${ta.m}`:ta.type==='atr'?`TP×${ta.m}ATR`:`TP${ta.m}%`) : ''; }
     const name = typeof buildName === 'function'
-      ? buildName(c, c.pvL, c.pvR, slStr, tpStr, {}, {maP: c.maP, maType: c.maType||'EMA', stw: c.sTrendWin, atrP: c.atrPeriod, adxL: c.adxLen})
+      ? buildName(c, c.pvL, c.pvR, slStr, tpStr, {}, {maP: c.maP, maType: c.maType||'EMA', htfRatio: c.htfRatio||1, stw: c.sTrendWin, atrP: c.atrPeriod, adxL: c.adxLen})
       : ['SL('+slStr+')', 'TP('+tpStr+')', 'pv(L'+c.pvL+'R'+c.pvR+')', 'ATR'+c.atrPeriod].filter(Boolean).join(' ');
     // IS-статы для первой строки в таблице и детальной статистике
     const _isR = _is || raw;
