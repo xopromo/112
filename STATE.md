@@ -4,14 +4,14 @@
 > Также обновляй вручную когда вливаешь ветки в main.
 
 ## Последняя ручная сессия
-- **Дата:** 2026-03-07 06:50
+- **Дата:** 2026-03-07 09:10
 - **Ветка:** `main`
 - **Последние коммиты:**
+  - 9b363ab perf: pre-filter registries before hot loop + fix Pine solve_core if-body
+  - 95df99e feat: отложенный вход — режимы Bars и Retrace, совместим со всеми входами
+  - 2fb89db feat: Supertrend — вход при смене тренда + выход Вариант A
   - e246b48 Update STATE.md
   - 34833fb Cleanup: remove dead stochK (%K array) — only stochD (%D) is used in signals
-  - 842b509 Fix: stochastic signals broken — .d/.k → .dArr/.kArr
-  - a599352 Update STATE.md
-  - 184c344 Build: update USE_Optimizer_v6_built.html
 
 ## Последний цикл
 - **Дата:** 2026-03-03-20 (ручной исследовательский цикл)
