@@ -1161,7 +1161,7 @@ async function runOpt() {
       let macdLine=null,macdSignal=null;
       if(useMacd){const mk=macdFast+'_'+macdSlow+'_'+macdSigP;if(!macdNewCache[mk]){const m=calcMACD(macdFast,macdSlow,macdSigP);macdNewCache[mk]=m;}macdLine=macdNewCache[mk].line;macdSignal=macdNewCache[mk].signal;}
       let stochD=null;
-      if(useStochExit){const sk=stochKP+'_'+stochDP;if(!stochNewCache[sk])stochNewCache[sk]=calcStochastic(stochKP,stochDP);stochD=stochNewCache[sk].d;}
+      if(useStochExit){const sk=stochKP+'_'+stochDP;if(!stochNewCache[sk])stochNewCache[sk]=calcStochastic(stochKP,stochDP);stochD=stochNewCache[sk].dArr;}
       const {sigL:tfSigL, sigS:tfSigS} = _getTfSig(tlPvL, tlPvR);
 
       // Пропускаем невалидные BE комбинации
@@ -1406,7 +1406,7 @@ async function runOpt() {
       let macdLine=null,macdSignal=null;
       if(useMacd){const mk=macdFast+'_'+macdSlow+'_'+macdSigP;if(!macdNewCache[mk]){const m=calcMACD(macdFast,macdSlow,macdSigP);macdNewCache[mk]=m;}macdLine=macdNewCache[mk].line;macdSignal=macdNewCache[mk].signal;}
       let stochD=null;
-      if(useStochExit){const sk=stochKP+'_'+stochDP;if(!stochNewCache[sk])stochNewCache[sk]=calcStochastic(stochKP,stochDP);stochD=stochNewCache[sk].d;}
+      if(useStochExit){const sk=stochKP+'_'+stochDP;if(!stochNewCache[sk])stochNewCache[sk]=calcStochastic(stochKP,stochDP);stochD=stochNewCache[sk].dArr;}
       const {sigL:tfSigL, sigS:tfSigS} = _getTfSig(tlPvL, tlPvR);
 
       // Пропускаем невалидные BE комбинации
@@ -1823,7 +1823,7 @@ async function runOpt() {
                                     let macdLine=null,macdSignal=null;
                                     if(useMacd){const mk=macdFast+'_'+macdSlow+'_'+macdSigP;if(!macdNewCache[mk]){const m=calcMACD(macdFast,macdSlow,macdSigP);macdNewCache[mk]=m;}macdLine=macdNewCache[mk].line;macdSignal=macdNewCache[mk].signal;}
                                     let stochD=null;
-                                    if(useStochExit){const sk=stochKP+'_'+stochDP;if(!stochNewCache[sk])stochNewCache[sk]=calcStochastic(stochKP,stochDP);stochD=stochNewCache[sk].d;}
+                                    if(useStochExit){const sk=stochKP+'_'+stochDP;if(!stochNewCache[sk])stochNewCache[sk]=calcStochastic(stochKP,stochDP);stochD=stochNewCache[sk].dArr;}
                                     if(stopped) break;
 
                                     // Вторая MA для фильтра (confMatType + confN)
@@ -2223,8 +2223,8 @@ function _calcIndicators(cfg) {
   let stochK = null, stochD = null;
   if (cfg.useStochExit) {
     const _stoch = calcStochastic(cfg.stochKP || 14, cfg.stochDP || 3);
-    stochK = _stoch.k;
-    stochD = _stoch.d;
+    stochK = _stoch.kArr;
+    stochD = _stoch.dArr;
   }
 
   // ── SL Pivot ──────────────────────────────────────────────
