@@ -384,6 +384,27 @@ r.pnl/wr/n/dd/...   → IS-метрики (первая строка)
 - Чтобы добавить split для HC — нужно реализовать `_hcBuildOOS(cfg)` аналогично `_attachOOS`
   (вызывать при `_hcTableResults.push` и в `_hcOpenDetail`)
 
+### Правило: прогрев индикаторов (warmup) в filter_registry.js
+
+> ⚠️ **При добавлении нового фильтра, использующего MA или любой другой индикатор с периодом прогрева:**
+>
+> JS инициализирует `Float64Array` нулями → первые `period-1` баров = 0.
+> Pine возвращает `na` → любое сравнение с `na` = `false` → сигнал заблокирован.
+>
+> **Правило:** если `indicatorArr[i-1] <= 0` → **блокировать** сигнал (возвращать `true` из `blocksL`/`blocksS`).
+>
+> **Пример правильной реализации:**
+> ```javascript
+> blocksL: (cfg, i) => {
+>   if (!cfg.maArr) return false;
+>   const ma = cfg.maArr[i-1];
+>   return ma <= 0 || DATA[i-1].c <= ma; // ma<=0 = не прогрелась
+> }
+> ```
+>
+> **Затронутые индикаторы:** WMA(N) и SMA(N) = 0 для первых N-1 баров. EMA не страдает (seed=close[0]).
+> **Уже исправлено:** фильтры `ma`, `confirm`, `strend` (commit 991ebaf).
+
 ### Известные баги (зафиксированы)
 - **_stopCheck() bug**: `_stopCheck = () => !_massRobRunning && !_hcRobRunning` — возвращает true если оба флага false. При запуске тестов всегда нужно установить один из флагов.
   - ✅ Исправлено для: HC doRobFilter Phase 2, HC rob-metric Phase 2, OOS scan, runHillClimbing (строки 3776, 3930).
