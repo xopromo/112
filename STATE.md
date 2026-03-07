@@ -4,14 +4,14 @@
 > Также обновляй вручную когда вливаешь ветки в main.
 
 ## Последняя ручная сессия
-- **Дата:** 2026-03-06 22:12
+- **Дата:** 2026-03-07 04:22
 - **Ветка:** `main`
 - **Последние коммиты:**
+  - 184c344 Build: update USE_Optimizer_v6_built.html
+  - c096af0 Add Omega Ratio, Pain Ratio metrics + MC Permutation Test
   - a883d41 Fix SL Pivot + new entry ranges: exhaustive loop, buildName, showDetail
   - 66b93e9 chore: update STATE.md
   - 42cd56f feat: new entry params iterate ranges + showDetail entries section
-  - 8a26e3d fix: missing closing paren in pine_export.js pat_s line
-  - 3e6e401 chore: update STATE.md
 
 ## Последний цикл
 - **Дата:** 2026-03-03-20 (ручной исследовательский цикл)
