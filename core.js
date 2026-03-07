@@ -128,6 +128,26 @@ function calcMA(data, period, type) {
   if (type === 'WMA') return calcWMA(data, period);
   return calcEMA(data, period);
 }
+// HTF MA: строит MA на барах старшего ТФ (ratio=4 → 4x текущего).
+// Lookahead-free: на баре i видим только закрытые HTF-бары (до закрытия бара i).
+// HTF-бар k закрывается когда base-бар (k+1)*ratio-1 закрывается.
+// Поэтому aligned[i] = htfMA[floor((i+1)/ratio) - 1], или 0 если нет закрытых HTF-баров.
+function calcHTFMA(data, htfRatio, period, type) {
+  const N = data.length;
+  const htfN = Math.ceil(N / htfRatio);
+  const htfCloses = new Float64Array(htfN);
+  for (let k = 0; k < htfN; k++) {
+    const endIdx = Math.min((k + 1) * htfRatio - 1, N - 1);
+    htfCloses[k] = data[endIdx].c;
+  }
+  const htfMA = calcMA(htfCloses, period, type);
+  const aligned = new Float64Array(N);
+  for (let i = 0; i < N; i++) {
+    const lastHTF = Math.floor((i + 1) / htfRatio) - 1;
+    aligned[i] = lastHTF >= 0 ? htfMA[lastHTF] : 0;
+  }
+  return aligned;
+}
 // RMA (Wilder's smoothing) — как в Pine ta.rma: seed=SMA первых period баров, alpha=1/period
 function calcRMA(data, period) {
   const N = data.length, r = new Float64Array(N);

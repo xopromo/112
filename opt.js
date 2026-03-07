@@ -591,6 +591,10 @@ async function runOpt() {
   const useConfirm=$c('f_confirm');
   const confNArr=useConfirm?parseRange('f_confn'):[100];
   const confMatType=document.getElementById('f_conf_mat')?.value||'EMA';
+  // Sweep MA types: если галочка включена — перебираем все три типа
+  const _sweepMaTypes=$c('f_ma_sweep_types');
+  const _sweepConfTypes=$c('f_conf_sweep_types');
+  const _sweepMaCrossTypes=$c('e_macr_sweep_types');
   const confM=3; // не используется (оставлено для совместимости)
   const structHH=2; // убрано из USE — поле f_strpvl/f_strpvr используются
 
@@ -617,6 +621,11 @@ async function runOpt() {
   const pvRs=usePv?parseRange('e_pvr'):[2];
   const atrPs=parseRange('c_atr');
   const maPs=useMa?parseRange('f_map'):[0];
+  const maTypeArr=useMa?(_sweepMaTypes?['EMA','SMA','WMA']:[$v('f_mat')||'EMA']):['EMA'];
+  const htfRatioArr=useMa?parseRange('f_ma_htf'):[1];
+  const confTypeArr=useConfirm?(_sweepConfTypes?['EMA','SMA','WMA']:[confMatType]):['EMA'];
+  const confHtfArr=useConfirm?parseRange('f_conf_htf'):[1];
+  const maCrossTypeArr=$c('e_macr')?(_sweepMaCrossTypes?['EMA','SMA','WMA']:[$v('e_macr_t')||'EMA']):['EMA'];
   const adxTs=useAdx?parseRange('f_adxt'):[0];
   const vfMs=useVolF?parseRange('f_vfm'):[0];
   const mdMaxs=useMaDist?parseRange('f_madv'):[0];
@@ -937,10 +946,12 @@ async function runOpt() {
   let beValidCount=1;
   if(useBE){let v=0;beTrigs.forEach(t=>{beOffs.forEach(o=>{if(o<t)v++;});});beValidCount=v||1;}
   let total=pvLs.length*pvRs.length*atrPs.length*(maPs.length||1)*
+    (maTypeArr.length||1)*(htfRatioArr.length||1)*
     (adxTs.length||1)*(rsiPairs.length||1)*(vfMs.length||1)*(mdMaxs.length||1)*
     slPairs.length*tpPairs.length*beValidCount*(trTrigs.length||1)*(trDists.length||1)*
     (timeBarsArr.length||1)*(freshMaxs.length||1)*(wtThreshs.length||1)*
-    (vsaMs.length||1)*(atrBoMults.length||1)*(confNArr.length||1)*(revBarsArr.length||1)*
+    (vsaMs.length||1)*(atrBoMults.length||1)*(confNArr.length||1)*(confTypeArr.length||1)*
+    (confHtfArr.length||1)*(maCrossTypeArr.length||1)*(revBarsArr.length||1)*
     (revSkipArr.length||1)*(revCooldownArr.length||1)*
     (_adxLArr.length||1)*(_sTrendArr.length||1)*
     (tlPvLs.length||1)*(tlPvRs.length||1)*
@@ -958,10 +969,12 @@ async function runOpt() {
     // Генерируем Set случайных индексов (без повторений)
     // Используем Fisher-Yates на диапазоне [0, realTotal)
     const realTotal = pvLs.length*pvRs.length*atrPs.length*(maPs.length||1)*
+      (maTypeArr.length||1)*(htfRatioArr.length||1)*
       (adxTs.length||1)*(rsiPairs.length||1)*(vfMs.length||1)*(mdMaxs.length||1)*
       slPairs.length*tpPairs.length*beValidCount*(trTrigs.length||1)*(trDists.length||1)*
       (timeBarsArr.length||1)*(freshMaxs.length||1)*(wtThreshs.length||1)*
-      (vsaMs.length||1)*(atrBoMults.length||1)*(confNArr.length||1)*(revBarsArr.length||1)*
+      (vsaMs.length||1)*(atrBoMults.length||1)*(confNArr.length||1)*(confTypeArr.length||1)*
+      (confHtfArr.length||1)*(maCrossTypeArr.length||1)*(revBarsArr.length||1)*
     (revSkipArr.length||1)*(revCooldownArr.length||1)*
     (_adxLArr.length||1)*(_sTrendArr.length||1)*
     (tlPvLs.length||1)*(tlPvRs.length||1)*
@@ -1077,13 +1090,16 @@ async function runOpt() {
   // _mcDims/_mcDimSizes — общие для MC и TPE, строятся ПОСЛЕ _ipCombos
   const _mcDims = [
     pvLs, pvRs, atrPs, (maPs.length?maPs:[maPs[0]||0]),
+    (maTypeArr.length?maTypeArr:['EMA']), (htfRatioArr.length?htfRatioArr:[1]),
     (adxTs.length?adxTs:[0]), rsiPairs, (vfMs.length?vfMs:[0]),
     (mdMaxs.length?mdMaxs:[0]), (freshMaxs.length?freshMaxs:[20]),
     (wtThreshs.length?wtThreshs:[0]), (vsaMs.length?vsaMs:[0]),
     (atrBoMults.length?atrBoMults:[2.0]), slPairs, tpPairs,
     beOffs, beTrigs, trTrigs, trDists, (timeBarsArr.length?timeBarsArr:[50]),
     window._ipCombos,
-    (tlPvLs.length?tlPvLs:[5]), (tlPvRs.length?tlPvRs:[3])
+    (tlPvLs.length?tlPvLs:[5]), (tlPvRs.length?tlPvRs:[3]),
+    (confTypeArr.length?confTypeArr:['EMA']), (confHtfArr.length?confHtfArr:[1]),
+    (maCrossTypeArr.length?maCrossTypeArr:['EMA'])
   ];
   const _mcDimSizes = _mcDims.map(d => d.length || 1);
 
@@ -1143,6 +1159,8 @@ async function runOpt() {
       const pvR      = _dims[_d][_di[_d++]];
       const atrP     = _dims[_d][_di[_d++]];
       const maP      = _dims[_d][_di[_d++]];
+      const _mType   = _dims[_d][_di[_d++]];
+      const htfRatio = _dims[_d][_di[_d++]];
       const adxT     = _dims[_d][_di[_d++]];
       const rsiPair  = _dims[_d][_di[_d++]];
       const vfM      = _dims[_d][_di[_d++]];
@@ -1161,6 +1179,9 @@ async function runOpt() {
       const _ip      = _dims[_d][_di[_d++]];
       const tlPvL    = _dims[_d][_di[_d++]];
       const tlPvR    = _dims[_d][_di[_d++]];
+      const _confType= _dims[_d][_di[_d++]];
+      const _confHtf = _dims[_d][_di[_d++]];
+      const _mCrossType= _dims[_d][_di[_d++]];
       const adxL        = _ip.adxL        ?? window._ipDef.adxL;
       const sTrendWin   = _ip.sTrendWin   ?? window._ipDef.sTrendWin;
       const confN       = _ip.confN       ?? window._ipDef.confN;
@@ -1190,7 +1211,7 @@ async function runOpt() {
       const waitRetrace = _ip.waitRetrace ?? window._ipDef.waitRetrace;
       const {lo:pivSLLo, hi:pivSLHi} = useSLPiv ? _getPivSL(slPivL, slPivR) : {lo:null, hi:null};
       const rsiExitArr = useRsiExit   ? (rsiExitCache[rsiExitPer]||(rsiExitCache[rsiExitPer]=calcRSI(rsiExitPer))) : null;
-      const maCrossArr = useMaCross   ? (()=>{const k=maCrossType+'_'+maCrossP;return maCrossNewCache[k]||(maCrossNewCache[k]=calcMA(closes,maCrossP,maCrossType));})() : null;
+      const maCrossArr = useMaCross   ? (()=>{const k=_mCrossType+'_'+maCrossP;return maCrossNewCache[k]||(maCrossNewCache[k]=calcMA(closes,maCrossP,_mCrossType));})() : null;
       const stDir      = (useSupertrend||useStExit) ? (()=>{const k=stAtrP+'_'+stMult;return stDirCache[k]||(stDirCache[k]=calcSupertrend(stAtrP,stMult));})() : null;
       let macdLine=null,macdSignal=null;
       if(useMacd){const mk=macdFast+'_'+macdSlow+'_'+macdSigP;if(!macdNewCache[mk]){const m=calcMACD(macdFast,macdSlow,macdSigP);macdNewCache[mk]=m;}macdLine=macdNewCache[mk].line;macdSignal=macdNewCache[mk].signal;}
@@ -1207,15 +1228,18 @@ async function runOpt() {
       if (!atrCache[atrP]) atrCache[atrP] = calcRMA_ATR(atrP);
       if (!atrAvgCache[atrP]) atrAvgCache[atrP] = calcSMA(atrCache[atrP], 50);
       const atrAvg = atrAvgCache[atrP];
-      const mk = _mType+'_'+maP;
+      const mk = _mType+'_'+maP+'_htf'+htfRatio;
       let maArr = null;
-      if (maP > 0) { if (!maCache[mk]) maCache[mk] = calcMA(closes, maP, _mType); maArr = maCache[mk]; }
+      if (maP > 0) {
+        if (!maCache[mk]) maCache[mk] = htfRatio>1 ? calcHTFMA(DATA,htfRatio,maP,_mType) : calcMA(closes,maP,_mType);
+        maArr = maCache[mk];
+      }
       let wtScores = null;
       if (useWT && maArr) wtScores = calcWeightedTrend(maArr, atrCache[atrP], wtN, wtVolW, wtBodyW, wtDistW, wtUseDist);
       let confMAArr = null;
       if (useConfirm && confN > 0) {
-        const ck = confN+'_'+(confMatType||'EMA');
-        if (!maCache[ck]) maCache[ck] = calcMA(closes, confN, confMatType||'EMA');
+        const ck = _confType+'_'+confN+'_htf'+_confHtf;
+        if (!maCache[ck]) maCache[ck] = _confHtf>1 ? calcHTFMA(DATA,_confHtf,confN,_confType) : calcMA(closes,confN,_confType);
         confMAArr = maCache[ck];
       }
       if (!adxCache[adxL]) adxCache[adxL] = calcADX(adxL);
@@ -1231,7 +1255,7 @@ async function runOpt() {
         useSqueeze:useSqz,sqzOn,sqzCount,sqzMinBars,
         useTLTouch,useTLBreak,useFlag,useTri,tfSigL,tfSigS,tlPvL,tlPvR,
         useRsiExit,rsiExitArr,rsiExitPeriod:rsiExitPer,rsiExitOS,rsiExitOB,
-        useMaCross,maCrossArr,maCrossP,maCrossType,
+        useMaCross,maCrossArr,maCrossP,maCrossType:_mCrossType,
         useFreeEntry,
         useMacd,macdLine,macdSignal,macdFast,macdSlow,macdSignalP:macdSigP,
         useStochExit,stochD,stochKP,stochDP,stochOS,stochOB,
@@ -1250,13 +1274,13 @@ async function runOpt() {
         useTime,timeBars,timeMode,
         usePartial,partRR,partPct,partBE,
         useClimax:useClimaxExit&&HAS_VOLUME,clxVolMult,clxBodyMult,clxMode,
-        useMA:maP>0,maArr,
+        useMA:maP>0,maArr,maType:_mType,maP,htfRatio,
         useADX:useAdx&&adxT>0,adxArr:adxCache[adxL],adxThresh:adxT,adxLen:adxL,
         useRSI:useRsi,rsiArr:useRsi?calcRSI(14):null,rsiOS:rsiPair.os,rsiOB:rsiPair.ob,
         useVolF:useVolF&&vfM>0,atrAvg,volFMult:vfM,
         useStruct,structBull,structBear,strPvL,strPvR,
         useSLPiv,slPivOff,slPivMax,slPivL,slPivR,slPivTrail,pivSLLo,pivSLHi,
-        useConfirm:useConfirm&&confN>0,confN,confMatType,maArrConfirm:confMAArr,
+        useConfirm:useConfirm&&confN>0,confN,confMatType:_confType,confHtfRatio:_confHtf,maArrConfirm:confMAArr,
         useMaDist:useMaDist&&mdMax>0,maDistMax:mdMax,
         useCandleF,candleMin,candleMax,
         useConsec,consecMax,
@@ -1368,7 +1392,6 @@ async function runOpt() {
     // tpe_n      = жёсткий лимит итераций (защита от бесконечного цикла)
     const tpeTarget  = Math.max(10, parseInt($v('tpe_target')||'1000') || 1000);
     const tpeMaxIter = Math.max(100, parseInt($v('tpe_n')||'50000') || 50000);
-    const _mType    = $v('f_mat') || 'EMA';
     const _nCandidates = 32;
     const _exploreN = Math.max(20, Math.min(500, Math.floor(tpeMaxIter * 0.10))); // разведка = 10% бюджета, макс 500
 
@@ -1399,6 +1422,8 @@ async function runOpt() {
       const pvR      = _dims[_d][dimIndices[_d++]];
       const atrP     = _dims[_d][dimIndices[_d++]];
       const maP      = _dims[_d][dimIndices[_d++]];
+      const _mType   = _dims[_d][dimIndices[_d++]];
+      const htfRatio = _dims[_d][dimIndices[_d++]];
       const adxT     = _dims[_d][dimIndices[_d++]];
       const rsiPair  = _dims[_d][dimIndices[_d++]];
       const vfM      = _dims[_d][dimIndices[_d++]];
@@ -1417,6 +1442,9 @@ async function runOpt() {
       const _ip      = _dims[_d][dimIndices[_d++]];
       const tlPvL    = _dims[_d][dimIndices[_d++]];
       const tlPvR    = _dims[_d][dimIndices[_d++]];
+      const _confType= _dims[_d][dimIndices[_d++]];
+      const _confHtf = _dims[_d][dimIndices[_d++]];
+      const _mCrossType= _dims[_d][dimIndices[_d++]];
       const adxL        = _ip.adxL        ?? window._ipDef.adxL;
       const sTrendWin   = _ip.sTrendWin   ?? window._ipDef.sTrendWin;
       const confN       = _ip.confN       ?? window._ipDef.confN;
@@ -1446,7 +1474,7 @@ async function runOpt() {
       const waitRetrace = _ip.waitRetrace ?? window._ipDef.waitRetrace;
       const {lo:pivSLLo, hi:pivSLHi} = useSLPiv ? _getPivSL(slPivL, slPivR) : {lo:null, hi:null};
       const rsiExitArr = useRsiExit   ? (rsiExitCache[rsiExitPer]||(rsiExitCache[rsiExitPer]=calcRSI(rsiExitPer))) : null;
-      const maCrossArr = useMaCross   ? (()=>{const k=maCrossType+'_'+maCrossP;return maCrossNewCache[k]||(maCrossNewCache[k]=calcMA(closes,maCrossP,maCrossType));})() : null;
+      const maCrossArr = useMaCross   ? (()=>{const k=_mCrossType+'_'+maCrossP;return maCrossNewCache[k]||(maCrossNewCache[k]=calcMA(closes,maCrossP,_mCrossType));})() : null;
       const stDir      = (useSupertrend||useStExit) ? (()=>{const k=stAtrP+'_'+stMult;return stDirCache[k]||(stDirCache[k]=calcSupertrend(stAtrP,stMult));})() : null;
       let macdLine=null,macdSignal=null;
       if(useMacd){const mk=macdFast+'_'+macdSlow+'_'+macdSigP;if(!macdNewCache[mk]){const m=calcMACD(macdFast,macdSlow,macdSigP);macdNewCache[mk]=m;}macdLine=macdNewCache[mk].line;macdSignal=macdNewCache[mk].signal;}
@@ -1462,10 +1490,13 @@ async function runOpt() {
       if (!atrCache[atrP]) atrCache[atrP] = calcRMA_ATR(atrP);
       if (!atrAvgCache[atrP]) atrAvgCache[atrP] = calcSMA(atrCache[atrP], 50);
       const atrAvg = atrAvgCache[atrP];
-      const mk = _mType+'_'+maP;
+      const mk = _mType+'_'+maP+'_htf'+htfRatio;
       let maArr = null;
-      if (maP > 0) { if (!maCache[mk]) maCache[mk] = calcMA(closes, maP, _mType); maArr = maCache[mk]; }
-      const _wtKey = atrP+'_'+maP;
+      if (maP > 0) {
+        if (!maCache[mk]) maCache[mk] = htfRatio>1 ? calcHTFMA(DATA,htfRatio,maP,_mType) : calcMA(closes,maP,_mType);
+        maArr = maCache[mk];
+      }
+      const _wtKey = atrP+'_'+mk;
       let wtScores = null;
       if (useWT && maArr) {
         if (!_tpeWtCache[_wtKey]) _tpeWtCache[_wtKey] = calcWeightedTrend(maArr, atrCache[atrP], wtN, wtVolW, wtBodyW, wtDistW, wtUseDist);
@@ -1473,8 +1504,8 @@ async function runOpt() {
       }
       let confMAArr = null;
       if (useConfirm && confN > 0) {
-        const ck = confN+'_'+(confMatType||'EMA');
-        if (!maCache[ck]) maCache[ck] = calcMA(closes, confN, confMatType||'EMA');
+        const ck = _confType+'_'+confN+'_htf'+_confHtf;
+        if (!maCache[ck]) maCache[ck] = _confHtf>1 ? calcHTFMA(DATA,_confHtf,confN,_confType) : calcMA(closes,confN,_confType);
         confMAArr = maCache[ck];
       }
       if (!adxCache[adxL]) adxCache[adxL] = calcADX(adxL);
@@ -1490,7 +1521,7 @@ async function runOpt() {
         useSqueeze:useSqz,sqzOn,sqzCount,sqzMinBars,
         useTLTouch,useTLBreak,useFlag,useTri,tfSigL,tfSigS,tlPvL,tlPvR,
         useRsiExit,rsiExitArr,rsiExitPeriod:rsiExitPer,rsiExitOS,rsiExitOB,
-        useMaCross,maCrossArr,maCrossP,maCrossType,
+        useMaCross,maCrossArr,maCrossP,maCrossType:_mCrossType,
         useFreeEntry,
         useMacd,macdLine,macdSignal,macdFast,macdSlow,macdSignalP:macdSigP,
         useStochExit,stochD,stochKP,stochDP,stochOS,stochOB,
@@ -1507,13 +1538,13 @@ async function runOpt() {
         useRev,revBars,revMode,revAct,revSrc,revSkip,revCooldown,
         useTime,timeBars,timeMode,usePartial,partRR,partPct,partBE,
         useClimax:useClimaxExit&&HAS_VOLUME,clxVolMult,clxBodyMult,clxMode,
-        useMA:maP>0,maArr,
+        useMA:maP>0,maArr,maType:_mType,maP,htfRatio,
         useADX:useAdx&&adxT>0,adxArr:adxCache[adxL],adxThresh:adxT,adxLen:adxL,
         useRSI:useRsi,rsiArr:_tpeRsiArr,rsiOS:rsiPair.os,rsiOB:rsiPair.ob,
         useVolF:useVolF&&vfM>0,atrAvg,volFMult:vfM,
         useStruct,structBull,structBear,strPvL,strPvR,
         useSLPiv,slPivOff,slPivMax,slPivL,slPivR,slPivTrail,pivSLLo,pivSLHi,
-        useConfirm:useConfirm&&confN>0,confN,confMatType,maArrConfirm:confMAArr,
+        useConfirm:useConfirm&&confN>0,confN,confMatType:_confType,confHtfRatio:_confHtf,maArrConfirm:confMAArr,
         useMaDist:useMaDist&&mdMax>0,maDistMax:mdMax,
         useCandleF,candleMin,candleMax,useConsec,consecMax,
         useSTrend,sTrendWin,useFresh:useFresh&&freshMax>0,freshMax,
@@ -1556,7 +1587,7 @@ async function runOpt() {
         let slDesc = slPair.combo ? `SL(ATR×${slPair.a.m}${slLogic==='or'?'|OR|':'|AND|'}${slPair.p.m}%)` : slPair.a ? `SL×${slPair.a.m}ATR` : `SL${slPair.p.m}%`;
         if(useSLPiv) slDesc+=`+SPiv(L${slPivL}/R${slPivR}×${slPivOff})`;
         let tpDesc = tpPair.combo ? (()=>{const n1=tpPair.a.type==='rr'?`RR${tpPair.a.m}`:tpPair.a.type==='atr'?`TP×${tpPair.a.m}ATR`:`TP${tpPair.a.m}%`;const n2=tpPair.b.type==='rr'?`RR${tpPair.b.m}`:tpPair.b.type==='atr'?`TP×${tpPair.b.m}ATR`:`TP${tpPair.b.m}%`;return `TP(${n1}${tpLogic==='or'?'|OR|':'|AND|'}${n2})`;})() : tpPair.a ? (tpPair.a.type==='rr'?`RR×${tpPair.a.m}`:tpPair.a.type==='atr'?`TP×${tpPair.a.m}ATR`:`TP${tpPair.a.m}%`) : '';
-        const name = buildName(btCfg, pvL, pvR, slDesc, tpDesc, {}, {maP, maType:_mType, stw:sTrendWin, atrP, adxL});
+        const name = buildName(btCfg, pvL, pvR, slDesc, tpDesc, {}, {maP, maType:_mType, htfRatio, stw:sTrendWin, atrP, adxL});
         if (!_resultNames.has(name)) {
           _resultNames.add(name);
           const _cfg_tpe = {usePivot:usePv,pvL,pvR,useEngulf:useEng,usePinBar:usePin,pinRatio,
@@ -1569,7 +1600,7 @@ async function runOpt() {
               tlPvL,tlPvR,tlZonePct:$n('e_tl_zone')||0.3,
               flagImpMin:$n('e_flag_imp')||2.0,flagMaxBars:$n('e_flag_bars')||20,flagRetrace:$n('e_flag_ret')||0.618,
               useRsiExit,rsiExitPeriod:rsiExitPer,rsiExitOS,rsiExitOB,
-              useMaCross,maCrossP,maCrossType,
+              useMaCross,maCrossP,maCrossType:_mCrossType,
               useFreeEntry,
               useMacd,macdFast,macdSlow,macdSignalP:macdSigP,
               useStochExit,stochKP,stochDP,stochOS,stochOB,
@@ -1585,12 +1616,12 @@ async function runOpt() {
               useRev,revBars,revMode,revAct,revSrc,revSkip,revCooldown,
               useTime,timeBars,timeMode,usePartial,partRR,partPct,partBE,
               useClimax:useClimaxExit&&HAS_VOLUME,clxVolMult,clxBodyMult,clxMode,
-              useMA:maP>0,maType:_mType,maP,
+              useMA:maP>0,maType:_mType,maP,htfRatio,
               useADX:useAdx&&adxT>0,adxThresh:adxT,adxLen:adxL,
               useRSI:useRsi,rsiOS:rsiPair.os,rsiOB:rsiPair.ob,
               useVolF:useVolF&&vfM>0,volFMult:vfM,
               useStruct,structLen,strPvL,strPvR,
-              useConfirm:useConfirm&&confN>0,confN,confMatType,
+              useConfirm:useConfirm&&confN>0,confN,confMatType:_confType,confHtfRatio:_confHtf,
               useMaDist:useMaDist&&mdMax>0,maDistMax:mdMax,
               useCandleF,candleMin,candleMax,useConsec,consecMax,
               useSTrend,sTrendWin,useFresh:useFresh&&freshMax>0,freshMax,
@@ -1803,11 +1834,14 @@ async function runOpt() {
 
       for(const maP of maPs) {
         if(_mcDone) break;
-        const mType=$v('f_mat')||'EMA';
-        const mk=mType+'_'+maP;
+        for(const mType of (maTypeArr.length?maTypeArr:['EMA'])) {
+        if(_mcDone) break;
+        for(const htfRatio of (htfRatioArr.length?htfRatioArr:[1])) {
+        if(_mcDone) break;
+        const mk=mType+'_'+maP+'_htf'+htfRatio;
         let maArr=null;
         if(maP>0) {
-          if(!maCache[mk]) maCache[mk]=calcMA(closes,maP,mType);
+          if(!maCache[mk]) maCache[mk]=htfRatio>1?calcHTFMA(DATA,htfRatio,maP,mType):calcMA(closes,maP,mType);
           maArr=maCache[mk];
         }
 
@@ -1874,19 +1908,24 @@ async function runOpt() {
                                     const waitBars    = _ip.waitBars    ?? window._ipDef.waitBars;
                                     const waitRetrace = _ip.waitRetrace ?? window._ipDef.waitRetrace;
                                     const rsiExitArr = useRsiExit   ? (rsiExitCache[rsiExitPer]||(rsiExitCache[rsiExitPer]=calcRSI(rsiExitPer))) : null;
-                                    const maCrossArr = useMaCross   ? (()=>{const k=maCrossType+'_'+maCrossP;return maCrossNewCache[k]||(maCrossNewCache[k]=calcMA(closes,maCrossP,maCrossType));})() : null;
+                                    const _mCrossType0 = maCrossTypeArr[0]||maCrossType;
+                                    const maCrossArr = useMaCross   ? (()=>{const k=_mCrossType0+'_'+maCrossP;return maCrossNewCache[k]||(maCrossNewCache[k]=calcMA(closes,maCrossP,_mCrossType0));})() : null;
                                     const stDir      = (useSupertrend||useStExit) ? (()=>{const k=stAtrP+'_'+stMult;return stDirCache[k]||(stDirCache[k]=calcSupertrend(stAtrP,stMult));})() : null;
                                     let macdLine=null,macdSignal=null;
                                     if(useMacd){const mk=macdFast+'_'+macdSlow+'_'+macdSigP;if(!macdNewCache[mk]){const m=calcMACD(macdFast,macdSlow,macdSigP);macdNewCache[mk]=m;}macdLine=macdNewCache[mk].line;macdSignal=macdNewCache[mk].signal;}
                                     let stochD=null;
                                     if(useStochExit){const sk=stochKP+'_'+stochDP;if(!stochNewCache[sk])stochNewCache[sk]=calcStochastic(stochKP,stochDP);stochD=stochNewCache[sk].dArr;}
                                     if(stopped) break;
+                                    for(const _confType of (confTypeArr.length?confTypeArr:['EMA'])) {
+                                    for(const _confHtf of (confHtfArr.length?confHtfArr:[1])) {
+                                    for(const _mCrossTyp of (maCrossTypeArr.length?maCrossTypeArr:['EMA'])) {
+                                    if(_mcDone) break;
 
                                     // Вторая MA для фильтра (confMatType + confN)
                                      let confMAArr = null;
                                      if (useConfirm && confN > 0) {
-                                       const ck = confN+'_'+(confMatType||'EMA');
-                                       if (!maCache[ck]) maCache[ck] = calcMA(closes, confN, confMatType||'EMA');
+                                       const ck = _confType+'_'+confN+'_htf'+_confHtf;
+                                       if (!maCache[ck]) maCache[ck] = _confHtf>1?calcHTFMA(DATA,_confHtf,confN,_confType):calcMA(closes,confN,_confType);
                                        confMAArr = maCache[ck];
                                      }
 
@@ -1902,7 +1941,7 @@ async function runOpt() {
                                       useTLTouch,useTLBreak,useFlag,useTri,
                                       tfSigL,tfSigS,
                                       useRsiExit,rsiExitArr,rsiExitPeriod:rsiExitPer,rsiExitOS,rsiExitOB,
-                                      useMaCross,maCrossArr,maCrossP,maCrossType,
+                                      useMaCross,maCrossArr,maCrossP,maCrossType:_mCrossTyp,
                                       useFreeEntry,
                                       useMacd,macdLine,macdSignal,macdFast,macdSlow,macdSignalP:macdSigP,
                                       useStochExit,stochD,stochKP,stochDP,stochOS,stochOB,
@@ -1936,13 +1975,13 @@ async function runOpt() {
                                       usePartial,partRR,partPct,partBE,
                                       useClimax:useClimaxExit&&HAS_VOLUME,clxVolMult,clxBodyMult,clxMode,
                                       // Filters
-                                      useMA:maP>0,maArr,
+                                      useMA:maP>0,maArr,maType:mType,maP,htfRatio,
                                       useADX:useAdx&&adxT>0,adxArr:(()=>{if(!adxCache[adxL])adxCache[adxL]=calcADX(adxL);return adxCache[adxL];})(),adxThresh:adxT,adxLen:adxL,
                                       useRSI:useRsi,rsiArr:useRsi?calcRSI(14):null,
                                       rsiOS:rsiPair.os,rsiOB:rsiPair.ob,
                                       useVolF:useVolF&&vfM>0,atrAvg,volFMult:vfM,
                                       useStruct,structBull,structBear,strPvL,strPvR,
-                                      useConfirm:useConfirm&&confN>0,confN,confMatType,maArrConfirm:confMAArr,
+                                      useConfirm:useConfirm&&confN>0,confN,confMatType:_confType,confHtfRatio:_confHtf,maArrConfirm:confMAArr,
                                       useMaDist:useMaDist&&mdMax>0,maDistMax:mdMax,
                                       useCandleF,candleMin,candleMax,
                                       useConsec,consecMax,
@@ -1989,7 +2028,7 @@ async function runOpt() {
                                         tpDesc=tpPair.a.type==='rr'?`RR×${tpPair.a.m}`:tpPair.a.type==='atr'?`TP×${tpPair.a.m}ATR`:`TP${tpPair.a.m}%`;
                                       }
                                       const name=buildName(btCfg,pvL,pvR,slDesc,tpDesc,{},{
-                                        maP,maType:mType,stw:sTrendWin,atrP,adxL
+                                        maP,maType:mType,htfRatio,stw:sTrendWin,atrP,adxL
                                       });
                                       if (_resultNames.has(name)) { /* дубль — пропускаем */ } else {
                                       _resultNames.add(name);
@@ -2006,7 +2045,7 @@ async function runOpt() {
                                           tlPvL:$n('e_tl_pvl')||5, tlPvR:$n('e_tl_pvr')||3, tlZonePct:$n('e_tl_zone')||0.3,
                                           flagImpMin:$n('e_flag_imp')||2.0, flagMaxBars:$n('e_flag_bars')||20, flagRetrace:$n('e_flag_ret')||0.618,
                                           useRsiExit,rsiExitPeriod:rsiExitPer,rsiExitOS,rsiExitOB,
-                                          useMaCross,maCrossP,maCrossType,
+                                          useMaCross,maCrossP,maCrossType:_mCrossTyp,
                                           useFreeEntry,
                                           useMacd,macdFast,macdSlow,macdSignalP:macdSigP,
                                           useStochExit,stochKP,stochDP,stochOS,stochOB,
@@ -2024,12 +2063,12 @@ async function runOpt() {
                                           useTime, timeBars, timeMode,
                                           usePartial, partRR, partPct, partBE,
                                           useClimax:useClimaxExit&&HAS_VOLUME, clxVolMult, clxBodyMult, clxMode,
-                                          useMA:maP>0, maType:mType, maP,
+                                          useMA:maP>0, maType:mType, maP, htfRatio,
                                           useADX:useAdx&&adxT>0, adxThresh:adxT, adxLen:adxL,
                                           useRSI:useRsi, rsiOS:rsiPair.os, rsiOB:rsiPair.ob,
                                           useVolF:useVolF&&vfM>0, volFMult:vfM,
                                           useStruct, structLen, strPvL, strPvR,
-                                          useConfirm:useConfirm&&confN>0, confN, confMatType,
+                                          useConfirm:useConfirm&&confN>0, confN, confMatType:_confType, confHtfRatio:_confHtf,
                                           useMaDist:useMaDist&&mdMax>0, maDistMax:mdMax,
                                           useCandleF, candleMin, candleMax,
                                           useConsec, consecMax,
@@ -2058,6 +2097,7 @@ async function runOpt() {
                                       await checkPause();
                                     }
                                     if(stopped) { _mcDone=true; break; }
+                                    }}} // _mCrossTyp, _confHtf, _confType
                                   } // timeBars
                                   } // _ip combo
                                 } // trDist
@@ -2074,6 +2114,7 @@ async function runOpt() {
             } // vfM
           } // rsiPair
         } // adxT
+        }} // htfRatio, mType
       } // maP
     } // atrP
   }} // pvL pvR
@@ -2133,13 +2174,17 @@ function _calcIndicators(cfg) {
   // ── MA (тренд-фильтр) ─────────────────────────────────────
   const maP  = cfg.maP  || 0;
   const maType = cfg.maType || 'EMA';
-  const maArr = (maP > 0) ? calcMA(closes, maP, maType) : null;
+  const htfRatio = cfg.htfRatio || 1;
+  const maArr = (maP > 0)
+    ? (htfRatio > 1 ? calcHTFMA(DATA, htfRatio, maP, maType) : calcMA(closes, maP, maType))
+    : null;
 
   // ── Confirm MA ────────────────────────────────────────────
   const confN = cfg.confN || 0;
   const confMatType = cfg.confMatType || 'EMA';
+  const confHtfRatio = cfg.confHtfRatio || 1;
   const maArrConfirm = (cfg.useConfirm && confN > 0)
-    ? calcMA(closes, confN, confMatType)
+    ? (confHtfRatio > 1 ? calcHTFMA(DATA, confHtfRatio, confN, confMatType) : calcMA(closes, confN, confMatType))
     : null;
 
   // ── ADX ───────────────────────────────────────────────────
@@ -2535,6 +2580,9 @@ function buildBtCfg(cfg, ind) {
     // ── Фильтры ───────────────────────────────────────────────
     useMA:    maP > 0,
     maArr:    ind.maArr,
+    maType:   cfg.maType   || 'EMA',
+    maP:      maP,
+    htfRatio: cfg.htfRatio || 1,
     useADX:   cfg.useADX   || false,
     adxArr:   ind.adxArr,
     adxThresh: cfg.adxThresh || 25,
@@ -2559,10 +2607,11 @@ function buildBtCfg(cfg, ind) {
     slPivTrail: cfg.slPivTrail || false,
     pivSLLo:    ind.pivSLLo,
     pivSLHi:    ind.pivSLHi,
-    useConfirm: cfg.useConfirm || false,
-    confN:       cfg.confN       || 2,
-    confMatType: cfg.confMatType || 'EMA',
-    maArrConfirm: ind.maArrConfirm,
+    useConfirm:    cfg.useConfirm    || false,
+    confN:         cfg.confN         || 2,
+    confMatType:   cfg.confMatType   || 'EMA',
+    confHtfRatio:  cfg.confHtfRatio  || 1,
+    maArrConfirm:  ind.maArrConfirm,
     useMaDist:  cfg.useMaDist  || false,
     maDistMax:  cfg.maDistMax  || 2,
     useCandleF: cfg.useCandleF || false,
@@ -2909,7 +2958,7 @@ const HC_NUMERIC_PARAMS = [
   // RevSig
   ['revBars',2],['revSkip',0],['revCooldown',0],
   // Фильтры
-  ['confN',2],['sTrendWin',10],
+  ['confN',2],['sTrendWin',10],['htfRatio',1],['confHtfRatio',1],
   ['volFMult',1.5],['vsaMult',1.8],['wtThresh',15],
   ['freshMax',10],['maDistMax',2],
   // Структурные (не мутируются HC но нужны для уникальности кэша)
@@ -2923,7 +2972,7 @@ function _fastCfgKey(cfg) {
   parts.push(
     cfg.slPair ? JSON.stringify(cfg.slPair) : '',
     cfg.tpPair ? JSON.stringify(cfg.tpPair) : '',
-    cfg.maType||'EMA',
+    cfg.maType||'EMA', cfg.confMatType||'EMA', cfg.maCrossType||'EMA',
     cfg.useBE?1:0, cfg.useTrail?1:0, cfg.useRev?1:0, cfg.useTime?1:0,
     cfg.commission||0
   );

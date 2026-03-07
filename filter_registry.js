@@ -23,7 +23,7 @@ const FILTER_REGISTRY = [
     flag:     'useMA',
     blocksL:  (cfg, i) => { if (!cfg.maArr) return false; const ma = cfg.maArr[i-1]; return ma <= 0 || DATA[i-1].c <= ma; },
     blocksS:  (cfg, i) => { if (!cfg.maArr) return false; const ma = cfg.maArr[i-1]; return ma <= 0 || DATA[i-1].c >= ma; },
-    nameLabel: (cfg, ex) => ex && ex.maP ? `${ex.maType||'EMA'}${ex.maP}` : null,
+    nameLabel: (cfg, ex) => ex && ex.maP ? `${ex.maType||'EMA'}${ex.maP}${(ex.htfRatio&&ex.htfRatio>1)?'×'+ex.htfRatio+'tf':''}` : null,
   },
 
   // ── ADX Strength ─────────────────────────────────────────
