@@ -182,6 +182,15 @@ function generatePineScript(r) {
   lines.push(`use_st_exit = input.bool(${b(c.useStExit)}, "Supertrend-выход (смена тренда против позиции)", group=grp_exit)`);
   lines.push(``);
 
+  // Delayed entry
+  lines.push(`grp_wait = "⏳ ОТЛОЖЕННЫЙ ВХОД"`);
+  lines.push(`use_wait    = input.bool(${b(c.waitBars > 0 || c.waitRetrace)}, "Ждать отката", group=grp_wait)`);
+  lines.push(`wait_bars   = input.int(${c.waitBars||0}, "Баров ожидания (Bars)", minval=0, maxval=20, group=grp_wait)`);
+  lines.push(`wait_ret    = input.bool(${b(c.waitRetrace)}, "Требовать откат цены (Retrace)", group=grp_wait)`);
+  lines.push(`wait_max_b  = input.int(${c.waitMaxBars||10}, "Отменить после N баров", minval=0, maxval=100, group=grp_wait)`);
+  lines.push(`wait_catr   = input.float(${c.waitCancelAtr||0}, "Отменить при уходе ×ATR", minval=0, step=0.1, group=grp_wait)`);
+  lines.push(``);
+
   // Capital/costs
   lines.push(`grp_strat = "⚙️ КАПИТАЛ"`);
   lines.push(`start_cap  = input.float(1000.0, "Депозит $", group=grp_strat)`);
@@ -654,7 +663,11 @@ function generatePineScript(r) {
   lines.push(`    int _eff = math.min(max_bars, last_bar_index + 1)`);
   lines.push(`    int _split = last_bar_index - _eff + _eff / 2`);
   lines.push(`    var float _eq = 0.0`);
-    lines.push(`    var int _sig_skip = 0`);
+    lines.push(`    var int _sig_skip = 0`)
+    // Pending entry state
+    lines.push(`    var int _pd = 0`)           // pending dir: 1=long,-1=short,0=none
+    lines.push(`    var int _pb = -1`)           // pending bar_index
+    lines.push(`    var float _psc = 0.0`)       // pending signal close;
     lines.push(`    var int _cd_bar = -1`);
   lines.push(`    if bar_index > (last_bar_index - max_bars)`);
   lines.push(`        if _in and bar_index > _eb`);
@@ -788,7 +801,35 @@ function generatePineScript(r) {
   lines.push(`        if not _in and bar_index > _xb`);
   lines.push(`            float _sl_ov = _sl_over > 0 ? _sl_over : (use_sl_atr ? sl_atr_val : 0)`);
   lines.push(`            float _tp_ov = _tp_over > 0 ? _tp_over : 0`);
-  lines.push(`            if _b`);
+  lines.push(`            bool _do_enter = false`);
+  lines.push(`            int  _do_dir   = 0`);
+  lines.push(`            // A. Проверка отложенного входа`);
+  lines.push(`            if use_wait and _pd != 0`);
+  lines.push(`                int _bw = bar_index - _pb`);
+  lines.push(`                bool _cncl = (wait_max_b > 0 and _bw > wait_max_b) or (wait_catr > 0 and _pd * (close - _psc) > wait_catr * _ac)`);
+  lines.push(`                if _cncl`);
+  lines.push(`                    _pd := 0`);
+  lines.push(`                else`);
+  lines.push(`                    bool _bk = _bw >= wait_bars`);
+  lines.push(`                    bool _rk = not wait_ret or (_pd == 1 and close < _psc) or (_pd == -1 and close > _psc)`);
+  lines.push(`                    if _bk and _rk`);
+  lines.push(`                        _do_enter := true`);
+  lines.push(`                        _do_dir   := _pd`);
+  lines.push(`                        _pd       := 0`);
+  lines.push(`            // B. Новый сигнал (только если нет pending)`);
+  lines.push(`            if not _do_enter and _pd == 0`);
+  lines.push(`                if _b or _s`);
+  lines.push(`                    bool _use_delay = use_wait and (wait_bars > 0 or wait_ret)`);
+  lines.push(`                    if _use_delay`);
+  lines.push(`                        _pd  := _b ? 1 : -1`);
+  lines.push(`                        _pb  := bar_index`);
+  lines.push(`                        _psc := close`);
+  lines.push(`                    else`);
+  lines.push(`                        _do_enter := true`);
+  lines.push(`                        _do_dir   := _b ? 1 : -1`);
+  lines.push(`            // C. Исполнение входа`);
+  lines.push(`            if _do_enter`);
+  lines.push(`            if _do_dir == 1`);
     lines.push(`                _in := true`);
     lines.push(`                _dir := 1`);
     lines.push(`                _ep := entry_price`);
@@ -800,7 +841,7 @@ function generatePineScript(r) {
   lines.push(`                float sl_d = math.abs(entry_price - _dsl)`);
   lines.push(`                _dtp := _tp_over > 0 ? (entry_price + _ac * _tp_ov) : calc_tp_level(1, entry_price, _ac, sl_d)`);
   lines.push(`                _eb := bar_index`);
-  lines.push(`            else if _s`);
+  lines.push(`            else if _do_dir == -1`);
     lines.push(`                _in := true`);
     lines.push(`                _dir := -1`);
     lines.push(`                _ep := entry_price`);
@@ -851,6 +892,10 @@ function generatePineScript(r) {
     lines.push(`var line l_sl = na`);
     lines.push(`var int v_eb = -1`);
     lines.push(`var int v_xb = -1`);
+    // Pending entry state (vectorized)
+    lines.push(`var int v_pd = 0`)
+    lines.push(`var int v_pb = -1`)
+    lines.push(`var float v_psc = 0.0`)
     lines.push(`bool a_le = false`);
     lines.push(`bool a_se = false`);
     lines.push(`bool a_lx = false`);
@@ -1016,14 +1061,41 @@ function generatePineScript(r) {
   lines.push(`                if new_sl < v_sl and new_sl > close`);
   lines.push(`                    v_sl := new_sl`);
   lines.push(`    if not v_in and bar_index > v_xb`);
-  lines.push(`        if sig_l or sig_s`);
-    lines.push(`            v_in := true`);
-    lines.push(`            v_dir := sig_l ? 1 : -1`);
-    lines.push(`            v_ep := entry_price`);
-    lines.push(`            v_tra := false`);
-    lines.push(`            v_bea := false`);
-    lines.push(`            v_sig_skip := 0`);
-    lines.push(`            v_cd_bar := -1`);
+  lines.push(`        bool v_do_enter = false`);
+  lines.push(`        int  v_do_dir   = 0`);
+  lines.push(`        // A. Pending entry`);
+  lines.push(`        if use_wait and v_pd != 0`);
+  lines.push(`            int _bw = bar_index - v_pb`);
+  lines.push(`            bool _cncl = (wait_max_b > 0 and _bw > wait_max_b) or (wait_catr > 0 and v_pd * (close - v_psc) > wait_catr * atr_v[1])`);
+  lines.push(`            if _cncl`);
+  lines.push(`                v_pd := 0`);
+  lines.push(`            else`);
+  lines.push(`                bool _bk = _bw >= wait_bars`);
+  lines.push(`                bool _rk = not wait_ret or (v_pd == 1 and close < v_psc) or (v_pd == -1 and close > v_psc)`);
+  lines.push(`                if _bk and _rk`);
+  lines.push(`                    v_do_enter := true`);
+  lines.push(`                    v_do_dir   := v_pd`);
+  lines.push(`                    v_pd       := 0`);
+  lines.push(`        // B. New signal`);
+  lines.push(`        if not v_do_enter and v_pd == 0`);
+  lines.push(`            if sig_l or sig_s`);
+  lines.push(`                bool _use_delay = use_wait and (wait_bars > 0 or wait_ret)`);
+  lines.push(`                if _use_delay`);
+  lines.push(`                    v_pd  := sig_l ? 1 : -1`);
+  lines.push(`                    v_pb  := bar_index`);
+  lines.push(`                    v_psc := close`);
+  lines.push(`                else`);
+  lines.push(`                    v_do_enter := true`);
+  lines.push(`                    v_do_dir   := sig_l ? 1 : -1`);
+  lines.push(`        // C. Execute`);
+  lines.push(`        if v_do_enter`);
+  lines.push(`            v_in  := true`);
+  lines.push(`            v_dir := v_do_dir`);
+  lines.push(`            v_ep  := entry_price`);
+  lines.push(`            v_tra := false`);
+  lines.push(`            v_bea := false`);
+  lines.push(`            v_sig_skip := 0`);
+  lines.push(`            v_cd_bar := -1`);
   lines.push(`            float _u = atr_v[1]`);
   lines.push(`            v_sl := calc_sl_level(v_dir, entry_price, _u)`);
   lines.push(`            float sl_d = math.abs(entry_price - v_sl)`);

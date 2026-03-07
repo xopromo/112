@@ -917,6 +917,24 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
   </div>
 </div>
 
+<!-- Отложенный вход -->
+<div class="panel" style="min-width:180px">
+  <h3>⏳ Отложенный вход</h3>
+  <div class="cb"><input type="checkbox" id="e_wait_on"><label data-tip="Вместо немедленного входа по сигналу — ждать условия отката. Совместимо со всеми точками входа. При waitBars=0 и Retrace=false поведение идентично обычному.">Ждать отката</label></div>
+  <div class="sep"></div>
+  <div style="font-size:.65em;color:var(--text3);margin-bottom:4px">Режим Bars: войти через N баров</div>
+  <div class="field"><label>Баров ожидания</label><input id="e_wait_bars" value="0,1,2" data-tip="Войти через N баров после сигнала. 0 = первый же бар после сигнала (или retrace). Диапазон: 0,1,2 тестирует все варианты в одном прогоне"></div>
+  <div class="sep"></div>
+  <div style="font-size:.65em;color:var(--text3);margin-bottom:4px">Режим Retrace: войти при откате</div>
+  <div class="cb"><input type="checkbox" id="e_wait_retrace"><label data-tip="Дополнительное условие: цена должна закрыться ниже (лонг) / выше (шорт) close сигнального бара. Включение добавляет измерение [false,true] — в одном прогоне тестируются оба варианта: с откатом и без">Требовать откат цены</label></div>
+  <div class="sep"></div>
+  <div style="font-size:.65em;color:var(--text3);margin-bottom:4px">Отмена ожидания</div>
+  <div class="g2">
+    <div class="field"><label>Макс баров</label><input id="e_wait_maxb" value="10" data-tip="Отменить ожидание если прошло N баров без входа. 0 = не отменять"></div>
+    <div class="field"><label>Отмена ×ATR</label><input id="e_wait_catr" value="0" data-tip="Отменить если цена ушла в сторону сигнала на N×ATR без отката. 0 = не отменять"></div>
+  </div>
+</div>
+
 <!-- SL/TP -->
 <div class="panel" style="min-width:180px">
   <h3>🛑 Stop Loss</h3>
@@ -1999,6 +2017,15 @@ function generatePineScript(r) {
   lines.push(`use_st_exit = input.bool(${b(c.useStExit)}, "Supertrend-выход (смена тренда против позиции)", group=grp_exit)`);
   lines.push(``);
 
+  // Delayed entry
+  lines.push(`grp_wait = "⏳ ОТЛОЖЕННЫЙ ВХОД"`);
+  lines.push(`use_wait    = input.bool(${b(c.waitBars > 0 || c.waitRetrace)}, "Ждать отката", group=grp_wait)`);
+  lines.push(`wait_bars   = input.int(${c.waitBars||0}, "Баров ожидания (Bars)", minval=0, maxval=20, group=grp_wait)`);
+  lines.push(`wait_ret    = input.bool(${b(c.waitRetrace)}, "Требовать откат цены (Retrace)", group=grp_wait)`);
+  lines.push(`wait_max_b  = input.int(${c.waitMaxBars||10}, "Отменить после N баров", minval=0, maxval=100, group=grp_wait)`);
+  lines.push(`wait_catr   = input.float(${c.waitCancelAtr||0}, "Отменить при уходе ×ATR", minval=0, step=0.1, group=grp_wait)`);
+  lines.push(``);
+
   // Capital/costs
   lines.push(`grp_strat = "⚙️ КАПИТАЛ"`);
   lines.push(`start_cap  = input.float(1000.0, "Депозит $", group=grp_strat)`);
@@ -2471,7 +2498,11 @@ function generatePineScript(r) {
   lines.push(`    int _eff = math.min(max_bars, last_bar_index + 1)`);
   lines.push(`    int _split = last_bar_index - _eff + _eff / 2`);
   lines.push(`    var float _eq = 0.0`);
-    lines.push(`    var int _sig_skip = 0`);
+    lines.push(`    var int _sig_skip = 0`)
+    // Pending entry state
+    lines.push(`    var int _pd = 0`)           // pending dir: 1=long,-1=short,0=none
+    lines.push(`    var int _pb = -1`)           // pending bar_index
+    lines.push(`    var float _psc = 0.0`)       // pending signal close;
     lines.push(`    var int _cd_bar = -1`);
   lines.push(`    if bar_index > (last_bar_index - max_bars)`);
   lines.push(`        if _in and bar_index > _eb`);
@@ -2605,7 +2636,35 @@ function generatePineScript(r) {
   lines.push(`        if not _in and bar_index > _xb`);
   lines.push(`            float _sl_ov = _sl_over > 0 ? _sl_over : (use_sl_atr ? sl_atr_val : 0)`);
   lines.push(`            float _tp_ov = _tp_over > 0 ? _tp_over : 0`);
-  lines.push(`            if _b`);
+  lines.push(`            bool _do_enter = false`);
+  lines.push(`            int  _do_dir   = 0`);
+  lines.push(`            // A. Проверка отложенного входа`);
+  lines.push(`            if use_wait and _pd != 0`);
+  lines.push(`                int _bw = bar_index - _pb`);
+  lines.push(`                bool _cncl = (wait_max_b > 0 and _bw > wait_max_b) or (wait_catr > 0 and _pd * (close - _psc) > wait_catr * _ac)`);
+  lines.push(`                if _cncl`);
+  lines.push(`                    _pd := 0`);
+  lines.push(`                else`);
+  lines.push(`                    bool _bk = _bw >= wait_bars`);
+  lines.push(`                    bool _rk = not wait_ret or (_pd == 1 and close < _psc) or (_pd == -1 and close > _psc)`);
+  lines.push(`                    if _bk and _rk`);
+  lines.push(`                        _do_enter := true`);
+  lines.push(`                        _do_dir   := _pd`);
+  lines.push(`                        _pd       := 0`);
+  lines.push(`            // B. Новый сигнал (только если нет pending)`);
+  lines.push(`            if not _do_enter and _pd == 0`);
+  lines.push(`                if _b or _s`);
+  lines.push(`                    bool _use_delay = use_wait and (wait_bars > 0 or wait_ret)`);
+  lines.push(`                    if _use_delay`);
+  lines.push(`                        _pd  := _b ? 1 : -1`);
+  lines.push(`                        _pb  := bar_index`);
+  lines.push(`                        _psc := close`);
+  lines.push(`                    else`);
+  lines.push(`                        _do_enter := true`);
+  lines.push(`                        _do_dir   := _b ? 1 : -1`);
+  lines.push(`            // C. Исполнение входа`);
+  lines.push(`            if _do_enter`);
+  lines.push(`            if _do_dir == 1`);
     lines.push(`                _in := true`);
     lines.push(`                _dir := 1`);
     lines.push(`                _ep := entry_price`);
@@ -2617,7 +2676,7 @@ function generatePineScript(r) {
   lines.push(`                float sl_d = math.abs(entry_price - _dsl)`);
   lines.push(`                _dtp := _tp_over > 0 ? (entry_price + _ac * _tp_ov) : calc_tp_level(1, entry_price, _ac, sl_d)`);
   lines.push(`                _eb := bar_index`);
-  lines.push(`            else if _s`);
+  lines.push(`            else if _do_dir == -1`);
     lines.push(`                _in := true`);
     lines.push(`                _dir := -1`);
     lines.push(`                _ep := entry_price`);
@@ -2668,6 +2727,10 @@ function generatePineScript(r) {
     lines.push(`var line l_sl = na`);
     lines.push(`var int v_eb = -1`);
     lines.push(`var int v_xb = -1`);
+    // Pending entry state (vectorized)
+    lines.push(`var int v_pd = 0`)
+    lines.push(`var int v_pb = -1`)
+    lines.push(`var float v_psc = 0.0`)
     lines.push(`bool a_le = false`);
     lines.push(`bool a_se = false`);
     lines.push(`bool a_lx = false`);
@@ -2833,14 +2896,41 @@ function generatePineScript(r) {
   lines.push(`                if new_sl < v_sl and new_sl > close`);
   lines.push(`                    v_sl := new_sl`);
   lines.push(`    if not v_in and bar_index > v_xb`);
-  lines.push(`        if sig_l or sig_s`);
-    lines.push(`            v_in := true`);
-    lines.push(`            v_dir := sig_l ? 1 : -1`);
-    lines.push(`            v_ep := entry_price`);
-    lines.push(`            v_tra := false`);
-    lines.push(`            v_bea := false`);
-    lines.push(`            v_sig_skip := 0`);
-    lines.push(`            v_cd_bar := -1`);
+  lines.push(`        bool v_do_enter = false`);
+  lines.push(`        int  v_do_dir   = 0`);
+  lines.push(`        // A. Pending entry`);
+  lines.push(`        if use_wait and v_pd != 0`);
+  lines.push(`            int _bw = bar_index - v_pb`);
+  lines.push(`            bool _cncl = (wait_max_b > 0 and _bw > wait_max_b) or (wait_catr > 0 and v_pd * (close - v_psc) > wait_catr * atr_v[1])`);
+  lines.push(`            if _cncl`);
+  lines.push(`                v_pd := 0`);
+  lines.push(`            else`);
+  lines.push(`                bool _bk = _bw >= wait_bars`);
+  lines.push(`                bool _rk = not wait_ret or (v_pd == 1 and close < v_psc) or (v_pd == -1 and close > v_psc)`);
+  lines.push(`                if _bk and _rk`);
+  lines.push(`                    v_do_enter := true`);
+  lines.push(`                    v_do_dir   := v_pd`);
+  lines.push(`                    v_pd       := 0`);
+  lines.push(`        // B. New signal`);
+  lines.push(`        if not v_do_enter and v_pd == 0`);
+  lines.push(`            if sig_l or sig_s`);
+  lines.push(`                bool _use_delay = use_wait and (wait_bars > 0 or wait_ret)`);
+  lines.push(`                if _use_delay`);
+  lines.push(`                    v_pd  := sig_l ? 1 : -1`);
+  lines.push(`                    v_pb  := bar_index`);
+  lines.push(`                    v_psc := close`);
+  lines.push(`                else`);
+  lines.push(`                    v_do_enter := true`);
+  lines.push(`                    v_do_dir   := sig_l ? 1 : -1`);
+  lines.push(`        // C. Execute`);
+  lines.push(`        if v_do_enter`);
+  lines.push(`            v_in  := true`);
+  lines.push(`            v_dir := v_do_dir`);
+  lines.push(`            v_ep  := entry_price`);
+  lines.push(`            v_tra := false`);
+  lines.push(`            v_bea := false`);
+  lines.push(`            v_sig_skip := 0`);
+  lines.push(`            v_cd_bar := -1`);
   lines.push(`            float _u = atr_v[1]`);
   lines.push(`            v_sl := calc_sl_level(v_dir, entry_price, _u)`);
   lines.push(`            float sl_d = math.abs(entry_price - v_sl)`);
@@ -4646,6 +4736,8 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
   let exitBar = -1, entryBar = -1;
   let beActive = false, trailActive = false, partialDone = false, posSize = 1.0;
   let revSkipCount = 0, revCooldownBar = -1; // счётчики skip/cooldown для обратного сигнала
+  // Отложенный вход (Bars / Retrace)
+  let pendingDir = 0, pendingBar = -1, pendingSigClose = 0;
   let pnl = 0, trades = 0, wins = 0, maxPnl = 0, dd = 0;
   let p1 = 0, c1 = 0, w1 = 0, p2 = 0, c2 = 0, w2 = 0;
   let nL = 0, wL = 0, pL = 0, nS = 0, wS = 0, pS = 0; // лонг/шорт стат
@@ -4892,27 +4984,65 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
 
     // ===== ENTRY =====
     if (!inTrade && i > exitBar) {
-      let sigL = false, sigS = false;
+      let doDir = 0; // направление входа: 0 = нет, 1 = лонг, -1 = шорт
 
-      // ENTRY SIGNALS — из ENTRY_REGISTRY
-      for (let _ei = 0; _ei < ENTRY_REGISTRY.length; _ei++) {
-        const _e = ENTRY_REGISTRY[_ei];
-        if (!cfg[_e.flag]) continue;
-        if (!sigL && _e.detectL(cfg, i)) sigL = true;
-        if (!sigS && _e.detectS(cfg, i)) sigS = true;
+      // --- A. Проверка отложенного входа ---
+      if (pendingDir !== 0) {
+        const barsWaited = i - pendingBar;
+        let cancel = false;
+        // Отмена если превышен лимит ожидания
+        if (cfg.waitMaxBars > 0 && barsWaited > cfg.waitMaxBars) cancel = true;
+        // Отмена если цена ушла слишком далеко в нашу сторону (пропустили движение)
+        if (!cancel && cfg.waitCancelAtr > 0 && ac > 0) {
+          if (pendingDir * (bar.c - pendingSigClose) > cfg.waitCancelAtr * ac) cancel = true;
+        }
+        if (cancel) {
+          pendingDir = 0;
+        } else {
+          const barsOk    = barsWaited >= cfg.waitBars;
+          const retraceOk = !cfg.waitRetrace ||
+            (pendingDir === 1  && bar.c < pendingSigClose) ||
+            (pendingDir === -1 && bar.c > pendingSigClose);
+          if (barsOk && retraceOk) { doDir = pendingDir; pendingDir = 0; }
+        }
       }
 
-      // FILTERS — из FILTER_REGISTRY
-      for (let _fi = 0; _fi < FILTER_REGISTRY.length && (sigL || sigS); _fi++) {
-        const _f = FILTER_REGISTRY[_fi];
-        if (!cfg[_f.flag]) continue;
-        if (sigL && _f.blocksL(cfg, i, ac)) sigL = false;
-        if (sigS && _f.blocksS(cfg, i, ac)) sigS = false;
+      // --- B. Новые сигналы (только если нет активного pending и pending не сработал) ---
+      if (doDir === 0 && pendingDir === 0) {
+        let sigL = false, sigS = false;
+
+        // ENTRY SIGNALS — из ENTRY_REGISTRY
+        for (let _ei = 0; _ei < ENTRY_REGISTRY.length; _ei++) {
+          const _e = ENTRY_REGISTRY[_ei];
+          if (!cfg[_e.flag]) continue;
+          if (!sigL && _e.detectL(cfg, i)) sigL = true;
+          if (!sigS && _e.detectS(cfg, i)) sigS = true;
+        }
+
+        // FILTERS — из FILTER_REGISTRY
+        for (let _fi = 0; _fi < FILTER_REGISTRY.length && (sigL || sigS); _fi++) {
+          const _f = FILTER_REGISTRY[_fi];
+          if (!cfg[_f.flag]) continue;
+          if (sigL && _f.blocksL(cfg, i, ac)) sigL = false;
+          if (sigS && _f.blocksS(cfg, i, ac)) sigS = false;
+        }
+
+        if (sigL || sigS) {
+          const useDelay = cfg.waitBars > 0 || cfg.waitRetrace;
+          if (useDelay) {
+            // Сохраняем pending — войдём позже
+            pendingDir = sigL ? 1 : -1;
+            pendingBar = i;
+            pendingSigClose = bar.c;
+          } else {
+            doDir = sigL ? 1 : -1;
+          }
+        }
       }
 
-      // ENTRY EXECUTION
-      if ((sigL||sigS) && ac>0) {
-        inTrade=true; dir=sigL?1:-1;
+      // --- C. Исполнение входа ---
+      if (doDir !== 0 && ac > 0) {
+        inTrade=true; dir=doDir;
         entry=bar.c; entryBar=i;
         beActive=false; trailActive=false; partialDone=false; posSize=1.0;
         revSkipCount=0; revCooldownBar=-1;
@@ -5304,6 +5434,13 @@ function buildName(cfg, pvL, pvR, slDesc, tpDesc, filters, extras) {
   if (cfg.useClimax) exits.push('Clmx');
   if (cfg.useStExit) exits.push(`STex(${cfg.stAtrP||10},${cfg.stMult||3})`);
   if (exits.length>0) parts.push(exits.join('+'));
+  // Delay
+  if (cfg.waitBars > 0 || cfg.waitRetrace) {
+    let _wd = `Wait(`;
+    if (cfg.waitBars > 0) _wd += `b${cfg.waitBars}`;
+    if (cfg.waitRetrace) _wd += (cfg.waitBars > 0 ? '+' : '') + 'Ret';
+    parts.push(_wd + ')');
+  }
 
   // Filters — из FILTER_REGISTRY
   const filts = [];
@@ -5525,6 +5662,8 @@ async function runOpt() {
   const useNReversal  = $c('e_nrev');
   const useSupertrend = $c('e_st');
   const useStExit     = $c('x_st');
+  const useWaitEntry  = $c('e_wait_on');
+  const useWaitRetrace= useWaitEntry && $c('e_wait_retrace');
 
   // Filter flags
   const useMa=$c('f_ma'),useAdx=$c('f_adx'),useRsi=$c('f_rsi');
@@ -5783,6 +5922,11 @@ async function runOpt() {
   const nRevNArr     = useNReversal  ? parseRange('e_nrev_n')  : [$n('e_nrev_n') ||3];
   const stAtrPArr    = (useSupertrend||useStExit) ? parseRange('e_st_atrp') : [$n('e_st_atrp')||10];
   const stMultArr    = (useSupertrend||useStExit) ? parseRange('e_st_mult') : [$n('e_st_mult')||3.0];
+  // Отложенный вход
+  const waitBarsArr     = useWaitEntry ? parseRange('e_wait_bars')  : [0];
+  const waitRetraceArr  = useWaitRetrace ? [false, true] : [false]; // оба варианта в одном прогоне
+  const waitMaxBars     = useWaitEntry ? ($n('e_wait_maxb') || 0) : 0;
+  const waitCancelAtr   = useWaitEntry ? ($n('e_wait_catr') || 0) : 0;
   // ── Per-iteration indicator caches ─────────────────────────────────
   const rsiExitCache = {}, maCrossNewCache = {}, macdNewCache = {}, stochNewCache = {}, stDirCache = {};
 
@@ -5882,7 +6026,8 @@ async function runOpt() {
     (revSkipArr.length||1)*(revCooldownArr.length||1)*
     (_adxLArr.length||1)*(_sTrendArr.length||1)*
     (tlPvLs.length||1)*(tlPvRs.length||1)*
-    (stAtrPArr.length||1)*(stMultArr.length||1);
+    (stAtrPArr.length||1)*(stMultArr.length||1)*
+    (waitBarsArr.length||1)*(waitRetraceArr.length||1);
 
   // Monte Carlo: shuffle and limit
   let mcTotal = total;
@@ -5902,7 +6047,8 @@ async function runOpt() {
     (revSkipArr.length||1)*(revCooldownArr.length||1)*
     (_adxLArr.length||1)*(_sTrendArr.length||1)*
     (tlPvLs.length||1)*(tlPvRs.length||1)*
-    (stAtrPArr.length||1)*(stMultArr.length||1);
+    (stAtrPArr.length||1)*(stMultArr.length||1)*
+    (waitBarsArr.length||1)*(waitRetraceArr.length||1);
     // ── ИДЕЯ 7: Latin Hypercube Sampling — равномерное покрытие пространства
     // Делим [0, realTotal) на mcTotal равных страт, из каждой берём 1 случайную точку.
     // Гарантирует что каждая зона пространства представлена, нет кластеризации.
@@ -5948,7 +6094,8 @@ async function runOpt() {
     (revSkipArr.length||1)*(revCooldownArr.length||1)*
     (_adxLArr.length||1)*(_sTrendArr.length||1)*
     (tlPvLs.length||1)*(tlPvRs.length||1)*
-    (stAtrPArr.length||1)*(stMultArr.length||1);
+    (stAtrPArr.length||1)*(stMultArr.length||1)*
+    (waitBarsArr.length||1)*(waitRetraceArr.length||1);
     const _mcEffective = Math.min(mcTotal, _mcRealTotal);
     if (_mcRealTotal <= mcTotal) {
       setMcPhase('⚠️ Пространство (' + _mcRealTotal + ') < N (' + mcTotal + ') — полный перебор, результаты одинаковы каждый раз');
@@ -5993,6 +6140,8 @@ async function runOpt() {
       ['nReversalN',  nRevNArr],
       ['stAtrP',      stAtrPArr],
       ['stMult',      stMultArr],
+      ['waitBars',    waitBarsArr],
+      ['waitRetrace', waitRetraceArr],
     ];
     // Defaults for all params (first element of each array)
     window._ipDef = Object.fromEntries(_allIp.map(([n,a])=>[n,a[0]]));
@@ -6119,6 +6268,8 @@ async function runOpt() {
       const nReversalN  = _ip.nReversalN  ?? window._ipDef.nReversalN;
       const stAtrP      = _ip.stAtrP      ?? window._ipDef.stAtrP;
       const stMult      = _ip.stMult      ?? window._ipDef.stMult;
+      const waitBars    = _ip.waitBars    ?? window._ipDef.waitBars;
+      const waitRetrace = _ip.waitRetrace ?? window._ipDef.waitRetrace;
       const {lo:pivSLLo, hi:pivSLHi} = useSLPiv ? _getPivSL(slPivL, slPivR) : {lo:null, hi:null};
       const rsiExitArr = useRsiExit   ? (rsiExitCache[rsiExitPer]||(rsiExitCache[rsiExitPer]=calcRSI(rsiExitPer))) : null;
       const maCrossArr = useMaCross   ? (()=>{const k=maCrossType+'_'+maCrossP;return maCrossNewCache[k]||(maCrossNewCache[k]=calcMA(closes,maCrossP,maCrossType));})() : null;
@@ -6171,6 +6322,7 @@ async function runOpt() {
         useNReversal,nReversalN,
         useSupertrend,stDir,stAtrP,stMult,
         useStExit,
+        waitBars:waitBars||0,waitRetrace:waitRetrace||false,waitMaxBars,waitCancelAtr,
         hasSLA:!!(slPair.a),slMult:slPair.a?slPair.a.m:0,hasSLB:!!(slPair.p),slPctMult:slPair.p?slPair.p.m:0,slLogic,
         hasTPA:!!(tpPair.a),tpMult:tpPair.a?tpPair.a.m:0,tpMode:tpPair.a?tpPair.a.type:'rr',
         hasTPB:!!(tpPair.b),tpMultB:tpPair.b?tpPair.b.m:0,tpModeB:tpPair.b?tpPair.b.type:'rr',tpLogic,
@@ -6236,6 +6388,7 @@ async function runOpt() {
               useNReversal,nReversalN,
               useSupertrend,stAtrP,stMult,
               useStExit,
+              waitBars:waitBars||0,waitRetrace:waitRetrace||false,waitMaxBars,waitCancelAtr,
               slPair,slLogic,tpPair,tpLogic,
               useSLPiv,slPivOff,slPivMax,slPivL,slPivR,slPivTrail,
               useBE,beTrig,beOff,useTrail,trTrig,trDist,
@@ -6371,6 +6524,8 @@ async function runOpt() {
       const nReversalN  = _ip.nReversalN  ?? window._ipDef.nReversalN;
       const stAtrP      = _ip.stAtrP      ?? window._ipDef.stAtrP;
       const stMult      = _ip.stMult      ?? window._ipDef.stMult;
+      const waitBars    = _ip.waitBars    ?? window._ipDef.waitBars;
+      const waitRetrace = _ip.waitRetrace ?? window._ipDef.waitRetrace;
       const {lo:pivSLLo, hi:pivSLHi} = useSLPiv ? _getPivSL(slPivL, slPivR) : {lo:null, hi:null};
       const rsiExitArr = useRsiExit   ? (rsiExitCache[rsiExitPer]||(rsiExitCache[rsiExitPer]=calcRSI(rsiExitPer))) : null;
       const maCrossArr = useMaCross   ? (()=>{const k=maCrossType+'_'+maCrossP;return maCrossNewCache[k]||(maCrossNewCache[k]=calcMA(closes,maCrossP,maCrossType));})() : null;
@@ -6426,6 +6581,7 @@ async function runOpt() {
         useNReversal,nReversalN,
         useSupertrend,stDir,stAtrP,stMult,
         useStExit,
+        waitBars:waitBars||0,waitRetrace:waitRetrace||false,waitMaxBars,waitCancelAtr,
         hasSLA:!!(slPair.a),slMult:slPair.a?slPair.a.m:0,hasSLB:!!(slPair.p),slPctMult:slPair.p?slPair.p.m:0,slLogic,
         hasTPA:!!(tpPair.a),tpMult:tpPair.a?tpPair.a.m:0,tpMode:tpPair.a?tpPair.a.type:'rr',
         hasTPB:!!(tpPair.b),tpMultB:tpPair.b?tpPair.b.m:0,tpModeB:tpPair.b?tpPair.b.type:'rr',tpLogic,
@@ -6504,6 +6660,7 @@ async function runOpt() {
               useNReversal,nReversalN,
               useSupertrend,stAtrP,stMult,
               useStExit,
+              waitBars:waitBars||0,waitRetrace:waitRetrace||false,waitMaxBars,waitCancelAtr,
               slPair,slLogic,tpPair,tpLogic,
               useSLPiv,slPivOff,slPivMax,slPivL,slPivR,slPivTrail,
               useBE,beTrig,beOff,useTrail,trTrig,trDist,
@@ -6796,6 +6953,8 @@ async function runOpt() {
                                     const nReversalN  = _ip.nReversalN  ?? window._ipDef.nReversalN;
                                     const stAtrP      = _ip.stAtrP      ?? window._ipDef.stAtrP;
                                     const stMult      = _ip.stMult      ?? window._ipDef.stMult;
+                                    const waitBars    = _ip.waitBars    ?? window._ipDef.waitBars;
+                                    const waitRetrace = _ip.waitRetrace ?? window._ipDef.waitRetrace;
                                     const rsiExitArr = useRsiExit   ? (rsiExitCache[rsiExitPer]||(rsiExitCache[rsiExitPer]=calcRSI(rsiExitPer))) : null;
                                     const maCrossArr = useMaCross   ? (()=>{const k=maCrossType+'_'+maCrossP;return maCrossNewCache[k]||(maCrossNewCache[k]=calcMA(closes,maCrossP,maCrossType));})() : null;
                                     const stDir      = (useSupertrend||useStExit) ? (()=>{const k=stAtrP+'_'+stMult;return stDirCache[k]||(stDirCache[k]=calcSupertrend(stAtrP,stMult));})() : null;
@@ -6834,6 +6993,7 @@ async function runOpt() {
                                       useNReversal,nReversalN,
                                       useSupertrend,stDir,stAtrP,stMult,
                                       useStExit,
+                                      waitBars:waitBars||0,waitRetrace:waitRetrace||false,waitMaxBars,waitCancelAtr,
                                       // SL
                                       hasSLA:!!slPair.a,
                                       slMult:slPair.a?slPair.a.m:0,
@@ -6937,6 +7097,7 @@ async function runOpt() {
                                           useNReversal,nReversalN,
                                           useSupertrend,stAtrP,stMult,
                                           useStExit,
+                                          waitBars:waitBars||0,waitRetrace:waitRetrace||false,waitMaxBars,waitCancelAtr,
                                           slPair, slLogic, tpPair, tpLogic,
                                           useSLPiv, slPivOff, slPivMax, slPivL, slPivR, slPivTrail,
                                           useBE, beTrig, beOff,
@@ -7408,6 +7569,10 @@ function buildBtCfg(cfg, ind) {
     stAtrP:        cfg.stAtrP        || 10,
     stMult:        cfg.stMult        || 3.0,
     useStExit:     cfg.useStExit     || false,
+    waitBars:      cfg.waitBars      || 0,
+    waitRetrace:   cfg.waitRetrace   || false,
+    waitMaxBars:   cfg.waitMaxBars   || 0,
+    waitCancelAtr: cfg.waitCancelAtr || 0,
 
     // ── SL / TP ───────────────────────────────────────────────
     hasSLA:    !!(slPair.a),

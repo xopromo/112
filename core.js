@@ -316,6 +316,8 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
   let exitBar = -1, entryBar = -1;
   let beActive = false, trailActive = false, partialDone = false, posSize = 1.0;
   let revSkipCount = 0, revCooldownBar = -1; // счётчики skip/cooldown для обратного сигнала
+  // Отложенный вход (Bars / Retrace)
+  let pendingDir = 0, pendingBar = -1, pendingSigClose = 0;
   let pnl = 0, trades = 0, wins = 0, maxPnl = 0, dd = 0;
   let p1 = 0, c1 = 0, w1 = 0, p2 = 0, c2 = 0, w2 = 0;
   let nL = 0, wL = 0, pL = 0, nS = 0, wS = 0, pS = 0; // лонг/шорт стат
@@ -562,27 +564,65 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
 
     // ===== ENTRY =====
     if (!inTrade && i > exitBar) {
-      let sigL = false, sigS = false;
+      let doDir = 0; // направление входа: 0 = нет, 1 = лонг, -1 = шорт
 
-      // ENTRY SIGNALS — из ENTRY_REGISTRY
-      for (let _ei = 0; _ei < ENTRY_REGISTRY.length; _ei++) {
-        const _e = ENTRY_REGISTRY[_ei];
-        if (!cfg[_e.flag]) continue;
-        if (!sigL && _e.detectL(cfg, i)) sigL = true;
-        if (!sigS && _e.detectS(cfg, i)) sigS = true;
+      // --- A. Проверка отложенного входа ---
+      if (pendingDir !== 0) {
+        const barsWaited = i - pendingBar;
+        let cancel = false;
+        // Отмена если превышен лимит ожидания
+        if (cfg.waitMaxBars > 0 && barsWaited > cfg.waitMaxBars) cancel = true;
+        // Отмена если цена ушла слишком далеко в нашу сторону (пропустили движение)
+        if (!cancel && cfg.waitCancelAtr > 0 && ac > 0) {
+          if (pendingDir * (bar.c - pendingSigClose) > cfg.waitCancelAtr * ac) cancel = true;
+        }
+        if (cancel) {
+          pendingDir = 0;
+        } else {
+          const barsOk    = barsWaited >= cfg.waitBars;
+          const retraceOk = !cfg.waitRetrace ||
+            (pendingDir === 1  && bar.c < pendingSigClose) ||
+            (pendingDir === -1 && bar.c > pendingSigClose);
+          if (barsOk && retraceOk) { doDir = pendingDir; pendingDir = 0; }
+        }
       }
 
-      // FILTERS — из FILTER_REGISTRY
-      for (let _fi = 0; _fi < FILTER_REGISTRY.length && (sigL || sigS); _fi++) {
-        const _f = FILTER_REGISTRY[_fi];
-        if (!cfg[_f.flag]) continue;
-        if (sigL && _f.blocksL(cfg, i, ac)) sigL = false;
-        if (sigS && _f.blocksS(cfg, i, ac)) sigS = false;
+      // --- B. Новые сигналы (только если нет активного pending и pending не сработал) ---
+      if (doDir === 0 && pendingDir === 0) {
+        let sigL = false, sigS = false;
+
+        // ENTRY SIGNALS — из ENTRY_REGISTRY
+        for (let _ei = 0; _ei < ENTRY_REGISTRY.length; _ei++) {
+          const _e = ENTRY_REGISTRY[_ei];
+          if (!cfg[_e.flag]) continue;
+          if (!sigL && _e.detectL(cfg, i)) sigL = true;
+          if (!sigS && _e.detectS(cfg, i)) sigS = true;
+        }
+
+        // FILTERS — из FILTER_REGISTRY
+        for (let _fi = 0; _fi < FILTER_REGISTRY.length && (sigL || sigS); _fi++) {
+          const _f = FILTER_REGISTRY[_fi];
+          if (!cfg[_f.flag]) continue;
+          if (sigL && _f.blocksL(cfg, i, ac)) sigL = false;
+          if (sigS && _f.blocksS(cfg, i, ac)) sigS = false;
+        }
+
+        if (sigL || sigS) {
+          const useDelay = cfg.waitBars > 0 || cfg.waitRetrace;
+          if (useDelay) {
+            // Сохраняем pending — войдём позже
+            pendingDir = sigL ? 1 : -1;
+            pendingBar = i;
+            pendingSigClose = bar.c;
+          } else {
+            doDir = sigL ? 1 : -1;
+          }
+        }
       }
 
-      // ENTRY EXECUTION
-      if ((sigL||sigS) && ac>0) {
-        inTrade=true; dir=sigL?1:-1;
+      // --- C. Исполнение входа ---
+      if (doDir !== 0 && ac > 0) {
+        inTrade=true; dir=doDir;
         entry=bar.c; entryBar=i;
         beActive=false; trailActive=false; partialDone=false; posSize=1.0;
         revSkipCount=0; revCooldownBar=-1;

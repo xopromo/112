@@ -917,6 +917,24 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
   </div>
 </div>
 
+<!-- Отложенный вход -->
+<div class="panel" style="min-width:180px">
+  <h3>⏳ Отложенный вход</h3>
+  <div class="cb"><input type="checkbox" id="e_wait_on"><label data-tip="Вместо немедленного входа по сигналу — ждать условия отката. Совместимо со всеми точками входа. При waitBars=0 и Retrace=false поведение идентично обычному.">Ждать отката</label></div>
+  <div class="sep"></div>
+  <div style="font-size:.65em;color:var(--text3);margin-bottom:4px">Режим Bars: войти через N баров</div>
+  <div class="field"><label>Баров ожидания</label><input id="e_wait_bars" value="0,1,2" data-tip="Войти через N баров после сигнала. 0 = первый же бар после сигнала (или retrace). Диапазон: 0,1,2 тестирует все варианты в одном прогоне"></div>
+  <div class="sep"></div>
+  <div style="font-size:.65em;color:var(--text3);margin-bottom:4px">Режим Retrace: войти при откате</div>
+  <div class="cb"><input type="checkbox" id="e_wait_retrace"><label data-tip="Дополнительное условие: цена должна закрыться ниже (лонг) / выше (шорт) close сигнального бара. Включение добавляет измерение [false,true] — в одном прогоне тестируются оба варианта: с откатом и без">Требовать откат цены</label></div>
+  <div class="sep"></div>
+  <div style="font-size:.65em;color:var(--text3);margin-bottom:4px">Отмена ожидания</div>
+  <div class="g2">
+    <div class="field"><label>Макс баров</label><input id="e_wait_maxb" value="10" data-tip="Отменить ожидание если прошло N баров без входа. 0 = не отменять"></div>
+    <div class="field"><label>Отмена ×ATR</label><input id="e_wait_catr" value="0" data-tip="Отменить если цена ушла в сторону сигнала на N×ATR без отката. 0 = не отменять"></div>
+  </div>
+</div>
+
 <!-- SL/TP -->
 <div class="panel" style="min-width:180px">
   <h3>🛑 Stop Loss</h3>
