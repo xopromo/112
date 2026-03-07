@@ -233,6 +233,32 @@ function calcMACD(fast, slow, signalP) {
   const signal = calcEMA(Array.from(line), signalP);
   return { line, signal };
 }
+// Supertrend: возвращает Int8Array dir (+1 = бычий, -1 = медвежий)
+function calcSupertrend(atrP, mult) {
+  const N = DATA.length;
+  const atr = calcRMA_ATR(atrP);
+  const dir   = new Int8Array(N);
+  const upper = new Float64Array(N);
+  const lower = new Float64Array(N);
+  if (N === 0) return dir;
+  const hl2_0 = (DATA[0].h + DATA[0].l) / 2;
+  upper[0] = hl2_0 + mult * (atr[0] || 0);
+  lower[0] = hl2_0 - mult * (atr[0] || 0);
+  dir[0] = 1;
+  for (let i = 1; i < N; i++) {
+    const hl2   = (DATA[i].h + DATA[i].l) / 2;
+    const rawUp = hl2 + mult * atr[i];
+    const rawLo = hl2 - mult * atr[i];
+    upper[i] = (rawUp < upper[i-1] || DATA[i-1].c > upper[i-1]) ? rawUp : upper[i-1];
+    lower[i] = (rawLo > lower[i-1] || DATA[i-1].c < lower[i-1]) ? rawLo : lower[i-1];
+    if (dir[i-1] === -1) {
+      dir[i] = DATA[i].c > upper[i] ? 1 : -1;
+    } else {
+      dir[i] = DATA[i].c < lower[i] ? -1 : 1;
+    }
+  }
+  return dir;
+}
 // Stochastic %K и %D (SMA of %K)
 function calcStochastic(kPeriod, dPeriod) {
   const N = DATA.length;

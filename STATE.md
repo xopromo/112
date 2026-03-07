@@ -4,14 +4,14 @@
 > Также обновляй вручную когда вливаешь ветки в main.
 
 ## Последняя ручная сессия
-- **Дата:** 2026-03-07 06:27
+- **Дата:** 2026-03-07 06:50
 - **Ветка:** `main`
 - **Последние коммиты:**
+  - e246b48 Update STATE.md
   - 34833fb Cleanup: remove dead stochK (%K array) — only stochD (%D) is used in signals
   - 842b509 Fix: stochastic signals broken — .d/.k → .dArr/.kArr
   - a599352 Update STATE.md
   - 184c344 Build: update USE_Optimizer_v6_built.html
-  - c096af0 Add Omega Ratio, Pain Ratio metrics + MC Permutation Test
 
 ## Последний цикл
 - **Дата:** 2026-03-03-20 (ручной исследовательский цикл)

@@ -910,6 +910,11 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
 
   <div class="cb"><input type="checkbox" id="e_nrev"><label data-tip="Разворот после N свечей: N последовательных медвежьих свечей, затем бычья = лонг. N последовательных бычьих свечей, затем медвежья = шорт">N-Candle Reversal</label></div>
   <div class="field"><label>N свечей</label><input id="e_nrev_n" value="3" data-tip="Количество последовательных направленных свечей перед разворотом"></div>
+  <div class="cb"><input type="checkbox" id="e_st"><label data-tip="Supertrend: вход при смене направления тренда. Лонг — Supertrend флипнулся с медвежьего на бычий (close пересёк нижнюю полосу снизу вверх). Шорт — наоборот.">Supertrend</label></div>
+  <div class="g2">
+    <div class="field"><label>ATR период</label><input id="e_st_atrp" value="10" data-tip="Период ATR для расчёта Supertrend. Больше = медленнее реагирует, меньше сигналов"></div>
+    <div class="field"><label>Множитель</label><input id="e_st_mult" value="3.0" data-tip="Множитель ATR для ширины полос Supertrend. Больше = реже смены тренда"></div>
+  </div>
 </div>
 
 <!-- SL/TP -->
@@ -1004,6 +1009,9 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
     <div class="xmode-btn active" id="timemode_any" onclick="setXMode('time','any')"  data-tip="Закрывать по времени в любом случае">Любом P&L</div>
     <div class="xmode-btn"        id="timemode_plus"onclick="setXMode('time','plus')" data-tip="Закрывать по времени только если сделка в плюсе (не режем прибыль)">Только +P&L</div>
   </div>
+
+  <div class="sep"></div>
+  <div class="cb"><input type="checkbox" id="x_st"><label data-tip="Supertrend-выход (Вариант A): закрывает позицию когда Supertrend разворачивается против неё. Параметры ATR-период и множитель берутся из блока «Точки входа → Supertrend» (поля e_st_atrp / e_st_mult).">Supertrend-выход</label></div>
 
   <div class="sep"></div>
   <div class="cb"><input type="checkbox" id="x_part"><label data-tip="Закрывает часть позиции на промежуточном уровне, позволяя остатку расти">Частичный TP1</label></div>

@@ -44,4 +44,19 @@ const EXIT_REGISTRY = [
       return cfg.timeMode === 'plus' && cpnl > 0;
     },
   },
+
+  // ── Supertrend Exit (Вариант A) ───────────────────────────
+  // Выход когда Supertrend разворачивается против позиции.
+  // Лонг: dir флипнулся с +1 на -1 на предыдущем баре → exit.
+  // Шорт: dir флипнулся с -1 на +1 на предыдущем баре → exit.
+  {
+    id:    'stExit',
+    flag:  'useStExit',
+    check: (cfg, i, ts) => {
+      if (!cfg.stDir || i < 2) return false;
+      if (ts.dir === 1)  return cfg.stDir[i-1] === -1 && cfg.stDir[i-2] === 1;
+      if (ts.dir === -1) return cfg.stDir[i-1] === 1  && cfg.stDir[i-2] === -1;
+      return false;
+    },
+  },
 ];

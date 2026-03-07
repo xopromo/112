@@ -293,6 +293,29 @@ const ENTRY_REGISTRY = [
     ],
   },
 
+  // ── Supertrend ────────────────────────────────────────────
+  // Лонг: направление флипнулось с -1 на +1 на предыдущем баре.
+  // Шорт: направление флипнулось с +1 на -1 на предыдущем баре.
+  {
+    id:        'supertrend',
+    flag:      'useSupertrend',
+    htmlId:    'e_st',
+    shortName: c => `ST(${c.stAtrP||10},${c.stMult||3})`,
+    detectL: (cfg, i) => {
+      if (!cfg.stDir || i < 3) return false;
+      return cfg.stDir[i-1] === 1 && cfg.stDir[i-2] === -1;
+    },
+    detectS: (cfg, i) => {
+      if (!cfg.stDir || i < 3) return false;
+      return cfg.stDir[i-1] === -1 && cfg.stDir[i-2] === 1;
+    },
+    pineLines: (c, b) => [
+      `use_supertrend = input.bool(${b(c.useSupertrend)}, "Supertrend смена тренда", group=grp_entry)`,
+      `st_atr_p       = input.int(${c.stAtrP||10}, "  ST ATR период", minval=1, maxval=200, group=grp_entry)`,
+      `st_mult        = input.float(${c.stMult||3.0}, "  ST множитель", minval=0.1, maxval=20, step=0.1, group=grp_entry)`,
+    ],
+  },
+
   // ── Свободный вход (Free Entry) ───────────────────────────
   // Вход разрешён всегда. Ограничивают только фильтры (AND-логика).
   // Полезно: тест чистой системы фильтров без сигнала входа.

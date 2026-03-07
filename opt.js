@@ -350,6 +350,7 @@ function buildName(cfg, pvL, pvR, slDesc, tpDesc, filters, extras) {
   if (cfg.useTime) exits.push(`Time${cfg.timeBars}`);
   if (cfg.usePartial) exits.push(`Partial${cfg.partPct}%`);
   if (cfg.useClimax) exits.push('Clmx');
+  if (cfg.useStExit) exits.push(`STex(${cfg.stAtrP||10},${cfg.stMult||3})`);
   if (exits.length>0) parts.push(exits.join('+'));
 
   // Filters — из FILTER_REGISTRY
@@ -563,13 +564,15 @@ async function runOpt() {
 
   // New entry flags
   const useRsiExit  = $c('e_rsix');
-  const useMaCross  = $c('e_macr');
-  const useFreeEntry= $c('e_free');
-  const useMacd     = $c('e_macd');
-  const useStochExit= $c('e_stx');
-  const useVolMove  = HAS_VOLUME && $c('e_volmv');
-  const useInsideBar= $c('e_inb');
-  const useNReversal= $c('e_nrev');
+  const useMaCross    = $c('e_macr');
+  const useFreeEntry  = $c('e_free');
+  const useMacd       = $c('e_macd');
+  const useStochExit  = $c('e_stx');
+  const useVolMove    = HAS_VOLUME && $c('e_volmv');
+  const useInsideBar  = $c('e_inb');
+  const useNReversal  = $c('e_nrev');
+  const useSupertrend = $c('e_st');
+  const useStExit     = $c('x_st');
 
   // Filter flags
   const useMa=$c('f_ma'),useAdx=$c('f_adx'),useRsi=$c('f_rsi');
@@ -826,8 +829,10 @@ async function runOpt() {
   const stochOBA     = useStochExit  ? parseRange('e_stx_ob')  : [$n('e_stx_ob') ||80];
   const volMoveMultA = useVolMove     ? parseRange('e_volmv_m') : [$n('e_volmv_m')||1.5];
   const nRevNArr     = useNReversal  ? parseRange('e_nrev_n')  : [$n('e_nrev_n') ||3];
+  const stAtrPArr    = (useSupertrend||useStExit) ? parseRange('e_st_atrp') : [$n('e_st_atrp')||10];
+  const stMultArr    = (useSupertrend||useStExit) ? parseRange('e_st_mult') : [$n('e_st_mult')||3.0];
   // ── Per-iteration indicator caches ─────────────────────────────────
-  const rsiExitCache = {}, maCrossNewCache = {}, macdNewCache = {}, stochNewCache = {};
+  const rsiExitCache = {}, maCrossNewCache = {}, macdNewCache = {}, stochNewCache = {}, stDirCache = {};
 
   // ── Trendline Figures Precompute ─────────────────────────────
   // Все четыре паттерна вычисляются один раз перед основным циклом.
@@ -924,7 +929,8 @@ async function runOpt() {
     (vsaMs.length||1)*(atrBoMults.length||1)*(confNArr.length||1)*(revBarsArr.length||1)*
     (revSkipArr.length||1)*(revCooldownArr.length||1)*
     (_adxLArr.length||1)*(_sTrendArr.length||1)*
-    (tlPvLs.length||1)*(tlPvRs.length||1);
+    (tlPvLs.length||1)*(tlPvRs.length||1)*
+    (stAtrPArr.length||1)*(stMultArr.length||1);
 
   // Monte Carlo: shuffle and limit
   let mcTotal = total;
@@ -943,7 +949,8 @@ async function runOpt() {
       (vsaMs.length||1)*(atrBoMults.length||1)*(confNArr.length||1)*(revBarsArr.length||1)*
     (revSkipArr.length||1)*(revCooldownArr.length||1)*
     (_adxLArr.length||1)*(_sTrendArr.length||1)*
-    (tlPvLs.length||1)*(tlPvRs.length||1);
+    (tlPvLs.length||1)*(tlPvRs.length||1)*
+    (stAtrPArr.length||1)*(stMultArr.length||1);
     // ── ИДЕЯ 7: Latin Hypercube Sampling — равномерное покрытие пространства
     // Делим [0, realTotal) на mcTotal равных страт, из каждой берём 1 случайную точку.
     // Гарантирует что каждая зона пространства представлена, нет кластеризации.
@@ -988,7 +995,8 @@ async function runOpt() {
       (vsaMs.length||1)*(atrBoMults.length||1)*(confNArr.length||1)*(revBarsArr.length||1)*
     (revSkipArr.length||1)*(revCooldownArr.length||1)*
     (_adxLArr.length||1)*(_sTrendArr.length||1)*
-    (tlPvLs.length||1)*(tlPvRs.length||1);
+    (tlPvLs.length||1)*(tlPvRs.length||1)*
+    (stAtrPArr.length||1)*(stMultArr.length||1);
     const _mcEffective = Math.min(mcTotal, _mcRealTotal);
     if (_mcRealTotal <= mcTotal) {
       setMcPhase('⚠️ Пространство (' + _mcRealTotal + ') < N (' + mcTotal + ') — полный перебор, результаты одинаковы каждый раз');
@@ -1031,6 +1039,8 @@ async function runOpt() {
       ['stochOB',     stochOBA],
       ['volMoveMult', volMoveMultA],
       ['nReversalN',  nRevNArr],
+      ['stAtrP',      stAtrPArr],
+      ['stMult',      stMultArr],
     ];
     // Defaults for all params (first element of each array)
     window._ipDef = Object.fromEntries(_allIp.map(([n,a])=>[n,a[0]]));
@@ -1155,9 +1165,12 @@ async function runOpt() {
       const stochOB     = _ip.stochOB     ?? window._ipDef.stochOB;
       const volMoveMult = _ip.volMoveMult ?? window._ipDef.volMoveMult;
       const nReversalN  = _ip.nReversalN  ?? window._ipDef.nReversalN;
+      const stAtrP      = _ip.stAtrP      ?? window._ipDef.stAtrP;
+      const stMult      = _ip.stMult      ?? window._ipDef.stMult;
       const {lo:pivSLLo, hi:pivSLHi} = useSLPiv ? _getPivSL(slPivL, slPivR) : {lo:null, hi:null};
       const rsiExitArr = useRsiExit   ? (rsiExitCache[rsiExitPer]||(rsiExitCache[rsiExitPer]=calcRSI(rsiExitPer))) : null;
       const maCrossArr = useMaCross   ? (()=>{const k=maCrossType+'_'+maCrossP;return maCrossNewCache[k]||(maCrossNewCache[k]=calcMA(closes,maCrossP,maCrossType));})() : null;
+      const stDir      = (useSupertrend||useStExit) ? (()=>{const k=stAtrP+'_'+stMult;return stDirCache[k]||(stDirCache[k]=calcSupertrend(stAtrP,stMult));})() : null;
       let macdLine=null,macdSignal=null;
       if(useMacd){const mk=macdFast+'_'+macdSlow+'_'+macdSigP;if(!macdNewCache[mk]){const m=calcMACD(macdFast,macdSlow,macdSigP);macdNewCache[mk]=m;}macdLine=macdNewCache[mk].line;macdSignal=macdNewCache[mk].signal;}
       let stochD=null;
@@ -1204,6 +1217,8 @@ async function runOpt() {
         useVolMove,volMoveMult,
         useInsideBar,
         useNReversal,nReversalN,
+        useSupertrend,stDir,stAtrP,stMult,
+        useStExit,
         hasSLA:!!(slPair.a),slMult:slPair.a?slPair.a.m:0,hasSLB:!!(slPair.p),slPctMult:slPair.p?slPair.p.m:0,slLogic,
         hasTPA:!!(tpPair.a),tpMult:tpPair.a?tpPair.a.m:0,tpMode:tpPair.a?tpPair.a.type:'rr',
         hasTPB:!!(tpPair.b),tpMultB:tpPair.b?tpPair.b.m:0,tpModeB:tpPair.b?tpPair.b.type:'rr',tpLogic,
@@ -1267,6 +1282,8 @@ async function runOpt() {
               useVolMove,volMoveMult,
               useInsideBar,
               useNReversal,nReversalN,
+              useSupertrend,stAtrP,stMult,
+              useStExit,
               slPair,slLogic,tpPair,tpLogic,
               useSLPiv,slPivOff,slPivMax,slPivL,slPivR,slPivTrail,
               useBE,beTrig,beOff,useTrail,trTrig,trDist,
@@ -1400,9 +1417,12 @@ async function runOpt() {
       const stochOB     = _ip.stochOB     ?? window._ipDef.stochOB;
       const volMoveMult = _ip.volMoveMult ?? window._ipDef.volMoveMult;
       const nReversalN  = _ip.nReversalN  ?? window._ipDef.nReversalN;
+      const stAtrP      = _ip.stAtrP      ?? window._ipDef.stAtrP;
+      const stMult      = _ip.stMult      ?? window._ipDef.stMult;
       const {lo:pivSLLo, hi:pivSLHi} = useSLPiv ? _getPivSL(slPivL, slPivR) : {lo:null, hi:null};
       const rsiExitArr = useRsiExit   ? (rsiExitCache[rsiExitPer]||(rsiExitCache[rsiExitPer]=calcRSI(rsiExitPer))) : null;
       const maCrossArr = useMaCross   ? (()=>{const k=maCrossType+'_'+maCrossP;return maCrossNewCache[k]||(maCrossNewCache[k]=calcMA(closes,maCrossP,maCrossType));})() : null;
+      const stDir      = (useSupertrend||useStExit) ? (()=>{const k=stAtrP+'_'+stMult;return stDirCache[k]||(stDirCache[k]=calcSupertrend(stAtrP,stMult));})() : null;
       let macdLine=null,macdSignal=null;
       if(useMacd){const mk=macdFast+'_'+macdSlow+'_'+macdSigP;if(!macdNewCache[mk]){const m=calcMACD(macdFast,macdSlow,macdSigP);macdNewCache[mk]=m;}macdLine=macdNewCache[mk].line;macdSignal=macdNewCache[mk].signal;}
       let stochD=null;
@@ -1452,6 +1472,8 @@ async function runOpt() {
         useVolMove,volMoveMult,
         useInsideBar,
         useNReversal,nReversalN,
+        useSupertrend,stDir,stAtrP,stMult,
+        useStExit,
         hasSLA:!!(slPair.a),slMult:slPair.a?slPair.a.m:0,hasSLB:!!(slPair.p),slPctMult:slPair.p?slPair.p.m:0,slLogic,
         hasTPA:!!(tpPair.a),tpMult:tpPair.a?tpPair.a.m:0,tpMode:tpPair.a?tpPair.a.type:'rr',
         hasTPB:!!(tpPair.b),tpMultB:tpPair.b?tpPair.b.m:0,tpModeB:tpPair.b?tpPair.b.type:'rr',tpLogic,
@@ -1528,6 +1550,8 @@ async function runOpt() {
               useVolMove,volMoveMult,
               useInsideBar,
               useNReversal,nReversalN,
+              useSupertrend,stAtrP,stMult,
+              useStExit,
               slPair,slLogic,tpPair,tpLogic,
               useSLPiv,slPivOff,slPivMax,slPivL,slPivR,slPivTrail,
               useBE,beTrig,beOff,useTrail,trTrig,trDist,
@@ -1818,8 +1842,11 @@ async function runOpt() {
                                     const stochOB     = _ip.stochOB     ?? window._ipDef.stochOB;
                                     const volMoveMult = _ip.volMoveMult ?? window._ipDef.volMoveMult;
                                     const nReversalN  = _ip.nReversalN  ?? window._ipDef.nReversalN;
+                                    const stAtrP      = _ip.stAtrP      ?? window._ipDef.stAtrP;
+                                    const stMult      = _ip.stMult      ?? window._ipDef.stMult;
                                     const rsiExitArr = useRsiExit   ? (rsiExitCache[rsiExitPer]||(rsiExitCache[rsiExitPer]=calcRSI(rsiExitPer))) : null;
                                     const maCrossArr = useMaCross   ? (()=>{const k=maCrossType+'_'+maCrossP;return maCrossNewCache[k]||(maCrossNewCache[k]=calcMA(closes,maCrossP,maCrossType));})() : null;
+                                    const stDir      = (useSupertrend||useStExit) ? (()=>{const k=stAtrP+'_'+stMult;return stDirCache[k]||(stDirCache[k]=calcSupertrend(stAtrP,stMult));})() : null;
                                     let macdLine=null,macdSignal=null;
                                     if(useMacd){const mk=macdFast+'_'+macdSlow+'_'+macdSigP;if(!macdNewCache[mk]){const m=calcMACD(macdFast,macdSlow,macdSigP);macdNewCache[mk]=m;}macdLine=macdNewCache[mk].line;macdSignal=macdNewCache[mk].signal;}
                                     let stochD=null;
@@ -1853,6 +1880,8 @@ async function runOpt() {
                                       useVolMove,volMoveMult,
                                       useInsideBar,
                                       useNReversal,nReversalN,
+                                      useSupertrend,stDir,stAtrP,stMult,
+                                      useStExit,
                                       // SL
                                       hasSLA:!!slPair.a,
                                       slMult:slPair.a?slPair.a.m:0,
@@ -1954,6 +1983,8 @@ async function runOpt() {
                                           useVolMove,volMoveMult,
                                           useInsideBar,
                                           useNReversal,nReversalN,
+                                          useSupertrend,stAtrP,stMult,
+                                          useStExit,
                                           slPair, slLogic, tpPair, tpLogic,
                                           useSLPiv, slPivOff, slPivMax, slPivL, slPivR, slPivTrail,
                                           useBE, beTrig, beOff,
@@ -2211,6 +2242,11 @@ function _calcIndicators(cfg) {
     ? calcMA(closes, cfg.maCrossP || 20, cfg.maCrossType || 'EMA')
     : null;
 
+  // ── Supertrend ────────────────────────────────────────────
+  const stDir = (cfg.useSupertrend || cfg.useStExit)
+    ? calcSupertrend(cfg.stAtrP || 10, cfg.stMult || 3.0)
+    : null;
+
   // ── MACD ──────────────────────────────────────────────────
   let macdLine = null, macdSignal = null;
   if (cfg.useMacd) {
@@ -2338,6 +2374,7 @@ function _calcIndicators(cfg) {
     rsiExitArr, maCrossArr,
     macdLine, macdSignal,
     stochD,
+    stDir,
   };
 }
 
@@ -2414,6 +2451,11 @@ function buildBtCfg(cfg, ind) {
     useInsideBar:  cfg.useInsideBar  || false,
     useNReversal:  cfg.useNReversal  || false,
     nReversalN:    cfg.nReversalN    || 3,
+    useSupertrend: cfg.useSupertrend || false,
+    stDir:         ind.stDir,
+    stAtrP:        cfg.stAtrP        || 10,
+    stMult:        cfg.stMult        || 3.0,
+    useStExit:     cfg.useStExit     || false,
 
     // ── SL / TP ───────────────────────────────────────────────
     hasSLA:    !!(slPair.a),

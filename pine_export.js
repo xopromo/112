@@ -179,6 +179,7 @@ function generatePineScript(r) {
   lines.push(`max_bars_in = input.int(${Math.max(2, c.timeBars||50)}, "Макс баров в сделке", minval=2, maxval=500, group=grp_exit)`);
   lines.push(`use_climax  = input.bool(${b(c.useClimax)}, "Climax выход (только в плюс)", group=grp_exit)`);
   lines.push(`use_clx_any = input.bool(false, "Climax± (любой)", group=grp_exit)`);
+  lines.push(`use_st_exit = input.bool(${b(c.useStExit)}, "Supertrend-выход (смена тренда против позиции)", group=grp_exit)`);
   lines.push(``);
 
   // Capital/costs
@@ -505,8 +506,17 @@ function generatePineScript(r) {
   lines.push(`bool nrev_s = use_n_reversal and close[1] < open[1] and nrev_bull`);
   lines.push(``);
 
-  lines.push(`bool pat_l = pivot_l or (use_engulf and bull_engulf[1]) or (use_pinbar and bull_pin[1]) or donch_l or boll_l or atr_bo_l or (use_ma_touch and ma_touch_l) or tl_touch_l or tl_break_l or flag_l or tri_l or rsix_l or macr_l or free_l or macd_l or stx_l or volmv_l or inb_l or nrev_l`);
-  lines.push(`bool pat_s = pivot_s or (use_engulf and bear_engulf[1]) or (use_pinbar and bear_pin[1]) or donch_s or boll_s or atr_bo_s or (use_ma_touch and ma_touch_s) or tl_touch_s or tl_break_s or flag_s or tri_s or rsix_s or macr_s or free_s or macd_s or stx_s or volmv_s or inb_s or nrev_s`);
+  // ── Supertrend ────────────────────────────────────────────
+  lines.push(`[st_val, st_dir_raw] = ta.supertrend(st_mult, st_atr_p)`);
+  lines.push(`bool st_bull = st_dir_raw < 0  // Pine: -1 = bullish, +1 = bearish`);
+  lines.push(`bool st_flip_bull = st_bull[1] and not st_bull[2]   // prev bar turned bullish (was bearish)`);
+  lines.push(`bool st_flip_bear = not st_bull[1] and st_bull[2]  // prev bar turned bearish (was bullish)`);
+  lines.push(`bool st_l = use_supertrend and st_flip_bull`);
+  lines.push(`bool st_s = use_supertrend and st_flip_bear`);
+  lines.push(``);
+
+  lines.push(`bool pat_l = pivot_l or (use_engulf and bull_engulf[1]) or (use_pinbar and bull_pin[1]) or donch_l or boll_l or atr_bo_l or (use_ma_touch and ma_touch_l) or tl_touch_l or tl_break_l or flag_l or tri_l or rsix_l or macr_l or free_l or macd_l or stx_l or volmv_l or inb_l or nrev_l or st_l`);
+  lines.push(`bool pat_s = pivot_s or (use_engulf and bear_engulf[1]) or (use_pinbar and bear_pin[1]) or donch_s or boll_s or atr_bo_s or (use_ma_touch and ma_touch_s) or tl_touch_s or tl_break_s or flag_s or tri_s or rsix_s or macr_s or free_s or macd_s or stx_s or volmv_s or inb_s or nrev_s or st_s`);
   lines.push(``);
   lines.push(`// SL pivot for dynamic SL`);
   lines.push(`sl_pv_lo = ta.pivotlow(low,  sl_piv_look, sl_piv_right_v)`);
@@ -684,6 +694,10 @@ function generatePineScript(r) {
   lines.push(`                    frc := true`);
   lines.push(`            if use_clx_any and is_climax_v and not frc`);
   lines.push(`                frc := true`);
+  lines.push(`            // Supertrend exit`);
+  lines.push(`            if use_st_exit and not frc`);
+  lines.push(`                if (_dir == 1 and st_flip_bear) or (_dir == -1 and st_flip_bull)`);
+  lines.push(`                    frc := true`);
   lines.push(`            // BE`);
   lines.push(`            if use_be and not _bea and be_offset >= be_trig and not frc`);
   lines.push(`                if (_dir == 1 and high >= _ep + _u * be_trig) or (_dir == -1 and low <= _ep - _u * be_trig)`);
@@ -883,6 +897,11 @@ function generatePineScript(r) {
   lines.push(`        if use_clx_any and is_climax_v and not frc`);
     lines.push(`            frc := true`);
     lines.push(`            vxt := "CLX!"`);
+  lines.push(`        // Supertrend exit`);
+  lines.push(`        if use_st_exit and not frc`);
+  lines.push(`            if (v_dir == 1 and st_flip_bear) or (v_dir == -1 and st_flip_bull)`);
+    lines.push(`                frc := true`);
+    lines.push(`                vxt := "ST"`);
   lines.push(`        // Time exit`);
   lines.push(`        if use_time_ex and (bar_index - v_eb) >= max_bars_in and not frc`);
     lines.push(`            frc := true`);

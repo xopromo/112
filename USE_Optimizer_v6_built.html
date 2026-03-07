@@ -910,6 +910,11 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
 
   <div class="cb"><input type="checkbox" id="e_nrev"><label data-tip="Разворот после N свечей: N последовательных медвежьих свечей, затем бычья = лонг. N последовательных бычьих свечей, затем медвежья = шорт">N-Candle Reversal</label></div>
   <div class="field"><label>N свечей</label><input id="e_nrev_n" value="3" data-tip="Количество последовательных направленных свечей перед разворотом"></div>
+  <div class="cb"><input type="checkbox" id="e_st"><label data-tip="Supertrend: вход при смене направления тренда. Лонг — Supertrend флипнулся с медвежьего на бычий (close пересёк нижнюю полосу снизу вверх). Шорт — наоборот.">Supertrend</label></div>
+  <div class="g2">
+    <div class="field"><label>ATR период</label><input id="e_st_atrp" value="10" data-tip="Период ATR для расчёта Supertrend. Больше = медленнее реагирует, меньше сигналов"></div>
+    <div class="field"><label>Множитель</label><input id="e_st_mult" value="3.0" data-tip="Множитель ATR для ширины полос Supertrend. Больше = реже смены тренда"></div>
+  </div>
 </div>
 
 <!-- SL/TP -->
@@ -1004,6 +1009,9 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
     <div class="xmode-btn active" id="timemode_any" onclick="setXMode('time','any')"  data-tip="Закрывать по времени в любом случае">Любом P&L</div>
     <div class="xmode-btn"        id="timemode_plus"onclick="setXMode('time','plus')" data-tip="Закрывать по времени только если сделка в плюсе (не режем прибыль)">Только +P&L</div>
   </div>
+
+  <div class="sep"></div>
+  <div class="cb"><input type="checkbox" id="x_st"><label data-tip="Supertrend-выход (Вариант A): закрывает позицию когда Supertrend разворачивается против неё. Параметры ATR-период и множитель берутся из блока «Точки входа → Supertrend» (поля e_st_atrp / e_st_mult).">Supertrend-выход</label></div>
 
   <div class="sep"></div>
   <div class="cb"><input type="checkbox" id="x_part"><label data-tip="Закрывает часть позиции на промежуточном уровне, позволяя остатку расти">Частичный TP1</label></div>
@@ -1988,6 +1996,7 @@ function generatePineScript(r) {
   lines.push(`max_bars_in = input.int(${Math.max(2, c.timeBars||50)}, "Макс баров в сделке", minval=2, maxval=500, group=grp_exit)`);
   lines.push(`use_climax  = input.bool(${b(c.useClimax)}, "Climax выход (только в плюс)", group=grp_exit)`);
   lines.push(`use_clx_any = input.bool(false, "Climax± (любой)", group=grp_exit)`);
+  lines.push(`use_st_exit = input.bool(${b(c.useStExit)}, "Supertrend-выход (смена тренда против позиции)", group=grp_exit)`);
   lines.push(``);
 
   // Capital/costs
@@ -2314,8 +2323,17 @@ function generatePineScript(r) {
   lines.push(`bool nrev_s = use_n_reversal and close[1] < open[1] and nrev_bull`);
   lines.push(``);
 
-  lines.push(`bool pat_l = pivot_l or (use_engulf and bull_engulf[1]) or (use_pinbar and bull_pin[1]) or donch_l or boll_l or atr_bo_l or (use_ma_touch and ma_touch_l) or tl_touch_l or tl_break_l or flag_l or tri_l or rsix_l or macr_l or free_l or macd_l or stx_l or volmv_l or inb_l or nrev_l`);
-  lines.push(`bool pat_s = pivot_s or (use_engulf and bear_engulf[1]) or (use_pinbar and bear_pin[1]) or donch_s or boll_s or atr_bo_s or (use_ma_touch and ma_touch_s) or tl_touch_s or tl_break_s or flag_s or tri_s or rsix_s or macr_s or free_s or macd_s or stx_s or volmv_s or inb_s or nrev_s`);
+  // ── Supertrend ────────────────────────────────────────────
+  lines.push(`[st_val, st_dir_raw] = ta.supertrend(st_mult, st_atr_p)`);
+  lines.push(`bool st_bull = st_dir_raw < 0  // Pine: -1 = bullish, +1 = bearish`);
+  lines.push(`bool st_flip_bull = st_bull[1] and not st_bull[2]   // prev bar turned bullish (was bearish)`);
+  lines.push(`bool st_flip_bear = not st_bull[1] and st_bull[2]  // prev bar turned bearish (was bullish)`);
+  lines.push(`bool st_l = use_supertrend and st_flip_bull`);
+  lines.push(`bool st_s = use_supertrend and st_flip_bear`);
+  lines.push(``);
+
+  lines.push(`bool pat_l = pivot_l or (use_engulf and bull_engulf[1]) or (use_pinbar and bull_pin[1]) or donch_l or boll_l or atr_bo_l or (use_ma_touch and ma_touch_l) or tl_touch_l or tl_break_l or flag_l or tri_l or rsix_l or macr_l or free_l or macd_l or stx_l or volmv_l or inb_l or nrev_l or st_l`);
+  lines.push(`bool pat_s = pivot_s or (use_engulf and bear_engulf[1]) or (use_pinbar and bear_pin[1]) or donch_s or boll_s or atr_bo_s or (use_ma_touch and ma_touch_s) or tl_touch_s or tl_break_s or flag_s or tri_s or rsix_s or macr_s or free_s or macd_s or stx_s or volmv_s or inb_s or nrev_s or st_s`);
   lines.push(``);
   lines.push(`// SL pivot for dynamic SL`);
   lines.push(`sl_pv_lo = ta.pivotlow(low,  sl_piv_look, sl_piv_right_v)`);
@@ -2493,6 +2511,10 @@ function generatePineScript(r) {
   lines.push(`                    frc := true`);
   lines.push(`            if use_clx_any and is_climax_v and not frc`);
   lines.push(`                frc := true`);
+  lines.push(`            // Supertrend exit`);
+  lines.push(`            if use_st_exit and not frc`);
+  lines.push(`                if (_dir == 1 and st_flip_bear) or (_dir == -1 and st_flip_bull)`);
+  lines.push(`                    frc := true`);
   lines.push(`            // BE`);
   lines.push(`            if use_be and not _bea and be_offset >= be_trig and not frc`);
   lines.push(`                if (_dir == 1 and high >= _ep + _u * be_trig) or (_dir == -1 and low <= _ep - _u * be_trig)`);
@@ -2692,6 +2714,11 @@ function generatePineScript(r) {
   lines.push(`        if use_clx_any and is_climax_v and not frc`);
     lines.push(`            frc := true`);
     lines.push(`            vxt := "CLX!"`);
+  lines.push(`        // Supertrend exit`);
+  lines.push(`        if use_st_exit and not frc`);
+  lines.push(`            if (v_dir == 1 and st_flip_bear) or (v_dir == -1 and st_flip_bull)`);
+    lines.push(`                frc := true`);
+    lines.push(`                vxt := "ST"`);
   lines.push(`        // Time exit`);
   lines.push(`        if use_time_ex and (bar_index - v_eb) >= max_bars_in and not frc`);
     lines.push(`            frc := true`);
@@ -3727,6 +3754,29 @@ const ENTRY_REGISTRY = [
     ],
   },
 
+  // ── Supertrend ────────────────────────────────────────────
+  // Лонг: направление флипнулось с -1 на +1 на предыдущем баре.
+  // Шорт: направление флипнулось с +1 на -1 на предыдущем баре.
+  {
+    id:        'supertrend',
+    flag:      'useSupertrend',
+    htmlId:    'e_st',
+    shortName: c => `ST(${c.stAtrP||10},${c.stMult||3})`,
+    detectL: (cfg, i) => {
+      if (!cfg.stDir || i < 3) return false;
+      return cfg.stDir[i-1] === 1 && cfg.stDir[i-2] === -1;
+    },
+    detectS: (cfg, i) => {
+      if (!cfg.stDir || i < 3) return false;
+      return cfg.stDir[i-1] === -1 && cfg.stDir[i-2] === 1;
+    },
+    pineLines: (c, b) => [
+      `use_supertrend = input.bool(${b(c.useSupertrend)}, "Supertrend смена тренда", group=grp_entry)`,
+      `st_atr_p       = input.int(${c.stAtrP||10}, "  ST ATR период", minval=1, maxval=200, group=grp_entry)`,
+      `st_mult        = input.float(${c.stMult||3.0}, "  ST множитель", minval=0.1, maxval=20, step=0.1, group=grp_entry)`,
+    ],
+  },
+
   // ── Свободный вход (Free Entry) ───────────────────────────
   // Вход разрешён всегда. Ограничивают только фильтры (AND-логика).
   // Полезно: тест чистой системы фильтров без сигнала входа.
@@ -4197,6 +4247,21 @@ const EXIT_REGISTRY = [
       return cfg.timeMode === 'plus' && cpnl > 0;
     },
   },
+
+  // ── Supertrend Exit (Вариант A) ───────────────────────────
+  // Выход когда Supertrend разворачивается против позиции.
+  // Лонг: dir флипнулся с +1 на -1 на предыдущем баре → exit.
+  // Шорт: dir флипнулся с -1 на +1 на предыдущем баре → exit.
+  {
+    id:    'stExit',
+    flag:  'useStExit',
+    check: (cfg, i, ts) => {
+      if (!cfg.stDir || i < 2) return false;
+      if (ts.dir === 1)  return cfg.stDir[i-1] === -1 && cfg.stDir[i-2] === 1;
+      if (ts.dir === -1) return cfg.stDir[i-1] === 1  && cfg.stDir[i-2] === -1;
+      return false;
+    },
+  },
 ];
 
 // ============================================================
@@ -4497,6 +4562,32 @@ function calcMACD(fast, slow, signalP) {
   for (let i = 0; i < N; i++) line[i] = emaFast[i] - emaSlow[i];
   const signal = calcEMA(Array.from(line), signalP);
   return { line, signal };
+}
+// Supertrend: возвращает Int8Array dir (+1 = бычий, -1 = медвежий)
+function calcSupertrend(atrP, mult) {
+  const N = DATA.length;
+  const atr = calcRMA_ATR(atrP);
+  const dir   = new Int8Array(N);
+  const upper = new Float64Array(N);
+  const lower = new Float64Array(N);
+  if (N === 0) return dir;
+  const hl2_0 = (DATA[0].h + DATA[0].l) / 2;
+  upper[0] = hl2_0 + mult * (atr[0] || 0);
+  lower[0] = hl2_0 - mult * (atr[0] || 0);
+  dir[0] = 1;
+  for (let i = 1; i < N; i++) {
+    const hl2   = (DATA[i].h + DATA[i].l) / 2;
+    const rawUp = hl2 + mult * atr[i];
+    const rawLo = hl2 - mult * atr[i];
+    upper[i] = (rawUp < upper[i-1] || DATA[i-1].c > upper[i-1]) ? rawUp : upper[i-1];
+    lower[i] = (rawLo > lower[i-1] || DATA[i-1].c < lower[i-1]) ? rawLo : lower[i-1];
+    if (dir[i-1] === -1) {
+      dir[i] = DATA[i].c > upper[i] ? 1 : -1;
+    } else {
+      dir[i] = DATA[i].c < lower[i] ? -1 : 1;
+    }
+  }
+  return dir;
 }
 // Stochastic %K и %D (SMA of %K)
 function calcStochastic(kPeriod, dPeriod) {
@@ -5211,6 +5302,7 @@ function buildName(cfg, pvL, pvR, slDesc, tpDesc, filters, extras) {
   if (cfg.useTime) exits.push(`Time${cfg.timeBars}`);
   if (cfg.usePartial) exits.push(`Partial${cfg.partPct}%`);
   if (cfg.useClimax) exits.push('Clmx');
+  if (cfg.useStExit) exits.push(`STex(${cfg.stAtrP||10},${cfg.stMult||3})`);
   if (exits.length>0) parts.push(exits.join('+'));
 
   // Filters — из FILTER_REGISTRY
@@ -5424,13 +5516,15 @@ async function runOpt() {
 
   // New entry flags
   const useRsiExit  = $c('e_rsix');
-  const useMaCross  = $c('e_macr');
-  const useFreeEntry= $c('e_free');
-  const useMacd     = $c('e_macd');
-  const useStochExit= $c('e_stx');
-  const useVolMove  = HAS_VOLUME && $c('e_volmv');
-  const useInsideBar= $c('e_inb');
-  const useNReversal= $c('e_nrev');
+  const useMaCross    = $c('e_macr');
+  const useFreeEntry  = $c('e_free');
+  const useMacd       = $c('e_macd');
+  const useStochExit  = $c('e_stx');
+  const useVolMove    = HAS_VOLUME && $c('e_volmv');
+  const useInsideBar  = $c('e_inb');
+  const useNReversal  = $c('e_nrev');
+  const useSupertrend = $c('e_st');
+  const useStExit     = $c('x_st');
 
   // Filter flags
   const useMa=$c('f_ma'),useAdx=$c('f_adx'),useRsi=$c('f_rsi');
@@ -5687,8 +5781,10 @@ async function runOpt() {
   const stochOBA     = useStochExit  ? parseRange('e_stx_ob')  : [$n('e_stx_ob') ||80];
   const volMoveMultA = useVolMove     ? parseRange('e_volmv_m') : [$n('e_volmv_m')||1.5];
   const nRevNArr     = useNReversal  ? parseRange('e_nrev_n')  : [$n('e_nrev_n') ||3];
+  const stAtrPArr    = (useSupertrend||useStExit) ? parseRange('e_st_atrp') : [$n('e_st_atrp')||10];
+  const stMultArr    = (useSupertrend||useStExit) ? parseRange('e_st_mult') : [$n('e_st_mult')||3.0];
   // ── Per-iteration indicator caches ─────────────────────────────────
-  const rsiExitCache = {}, maCrossNewCache = {}, macdNewCache = {}, stochNewCache = {};
+  const rsiExitCache = {}, maCrossNewCache = {}, macdNewCache = {}, stochNewCache = {}, stDirCache = {};
 
   // ── Trendline Figures Precompute ─────────────────────────────
   // Все четыре паттерна вычисляются один раз перед основным циклом.
@@ -5785,7 +5881,8 @@ async function runOpt() {
     (vsaMs.length||1)*(atrBoMults.length||1)*(confNArr.length||1)*(revBarsArr.length||1)*
     (revSkipArr.length||1)*(revCooldownArr.length||1)*
     (_adxLArr.length||1)*(_sTrendArr.length||1)*
-    (tlPvLs.length||1)*(tlPvRs.length||1);
+    (tlPvLs.length||1)*(tlPvRs.length||1)*
+    (stAtrPArr.length||1)*(stMultArr.length||1);
 
   // Monte Carlo: shuffle and limit
   let mcTotal = total;
@@ -5804,7 +5901,8 @@ async function runOpt() {
       (vsaMs.length||1)*(atrBoMults.length||1)*(confNArr.length||1)*(revBarsArr.length||1)*
     (revSkipArr.length||1)*(revCooldownArr.length||1)*
     (_adxLArr.length||1)*(_sTrendArr.length||1)*
-    (tlPvLs.length||1)*(tlPvRs.length||1);
+    (tlPvLs.length||1)*(tlPvRs.length||1)*
+    (stAtrPArr.length||1)*(stMultArr.length||1);
     // ── ИДЕЯ 7: Latin Hypercube Sampling — равномерное покрытие пространства
     // Делим [0, realTotal) на mcTotal равных страт, из каждой берём 1 случайную точку.
     // Гарантирует что каждая зона пространства представлена, нет кластеризации.
@@ -5849,7 +5947,8 @@ async function runOpt() {
       (vsaMs.length||1)*(atrBoMults.length||1)*(confNArr.length||1)*(revBarsArr.length||1)*
     (revSkipArr.length||1)*(revCooldownArr.length||1)*
     (_adxLArr.length||1)*(_sTrendArr.length||1)*
-    (tlPvLs.length||1)*(tlPvRs.length||1);
+    (tlPvLs.length||1)*(tlPvRs.length||1)*
+    (stAtrPArr.length||1)*(stMultArr.length||1);
     const _mcEffective = Math.min(mcTotal, _mcRealTotal);
     if (_mcRealTotal <= mcTotal) {
       setMcPhase('⚠️ Пространство (' + _mcRealTotal + ') < N (' + mcTotal + ') — полный перебор, результаты одинаковы каждый раз');
@@ -5892,6 +5991,8 @@ async function runOpt() {
       ['stochOB',     stochOBA],
       ['volMoveMult', volMoveMultA],
       ['nReversalN',  nRevNArr],
+      ['stAtrP',      stAtrPArr],
+      ['stMult',      stMultArr],
     ];
     // Defaults for all params (first element of each array)
     window._ipDef = Object.fromEntries(_allIp.map(([n,a])=>[n,a[0]]));
@@ -6016,9 +6117,12 @@ async function runOpt() {
       const stochOB     = _ip.stochOB     ?? window._ipDef.stochOB;
       const volMoveMult = _ip.volMoveMult ?? window._ipDef.volMoveMult;
       const nReversalN  = _ip.nReversalN  ?? window._ipDef.nReversalN;
+      const stAtrP      = _ip.stAtrP      ?? window._ipDef.stAtrP;
+      const stMult      = _ip.stMult      ?? window._ipDef.stMult;
       const {lo:pivSLLo, hi:pivSLHi} = useSLPiv ? _getPivSL(slPivL, slPivR) : {lo:null, hi:null};
       const rsiExitArr = useRsiExit   ? (rsiExitCache[rsiExitPer]||(rsiExitCache[rsiExitPer]=calcRSI(rsiExitPer))) : null;
       const maCrossArr = useMaCross   ? (()=>{const k=maCrossType+'_'+maCrossP;return maCrossNewCache[k]||(maCrossNewCache[k]=calcMA(closes,maCrossP,maCrossType));})() : null;
+      const stDir      = (useSupertrend||useStExit) ? (()=>{const k=stAtrP+'_'+stMult;return stDirCache[k]||(stDirCache[k]=calcSupertrend(stAtrP,stMult));})() : null;
       let macdLine=null,macdSignal=null;
       if(useMacd){const mk=macdFast+'_'+macdSlow+'_'+macdSigP;if(!macdNewCache[mk]){const m=calcMACD(macdFast,macdSlow,macdSigP);macdNewCache[mk]=m;}macdLine=macdNewCache[mk].line;macdSignal=macdNewCache[mk].signal;}
       let stochD=null;
@@ -6065,6 +6169,8 @@ async function runOpt() {
         useVolMove,volMoveMult,
         useInsideBar,
         useNReversal,nReversalN,
+        useSupertrend,stDir,stAtrP,stMult,
+        useStExit,
         hasSLA:!!(slPair.a),slMult:slPair.a?slPair.a.m:0,hasSLB:!!(slPair.p),slPctMult:slPair.p?slPair.p.m:0,slLogic,
         hasTPA:!!(tpPair.a),tpMult:tpPair.a?tpPair.a.m:0,tpMode:tpPair.a?tpPair.a.type:'rr',
         hasTPB:!!(tpPair.b),tpMultB:tpPair.b?tpPair.b.m:0,tpModeB:tpPair.b?tpPair.b.type:'rr',tpLogic,
@@ -6128,6 +6234,8 @@ async function runOpt() {
               useVolMove,volMoveMult,
               useInsideBar,
               useNReversal,nReversalN,
+              useSupertrend,stAtrP,stMult,
+              useStExit,
               slPair,slLogic,tpPair,tpLogic,
               useSLPiv,slPivOff,slPivMax,slPivL,slPivR,slPivTrail,
               useBE,beTrig,beOff,useTrail,trTrig,trDist,
@@ -6261,9 +6369,12 @@ async function runOpt() {
       const stochOB     = _ip.stochOB     ?? window._ipDef.stochOB;
       const volMoveMult = _ip.volMoveMult ?? window._ipDef.volMoveMult;
       const nReversalN  = _ip.nReversalN  ?? window._ipDef.nReversalN;
+      const stAtrP      = _ip.stAtrP      ?? window._ipDef.stAtrP;
+      const stMult      = _ip.stMult      ?? window._ipDef.stMult;
       const {lo:pivSLLo, hi:pivSLHi} = useSLPiv ? _getPivSL(slPivL, slPivR) : {lo:null, hi:null};
       const rsiExitArr = useRsiExit   ? (rsiExitCache[rsiExitPer]||(rsiExitCache[rsiExitPer]=calcRSI(rsiExitPer))) : null;
       const maCrossArr = useMaCross   ? (()=>{const k=maCrossType+'_'+maCrossP;return maCrossNewCache[k]||(maCrossNewCache[k]=calcMA(closes,maCrossP,maCrossType));})() : null;
+      const stDir      = (useSupertrend||useStExit) ? (()=>{const k=stAtrP+'_'+stMult;return stDirCache[k]||(stDirCache[k]=calcSupertrend(stAtrP,stMult));})() : null;
       let macdLine=null,macdSignal=null;
       if(useMacd){const mk=macdFast+'_'+macdSlow+'_'+macdSigP;if(!macdNewCache[mk]){const m=calcMACD(macdFast,macdSlow,macdSigP);macdNewCache[mk]=m;}macdLine=macdNewCache[mk].line;macdSignal=macdNewCache[mk].signal;}
       let stochD=null;
@@ -6313,6 +6424,8 @@ async function runOpt() {
         useVolMove,volMoveMult,
         useInsideBar,
         useNReversal,nReversalN,
+        useSupertrend,stDir,stAtrP,stMult,
+        useStExit,
         hasSLA:!!(slPair.a),slMult:slPair.a?slPair.a.m:0,hasSLB:!!(slPair.p),slPctMult:slPair.p?slPair.p.m:0,slLogic,
         hasTPA:!!(tpPair.a),tpMult:tpPair.a?tpPair.a.m:0,tpMode:tpPair.a?tpPair.a.type:'rr',
         hasTPB:!!(tpPair.b),tpMultB:tpPair.b?tpPair.b.m:0,tpModeB:tpPair.b?tpPair.b.type:'rr',tpLogic,
@@ -6389,6 +6502,8 @@ async function runOpt() {
               useVolMove,volMoveMult,
               useInsideBar,
               useNReversal,nReversalN,
+              useSupertrend,stAtrP,stMult,
+              useStExit,
               slPair,slLogic,tpPair,tpLogic,
               useSLPiv,slPivOff,slPivMax,slPivL,slPivR,slPivTrail,
               useBE,beTrig,beOff,useTrail,trTrig,trDist,
@@ -6679,8 +6794,11 @@ async function runOpt() {
                                     const stochOB     = _ip.stochOB     ?? window._ipDef.stochOB;
                                     const volMoveMult = _ip.volMoveMult ?? window._ipDef.volMoveMult;
                                     const nReversalN  = _ip.nReversalN  ?? window._ipDef.nReversalN;
+                                    const stAtrP      = _ip.stAtrP      ?? window._ipDef.stAtrP;
+                                    const stMult      = _ip.stMult      ?? window._ipDef.stMult;
                                     const rsiExitArr = useRsiExit   ? (rsiExitCache[rsiExitPer]||(rsiExitCache[rsiExitPer]=calcRSI(rsiExitPer))) : null;
                                     const maCrossArr = useMaCross   ? (()=>{const k=maCrossType+'_'+maCrossP;return maCrossNewCache[k]||(maCrossNewCache[k]=calcMA(closes,maCrossP,maCrossType));})() : null;
+                                    const stDir      = (useSupertrend||useStExit) ? (()=>{const k=stAtrP+'_'+stMult;return stDirCache[k]||(stDirCache[k]=calcSupertrend(stAtrP,stMult));})() : null;
                                     let macdLine=null,macdSignal=null;
                                     if(useMacd){const mk=macdFast+'_'+macdSlow+'_'+macdSigP;if(!macdNewCache[mk]){const m=calcMACD(macdFast,macdSlow,macdSigP);macdNewCache[mk]=m;}macdLine=macdNewCache[mk].line;macdSignal=macdNewCache[mk].signal;}
                                     let stochD=null;
@@ -6714,6 +6832,8 @@ async function runOpt() {
                                       useVolMove,volMoveMult,
                                       useInsideBar,
                                       useNReversal,nReversalN,
+                                      useSupertrend,stDir,stAtrP,stMult,
+                                      useStExit,
                                       // SL
                                       hasSLA:!!slPair.a,
                                       slMult:slPair.a?slPair.a.m:0,
@@ -6815,6 +6935,8 @@ async function runOpt() {
                                           useVolMove,volMoveMult,
                                           useInsideBar,
                                           useNReversal,nReversalN,
+                                          useSupertrend,stAtrP,stMult,
+                                          useStExit,
                                           slPair, slLogic, tpPair, tpLogic,
                                           useSLPiv, slPivOff, slPivMax, slPivL, slPivR, slPivTrail,
                                           useBE, beTrig, beOff,
@@ -7072,6 +7194,11 @@ function _calcIndicators(cfg) {
     ? calcMA(closes, cfg.maCrossP || 20, cfg.maCrossType || 'EMA')
     : null;
 
+  // ── Supertrend ────────────────────────────────────────────
+  const stDir = (cfg.useSupertrend || cfg.useStExit)
+    ? calcSupertrend(cfg.stAtrP || 10, cfg.stMult || 3.0)
+    : null;
+
   // ── MACD ──────────────────────────────────────────────────
   let macdLine = null, macdSignal = null;
   if (cfg.useMacd) {
@@ -7199,6 +7326,7 @@ function _calcIndicators(cfg) {
     rsiExitArr, maCrossArr,
     macdLine, macdSignal,
     stochD,
+    stDir,
   };
 }
 
@@ -7275,6 +7403,11 @@ function buildBtCfg(cfg, ind) {
     useInsideBar:  cfg.useInsideBar  || false,
     useNReversal:  cfg.useNReversal  || false,
     nReversalN:    cfg.nReversalN    || 3,
+    useSupertrend: cfg.useSupertrend || false,
+    stDir:         ind.stDir,
+    stAtrP:        cfg.stAtrP        || 10,
+    stMult:        cfg.stMult        || 3.0,
+    useStExit:     cfg.useStExit     || false,
 
     // ── SL / TP ───────────────────────────────────────────────
     hasSLA:    !!(slPair.a),
