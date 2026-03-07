@@ -2129,7 +2129,7 @@ function generatePineScript(r) {
   lines.push(`calc_ma(t, s, l) =>`);
   lines.push(`    t == "SMA" ? ta.sma(s,l) : t == "EMA" ? ta.ema(s,l) : t == "WMA" ? ta.wma(s,l) : t == "VWMA" ? ta.vwma(s,l) : ta.hma(s,l)`);
   lines.push(`f_tf_str(int secs) =>`);
-  lines.push(`    secs < 60 ? str.tostring(secs) + "S" : secs < 3600 ? str.tostring(math.round(secs / 60)) : secs < 86400 ? str.tostring(math.round(secs / 3600)) + "H" : str.tostring(math.round(secs / 86400)) + "D"`);
+  lines.push(`    secs < 60 ? str.tostring(secs) + "S" : secs < 86400 ? str.tostring(math.round(secs / 60)) : str.tostring(math.round(secs / 86400)) + "D"`);
   lines.push(`string _ma_tf_str   = ma_htf_ratio   <= 1 ? timeframe.period : f_tf_str(timeframe.in_seconds() * ma_htf_ratio)`);
   lines.push(`string _conf_tf_str = conf_ma_htf <= 1 ? timeframe.period : f_tf_str(timeframe.in_seconds() * conf_ma_htf)`);
   lines.push(`float ma_raw = request.security(syminfo.tickerid, _ma_tf_str, calc_ma(ma_type, close, ma_len)[1], barmerge.gaps_off, barmerge.lookahead_on)`);
