@@ -2220,11 +2220,9 @@ function _calcIndicators(cfg) {
   }
 
   // ── Stochastic ────────────────────────────────────────────
-  let stochK = null, stochD = null;
+  let stochD = null;
   if (cfg.useStochExit) {
-    const _stoch = calcStochastic(cfg.stochKP || 14, cfg.stochDP || 3);
-    stochK = _stoch.kArr;
-    stochD = _stoch.dArr;
+    stochD = calcStochastic(cfg.stochKP || 14, cfg.stochDP || 3).dArr;
   }
 
   // ── SL Pivot ──────────────────────────────────────────────
@@ -2339,7 +2337,7 @@ function _calcIndicators(cfg) {
     tfSigL, tfSigS,
     rsiExitArr, maCrossArr,
     macdLine, macdSignal,
-    stochK, stochD,
+    stochD,
   };
 }
 
