@@ -419,7 +419,7 @@ function applyFiltersDebounced() {
 
 function resetAllFilters() {
   // Сбрасываем все текстовые/числовые инпуты
-  ['f_name','f_pnl','f_wr','f_n','f_dd','f_pdd','f_sig','f_gt','f_cvr','f_sortino','f_kr','f_sqn','f_cpcv','f_avg','f_p1','f_p2','f_dwr',
+  ['f_name','f_pnl','f_wr','f_n','f_dd','f_pdd','f_sig','f_gt','f_cvr','f_sortino','f_kr','f_sqn','f_cpcv','f_omega','f_pain','f_avg','f_p1','f_p2','f_dwr', // ##OMG ##PAIN
    'f_tv_dpnl','f_tv_ddd','f_tv_dpdd'].forEach(id => {
     const el = $(id); if (el) el.value = '';
   });
@@ -447,6 +447,8 @@ function applyFilters() {
   const fKR      = parseFloat($('f_kr').value);      // ##KR
   const fSqn     = parseFloat($('f_sqn').value);     // ##SQN
   const fCpcv    = parseFloat($('f_cpcv').value);    // ##CPCV
+  const fOmega   = parseFloat($('f_omega').value);   // ##OMG
+  const fPain    = parseFloat($('f_pain').value);    // ##PAIN
   const fAvg   = parseFloat($('f_avg').value);
   const fP1    = parseFloat($('f_p1').value);
   const fP2    = parseFloat($('f_p2').value);
@@ -478,6 +480,8 @@ function applyFilters() {
     if (!isNaN(fKR)      && (r.kRatio??-99)   < fKR)      return false; // ##KR
     if (!isNaN(fSqn)     && (r.sqn??-99)      < fSqn)     return false; // ##SQN
     if (!isNaN(fCpcv)    && (r.cpcvScore??-1) < fCpcv)    return false; // ##CPCV
+    if (!isNaN(fOmega)   && (r.omega??-99)    < fOmega)   return false; // ##OMG
+    if (!isNaN(fPain)    && (r.pain??-99)     < fPain)    return false; // ##PAIN
     if (!isNaN(fAvg) && r.avg < fAvg) return false;
     if (!isNaN(fP1)  && r.p1  < fP1)  return false;
     if (!isNaN(fP2)  && r.p2  < fP2)  return false;
@@ -644,6 +648,8 @@ function renderVisibleResults() {
       (()=>{ const v=r.sortino??null; if(v===null) return '<td class="col-sor muted">—</td>'; const vc=v>=3?'pos':v>=2?'warn':'neg'; return `<td class="col-sor ${vc}" title="Sortino Ratio = PnL / downside_vol\n≥3 = отлично ✅ | ≥2 = хорошо | &lt;1 = нестабильно">${v.toFixed(1)}</td>`; })() + // ##SOR
       (()=>{ const v=r.kRatio??null; if(v===null) return '<td class="col-kr muted">—</td>'; const vc=v>=2?'pos':v>=1?'warn':'neg'; return `<td class="col-kr ${vc}" title="K-Ratio = slope_OLS(equity) / se(slope)\nМерит равномерность роста equity (OLS регрессия).\n≥2 = отлично ✅ | ≥1 = хорошо | &lt;0.5 = нестабильно">${v.toFixed(1)}</td>`; })() + // ##KR
       (()=>{ const v=r.sqn??null; if(v===null) return '<td class="col-sqn muted">—</td>'; const vc=v>=3?'pos':v>=1?'warn':'neg'; return `<td class="col-sqn ${vc}" title="SQN = (avg_trade/std_trade)×√n  (Van Tharp)\nМерит качество системы на уровне сделок.\n≥5 = excellent | ≥3 = good | ≥1 = average | &lt;1 = poor">${v.toFixed(1)}</td>`; })() + // ##SQN
+      (()=>{ const v=r.omega??null; if(v===null) return '<td class="col-omg muted">—</td>'; const vc=v>=3?'pos':v>=2?'warn':'neg'; return `<td class="col-omg ${vc}" title="Omega Ratio = Σприросты / Σпадения (уровень баров)\nProfit factor без предположения о нормальности.\n≥3 = отлично ✅ | ≥2 = хорошо">${v.toFixed(1)}</td>`; })() + // ##OMG
+      (()=>{ const v=r.pain??null; if(v===null) return '<td class="col-pain muted">—</td>'; const vc=v>=5?'pos':v>=3?'warn':'neg'; return `<td class="col-pain ${vc}" title="Pain Ratio = PnL / Pain Index\nPain Index = mean(просадка от пика). Штрафует за длительность любых просадок.\n≥5 = отлично ✅ | ≥3 = хорошо | &lt;1 = плохо">${v.toFixed(1)}</td>`; })() + // ##PAIN
       (()=>{ const v=r.cpcvScore??null; if(v===null) return '<td class="col-cpcv muted">—</td>'; const vc=v>=80?'pos':v>=60?'warn':'neg'; return `<td class="col-cpcv ${vc}" title="CPCV% — блочная валидация: % прибыльных блоков.\nЗаполняется после открытия детали. ≥80% = устойчива ✅">${v}%</td>`; })() + // ##CPCV lazy
       `<td class="col-avg">${r.avg.toFixed(2)}</td>` +
       `<td class="col-p1 ${r.p1 >= 0 ? 'pos' : 'neg'}">${r.p1.toFixed(1)}</td>` +
@@ -784,7 +790,7 @@ function showDetail(r) {
   const _fwd = r.cfg && r.cfg._oos && r.cfg._oos.forward;
   const _hasLS = r.wrL != null;
   // Column count: 9 base + Avg + CVR + UPI + Sortino + (1 ΔWR L/S if applicable)
-  const _ncols = 13 + (_hasLS ? 1 : 0); // ##SOR +1
+  const _ncols = 15 + (_hasLS ? 1 : 0); // ##SOR +1 ##OMG +1 ##PAIN +1
 
   // Build one row of dp-stat cells (same structure for both IS and TV)
   function _statsRow(v) {
@@ -796,6 +802,10 @@ function showDetail(r) {
     const upiV = v.upi!=null ? v.upi.toFixed(1) : '—';
     const sorC = v.sortino!=null ? (v.sortino>=3?'pos':v.sortino>=2?'warn':'neg') : 'muted'; // ##SOR
     const sorV = v.sortino!=null ? v.sortino.toFixed(1) : '—'; // ##SOR
+    const omgC = v.omega!=null ? (v.omega>=3?'pos':v.omega>=2?'warn':'neg') : 'muted'; // ##OMG
+    const omgV = v.omega!=null ? v.omega.toFixed(1) : '—'; // ##OMG
+    const painC = v.pain!=null ? (v.pain>=5?'pos':v.pain>=3?'warn':'neg') : 'muted'; // ##PAIN
+    const painV = v.pain!=null ? v.pain.toFixed(1) : '—'; // ##PAIN
     let h =
       `<div class="dp-stat"><div class="v ${v.pnl>=0?'pos':'neg'}">${v.pnl.toFixed(1)}%</div><div class="l">PnL</div></div>`+
       `<div class="dp-stat"><div class="v">${v.wr.toFixed(1)}%</div><div class="l">WinRate</div></div>`+
@@ -808,7 +818,9 @@ function showDetail(r) {
       `<div class="dp-stat"><div class="v">${v.avg.toFixed(2)}%</div><div class="l">Avg/сд</div></div>`+
       `<div class="dp-stat"><div class="v ${cvrC}">${cvrV}</div><div class="l">CVR%</div></div>`+
       `<div class="dp-stat" title="Ulcer Performance Index = PnL / sqrt(mean(просадка²))\nЛучше Calmar: учитывает длительность и частоту просадок.\n≥5 = устойчива ✅ | 2–5 = умеренно | &lt;2 = нестабильна"><div class="v ${upiC}">${upiV}</div><div class="l">UPI</div></div>`+
-      `<div class="dp-stat" title="Sortino Ratio = PnL / downside_dev\ndownside_dev = sqrt(mean(min(Δeq,0)²)) — только отриц. движения.\n≥3 = отлично ✅ | ≥2 = хорошо | &lt;1 = нестабильно"><div class="v ${sorC}">${sorV}</div><div class="l">Sortino</div></div>`; // ##SOR
+      `<div class="dp-stat" title="Sortino Ratio = PnL / downside_dev\ndownside_dev = sqrt(mean(min(Δeq,0)²)) — только отриц. движения.\n≥3 = отлично ✅ | ≥2 = хорошо | &lt;1 = нестабильно"><div class="v ${sorC}">${sorV}</div><div class="l">Sortino</div></div>`+ // ##SOR
+      `<div class="dp-stat" title="Omega Ratio = Σприросты / Σпадения (уровень баров)\nProfit factor без предположения о нормальности. ≥3 = отлично ✅ | ≥2 = хорошо."><div class="v ${omgC}">${omgV}</div><div class="l">Omega</div></div>`+ // ##OMG
+      `<div class="dp-stat" title="Pain Ratio = PnL / Pain Index\nPain Index = mean(просадка от пика). Штрафует за длительность любых просадок.\n≥5 = отлично ✅ | ≥3 = хорошо | &lt;1 = плохо"><div class="v ${painC}">${painV}</div><div class="l">Pain</div></div>`; // ##PAIN
     if (_hasLS) {
       const lsC = v.dwrLS!=null ? (v.dwrLS<10?'ok':v.dwrLS<25?'warn':'bad') : 'muted';
       h += `<div class="dp-stat" title="Разница WR лонгов и шортов. L:${v.nL||0}сд WR${v.wrL!=null?v.wrL.toFixed(0):'?'}% · S:${v.nS||0}сд WR${v.wrS!=null?v.wrS.toFixed(0):'?'}%"><div class="v ${lsC}">${v.dwrLS!=null?v.dwrLS.toFixed(0)+'%':'—'}</div><div class="l">ΔWR L/S</div></div>`;
@@ -823,6 +835,7 @@ function showDetail(r) {
     pnl: r.pnl, wr: r.wr, n: r.n, dd: r.dd, pdd: r.pdd, dwr: r.dwr,
     p1: r.p1, p2: r.p2, c1: r.c1, c2: r.c2, avg: r.avg, cvr: r.cvr??null, upi: r.upi??null,
     sortino: r.sortino??null, // ##SOR
+    omega: r.omega??null, pain: r.pain??null, // ##OMG ##PAIN
     dwrLS: r.dwrLS??null, wrL: r.wrL??null, nL: r.nL||0, wrS: r.wrS??null, nS: r.nS||0
   });
 
@@ -836,6 +849,7 @@ function showDetail(r) {
         dwr: _fwd.dwr??0, p1: _fwd.p1??0, p2: _fwd.p2??0, c1: _fwd.c1??0, c2: _fwd.c2??0,
         avg: _fwd.avg??0, cvr: _fwd.cvr??null, upi: _fwd.upi??null,
         sortino: _fwd.sortino??null, // ##SOR
+        omega: _fwd.omega??null, pain: _fwd.pain??null, // ##OMG ##PAIN
         dwrLS: _fwd.dwrLS??null, wrL: _fwd.wrL??null, nL: _fwd.nL||0, wrS: _fwd.wrS??null, nS: _fwd.nS||0
       });
   }
@@ -979,14 +993,15 @@ function showDetail(r) {
   }
   // ##CPCV_END##
 
-  // ##KR_SQN_START## — удалить для отката (вместе с _calcKRatio в opt.js)
-  // SQN теперь из r.sqn (core.js sumPnl2); K-Ratio требует re-run для equity
-  // collectTrades больше не нужен для SQN
+  // ##KR_SQN_START## — удалить для отката (вместе с _calcKRatio/_calcMCPerm в opt.js)
+  // SQN теперь из r.sqn (core.js sumPnl2); K-Ratio и MC Perm требуют re-run
+  // collectTrades=true нужен для MC Permutation Test (##MC_PERM)
   {
     let _rKS = null;
     try {
       const _ind = _calcIndicators(r.cfg);
       const _btc = buildBtCfg(r.cfg, _ind);
+      _btc.collectTrades = true; // ##MC_PERM — нужен tradePnl[] для permutation test
       _rKS = backtest(_ind.pvLo, _ind.pvHi, _ind.atrArr, _btc);
     } catch(_) {}
 
@@ -1014,6 +1029,27 @@ function showDetail(r) {
     html = section('📐', 'K-RATIO · SQN', _ksHtml) + html;
   }
   // ##KR_SQN_END##
+
+  // ##MC_PERM_START## — удалить для отката (вместе с _calcMCPerm в opt.js)
+  //                   + убрать collectTrades=true в ##KR_SQN_START## выше
+  {
+    const _pArr = typeof _rKS !== 'undefined' && _rKS ? _rKS.tradePnl : null;
+    const _pval = _calcMCPerm(_pArr);
+    let _mpHtml = '';
+    if (_pval !== null) {
+      const _pc = _pval <= 0.01 ? 'pos' : _pval <= 0.05 ? 'warn' : 'neg';
+      const _plabel = _pval <= 0.01 ? 'очень значимо ✅' : _pval <= 0.05 ? 'значимо' : 'незначимо';
+      _mpHtml += row('p-value',
+        `<span class="${_pc}">${_pval.toFixed(3)}</span>` +
+        ` <span style="opacity:.6;font-size:.85em">${_plabel}</span>`, '');
+      _mpHtml += row('Интерпретация',
+        `${_pval <= 0.05 ? 'Стратегия статистически значима — порядок сделок важен' : 'Результат может быть случайностью порядка сделок'}`, 'muted');
+    } else {
+      _mpHtml += row('p-value', 'нет данных — нужно ≥10 сделок', 'muted');
+    }
+    html = section('🎲', 'MC PERMUTATION TEST (1000 итераций)', _mpHtml) + html;
+  }
+  // ##MC_PERM_END##
 
   $('dp-body').innerHTML = html;
 
@@ -2782,6 +2818,10 @@ function doSort(col) {
     arr.sort((a,b) => d * ((a.sqn??-99)     - (b.sqn??-99)));
   } else if (col === 29) { // ##CPCV
     arr.sort((a,b) => d * ((a.cpcvScore??-1) - (b.cpcvScore??-1)));
+  } else if (col === 30) { // ##OMG
+    arr.sort((a,b) => d * ((a.omega??-99) - (b.omega??-99)));
+  } else if (col === 31) { // ##PAIN
+    arr.sort((a,b) => d * ((a.pain??-99) - (b.pain??-99)));
   } else if (col <= 11) {
     const keys = ['name','pnl','wr','n','dd','pdd','avg','p1','p2','dwr','dwr','robScore'];
     const key = keys[col];
@@ -3000,6 +3040,8 @@ const _COL_DEFS = [
   { id: 'col-sor',        label: 'Sortino',             default: true },  // ##SOR
   { id: 'col-kr',         label: 'K-Ratio',             default: true },  // ##KR
   { id: 'col-sqn',        label: 'SQN',                 default: true },  // ##SQN
+  { id: 'col-omg',        label: 'Omega',               default: true },  // ##OMG
+  { id: 'col-pain',       label: 'Pain',                default: true },  // ##PAIN
   { id: 'col-cpcv',       label: 'CPCV%',               default: false }, // ##CPCV lazy
   { id: 'col-avg',        label: 'Avg%',                default: true },
   { id: 'col-p1',         label: '1п PnL',              default: true },
@@ -3501,7 +3543,8 @@ function _hcBuildOOS(cfg) {
       dwr: rFull.dwr, p1: rFull.p1, p2: rFull.p2, c1: rFull.c1, c2: rFull.c2,
       wrL: rFull.wrL ?? null, nL: rFull.nL || 0, wrS: rFull.wrS ?? null, nS: rFull.nS || 0,
       dwrLS: rFull.dwrLS ?? null, cvr: _calcCVR(rFull.eq), upi: _calcUlcerIdx(rFull.eq),
-      sortino: _calcSortino(rFull.eq), kRatio: _calcKRatio(rFull.eq), sqn: rFull.sqn??null // ##SOR ##KR ##SQN
+      sortino: _calcSortino(rFull.eq), kRatio: _calcKRatio(rFull.eq), sqn: rFull.sqn??null, // ##SOR ##KR ##SQN
+      omega: _calcOmega(rFull.eq), pain: _calcPainRatio(rFull.eq) // ##OMG ##PAIN
     }
   };
 
@@ -3517,7 +3560,9 @@ function _hcBuildOOS(cfg) {
     dwrLS: rIS.dwrLS ?? null, cvr: _calcCVR(rIS.eq), upi: _calcUlcerIdx(rIS.eq),
     sortino: _calcSortino(rIS.eq), // ##SOR
     kRatio:  _calcKRatio(rIS.eq),  // ##KR
-    sqn:     rIS.sqn ?? null        // ##SQN
+    sqn:     rIS.sqn ?? null,       // ##SQN
+    omega:   _calcOmega(rIS.eq),   // ##OMG
+    pain:    _calcPainRatio(rIS.eq) // ##PAIN
   } : null;
 
   return { _oos, isStats, eq: rFull.eq };
@@ -4218,6 +4263,8 @@ async function runHillClimbing() {
       sortino: _isR.sortino != null ? _isR.sortino : _calcSortino(_isR.eq), // ##SOR
       kRatio:  _isR.kRatio  != null ? _isR.kRatio  : _calcKRatio(_isR.eq),  // ##KR
       sqn:     _isR.sqn     != null ? _isR.sqn     : null,                   // ##SQN (нет eq→sqn нет fallback)
+      omega:   _isR.omega   != null ? _isR.omega   : _calcOmega(_isR.eq),   // ##OMG
+      pain:    _isR.pain    != null ? _isR.pain    : _calcPainRatio(_isR.eq), // ##PAIN
       robScore: x.robScore, robMax: x.robMax, robDetails: x.robDetails,
       eq: x.r.eq,
       nL: _isR.nL||0, pL: _isR.pL||0, wrL: _isR.wrL,

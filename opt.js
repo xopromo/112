@@ -176,6 +176,90 @@ function _calcSQN(tradePnlArr) {
 }
 // ─────────────────────────────────────────────────────────────
 
+// ── Omega Ratio (поиск 2026-03-06) ───────────────────────────────
+// Omega = Σmax(Δeq_i, 0) / |Σmin(Δeq_i, 0)|
+// Profit factor на уровне баров: сумма приростов / сумма падений.
+// Единственная метрика без предположения о нормальности распределения.
+// Omega ≥ 2 = хорошо, ≥ 3 = отлично. Только equity[].
+// Откат: удалить эту функцию + поле omega во всех results.push() (opt.js)
+//        + batch-update omega (opt.js) + _attachOOS.forward (opt.js)
+//        + _statsRow/table/filter/sort/col (ui.js) + col-omg / f_omega (shell.html)
+function _calcOmega(eq) {
+  if (!eq || eq.length < 10) return null;
+  let up = 0, dn = 0;
+  for (let i = 1; i < eq.length; i++) {
+    const r = eq[i] - eq[i - 1];
+    if (r > 0) up += r; else dn -= r;
+  }
+  if (dn < 1e-9) return up > 0 ? 99.9 : null;
+  return Math.round(up / dn * 10) / 10;
+}
+// ─────────────────────────────────────────────────────────────────
+
+// ── Pain Ratio (поиск 2026-03-06) ────────────────────────────────
+// Pain Index = mean(|dd_from_peak[i]|) — средняя просадка от пика.
+// Pain Ratio = pnl / Pain Index.
+// Дополняет UPI: UPI штрафует за экстремумы (sqrt(mean(dd²))),
+// Pain штрафует равномерно за длительность любой просадки.
+// Pain ≥ 3 = хорошо, ≥ 5 = отлично. Только equity[].
+// Откат: удалить эту функцию + поле pain во всех results.push() (opt.js)
+//        + batch-update pain (opt.js) + _attachOOS.forward (opt.js)
+//        + _statsRow/table/filter/sort/col (ui.js) + col-pain / f_pain (shell.html)
+function _calcPainRatio(eq) {
+  if (!eq || eq.length < 20) return null;
+  const N = eq.length;
+  let peak = eq[0], sumDD = 0;
+  for (let i = 0; i < N; i++) {
+    if (eq[i] > peak) peak = eq[i];
+    sumDD += peak - eq[i];
+  }
+  const painIdx = sumDD / N;
+  if (painIdx < 0.001) return null;
+  return Math.round(eq[N - 1] / painIdx * 10) / 10;
+}
+// ─────────────────────────────────────────────────────────────────
+
+// ── MC Permutation Test (поиск 2026-03-06) ───────────────────────
+// p-value = доля из 1000 случайных перемешиваний сделок,
+// где shuffled Calmar ≥ actual Calmar.
+// Тестирует: результат стратегии — скилл или удача порядка сделок?
+// p < 0.05 = значимо, p < 0.01 = очень значимо.
+// Требует tradePnl[] из backtest() (collectTrades=true).
+// Вычисляется лениво в showDetail (НЕ в горячем цикле).
+// Откат: удалить эту функцию + блок ##MC_PERM## в showDetail (ui.js)
+//        + collectTrades=true в ##KR_SQN## блоке (ui.js)
+function _calcMCPerm(tradePnlArr) {
+  if (!tradePnlArr || tradePnlArr.length < 10) return null;
+  const arr = tradePnlArr.slice();
+  const n = arr.length;
+  let eq = 0, peak = 0, actualDD = 0;
+  for (let i = 0; i < n; i++) {
+    eq += arr[i];
+    if (eq > peak) peak = eq;
+    const d = peak - eq; if (d > actualDD) actualDD = d;
+  }
+  const totalPnL = eq;
+  if (totalPnL <= 0) return null; // убыточная стратегия — тест не имеет смысла
+  const actualCalmar = actualDD > 1e-9 ? totalPnL / actualDD : 99;
+  let betterCount = 0;
+  for (let k = 0; k < 1000; k++) {
+    for (let i = n - 1; i > 0; i--) { // Fisher-Yates shuffle
+      const j = (Math.random() * (i + 1)) | 0;
+      const tmp = arr[i]; arr[i] = arr[j]; arr[j] = tmp;
+    }
+    eq = 0; peak = 0; let dd = 0;
+    for (let i = 0; i < n; i++) {
+      eq += arr[i];
+      if (eq > peak) peak = eq;
+      const d = peak - eq; if (d > dd) dd = d;
+    }
+    const calmar = dd > 1e-9 ? totalPnL / dd : 99;
+    if (calmar >= actualCalmar) betterCount++;
+  }
+  return Math.round(betterCount / 1000 * 1000) / 1000; // 3 знака после запятой
+}
+// ─────────────────────────────────────────────────────────────────
+
 // ── CPCV batch: вычисляет CPCV для топ-N результатов (асинхронно) ──
 async function _batchCPCV(arr, limit) {
   const n = Math.min(arr.length, limit || 200);
@@ -452,7 +536,8 @@ async function runOpt() {
       dwr: rFull.dwr, p1: rFull.p1, p2: rFull.p2, c1: rFull.c1, c2: rFull.c2,
       wrL: rFull.wrL??null, nL: rFull.nL||0, wrS: rFull.wrS??null, nS: rFull.nS||0,
       dwrLS: rFull.dwrLS??null, cvr: _calcCVR(rFull.eq), upi: _calcUlcerIdx(rFull.eq),
-      sortino: _calcSortino(rFull.eq), kRatio: _calcKRatio(rFull.eq), sqn: rFull.sqn??null };
+      sortino: _calcSortino(rFull.eq), kRatio: _calcKRatio(rFull.eq), sqn: rFull.sqn??null,
+      omega: _calcOmega(rFull.eq), pain: _calcPainRatio(rFull.eq) }; // ##OMG ##PAIN
     // Обновляем глобальный equities полной кривой — чтобы график показывал 100% данных
     // с правильным split-маркером на IS/OOS границе, а не растянутую IS-кривую.
     if (name && typeof equities !== 'undefined') equities[name] = rFull.eq;
@@ -1205,7 +1290,8 @@ async function runOpt() {
               revSkip,revCooldown,revSrc};
           results.push({name,pnl:r.pnl,wr:r.wr,n:r.n,dd:r.dd,pdd,avg:r.avg,sig,gt,
             p1:r.p1,p2:r.p2,dwr:r.dwr,c1:r.c1,c2:r.c2,nL:r.nL||0,pL:r.pL||0,wrL:r.wrL,nS:r.nS||0,pS:r.pS||0,wrS:r.wrS,dwrLS:r.dwrLS,
-            cvr:_calcCVR(r.eq),upi:_calcUlcerIdx(r.eq),sortino:_calcSortino(r.eq),kRatio:_calcKRatio(r.eq),sqn:r.sqn??null,cfg:_cfg});
+            cvr:_calcCVR(r.eq),upi:_calcUlcerIdx(r.eq),sortino:_calcSortino(r.eq),kRatio:_calcKRatio(r.eq),sqn:r.sqn??null,
+            omega:_calcOmega(r.eq),pain:_calcPainRatio(r.eq),cfg:_cfg}); // ##OMG ##PAIN
           equities[name] = r.eq;
         }
       }
@@ -1466,7 +1552,8 @@ async function runOpt() {
           // CVR/UPI/Sortino/kRatio вычислятся батчем после завершения TPE
           results.push({name,pnl:r.pnl,wr:r.wr,n:r.n,dd:r.dd,pdd,avg:r.avg,sig,gt,
             p1:r.p1,p2:r.p2,dwr:r.dwr,c1:r.c1,c2:r.c2,nL:r.nL||0,pL:r.pL||0,wrL:r.wrL,nS:r.nS||0,pS:r.pS||0,wrS:r.wrS,dwrLS:r.dwrLS,
-            cvr:null,upi:null,sortino:null,kRatio:null,sqn:r.sqn??null,cfg:_cfg_tpe});
+            cvr:null,upi:null,sortino:null,kRatio:null,sqn:r.sqn??null,
+            omega:null,pain:null,cfg:_cfg_tpe}); // ##OMG ##PAIN (null — вычислятся батчем)
           equities[name] = r.eq;
         }
       }
@@ -1626,6 +1713,8 @@ async function runOpt() {
           results[oi].upi     = _calcUlcerIdx(_eq);
           results[oi].sortino = _calcSortino(_eq);
           results[oi].kRatio  = _calcKRatio(_eq);
+          results[oi].omega   = _calcOmega(_eq);   // ##OMG
+          results[oi].pain    = _calcPainRatio(_eq); // ##PAIN
         }
         if (oi % 100 === 0) { await yieldToUI(); }
       }
@@ -1893,7 +1982,8 @@ async function runOpt() {
                                         };
                                       results.push({name,pnl:r.pnl,wr:r.wr,n:r.n,dd:r.dd,pdd,avg:r.avg,sig,gt,
                                         p1:r.p1,p2:r.p2,dwr:r.dwr,c1:r.c1,c2:r.c2,nL:r.nL||0,pL:r.pL||0,wrL:r.wrL,nS:r.nS||0,pS:r.pS||0,wrS:r.wrS,dwrLS:r.dwrLS,
-                                        cvr:_calcCVR(r.eq),upi:_calcUlcerIdx(r.eq),sortino:_calcSortino(r.eq),kRatio:_calcKRatio(r.eq),sqn:r.sqn??null,cfg:_cfg_ex});
+                                        cvr:_calcCVR(r.eq),upi:_calcUlcerIdx(r.eq),sortino:_calcSortino(r.eq),kRatio:_calcKRatio(r.eq),sqn:r.sqn??null,
+                                        omega:_calcOmega(r.eq),pain:_calcPainRatio(r.eq),cfg:_cfg_ex}); // ##OMG ##PAIN
                                       equities[name]=r.eq;
                                       } // end else (не дубль)
                                     } // end if(r passed filter)

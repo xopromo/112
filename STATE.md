@@ -4,14 +4,14 @@
 > Также обновляй вручную когда вливаешь ветки в main.
 
 ## Последняя ручная сессия
-- **Дата:** 2026-03-06 20:57
+- **Дата:** 2026-03-06 22:12
 - **Ветка:** `main`
 - **Последние коммиты:**
+  - a883d41 Fix SL Pivot + new entry ranges: exhaustive loop, buildName, showDetail
+  - 66b93e9 chore: update STATE.md
   - 42cd56f feat: new entry params iterate ranges + showDetail entries section
   - 8a26e3d fix: missing closing paren in pine_export.js pat_s line
   - 3e6e401 chore: update STATE.md
-  - 243dcc8 Fix CPCV batch, maxDD unrealized DD, Pine Script new entries
-  - 8d37d4d fix: correct TL checkbox IDs in calcTotal and entry_registry
 
 ## Последний цикл
 - **Дата:** 2026-03-03-20 (ручной исследовательский цикл)
