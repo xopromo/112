@@ -4,14 +4,14 @@
 > Также обновляй вручную когда вливаешь ветки в main.
 
 ## Последняя ручная сессия
-- **Дата:** 2026-03-07 09:10
+- **Дата:** 2026-03-07 10:40
 - **Ветка:** `main`
 - **Последние коммиты:**
+  - 991ebaf fix: MA/confirm/strend фильтры блокируют сигналы во время прогрева MA
+  - e4df723 docs: добавить правило — всегда отвечать на русском языке
+  - 1039f9f chore: update STATE.md
   - 9b363ab perf: pre-filter registries before hot loop + fix Pine solve_core if-body
   - 95df99e feat: отложенный вход — режимы Bars и Retrace, совместим со всеми входами
-  - 2fb89db feat: Supertrend — вход при смене тренда + выход Вариант A
-  - e246b48 Update STATE.md
-  - 34833fb Cleanup: remove dead stochK (%K array) — only stochD (%D) is used in signals
 
 ## Последний цикл
 - **Дата:** 2026-03-03-20 (ручной исследовательский цикл)
