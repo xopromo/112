@@ -332,6 +332,10 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
   const start = cfg.start || 50;
   const volAvg = cfg.volAvg;
   const bodyAvg = cfg.bodyAvg;
+  // Pre-filter active registries to avoid per-bar flag checks in hot loop
+  const activeEntries = ENTRY_REGISTRY.filter(e => cfg[e.flag]);
+  const activeFilters = FILTER_REGISTRY.filter(f => cfg[f.flag]);
+  const activeExits   = EXIT_REGISTRY.filter(x => cfg[x.flag]);
 
   for (let i = start; i < N; i++) {
     const ac = atrArr[i-1];
@@ -373,9 +377,8 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
       if (cfg.useRev && (i-entryBar) >= cfg.revBars) {
         // oppSig: сигнал противоположного направления из любого включённого типа входа
         let oppSig = false;
-        for (let _ei = 0; _ei < ENTRY_REGISTRY.length && !oppSig; _ei++) {
-          const _e = ENTRY_REGISTRY[_ei];
-          if (!cfg[_e.flag]) continue;
+        for (let _ei = 0; _ei < activeEntries.length && !oppSig; _ei++) {
+          const _e = activeEntries[_ei];
           if (dir === 1) {
             const fn = _e.revDetectS || _e.detectS;
             if (fn(cfg, i)) oppSig = true;
@@ -416,9 +419,8 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
       // --- Шаги 2-3: Forced exits (Climax, Time) из EXIT_REGISTRY ---
       if (!frc) {
         const _ts = { dir, entry, entryBar };
-        for (let _xi = 0; _xi < EXIT_REGISTRY.length && !frc; _xi++) {
-          const _ex = EXIT_REGISTRY[_xi];
-          if (cfg[_ex.flag] && _ex.check(cfg, i, _ts)) frc = true;
+        for (let _xi = 0; _xi < activeExits.length && !frc; _xi++) {
+          if (activeExits[_xi].check(cfg, i, _ts)) frc = true;
         }
       }
 
@@ -591,18 +593,16 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
       if (doDir === 0 && pendingDir === 0) {
         let sigL = false, sigS = false;
 
-        // ENTRY SIGNALS — из ENTRY_REGISTRY
-        for (let _ei = 0; _ei < ENTRY_REGISTRY.length; _ei++) {
-          const _e = ENTRY_REGISTRY[_ei];
-          if (!cfg[_e.flag]) continue;
+        // ENTRY SIGNALS — из activeEntries (pre-filtered)
+        for (let _ei = 0; _ei < activeEntries.length; _ei++) {
+          const _e = activeEntries[_ei];
           if (!sigL && _e.detectL(cfg, i)) sigL = true;
           if (!sigS && _e.detectS(cfg, i)) sigS = true;
         }
 
-        // FILTERS — из FILTER_REGISTRY
-        for (let _fi = 0; _fi < FILTER_REGISTRY.length && (sigL || sigS); _fi++) {
-          const _f = FILTER_REGISTRY[_fi];
-          if (!cfg[_f.flag]) continue;
+        // FILTERS — из activeFilters (pre-filtered)
+        for (let _fi = 0; _fi < activeFilters.length && (sigL || sigS); _fi++) {
+          const _f = activeFilters[_fi];
           if (sigL && _f.blocksL(cfg, i, ac)) sigL = false;
           if (sigS && _f.blocksS(cfg, i, ac)) sigS = false;
         }
