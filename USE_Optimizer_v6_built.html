@@ -4201,7 +4201,7 @@ const FILTER_REGISTRY = [
       const ma = cfg.maArrConfirm[i-1];
       return ma <= 0 || DATA[i-1].c >= ma;
     },
-    nameLabel: (cfg) => `Conf${cfg.confMatType||'EMA'}${cfg.confN}`,
+    nameLabel: (cfg) => `Conf${cfg.confMatType||'EMA'}${cfg.confN}${(cfg.confHtfRatio&&cfg.confHtfRatio>1)?'×'+cfg.confHtfRatio+'tf':''}`,
   },
 
   // ── Trend Freshness ───────────────────────────────────────
