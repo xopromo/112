@@ -17,11 +17,12 @@
 const FILTER_REGISTRY = [
   // ── MA Direction ─────────────────────────────────────────
   // Pine: close[1] > ma_val где ma_val = EMA[i-1]
+  // FIX: ma <= 0 означает индикатор ещё не прогрелся → блокируем сигнал (как Pine: close[1] > na = false)
   {
     id:       'ma',
     flag:     'useMA',
-    blocksL:  (cfg, i) => cfg.maArr && cfg.maArr[i-1] > 0 && DATA[i-1].c <= cfg.maArr[i-1],
-    blocksS:  (cfg, i) => cfg.maArr && cfg.maArr[i-1] > 0 && DATA[i-1].c >= cfg.maArr[i-1],
+    blocksL:  (cfg, i) => { if (!cfg.maArr) return false; const ma = cfg.maArr[i-1]; return ma <= 0 || DATA[i-1].c <= ma; },
+    blocksS:  (cfg, i) => { if (!cfg.maArr) return false; const ma = cfg.maArr[i-1]; return ma <= 0 || DATA[i-1].c >= ma; },
     nameLabel: (cfg, ex) => ex && ex.maP ? `${ex.maType||'EMA'}${ex.maP}` : null,
   },
 
@@ -126,6 +127,7 @@ const FILTER_REGISTRY = [
     blocksL:  (cfg, i) => {
       if (!cfg.maArr || i < cfg.sTrendWin + 1) return false;
       const maRef = cfg.maArr[i-1];
+      if (maRef <= 0) return true; // MA не прогрелась → блокировать
       let ab = 0, bl = 0;
       for (let j = 1; j <= cfg.sTrendWin; j++) {
         if (DATA[i-j].c > maRef) ab++; else bl++;
@@ -135,6 +137,7 @@ const FILTER_REGISTRY = [
     blocksS:  (cfg, i) => {
       if (!cfg.maArr || i < cfg.sTrendWin + 1) return false;
       const maRef = cfg.maArr[i-1];
+      if (maRef <= 0) return true; // MA не прогрелась → блокировать
       let ab = 0, bl = 0;
       for (let j = 1; j <= cfg.sTrendWin; j++) {
         if (DATA[i-j].c > maRef) ab++; else bl++;
@@ -150,13 +153,13 @@ const FILTER_REGISTRY = [
     flag:     'useConfirm',
     blocksL:  (cfg, i) => {
       if (!cfg.maArrConfirm || i < 1) return false;
-      const secMA = cfg.maArrConfirm[i-1];
-      return secMA > 0 && DATA[i-1].c <= secMA;
+      const ma = cfg.maArrConfirm[i-1];
+      return ma <= 0 || DATA[i-1].c <= ma;
     },
     blocksS:  (cfg, i) => {
       if (!cfg.maArrConfirm || i < 1) return false;
-      const secMA = cfg.maArrConfirm[i-1];
-      return secMA > 0 && DATA[i-1].c >= secMA;
+      const ma = cfg.maArrConfirm[i-1];
+      return ma <= 0 || DATA[i-1].c >= ma;
     },
     nameLabel: (cfg) => `Conf${cfg.confMatType||'EMA'}${cfg.confN}`,
   },
