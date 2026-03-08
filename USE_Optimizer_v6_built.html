@@ -1060,6 +1060,10 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
     <div class="field"><label>Период ADX</label><input id="f_adxl" value="14" data-tip="Период расчёта ADX. Стандарт = 14"></div>
     <div class="field"><label>Мин ADX</label><input id="f_adxt" value="15:30:5" data-tip="Торговать только когда ADX выше этого порога. 20-25 = наличие тренда"></div>
   </div>
+  <div class="g2">
+    <div class="field"><label>HTF ratio</label><input id="f_adx_htf" value="1" data-tip="Старший ТФ для ADX. 1=текущий ТФ, 4=4x, 9=9x. Несколько: 1,4,9"></div>
+    <div class="field"><label><input type="checkbox" id="f_adx_slope"> ADX растёт (slope)</label><input id="f_adx_slope_bars" value="3" data-tip="ADX должен быть выше чем N баров назад. Фильтрует затухающий тренд"></div>
+  </div>
 
   <div class="cb"><input type="checkbox" id="f_strend"><label data-tip="Мажоритарный фильтр: из последних N баров более половины должны закрыться выше MA (для лонга). Простая и надёжная оценка направления тренда без лагов ADX">Простой тренд (MA)</label></div>
   <div class="field"><label>Окно баров</label><input id="f_stw" value="10" data-tip="Смотрим последние N баров: если ›50% выше MA — лонг разрешён, ›50% ниже — шорт разрешён"></div>
@@ -1107,6 +1111,9 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
 
   <div class="cb"><input type="checkbox" id="f_volf"><label data-tip="Фильтр волатильности ATR: не торговать в периоды аномально высокой волатильности (новости, спреды)">Волатильность ATR</label></div>
   <div class="field"><label>Макс ATR/сред ×</label><input id="f_vfm" value="1.5,2.0" data-tip="Максимальное отношение текущего ATR к среднему ATR. ›2.0 = аномальная волатильность"></div>
+
+  <div class="cb"><input type="checkbox" id="f_atrexp"><label data-tip="ATR расширяется: торговать только когда волатильность выше среднего. Избегает флета и консолидации">ATR расширяется (антифлет)</label></div>
+  <div class="field"><label>Мин ATR/сред ×</label><input id="f_atrexpm" value="0.8,1.0,1.2" data-tip="Минимальное отношение текущего ATR к среднему. 1.0 = ATR выше среднего. 0.8 = допускает умеренный флет"></div>
 </div>
 
 <!-- VOLUME FILTERS -->
@@ -1942,9 +1949,12 @@ function generatePineScript(r) {
 
   // ADX
   lines.push(`grp_adx  = "📊 ADX"`);
-  lines.push(`use_adx    = input.bool(${b(c.useADX)}, "ADX фильтр", group=grp_adx)`);
-  lines.push(`adx_len    = input.int(${c.adxLen||14}, "Период", group=grp_adx)`);
-  lines.push(`adx_thresh = input.float(${f(c.adxThresh||20.0,1)}, "Мин ADX", step=1.0, group=grp_adx)`);
+  lines.push(`use_adx       = input.bool(${b(c.useADX)}, "ADX фильтр", group=grp_adx)`);
+  lines.push(`adx_len       = input.int(${c.adxLen||14}, "Период", group=grp_adx)`);
+  lines.push(`adx_thresh    = input.float(${f(c.adxThresh||20.0,1)}, "Мин ADX", step=1.0, group=grp_adx)`);
+  lines.push(`adx_htf_ratio = input.int(${c.adxHtfRatio||1}, "HTF ratio (1=текущий ТФ)", minval=1, maxval=1000, group=grp_adx)`);
+  lines.push(`adx_slope     = input.bool(${b(c.useAdxSlope)}, "ADX растёт (slope)", group=grp_adx)`);
+  lines.push(`adx_slope_bars= input.int(${c.adxSlopeBars||3}, "Slope: баров назад", minval=1, maxval=20, group=grp_adx)`);
   lines.push(``);
 
   // Volume
@@ -1970,6 +1980,8 @@ function generatePineScript(r) {
   lines.push(`use_vol_f   = input.bool(${b(c.useVolF)},  "Фильтр волатильности", group=grp_volf)`);
   lines.push(`vol_f_mult  = input.float(${f(c.volFMult||2.0,1)}, "Макс ATR/средний", step=0.1, group=grp_volf)`);
   lines.push(`vol_f_len   = input.int(50, "Период", group=grp_volf)`);
+  lines.push(`use_atr_exp  = input.bool(${b(c.useAtrExp)}, "ATR расширяется (антифлет)", group=grp_volf)`);
+  lines.push(`atr_exp_mult = input.float(${f(c.atrExpMult||1.0,1)}, "Мин ATR/средний (антифлет)", step=0.1, group=grp_volf)`);
   lines.push(``);
 
   // Market structure
@@ -2084,6 +2096,10 @@ function generatePineScript(r) {
   lines.push(`float total_cost = comm_rate * 2 + (use_spread ? spread_pct : 0)`);
   lines.push(`float entry_price = close`);
   lines.push(``);
+  lines.push(`// Helper: convert seconds to TF string`);
+  lines.push(`f_tf_str(int secs) =>`);
+  lines.push(`    secs < 60 ? str.tostring(secs) + "S" : secs < 86400 ? str.tostring(math.round(secs / 60)) : str.tostring(math.round(secs / 86400)) + "D"`);
+  lines.push(``);
   lines.push(`// ADX (Wilder's)`);
   lines.push(`dirmov(len) =>`);
     lines.push(`    up = ta.change(high)`);
@@ -2096,12 +2112,17 @@ function generatePineScript(r) {
   lines.push(`    [pd, md] = dirmov(len)`);
   lines.push(`    s = pd + md`);
   lines.push(`    100 * ta.rma(math.abs(pd - md) / (s == 0 ? 1 : s), len)`);
-  lines.push(`float adx_val = adx_calc(adx_len)`);
-  lines.push(`bool adx_ok   = use_adx ? adx_val[1] >= adx_thresh : true`);
+  lines.push(`string _adx_tf_str = adx_htf_ratio <= 1 ? timeframe.period : f_tf_str(timeframe.in_seconds() * adx_htf_ratio)`);
+  lines.push(`float adx_val = request.security(syminfo.tickerid, _adx_tf_str, adx_calc(adx_len)[1], barmerge.gaps_off, barmerge.lookahead_on)`);
+  lines.push(`float adx_val_prev = request.security(syminfo.tickerid, _adx_tf_str, adx_calc(adx_len)[1 + adx_slope_bars], barmerge.gaps_off, barmerge.lookahead_on)`);
+  lines.push(`bool adx_thresh_ok = use_adx ? (not na(adx_val) and adx_val >= adx_thresh) : true`);
+  lines.push(`bool adx_slope_ok  = not use_adx or not adx_slope or (not na(adx_val) and not na(adx_val_prev) and adx_val > adx_val_prev)`);
+  lines.push(`bool adx_ok        = adx_thresh_ok and adx_slope_ok`);
   lines.push(``);
   lines.push(`// Volatility filter`);
   lines.push(`float atr_avg = ta.sma(atr_v, vol_f_len)`);
-  lines.push(`bool vol_f_ok = use_vol_f ? (atr_v[1] <= atr_avg[1] * vol_f_mult) : true`);
+  lines.push(`bool vol_f_ok   = use_vol_f   ? (atr_v[1] <= atr_avg[1] * vol_f_mult)  : true`);
+  lines.push(`bool atr_exp_ok = use_atr_exp ? (atr_v[1] >= atr_avg[1] * atr_exp_mult) : true`);
   lines.push(``);
   lines.push(`// Candle size filter`);
   lines.push(`float candle_size_1 = high[1] - low[1]`);
@@ -2128,8 +2149,6 @@ function generatePineScript(r) {
   lines.push(`// MA`);
   lines.push(`calc_ma(t, s, l) =>`);
   lines.push(`    t == "SMA" ? ta.sma(s,l) : t == "EMA" ? ta.ema(s,l) : t == "WMA" ? ta.wma(s,l) : t == "VWMA" ? ta.vwma(s,l) : ta.hma(s,l)`);
-  lines.push(`f_tf_str(int secs) =>`);
-  lines.push(`    secs < 60 ? str.tostring(secs) + "S" : secs < 86400 ? str.tostring(math.round(secs / 60)) : str.tostring(math.round(secs / 86400)) + "D"`);
   lines.push(`string _ma_tf_str   = ma_htf_ratio   <= 1 ? timeframe.period : f_tf_str(timeframe.in_seconds() * ma_htf_ratio)`);
   lines.push(`string _conf_tf_str = conf_ma_htf <= 1 ? timeframe.period : f_tf_str(timeframe.in_seconds() * conf_ma_htf)`);
   lines.push(`float ma_raw = request.security(syminfo.tickerid, _ma_tf_str, calc_ma(ma_type, close, ma_len)[1], barmerge.gaps_off, barmerge.lookahead_on)`);
@@ -2405,8 +2424,8 @@ function generatePineScript(r) {
   lines.push(`float dyn_sl_short_raw = use_sl_piv and not na(last_pv_hi) and (bar_index - last_pv_hi_bar) <= 30 ? last_pv_hi + atr_v * sl_piv_off : na`);
   lines.push(``);
   lines.push(`// All filters combined`);
-  lines.push(`bool all_filt_l = ma_ok_l and conf_ok_l and ma_dist_ok and adx_ok and vol_f_ok and candle_f_ok and struct_ok_l and (not use_vsa or is_whale) and liq_ok and vol_dir_ok_l and st_ok_l`);
-  lines.push(`bool all_filt_s = ma_ok_s and conf_ok_s and ma_dist_ok and adx_ok and vol_f_ok and candle_f_ok and struct_ok_s and (not use_vsa or is_whale) and liq_ok and vol_dir_ok_s and st_ok_s`);
+  lines.push(`bool all_filt_l = ma_ok_l and conf_ok_l and ma_dist_ok and adx_ok and vol_f_ok and atr_exp_ok and candle_f_ok and struct_ok_l and (not use_vsa or is_whale) and liq_ok and vol_dir_ok_l and st_ok_l`);
+  lines.push(`bool all_filt_s = ma_ok_s and conf_ok_s and ma_dist_ok and adx_ok and vol_f_ok and atr_exp_ok and candle_f_ok and struct_ok_s and (not use_vsa or is_whale) and liq_ok and vol_dir_ok_s and st_ok_s`);
   lines.push(``);
   lines.push(`// ПРАВИЛО: сигнал только на закрытии подтверждённой свечи`);
   lines.push(`bool confirmed = barstate.isconfirmed`);
@@ -4070,9 +4089,41 @@ const FILTER_REGISTRY = [
   {
     id:       'adx',
     flag:     'useADX',
-    blocksL:  (cfg, i) => cfg.adxArr && cfg.adxArr[i-1] < cfg.adxThresh,
-    blocksS:  (cfg, i) => cfg.adxArr && cfg.adxArr[i-1] < cfg.adxThresh,
-    nameLabel: (cfg, ex) => `ADX(${(ex&&ex.adxL)||cfg.adxLen||14}>${cfg.adxThresh})`,
+    blocksL:  (cfg, i) => {
+      if (!cfg.adxArr) return false;
+      const adx = cfg.adxArr[i-1];
+      if (adx <= 0 || adx < cfg.adxThresh) return true;
+      if (cfg.useAdxSlope) {
+        const sb = cfg.adxSlopeBars||3;
+        if (i-1 > sb && cfg.adxArr[i-1-sb] > 0) return adx <= cfg.adxArr[i-1-sb];
+      }
+      return false;
+    },
+    blocksS:  (cfg, i) => {
+      if (!cfg.adxArr) return false;
+      const adx = cfg.adxArr[i-1];
+      if (adx <= 0 || adx < cfg.adxThresh) return true;
+      if (cfg.useAdxSlope) {
+        const sb = cfg.adxSlopeBars||3;
+        if (i-1 > sb && cfg.adxArr[i-1-sb] > 0) return adx <= cfg.adxArr[i-1-sb];
+      }
+      return false;
+    },
+    nameLabel: (cfg, ex) => {
+      const l = (ex&&ex.adxL)||cfg.adxLen||14;
+      const htf = (cfg.adxHtfRatio&&cfg.adxHtfRatio>1) ? '×'+cfg.adxHtfRatio+'tf' : '';
+      const slope = cfg.useAdxSlope ? '↑' : '';
+      return `ADX(${l}>${cfg.adxThresh})${htf}${slope}`;
+    },
+  },
+
+  // ── ATR Expanding (anti-flat) ─────────────────────────────
+  {
+    id:       'atrexp',
+    flag:     'useAtrExp',
+    blocksL:  (cfg, i, ac) => !cfg.atrAvg || cfg.atrAvg[i-1] <= 0 || ac < cfg.atrAvg[i-1] * cfg.atrExpMult,
+    blocksS:  (cfg, i, ac) => !cfg.atrAvg || cfg.atrAvg[i-1] <= 0 || ac < cfg.atrAvg[i-1] * cfg.atrExpMult,
+    nameLabel: (cfg) => `AtrExp>${cfg.atrExpMult}×`,
   },
 
   // ── RSI Extremes ──────────────────────────────────────────
@@ -4594,6 +4645,38 @@ function calcHTFMA(data, htfRatio, period, type) {
   for (let i = 0; i < N; i++) {
     const lastHTF = Math.floor((i + 1) / htfRatio) - 1;
     aligned[i] = lastHTF >= 0 ? htfMA[lastHTF] : 0;
+  }
+  return aligned;
+}
+function calcHTFADX(data, htfRatio, period) {
+  const N = data.length;
+  const htfN = Math.ceil(N / htfRatio);
+  const htfH = new Float64Array(htfN), htfL = new Float64Array(htfN), htfC = new Float64Array(htfN);
+  for (let k = 0; k < htfN; k++) {
+    const s = k * htfRatio, e = Math.min((k+1)*htfRatio-1, N-1);
+    let h = -Infinity, l = Infinity;
+    for (let j = s; j <= e; j++) { h = Math.max(h, data[j].h); l = Math.min(l, data[j].l); }
+    htfH[k] = h; htfL[k] = l; htfC[k] = data[e].c;
+  }
+  const pdm = new Float64Array(htfN), mdm = new Float64Array(htfN), tr = new Float64Array(htfN);
+  for (let i = 1; i < htfN; i++) {
+    const up = htfH[i]-htfH[i-1], dn = htfL[i-1]-htfL[i];
+    pdm[i] = (up > dn && up > 0) ? up : 0;
+    mdm[i] = (dn > up && dn > 0) ? dn : 0;
+    tr[i]  = Math.max(htfH[i]-htfL[i], Math.abs(htfH[i]-htfC[i-1]), Math.abs(htfL[i]-htfC[i-1]));
+  }
+  const atrR = calcRMA(Array.from(tr), period);
+  const pdmR = calcRMA(Array.from(pdm), period);
+  const mdmR = calcRMA(Array.from(mdm), period);
+  const dx = new Float64Array(htfN);
+  for (let i = period; i < htfN; i++) {
+    if (atrR[i] > 0) { const pi=pdmR[i]/atrR[i]*100, mi=mdmR[i]/atrR[i]*100, s=pi+mi; dx[i]=s>0?Math.abs(pi-mi)/s*100:0; }
+  }
+  const htfADX = calcRMA(Array.from(dx), period);
+  const aligned = new Float64Array(N);
+  for (let i = 0; i < N; i++) {
+    const last = Math.floor((i+1)/htfRatio)-1;
+    aligned[i] = last >= 0 ? htfADX[last] : 0;
   }
   return aligned;
 }
@@ -5557,13 +5640,15 @@ function calcTotal() {
     tpCfgs.filter(t=>t.type===activeTp[0]).length*tpCfgs.filter(t=>t.type===activeTp[1]).length+tpCfgs.length :
     tpCfgs.length||1;
   const _ctAdxL=$c('f_adx')?parseRange('f_adxl'):[$n('f_adxl')||14];
+  const _ctAdxHtf=$c('f_adx')?parseRange('f_adx_htf'):[1];
+  const _ctAtrExpMs=$c('f_atrexp')?parseRange('f_atrexpm'):[0];
   const _ctStw=$c('f_strend')?parseRange('f_stw'):[$n('f_stw')||10];
   const _ctConf=$c('f_confirm')?parseRange('f_confn'):[100];
   const _useTF=$c('e_tl_touch')||$c('e_tl_break')||$c('e_flag')||$c('e_tri');
   const _ctTlPvL=_useTF?parseRange('e_tl_pvl'):[5];
   const _ctTlPvR=_useTF?parseRange('e_tl_pvr'):[3];
   return pvLs.length*pvRs.length*atrPs.length*(maPs.length||1)*
-    (adxTs.length||1)*(_ctAdxL.length||1)*rsiCount*(vfMs.length||1)*(mdMaxs.length||1)*
+    (adxTs.length||1)*(_ctAdxL.length||1)*(_ctAdxHtf.length||1)*rsiCount*(vfMs.length||1)*(_ctAtrExpMs.length||1)*(mdMaxs.length||1)*
     slCount*tpCount*beCount*(trTrigs.length||1)*(trDists.length||1)*
     (timeBarsA.length||1)*(freshMaxs.length||1)*(wtTs.length||1)*
     (vsaMs.length||1)*(atrBoMs.length||1)*(revBarsA.length||1)*
@@ -5719,6 +5804,9 @@ async function runOpt() {
   const useVolF=$c('f_volf'),useStruct=$c('f_struct'),useMaDist=$c('f_madist');
   const useCandleF=$c('f_candle'),useConsec=$c('f_consec');
   const useSTrend=$c('f_strend'),useFresh=$c('f_fresh');
+  const useAtrExp=$c('f_atrexp');
+  const useAdxSlope=$c('f_adx_slope');
+  const adxSlopeBars=$n('f_adx_slope_bars')||3;
   const useConfirm=$c('f_confirm');
   const confNArr=useConfirm?parseRange('f_confn'):[100];
   const confMatType=document.getElementById('f_conf_mat')?.value||'EMA';
@@ -5758,6 +5846,8 @@ async function runOpt() {
   const confHtfArr=useConfirm?parseRange('f_conf_htf'):[1];
   const maCrossTypeArr=$c('e_macr')?(_sweepMaCrossTypes?['EMA','SMA','WMA']:[$v('e_macr_t')||'EMA']):['EMA'];
   const adxTs=useAdx?parseRange('f_adxt'):[0];
+  const adxHtfArr=useAdx?parseRange('f_adx_htf'):[1];
+  const atrExpMs=useAtrExp?parseRange('f_atrexpm'):[0];
   const vfMs=useVolF?parseRange('f_vfm'):[0];
   const mdMaxs=useMaDist?parseRange('f_madv'):[0];
   const wtThreshs=useWT?parseRange('f_wtt'):[0];
@@ -6078,7 +6168,7 @@ async function runOpt() {
   if(useBE){let v=0;beTrigs.forEach(t=>{beOffs.forEach(o=>{if(o<t)v++;});});beValidCount=v||1;}
   let total=pvLs.length*pvRs.length*atrPs.length*(maPs.length||1)*
     (maTypeArr.length||1)*(htfRatioArr.length||1)*
-    (adxTs.length||1)*(rsiPairs.length||1)*(vfMs.length||1)*(mdMaxs.length||1)*
+    (adxTs.length||1)*(adxHtfArr.length||1)*(rsiPairs.length||1)*(vfMs.length||1)*(atrExpMs.length||1)*(mdMaxs.length||1)*
     slPairs.length*tpPairs.length*beValidCount*(trTrigs.length||1)*(trDists.length||1)*
     (timeBarsArr.length||1)*(freshMaxs.length||1)*(wtThreshs.length||1)*
     (vsaMs.length||1)*(atrBoMults.length||1)*(confNArr.length||1)*(confTypeArr.length||1)*
@@ -6101,7 +6191,7 @@ async function runOpt() {
     // Используем Fisher-Yates на диапазоне [0, realTotal)
     const realTotal = pvLs.length*pvRs.length*atrPs.length*(maPs.length||1)*
       (maTypeArr.length||1)*(htfRatioArr.length||1)*
-      (adxTs.length||1)*(rsiPairs.length||1)*(vfMs.length||1)*(mdMaxs.length||1)*
+      (adxTs.length||1)*(adxHtfArr.length||1)*(rsiPairs.length||1)*(vfMs.length||1)*(atrExpMs.length||1)*(mdMaxs.length||1)*
       slPairs.length*tpPairs.length*beValidCount*(trTrigs.length||1)*(trDists.length||1)*
       (timeBarsArr.length||1)*(freshMaxs.length||1)*(wtThreshs.length||1)*
       (vsaMs.length||1)*(atrBoMults.length||1)*(confNArr.length||1)*(confTypeArr.length||1)*
@@ -6149,7 +6239,7 @@ async function runOpt() {
   if (optMode === 'mc') {
     // Предупреждение: если пространство меньше N — каждый запуск одинаков
     const _mcRealTotal = pvLs.length*pvRs.length*atrPs.length*(maPs.length||1)*
-      (adxTs.length||1)*(rsiPairs.length||1)*(vfMs.length||1)*(mdMaxs.length||1)*
+      (adxTs.length||1)*(adxHtfArr.length||1)*(rsiPairs.length||1)*(vfMs.length||1)*(atrExpMs.length||1)*(mdMaxs.length||1)*
       slPairs.length*tpPairs.length*beValidCount*(trTrigs.length||1)*(trDists.length||1)*
       (timeBarsArr.length||1)*(freshMaxs.length||1)*(wtThreshs.length||1)*
       (vsaMs.length||1)*(atrBoMults.length||1)*(confNArr.length||1)*(revBarsArr.length||1)*
@@ -6222,7 +6312,7 @@ async function runOpt() {
   const _mcDims = [
     pvLs, pvRs, atrPs, (maPs.length?maPs:[maPs[0]||0]),
     (maTypeArr.length?maTypeArr:['EMA']), (htfRatioArr.length?htfRatioArr:[1]),
-    (adxTs.length?adxTs:[0]), rsiPairs, (vfMs.length?vfMs:[0]),
+    (adxTs.length?adxTs:[0]), (adxHtfArr.length?adxHtfArr:[1]), rsiPairs, (vfMs.length?vfMs:[0]), (atrExpMs.length?atrExpMs:[0]),
     (mdMaxs.length?mdMaxs:[0]), (freshMaxs.length?freshMaxs:[20]),
     (wtThreshs.length?wtThreshs:[0]), (vsaMs.length?vsaMs:[0]),
     (atrBoMults.length?atrBoMults:[2.0]), slPairs, tpPairs,
@@ -6292,9 +6382,11 @@ async function runOpt() {
       const maP      = _dims[_d][_di[_d++]];
       const _mType   = _dims[_d][_di[_d++]];
       const htfRatio = _dims[_d][_di[_d++]];
-      const adxT     = _dims[_d][_di[_d++]];
+      const adxT        = _dims[_d][_di[_d++]];
+      const adxHtfRatio = _dims[_d][_di[_d++]];
       const rsiPair  = _dims[_d][_di[_d++]];
       const vfM      = _dims[_d][_di[_d++]];
+      const atrExpM  = _dims[_d][_di[_d++]];
       const mdMax    = _dims[_d][_di[_d++]];
       const freshMax = _dims[_d][_di[_d++]];
       const wtT      = _dims[_d][_di[_d++]];
@@ -6373,7 +6465,8 @@ async function runOpt() {
         if (!maCache[ck]) maCache[ck] = _confHtf>1 ? calcHTFMA(DATA,_confHtf,confN,_confType) : calcMA(closes,confN,_confType);
         confMAArr = maCache[ck];
       }
-      if (!adxCache[adxL]) adxCache[adxL] = calcADX(adxL);
+      const _adxCk = adxL+'_htf'+adxHtfRatio;
+      if (!adxCache[_adxCk]) adxCache[_adxCk] = adxHtfRatio>1 ? calcHTFADX(DATA,adxHtfRatio,adxL) : calcADX(adxL);
 
       const btCfg = {
         comm: commTotal,
@@ -6406,9 +6499,10 @@ async function runOpt() {
         usePartial,partRR,partPct,partBE,
         useClimax:useClimaxExit&&HAS_VOLUME,clxVolMult,clxBodyMult,clxMode,
         useMA:maP>0,maArr,maType:_mType,maP,htfRatio,
-        useADX:useAdx&&adxT>0,adxArr:adxCache[adxL],adxThresh:adxT,adxLen:adxL,
+        useADX:useAdx&&adxT>0,adxArr:adxCache[_adxCk],adxThresh:adxT,adxLen:adxL,adxHtfRatio,useAdxSlope,adxSlopeBars,
         useRSI:useRsi,rsiArr:useRsi?calcRSI(14):null,rsiOS:rsiPair.os,rsiOB:rsiPair.ob,
         useVolF:useVolF&&vfM>0,atrAvg,volFMult:vfM,
+        useAtrExp:useAtrExp&&atrExpM>0,atrExpMult:atrExpM,
         useStruct,structBull,structBear,strPvL,strPvR,
         useSLPiv,slPivOff,slPivMax,slPivL,slPivR,slPivTrail,pivSLLo,pivSLHi,
         useConfirm:useConfirm&&confN>0,confN,confMatType:_confType,confHtfRatio:_confHtf,maArrConfirm:confMAArr,
@@ -6439,7 +6533,7 @@ async function runOpt() {
         let slDesc = slPair.combo ? `SL(ATR×${slPair.a.m}${slLogic==='or'?'|OR|':'|AND|'}${slPair.p.m}%)` : slPair.a ? `SL×${slPair.a.m}ATR` : `SL${slPair.p.m}%`;
         if(useSLPiv) slDesc+=`+SPiv(L${slPivL}/R${slPivR}×${slPivOff})`;
         let tpDesc = tpPair.combo ? (()=>{const n1=tpPair.a.type==='rr'?`RR${tpPair.a.m}`:tpPair.a.type==='atr'?`TP×${tpPair.a.m}ATR`:`TP${tpPair.a.m}%`;const n2=tpPair.b.type==='rr'?`RR${tpPair.b.m}`:tpPair.b.type==='atr'?`TP×${tpPair.b.m}ATR`:`TP${tpPair.b.m}%`;return `TP(${n1}${tpLogic==='or'?'|OR|':'|AND|'}${n2})`;})() : tpPair.a ? (tpPair.a.type==='rr'?`RR×${tpPair.a.m}`:tpPair.a.type==='atr'?`TP×${tpPair.a.m}ATR`:`TP${tpPair.a.m}%`) : '';
-        const name = buildName(btCfg, pvL, pvR, slDesc, tpDesc, {}, {maP, maType:_mType, stw:sTrendWin, atrP, adxL});
+        const name = buildName(btCfg, pvL, pvR, slDesc, tpDesc, {}, {maP, maType:_mType, stw:sTrendWin, atrP, adxL, adxHtfRatio});
         if (!_resultNames.has(name)) {
           _resultNames.add(name);
           const _cfg = {usePivot:usePv,pvL,pvR,useEngulf:useEng,usePinBar:usePin,pinRatio,
@@ -6468,12 +6562,13 @@ async function runOpt() {
               useRev,revBars,revMode,revAct,useTime,timeBars,timeMode,
               usePartial,partRR,partPct,partBE,
               useClimax:useClimaxExit&&HAS_VOLUME,clxVolMult,clxBodyMult,clxMode,
-              useMA:maP>0,maType:_mType,maP,
-              useADX:useAdx&&adxT>0,adxThresh:adxT,adxLen:adxL,
+              useMA:maP>0,maType:_mType,maP,htfRatio,
+              useADX:useAdx&&adxT>0,adxThresh:adxT,adxLen:adxL,adxHtfRatio,useAdxSlope,adxSlopeBars,
               useRSI:useRsi,rsiOS:rsiPair.os,rsiOB:rsiPair.ob,
               useVolF:useVolF&&vfM>0,volFMult:vfM,
+              useAtrExp:useAtrExp&&atrExpM>0,atrExpMult:atrExpM,
               useStruct,structLen,strPvL,strPvR,
-              useConfirm:useConfirm&&confN>0,confN,confMatType,
+              useConfirm:useConfirm&&confN>0,confN,confMatType:_confType,confHtfRatio:_confHtf,
               useMaDist:useMaDist&&mdMax>0,maDistMax:mdMax,
               useCandleF,candleMin,candleMax,useConsec,consecMax,
               useSTrend,sTrendWin,useFresh:useFresh&&freshMax>0,freshMax,
@@ -6555,9 +6650,11 @@ async function runOpt() {
       const maP      = _dims[_d][dimIndices[_d++]];
       const _mType   = _dims[_d][dimIndices[_d++]];
       const htfRatio = _dims[_d][dimIndices[_d++]];
-      const adxT     = _dims[_d][dimIndices[_d++]];
+      const adxT        = _dims[_d][dimIndices[_d++]];
+      const adxHtfRatio = _dims[_d][dimIndices[_d++]];
       const rsiPair  = _dims[_d][dimIndices[_d++]];
       const vfM      = _dims[_d][dimIndices[_d++]];
+      const atrExpM  = _dims[_d][dimIndices[_d++]];
       const mdMax    = _dims[_d][dimIndices[_d++]];
       const freshMax = _dims[_d][dimIndices[_d++]];
       const wtT      = _dims[_d][dimIndices[_d++]];
@@ -6639,7 +6736,8 @@ async function runOpt() {
         if (!maCache[ck]) maCache[ck] = _confHtf>1 ? calcHTFMA(DATA,_confHtf,confN,_confType) : calcMA(closes,confN,_confType);
         confMAArr = maCache[ck];
       }
-      if (!adxCache[adxL]) adxCache[adxL] = calcADX(adxL);
+      const _adxCk = adxL+'_htf'+adxHtfRatio;
+      if (!adxCache[_adxCk]) adxCache[_adxCk] = adxHtfRatio>1 ? calcHTFADX(DATA,adxHtfRatio,adxL) : calcADX(adxL);
 
       const btCfg = {
         comm:commTotal,
@@ -6670,9 +6768,10 @@ async function runOpt() {
         useTime,timeBars,timeMode,usePartial,partRR,partPct,partBE,
         useClimax:useClimaxExit&&HAS_VOLUME,clxVolMult,clxBodyMult,clxMode,
         useMA:maP>0,maArr,maType:_mType,maP,htfRatio,
-        useADX:useAdx&&adxT>0,adxArr:adxCache[adxL],adxThresh:adxT,adxLen:adxL,
+        useADX:useAdx&&adxT>0,adxArr:adxCache[_adxCk],adxThresh:adxT,adxLen:adxL,adxHtfRatio,useAdxSlope,adxSlopeBars,
         useRSI:useRsi,rsiArr:_tpeRsiArr,rsiOS:rsiPair.os,rsiOB:rsiPair.ob,
         useVolF:useVolF&&vfM>0,atrAvg,volFMult:vfM,
+        useAtrExp:useAtrExp&&atrExpM>0,atrExpMult:atrExpM,
         useStruct,structBull,structBear,strPvL,strPvR,
         useSLPiv,slPivOff,slPivMax,slPivL,slPivR,slPivTrail,pivSLLo,pivSLHi,
         useConfirm:useConfirm&&confN>0,confN,confMatType:_confType,confHtfRatio:_confHtf,maArrConfirm:confMAArr,
@@ -6718,7 +6817,7 @@ async function runOpt() {
         let slDesc = slPair.combo ? `SL(ATR×${slPair.a.m}${slLogic==='or'?'|OR|':'|AND|'}${slPair.p.m}%)` : slPair.a ? `SL×${slPair.a.m}ATR` : `SL${slPair.p.m}%`;
         if(useSLPiv) slDesc+=`+SPiv(L${slPivL}/R${slPivR}×${slPivOff})`;
         let tpDesc = tpPair.combo ? (()=>{const n1=tpPair.a.type==='rr'?`RR${tpPair.a.m}`:tpPair.a.type==='atr'?`TP×${tpPair.a.m}ATR`:`TP${tpPair.a.m}%`;const n2=tpPair.b.type==='rr'?`RR${tpPair.b.m}`:tpPair.b.type==='atr'?`TP×${tpPair.b.m}ATR`:`TP${tpPair.b.m}%`;return `TP(${n1}${tpLogic==='or'?'|OR|':'|AND|'}${n2})`;})() : tpPair.a ? (tpPair.a.type==='rr'?`RR×${tpPair.a.m}`:tpPair.a.type==='atr'?`TP×${tpPair.a.m}ATR`:`TP${tpPair.a.m}%`) : '';
-        const name = buildName(btCfg, pvL, pvR, slDesc, tpDesc, {}, {maP, maType:_mType, htfRatio, stw:sTrendWin, atrP, adxL});
+        const name = buildName(btCfg, pvL, pvR, slDesc, tpDesc, {}, {maP, maType:_mType, htfRatio, stw:sTrendWin, atrP, adxL, adxHtfRatio});
         if (!_resultNames.has(name)) {
           _resultNames.add(name);
           const _cfg_tpe = {usePivot:usePv,pvL,pvR,useEngulf:useEng,usePinBar:usePin,pinRatio,
@@ -6748,9 +6847,10 @@ async function runOpt() {
               useTime,timeBars,timeMode,usePartial,partRR,partPct,partBE,
               useClimax:useClimaxExit&&HAS_VOLUME,clxVolMult,clxBodyMult,clxMode,
               useMA:maP>0,maType:_mType,maP,htfRatio,
-              useADX:useAdx&&adxT>0,adxThresh:adxT,adxLen:adxL,
+              useADX:useAdx&&adxT>0,adxThresh:adxT,adxLen:adxL,adxHtfRatio,useAdxSlope,adxSlopeBars,
               useRSI:useRsi,rsiOS:rsiPair.os,rsiOB:rsiPair.ob,
               useVolF:useVolF&&vfM>0,volFMult:vfM,
+              useAtrExp:useAtrExp&&atrExpM>0,atrExpMult:atrExpM,
               useStruct,structLen,strPvL,strPvR,
               useConfirm:useConfirm&&confN>0,confN,confMatType:_confType,confHtfRatio:_confHtf,
               useMaDist:useMaDist&&mdMax>0,maDistMax:mdMax,
@@ -6978,9 +7078,15 @@ async function runOpt() {
 
         for(const adxT of (adxTs.length?adxTs:[0])) {
           if(_mcDone) break;
+          for(const adxHtfRatio of (adxHtfArr.length?adxHtfArr:[1])) {
+          if(_mcDone) break;
+          const _adxCk=adxL+'_htf'+adxHtfRatio;
+          if(!adxCache[_adxCk]) adxCache[_adxCk]=adxHtfRatio>1?calcHTFADX(DATA,adxHtfRatio,adxL):calcADX(adxL);
           for(const rsiPair of rsiPairs) {
             if(_mcDone) break;
             for(const vfM of (vfMs.length?vfMs:[0])) {
+              if(_mcDone) break;
+              for(const atrExpM of (atrExpMs.length?atrExpMs:[0])) {
               if(_mcDone) break;
               for(const mdMax of (mdMaxs.length?mdMaxs:[0])) {
                 if(_mcDone) break;
@@ -7107,10 +7213,11 @@ async function runOpt() {
                                       useClimax:useClimaxExit&&HAS_VOLUME,clxVolMult,clxBodyMult,clxMode,
                                       // Filters
                                       useMA:maP>0,maArr,maType:mType,maP,htfRatio,
-                                      useADX:useAdx&&adxT>0,adxArr:(()=>{if(!adxCache[adxL])adxCache[adxL]=calcADX(adxL);return adxCache[adxL];})(),adxThresh:adxT,adxLen:adxL,
+                                      useADX:useAdx&&adxT>0,adxArr:adxCache[_adxCk],adxThresh:adxT,adxLen:adxL,adxHtfRatio,useAdxSlope,adxSlopeBars,
                                       useRSI:useRsi,rsiArr:useRsi?calcRSI(14):null,
                                       rsiOS:rsiPair.os,rsiOB:rsiPair.ob,
                                       useVolF:useVolF&&vfM>0,atrAvg,volFMult:vfM,
+                                      useAtrExp:useAtrExp&&atrExpM>0,atrExpMult:atrExpM,
                                       useStruct,structBull,structBear,strPvL,strPvR,
                                       useConfirm:useConfirm&&confN>0,confN,confMatType:_confType,confHtfRatio:_confHtf,maArrConfirm:confMAArr,
                                       useMaDist:useMaDist&&mdMax>0,maDistMax:mdMax,
@@ -7159,7 +7266,7 @@ async function runOpt() {
                                         tpDesc=tpPair.a.type==='rr'?`RR×${tpPair.a.m}`:tpPair.a.type==='atr'?`TP×${tpPair.a.m}ATR`:`TP${tpPair.a.m}%`;
                                       }
                                       const name=buildName(btCfg,pvL,pvR,slDesc,tpDesc,{},{
-                                        maP,maType:mType,htfRatio,stw:sTrendWin,atrP,adxL
+                                        maP,maType:mType,htfRatio,stw:sTrendWin,atrP,adxL,adxHtfRatio
                                       });
                                       if (_resultNames.has(name)) { /* дубль — пропускаем */ } else {
                                       _resultNames.add(name);
@@ -7195,9 +7302,10 @@ async function runOpt() {
                                           usePartial, partRR, partPct, partBE,
                                           useClimax:useClimaxExit&&HAS_VOLUME, clxVolMult, clxBodyMult, clxMode,
                                           useMA:maP>0, maType:mType, maP, htfRatio,
-                                          useADX:useAdx&&adxT>0, adxThresh:adxT, adxLen:adxL,
+                                          useADX:useAdx&&adxT>0, adxThresh:adxT, adxLen:adxL, adxHtfRatio, useAdxSlope, adxSlopeBars,
                                           useRSI:useRsi, rsiOS:rsiPair.os, rsiOB:rsiPair.ob,
                                           useVolF:useVolF&&vfM>0, volFMult:vfM,
+                                          useAtrExp:useAtrExp&&atrExpM>0, atrExpMult:atrExpM,
                                           useStruct, structLen, strPvL, strPvR,
                                           useConfirm:useConfirm&&confN>0, confN, confMatType:_confType, confHtfRatio:_confHtf,
                                           useMaDist:useMaDist&&mdMax>0, maDistMax:mdMax,
@@ -7242,8 +7350,10 @@ async function runOpt() {
                   } // wtT
                 } // freshMax
               } // mdMax
+              } // atrExpM
             } // vfM
           } // rsiPair
+          } // adxHtfRatio
         } // adxT
         }} // htfRatio, mType
       } // maP
@@ -7320,7 +7430,8 @@ function _calcIndicators(cfg) {
 
   // ── ADX ───────────────────────────────────────────────────
   const adxLen = cfg.adxLen || 14;
-  const adxArr = cfg.useADX ? calcADX(adxLen) : null;
+  const adxHtfRatioInd = cfg.adxHtfRatio || 1;
+  const adxArr = cfg.useADX ? (adxHtfRatioInd > 1 ? calcHTFADX(DATA, adxHtfRatioInd, adxLen) : calcADX(adxLen)) : null;
 
   // ── RSI ───────────────────────────────────────────────────
   const rsiArr = cfg.useRSI ? calcRSI(14) : null;
@@ -7718,6 +7829,9 @@ function buildBtCfg(cfg, ind) {
     adxArr:   ind.adxArr,
     adxThresh: cfg.adxThresh || 25,
     adxLen:    cfg.adxLen    || 14,
+    adxHtfRatio: cfg.adxHtfRatio || 1,
+    useAdxSlope: cfg.useAdxSlope || false,
+    adxSlopeBars: cfg.adxSlopeBars || 3,
     useRSI:   cfg.useRSI   || false,
     rsiArr:   ind.rsiArr,
     rsiOS:    cfg.rsiOS    || 30,
@@ -7725,6 +7839,8 @@ function buildBtCfg(cfg, ind) {
     useVolF:  cfg.useVolF  || false,
     atrAvg:   ind.atrAvg,
     volFMult: cfg.volFMult || 1.5,
+    useAtrExp: cfg.useAtrExp || false,
+    atrExpMult: cfg.atrExpMult || 0.8,
     useStruct:  cfg.useStruct  || false,
     structBull: ind.structBull,
     structBear: ind.structBear,
@@ -8368,7 +8484,8 @@ function showDetail(r) {
   // 4. TREND FILTERS
   let filt = '';
   filt += row('MA фильтр тренда',   c.useMA      ? `ВКЛ · ${c.maType} период=${c.maP}${(c.htfRatio&&c.htfRatio>1)?' · HTF ×'+c.htfRatio+'tf':''}` : 'ВЫКЛ',               c.useMA?'on':'off');
-  filt += row('ADX (сила тренда)',  c.useADX     ? `ВКЛ · ADX(${c.adxLen||14}) > ${c.adxThresh}` : 'ВЫКЛ',                       c.useADX?'on':'off');
+  filt += row('ADX (сила тренда)',  c.useADX ? `ВКЛ · ADX(${c.adxLen||14}) > ${c.adxThresh}${(c.adxHtfRatio&&c.adxHtfRatio>1)?' · HTF ×'+c.adxHtfRatio+'tf':''}${c.useAdxSlope?' · slope↑('+c.adxSlopeBars+'b)':''}` : 'ВЫКЛ', c.useADX?'on':'off');
+  filt += row('ATR расширяется',   c.useAtrExp  ? `ВКЛ · ATR > ${c.atrExpMult}× среднего (антифлет)` : 'ВЫКЛ',  c.useAtrExp?'on':'off');
   filt += row('RSI перекуп/перепрод', c.useRSI   ? `ВКЛ · лонг если RSI < ${c.rsiOS}, шорт если RSI > ${c.rsiOB}` : 'ВЫКЛ', c.useRSI?'on':'off');
   filt += row('Простой тренд MA',   c.useSTrend  ? `ВКЛ · окно ${c.sTrendWin} баров` : 'ВЫКЛ',                  c.useSTrend?'on':'off');
   filt += row('Структура рынка HH/LL', c.useStruct ? `ВКЛ · lookback ${c.structLen} баров` : 'ВЫКЛ',            c.useStruct?'on':'off');
@@ -8534,7 +8651,8 @@ function buildCopyText(r, c, slName, tpName) {
   lines.push('');
   lines.push('--- ФИЛЬТРЫ ТРЕНДА ---');
   lines.push('MA фильтр:        ' + on(c.useMA,      c.maType + ' период=' + c.maP + ((c.htfRatio&&c.htfRatio>1) ? ' HTF×'+c.htfRatio+'tf' : '')));
-  lines.push('ADX:              ' + on(c.useADX,     'ADX>' + c.adxThresh));
+  lines.push('ADX:              ' + on(c.useADX,     'ADX>' + c.adxThresh + ((c.adxHtfRatio&&c.adxHtfRatio>1) ? ' HTF×'+c.adxHtfRatio+'tf' : '') + (c.useAdxSlope ? ' slope↑('+c.adxSlopeBars+'b)' : '')));
+  lines.push('ATR расширяется:  ' + on(c.useAtrExp,  'ATR>' + (c.atrExpMult||1.0) + 'x среднего'));
   lines.push('RSI:              ' + on(c.useRSI,     'лонг<' + c.rsiOS + ', шорт>' + c.rsiOB));
   lines.push('Простой тренд:    ' + on(c.useSTrend,  'окно=' + c.sTrendWin + ' баров'));
   lines.push('Структура рынка:  ' + on(c.useStruct,  'lookback=' + c.structLen));
@@ -10663,8 +10781,8 @@ let _robSliceCacheDataHash = '';
 const HC_NUMERIC_PARAMS = [
   // Базовые
   ['pvL',5],['pvR',2],['atrPeriod',14],['maP',0],
-  ['adxLen',14],['adxThresh',25],
-  ['rsiOS',30],['rsiOB',70],['atrBoMult',2],
+  ['adxLen',14],['adxThresh',25],['adxHtfRatio',1],['adxSlopeBars',3],
+  ['rsiOS',30],['rsiOB',70],['atrBoMult',2],['atrExpMult',0.8],
   // Выходы
   ['beTrig',1.0],['beOff',0],['trTrig',1.0],['trDist',0.5],['timeBars',20],
   // RevSig

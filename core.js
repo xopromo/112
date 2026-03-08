@@ -148,6 +148,38 @@ function calcHTFMA(data, htfRatio, period, type) {
   }
   return aligned;
 }
+function calcHTFADX(data, htfRatio, period) {
+  const N = data.length;
+  const htfN = Math.ceil(N / htfRatio);
+  const htfH = new Float64Array(htfN), htfL = new Float64Array(htfN), htfC = new Float64Array(htfN);
+  for (let k = 0; k < htfN; k++) {
+    const s = k * htfRatio, e = Math.min((k+1)*htfRatio-1, N-1);
+    let h = -Infinity, l = Infinity;
+    for (let j = s; j <= e; j++) { h = Math.max(h, data[j].h); l = Math.min(l, data[j].l); }
+    htfH[k] = h; htfL[k] = l; htfC[k] = data[e].c;
+  }
+  const pdm = new Float64Array(htfN), mdm = new Float64Array(htfN), tr = new Float64Array(htfN);
+  for (let i = 1; i < htfN; i++) {
+    const up = htfH[i]-htfH[i-1], dn = htfL[i-1]-htfL[i];
+    pdm[i] = (up > dn && up > 0) ? up : 0;
+    mdm[i] = (dn > up && dn > 0) ? dn : 0;
+    tr[i]  = Math.max(htfH[i]-htfL[i], Math.abs(htfH[i]-htfC[i-1]), Math.abs(htfL[i]-htfC[i-1]));
+  }
+  const atrR = calcRMA(Array.from(tr), period);
+  const pdmR = calcRMA(Array.from(pdm), period);
+  const mdmR = calcRMA(Array.from(mdm), period);
+  const dx = new Float64Array(htfN);
+  for (let i = period; i < htfN; i++) {
+    if (atrR[i] > 0) { const pi=pdmR[i]/atrR[i]*100, mi=mdmR[i]/atrR[i]*100, s=pi+mi; dx[i]=s>0?Math.abs(pi-mi)/s*100:0; }
+  }
+  const htfADX = calcRMA(Array.from(dx), period);
+  const aligned = new Float64Array(N);
+  for (let i = 0; i < N; i++) {
+    const last = Math.floor((i+1)/htfRatio)-1;
+    aligned[i] = last >= 0 ? htfADX[last] : 0;
+  }
+  return aligned;
+}
 // RMA (Wilder's smoothing) — как в Pine ta.rma: seed=SMA первых period баров, alpha=1/period
 function calcRMA(data, period) {
   const N = data.length, r = new Float64Array(N);

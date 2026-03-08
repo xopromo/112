@@ -938,7 +938,8 @@ function showDetail(r) {
   // 4. TREND FILTERS
   let filt = '';
   filt += row('MA фильтр тренда',   c.useMA      ? `ВКЛ · ${c.maType} период=${c.maP}${(c.htfRatio&&c.htfRatio>1)?' · HTF ×'+c.htfRatio+'tf':''}` : 'ВЫКЛ',               c.useMA?'on':'off');
-  filt += row('ADX (сила тренда)',  c.useADX     ? `ВКЛ · ADX(${c.adxLen||14}) > ${c.adxThresh}` : 'ВЫКЛ',                       c.useADX?'on':'off');
+  filt += row('ADX (сила тренда)',  c.useADX ? `ВКЛ · ADX(${c.adxLen||14}) > ${c.adxThresh}${(c.adxHtfRatio&&c.adxHtfRatio>1)?' · HTF ×'+c.adxHtfRatio+'tf':''}${c.useAdxSlope?' · slope↑('+c.adxSlopeBars+'b)':''}` : 'ВЫКЛ', c.useADX?'on':'off');
+  filt += row('ATR расширяется',   c.useAtrExp  ? `ВКЛ · ATR > ${c.atrExpMult}× среднего (антифлет)` : 'ВЫКЛ',  c.useAtrExp?'on':'off');
   filt += row('RSI перекуп/перепрод', c.useRSI   ? `ВКЛ · лонг если RSI < ${c.rsiOS}, шорт если RSI > ${c.rsiOB}` : 'ВЫКЛ', c.useRSI?'on':'off');
   filt += row('Простой тренд MA',   c.useSTrend  ? `ВКЛ · окно ${c.sTrendWin} баров` : 'ВЫКЛ',                  c.useSTrend?'on':'off');
   filt += row('Структура рынка HH/LL', c.useStruct ? `ВКЛ · lookback ${c.structLen} баров` : 'ВЫКЛ',            c.useStruct?'on':'off');
@@ -1104,7 +1105,8 @@ function buildCopyText(r, c, slName, tpName) {
   lines.push('');
   lines.push('--- ФИЛЬТРЫ ТРЕНДА ---');
   lines.push('MA фильтр:        ' + on(c.useMA,      c.maType + ' период=' + c.maP + ((c.htfRatio&&c.htfRatio>1) ? ' HTF×'+c.htfRatio+'tf' : '')));
-  lines.push('ADX:              ' + on(c.useADX,     'ADX>' + c.adxThresh));
+  lines.push('ADX:              ' + on(c.useADX,     'ADX>' + c.adxThresh + ((c.adxHtfRatio&&c.adxHtfRatio>1) ? ' HTF×'+c.adxHtfRatio+'tf' : '') + (c.useAdxSlope ? ' slope↑('+c.adxSlopeBars+'b)' : '')));
+  lines.push('ATR расширяется:  ' + on(c.useAtrExp,  'ATR>' + (c.atrExpMult||1.0) + 'x среднего'));
   lines.push('RSI:              ' + on(c.useRSI,     'лонг<' + c.rsiOS + ', шорт>' + c.rsiOB));
   lines.push('Простой тренд:    ' + on(c.useSTrend,  'окно=' + c.sTrendWin + ' баров'));
   lines.push('Структура рынка:  ' + on(c.useStruct,  'lookback=' + c.structLen));

@@ -98,9 +98,12 @@ function generatePineScript(r) {
 
   // ADX
   lines.push(`grp_adx  = "📊 ADX"`);
-  lines.push(`use_adx    = input.bool(${b(c.useADX)}, "ADX фильтр", group=grp_adx)`);
-  lines.push(`adx_len    = input.int(${c.adxLen||14}, "Период", group=grp_adx)`);
-  lines.push(`adx_thresh = input.float(${f(c.adxThresh||20.0,1)}, "Мин ADX", step=1.0, group=grp_adx)`);
+  lines.push(`use_adx       = input.bool(${b(c.useADX)}, "ADX фильтр", group=grp_adx)`);
+  lines.push(`adx_len       = input.int(${c.adxLen||14}, "Период", group=grp_adx)`);
+  lines.push(`adx_thresh    = input.float(${f(c.adxThresh||20.0,1)}, "Мин ADX", step=1.0, group=grp_adx)`);
+  lines.push(`adx_htf_ratio = input.int(${c.adxHtfRatio||1}, "HTF ratio (1=текущий ТФ)", minval=1, maxval=1000, group=grp_adx)`);
+  lines.push(`adx_slope     = input.bool(${b(c.useAdxSlope)}, "ADX растёт (slope)", group=grp_adx)`);
+  lines.push(`adx_slope_bars= input.int(${c.adxSlopeBars||3}, "Slope: баров назад", minval=1, maxval=20, group=grp_adx)`);
   lines.push(``);
 
   // Volume
@@ -126,6 +129,8 @@ function generatePineScript(r) {
   lines.push(`use_vol_f   = input.bool(${b(c.useVolF)},  "Фильтр волатильности", group=grp_volf)`);
   lines.push(`vol_f_mult  = input.float(${f(c.volFMult||2.0,1)}, "Макс ATR/средний", step=0.1, group=grp_volf)`);
   lines.push(`vol_f_len   = input.int(50, "Период", group=grp_volf)`);
+  lines.push(`use_atr_exp  = input.bool(${b(c.useAtrExp)}, "ATR расширяется (антифлет)", group=grp_volf)`);
+  lines.push(`atr_exp_mult = input.float(${f(c.atrExpMult||1.0,1)}, "Мин ATR/средний (антифлет)", step=0.1, group=grp_volf)`);
   lines.push(``);
 
   // Market structure
@@ -240,6 +245,10 @@ function generatePineScript(r) {
   lines.push(`float total_cost = comm_rate * 2 + (use_spread ? spread_pct : 0)`);
   lines.push(`float entry_price = close`);
   lines.push(``);
+  lines.push(`// Helper: convert seconds to TF string`);
+  lines.push(`f_tf_str(int secs) =>`);
+  lines.push(`    secs < 60 ? str.tostring(secs) + "S" : secs < 86400 ? str.tostring(math.round(secs / 60)) : str.tostring(math.round(secs / 86400)) + "D"`);
+  lines.push(``);
   lines.push(`// ADX (Wilder's)`);
   lines.push(`dirmov(len) =>`);
     lines.push(`    up = ta.change(high)`);
@@ -252,12 +261,17 @@ function generatePineScript(r) {
   lines.push(`    [pd, md] = dirmov(len)`);
   lines.push(`    s = pd + md`);
   lines.push(`    100 * ta.rma(math.abs(pd - md) / (s == 0 ? 1 : s), len)`);
-  lines.push(`float adx_val = adx_calc(adx_len)`);
-  lines.push(`bool adx_ok   = use_adx ? adx_val[1] >= adx_thresh : true`);
+  lines.push(`string _adx_tf_str = adx_htf_ratio <= 1 ? timeframe.period : f_tf_str(timeframe.in_seconds() * adx_htf_ratio)`);
+  lines.push(`float adx_val = request.security(syminfo.tickerid, _adx_tf_str, adx_calc(adx_len)[1], barmerge.gaps_off, barmerge.lookahead_on)`);
+  lines.push(`float adx_val_prev = request.security(syminfo.tickerid, _adx_tf_str, adx_calc(adx_len)[1 + adx_slope_bars], barmerge.gaps_off, barmerge.lookahead_on)`);
+  lines.push(`bool adx_thresh_ok = use_adx ? (not na(adx_val) and adx_val >= adx_thresh) : true`);
+  lines.push(`bool adx_slope_ok  = not use_adx or not adx_slope or (not na(adx_val) and not na(adx_val_prev) and adx_val > adx_val_prev)`);
+  lines.push(`bool adx_ok        = adx_thresh_ok and adx_slope_ok`);
   lines.push(``);
   lines.push(`// Volatility filter`);
   lines.push(`float atr_avg = ta.sma(atr_v, vol_f_len)`);
-  lines.push(`bool vol_f_ok = use_vol_f ? (atr_v[1] <= atr_avg[1] * vol_f_mult) : true`);
+  lines.push(`bool vol_f_ok   = use_vol_f   ? (atr_v[1] <= atr_avg[1] * vol_f_mult)  : true`);
+  lines.push(`bool atr_exp_ok = use_atr_exp ? (atr_v[1] >= atr_avg[1] * atr_exp_mult) : true`);
   lines.push(``);
   lines.push(`// Candle size filter`);
   lines.push(`float candle_size_1 = high[1] - low[1]`);
@@ -284,8 +298,6 @@ function generatePineScript(r) {
   lines.push(`// MA`);
   lines.push(`calc_ma(t, s, l) =>`);
   lines.push(`    t == "SMA" ? ta.sma(s,l) : t == "EMA" ? ta.ema(s,l) : t == "WMA" ? ta.wma(s,l) : t == "VWMA" ? ta.vwma(s,l) : ta.hma(s,l)`);
-  lines.push(`f_tf_str(int secs) =>`);
-  lines.push(`    secs < 60 ? str.tostring(secs) + "S" : secs < 86400 ? str.tostring(math.round(secs / 60)) : str.tostring(math.round(secs / 86400)) + "D"`);
   lines.push(`string _ma_tf_str   = ma_htf_ratio   <= 1 ? timeframe.period : f_tf_str(timeframe.in_seconds() * ma_htf_ratio)`);
   lines.push(`string _conf_tf_str = conf_ma_htf <= 1 ? timeframe.period : f_tf_str(timeframe.in_seconds() * conf_ma_htf)`);
   lines.push(`float ma_raw = request.security(syminfo.tickerid, _ma_tf_str, calc_ma(ma_type, close, ma_len)[1], barmerge.gaps_off, barmerge.lookahead_on)`);
@@ -561,8 +573,8 @@ function generatePineScript(r) {
   lines.push(`float dyn_sl_short_raw = use_sl_piv and not na(last_pv_hi) and (bar_index - last_pv_hi_bar) <= 30 ? last_pv_hi + atr_v * sl_piv_off : na`);
   lines.push(``);
   lines.push(`// All filters combined`);
-  lines.push(`bool all_filt_l = ma_ok_l and conf_ok_l and ma_dist_ok and adx_ok and vol_f_ok and candle_f_ok and struct_ok_l and (not use_vsa or is_whale) and liq_ok and vol_dir_ok_l and st_ok_l`);
-  lines.push(`bool all_filt_s = ma_ok_s and conf_ok_s and ma_dist_ok and adx_ok and vol_f_ok and candle_f_ok and struct_ok_s and (not use_vsa or is_whale) and liq_ok and vol_dir_ok_s and st_ok_s`);
+  lines.push(`bool all_filt_l = ma_ok_l and conf_ok_l and ma_dist_ok and adx_ok and vol_f_ok and atr_exp_ok and candle_f_ok and struct_ok_l and (not use_vsa or is_whale) and liq_ok and vol_dir_ok_l and st_ok_l`);
+  lines.push(`bool all_filt_s = ma_ok_s and conf_ok_s and ma_dist_ok and adx_ok and vol_f_ok and atr_exp_ok and candle_f_ok and struct_ok_s and (not use_vsa or is_whale) and liq_ok and vol_dir_ok_s and st_ok_s`);
   lines.push(``);
   lines.push(`// ПРАВИЛО: сигнал только на закрытии подтверждённой свечи`);
   lines.push(`bool confirmed = barstate.isconfirmed`);

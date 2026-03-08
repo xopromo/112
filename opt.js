@@ -426,13 +426,15 @@ function calcTotal() {
     tpCfgs.filter(t=>t.type===activeTp[0]).length*tpCfgs.filter(t=>t.type===activeTp[1]).length+tpCfgs.length :
     tpCfgs.length||1;
   const _ctAdxL=$c('f_adx')?parseRange('f_adxl'):[$n('f_adxl')||14];
+  const _ctAdxHtf=$c('f_adx')?parseRange('f_adx_htf'):[1];
+  const _ctAtrExpMs=$c('f_atrexp')?parseRange('f_atrexpm'):[0];
   const _ctStw=$c('f_strend')?parseRange('f_stw'):[$n('f_stw')||10];
   const _ctConf=$c('f_confirm')?parseRange('f_confn'):[100];
   const _useTF=$c('e_tl_touch')||$c('e_tl_break')||$c('e_flag')||$c('e_tri');
   const _ctTlPvL=_useTF?parseRange('e_tl_pvl'):[5];
   const _ctTlPvR=_useTF?parseRange('e_tl_pvr'):[3];
   return pvLs.length*pvRs.length*atrPs.length*(maPs.length||1)*
-    (adxTs.length||1)*(_ctAdxL.length||1)*rsiCount*(vfMs.length||1)*(mdMaxs.length||1)*
+    (adxTs.length||1)*(_ctAdxL.length||1)*(_ctAdxHtf.length||1)*rsiCount*(vfMs.length||1)*(_ctAtrExpMs.length||1)*(mdMaxs.length||1)*
     slCount*tpCount*beCount*(trTrigs.length||1)*(trDists.length||1)*
     (timeBarsA.length||1)*(freshMaxs.length||1)*(wtTs.length||1)*
     (vsaMs.length||1)*(atrBoMs.length||1)*(revBarsA.length||1)*
@@ -588,6 +590,9 @@ async function runOpt() {
   const useVolF=$c('f_volf'),useStruct=$c('f_struct'),useMaDist=$c('f_madist');
   const useCandleF=$c('f_candle'),useConsec=$c('f_consec');
   const useSTrend=$c('f_strend'),useFresh=$c('f_fresh');
+  const useAtrExp=$c('f_atrexp');
+  const useAdxSlope=$c('f_adx_slope');
+  const adxSlopeBars=$n('f_adx_slope_bars')||3;
   const useConfirm=$c('f_confirm');
   const confNArr=useConfirm?parseRange('f_confn'):[100];
   const confMatType=document.getElementById('f_conf_mat')?.value||'EMA';
@@ -627,6 +632,8 @@ async function runOpt() {
   const confHtfArr=useConfirm?parseRange('f_conf_htf'):[1];
   const maCrossTypeArr=$c('e_macr')?(_sweepMaCrossTypes?['EMA','SMA','WMA']:[$v('e_macr_t')||'EMA']):['EMA'];
   const adxTs=useAdx?parseRange('f_adxt'):[0];
+  const adxHtfArr=useAdx?parseRange('f_adx_htf'):[1];
+  const atrExpMs=useAtrExp?parseRange('f_atrexpm'):[0];
   const vfMs=useVolF?parseRange('f_vfm'):[0];
   const mdMaxs=useMaDist?parseRange('f_madv'):[0];
   const wtThreshs=useWT?parseRange('f_wtt'):[0];
@@ -947,7 +954,7 @@ async function runOpt() {
   if(useBE){let v=0;beTrigs.forEach(t=>{beOffs.forEach(o=>{if(o<t)v++;});});beValidCount=v||1;}
   let total=pvLs.length*pvRs.length*atrPs.length*(maPs.length||1)*
     (maTypeArr.length||1)*(htfRatioArr.length||1)*
-    (adxTs.length||1)*(rsiPairs.length||1)*(vfMs.length||1)*(mdMaxs.length||1)*
+    (adxTs.length||1)*(adxHtfArr.length||1)*(rsiPairs.length||1)*(vfMs.length||1)*(atrExpMs.length||1)*(mdMaxs.length||1)*
     slPairs.length*tpPairs.length*beValidCount*(trTrigs.length||1)*(trDists.length||1)*
     (timeBarsArr.length||1)*(freshMaxs.length||1)*(wtThreshs.length||1)*
     (vsaMs.length||1)*(atrBoMults.length||1)*(confNArr.length||1)*(confTypeArr.length||1)*
@@ -970,7 +977,7 @@ async function runOpt() {
     // Используем Fisher-Yates на диапазоне [0, realTotal)
     const realTotal = pvLs.length*pvRs.length*atrPs.length*(maPs.length||1)*
       (maTypeArr.length||1)*(htfRatioArr.length||1)*
-      (adxTs.length||1)*(rsiPairs.length||1)*(vfMs.length||1)*(mdMaxs.length||1)*
+      (adxTs.length||1)*(adxHtfArr.length||1)*(rsiPairs.length||1)*(vfMs.length||1)*(atrExpMs.length||1)*(mdMaxs.length||1)*
       slPairs.length*tpPairs.length*beValidCount*(trTrigs.length||1)*(trDists.length||1)*
       (timeBarsArr.length||1)*(freshMaxs.length||1)*(wtThreshs.length||1)*
       (vsaMs.length||1)*(atrBoMults.length||1)*(confNArr.length||1)*(confTypeArr.length||1)*
@@ -1018,7 +1025,7 @@ async function runOpt() {
   if (optMode === 'mc') {
     // Предупреждение: если пространство меньше N — каждый запуск одинаков
     const _mcRealTotal = pvLs.length*pvRs.length*atrPs.length*(maPs.length||1)*
-      (adxTs.length||1)*(rsiPairs.length||1)*(vfMs.length||1)*(mdMaxs.length||1)*
+      (adxTs.length||1)*(adxHtfArr.length||1)*(rsiPairs.length||1)*(vfMs.length||1)*(atrExpMs.length||1)*(mdMaxs.length||1)*
       slPairs.length*tpPairs.length*beValidCount*(trTrigs.length||1)*(trDists.length||1)*
       (timeBarsArr.length||1)*(freshMaxs.length||1)*(wtThreshs.length||1)*
       (vsaMs.length||1)*(atrBoMults.length||1)*(confNArr.length||1)*(revBarsArr.length||1)*
@@ -1091,7 +1098,7 @@ async function runOpt() {
   const _mcDims = [
     pvLs, pvRs, atrPs, (maPs.length?maPs:[maPs[0]||0]),
     (maTypeArr.length?maTypeArr:['EMA']), (htfRatioArr.length?htfRatioArr:[1]),
-    (adxTs.length?adxTs:[0]), rsiPairs, (vfMs.length?vfMs:[0]),
+    (adxTs.length?adxTs:[0]), (adxHtfArr.length?adxHtfArr:[1]), rsiPairs, (vfMs.length?vfMs:[0]), (atrExpMs.length?atrExpMs:[0]),
     (mdMaxs.length?mdMaxs:[0]), (freshMaxs.length?freshMaxs:[20]),
     (wtThreshs.length?wtThreshs:[0]), (vsaMs.length?vsaMs:[0]),
     (atrBoMults.length?atrBoMults:[2.0]), slPairs, tpPairs,
@@ -1161,9 +1168,11 @@ async function runOpt() {
       const maP      = _dims[_d][_di[_d++]];
       const _mType   = _dims[_d][_di[_d++]];
       const htfRatio = _dims[_d][_di[_d++]];
-      const adxT     = _dims[_d][_di[_d++]];
+      const adxT        = _dims[_d][_di[_d++]];
+      const adxHtfRatio = _dims[_d][_di[_d++]];
       const rsiPair  = _dims[_d][_di[_d++]];
       const vfM      = _dims[_d][_di[_d++]];
+      const atrExpM  = _dims[_d][_di[_d++]];
       const mdMax    = _dims[_d][_di[_d++]];
       const freshMax = _dims[_d][_di[_d++]];
       const wtT      = _dims[_d][_di[_d++]];
@@ -1242,7 +1251,8 @@ async function runOpt() {
         if (!maCache[ck]) maCache[ck] = _confHtf>1 ? calcHTFMA(DATA,_confHtf,confN,_confType) : calcMA(closes,confN,_confType);
         confMAArr = maCache[ck];
       }
-      if (!adxCache[adxL]) adxCache[adxL] = calcADX(adxL);
+      const _adxCk = adxL+'_htf'+adxHtfRatio;
+      if (!adxCache[_adxCk]) adxCache[_adxCk] = adxHtfRatio>1 ? calcHTFADX(DATA,adxHtfRatio,adxL) : calcADX(adxL);
 
       const btCfg = {
         comm: commTotal,
@@ -1275,9 +1285,10 @@ async function runOpt() {
         usePartial,partRR,partPct,partBE,
         useClimax:useClimaxExit&&HAS_VOLUME,clxVolMult,clxBodyMult,clxMode,
         useMA:maP>0,maArr,maType:_mType,maP,htfRatio,
-        useADX:useAdx&&adxT>0,adxArr:adxCache[adxL],adxThresh:adxT,adxLen:adxL,
+        useADX:useAdx&&adxT>0,adxArr:adxCache[_adxCk],adxThresh:adxT,adxLen:adxL,adxHtfRatio,useAdxSlope,adxSlopeBars,
         useRSI:useRsi,rsiArr:useRsi?calcRSI(14):null,rsiOS:rsiPair.os,rsiOB:rsiPair.ob,
         useVolF:useVolF&&vfM>0,atrAvg,volFMult:vfM,
+        useAtrExp:useAtrExp&&atrExpM>0,atrExpMult:atrExpM,
         useStruct,structBull,structBear,strPvL,strPvR,
         useSLPiv,slPivOff,slPivMax,slPivL,slPivR,slPivTrail,pivSLLo,pivSLHi,
         useConfirm:useConfirm&&confN>0,confN,confMatType:_confType,confHtfRatio:_confHtf,maArrConfirm:confMAArr,
@@ -1308,7 +1319,7 @@ async function runOpt() {
         let slDesc = slPair.combo ? `SL(ATR×${slPair.a.m}${slLogic==='or'?'|OR|':'|AND|'}${slPair.p.m}%)` : slPair.a ? `SL×${slPair.a.m}ATR` : `SL${slPair.p.m}%`;
         if(useSLPiv) slDesc+=`+SPiv(L${slPivL}/R${slPivR}×${slPivOff})`;
         let tpDesc = tpPair.combo ? (()=>{const n1=tpPair.a.type==='rr'?`RR${tpPair.a.m}`:tpPair.a.type==='atr'?`TP×${tpPair.a.m}ATR`:`TP${tpPair.a.m}%`;const n2=tpPair.b.type==='rr'?`RR${tpPair.b.m}`:tpPair.b.type==='atr'?`TP×${tpPair.b.m}ATR`:`TP${tpPair.b.m}%`;return `TP(${n1}${tpLogic==='or'?'|OR|':'|AND|'}${n2})`;})() : tpPair.a ? (tpPair.a.type==='rr'?`RR×${tpPair.a.m}`:tpPair.a.type==='atr'?`TP×${tpPair.a.m}ATR`:`TP${tpPair.a.m}%`) : '';
-        const name = buildName(btCfg, pvL, pvR, slDesc, tpDesc, {}, {maP, maType:_mType, stw:sTrendWin, atrP, adxL});
+        const name = buildName(btCfg, pvL, pvR, slDesc, tpDesc, {}, {maP, maType:_mType, stw:sTrendWin, atrP, adxL, adxHtfRatio});
         if (!_resultNames.has(name)) {
           _resultNames.add(name);
           const _cfg = {usePivot:usePv,pvL,pvR,useEngulf:useEng,usePinBar:usePin,pinRatio,
@@ -1337,12 +1348,13 @@ async function runOpt() {
               useRev,revBars,revMode,revAct,useTime,timeBars,timeMode,
               usePartial,partRR,partPct,partBE,
               useClimax:useClimaxExit&&HAS_VOLUME,clxVolMult,clxBodyMult,clxMode,
-              useMA:maP>0,maType:_mType,maP,
-              useADX:useAdx&&adxT>0,adxThresh:adxT,adxLen:adxL,
+              useMA:maP>0,maType:_mType,maP,htfRatio,
+              useADX:useAdx&&adxT>0,adxThresh:adxT,adxLen:adxL,adxHtfRatio,useAdxSlope,adxSlopeBars,
               useRSI:useRsi,rsiOS:rsiPair.os,rsiOB:rsiPair.ob,
               useVolF:useVolF&&vfM>0,volFMult:vfM,
+              useAtrExp:useAtrExp&&atrExpM>0,atrExpMult:atrExpM,
               useStruct,structLen,strPvL,strPvR,
-              useConfirm:useConfirm&&confN>0,confN,confMatType,
+              useConfirm:useConfirm&&confN>0,confN,confMatType:_confType,confHtfRatio:_confHtf,
               useMaDist:useMaDist&&mdMax>0,maDistMax:mdMax,
               useCandleF,candleMin,candleMax,useConsec,consecMax,
               useSTrend,sTrendWin,useFresh:useFresh&&freshMax>0,freshMax,
@@ -1424,9 +1436,11 @@ async function runOpt() {
       const maP      = _dims[_d][dimIndices[_d++]];
       const _mType   = _dims[_d][dimIndices[_d++]];
       const htfRatio = _dims[_d][dimIndices[_d++]];
-      const adxT     = _dims[_d][dimIndices[_d++]];
+      const adxT        = _dims[_d][dimIndices[_d++]];
+      const adxHtfRatio = _dims[_d][dimIndices[_d++]];
       const rsiPair  = _dims[_d][dimIndices[_d++]];
       const vfM      = _dims[_d][dimIndices[_d++]];
+      const atrExpM  = _dims[_d][dimIndices[_d++]];
       const mdMax    = _dims[_d][dimIndices[_d++]];
       const freshMax = _dims[_d][dimIndices[_d++]];
       const wtT      = _dims[_d][dimIndices[_d++]];
@@ -1508,7 +1522,8 @@ async function runOpt() {
         if (!maCache[ck]) maCache[ck] = _confHtf>1 ? calcHTFMA(DATA,_confHtf,confN,_confType) : calcMA(closes,confN,_confType);
         confMAArr = maCache[ck];
       }
-      if (!adxCache[adxL]) adxCache[adxL] = calcADX(adxL);
+      const _adxCk = adxL+'_htf'+adxHtfRatio;
+      if (!adxCache[_adxCk]) adxCache[_adxCk] = adxHtfRatio>1 ? calcHTFADX(DATA,adxHtfRatio,adxL) : calcADX(adxL);
 
       const btCfg = {
         comm:commTotal,
@@ -1539,9 +1554,10 @@ async function runOpt() {
         useTime,timeBars,timeMode,usePartial,partRR,partPct,partBE,
         useClimax:useClimaxExit&&HAS_VOLUME,clxVolMult,clxBodyMult,clxMode,
         useMA:maP>0,maArr,maType:_mType,maP,htfRatio,
-        useADX:useAdx&&adxT>0,adxArr:adxCache[adxL],adxThresh:adxT,adxLen:adxL,
+        useADX:useAdx&&adxT>0,adxArr:adxCache[_adxCk],adxThresh:adxT,adxLen:adxL,adxHtfRatio,useAdxSlope,adxSlopeBars,
         useRSI:useRsi,rsiArr:_tpeRsiArr,rsiOS:rsiPair.os,rsiOB:rsiPair.ob,
         useVolF:useVolF&&vfM>0,atrAvg,volFMult:vfM,
+        useAtrExp:useAtrExp&&atrExpM>0,atrExpMult:atrExpM,
         useStruct,structBull,structBear,strPvL,strPvR,
         useSLPiv,slPivOff,slPivMax,slPivL,slPivR,slPivTrail,pivSLLo,pivSLHi,
         useConfirm:useConfirm&&confN>0,confN,confMatType:_confType,confHtfRatio:_confHtf,maArrConfirm:confMAArr,
@@ -1587,7 +1603,7 @@ async function runOpt() {
         let slDesc = slPair.combo ? `SL(ATR×${slPair.a.m}${slLogic==='or'?'|OR|':'|AND|'}${slPair.p.m}%)` : slPair.a ? `SL×${slPair.a.m}ATR` : `SL${slPair.p.m}%`;
         if(useSLPiv) slDesc+=`+SPiv(L${slPivL}/R${slPivR}×${slPivOff})`;
         let tpDesc = tpPair.combo ? (()=>{const n1=tpPair.a.type==='rr'?`RR${tpPair.a.m}`:tpPair.a.type==='atr'?`TP×${tpPair.a.m}ATR`:`TP${tpPair.a.m}%`;const n2=tpPair.b.type==='rr'?`RR${tpPair.b.m}`:tpPair.b.type==='atr'?`TP×${tpPair.b.m}ATR`:`TP${tpPair.b.m}%`;return `TP(${n1}${tpLogic==='or'?'|OR|':'|AND|'}${n2})`;})() : tpPair.a ? (tpPair.a.type==='rr'?`RR×${tpPair.a.m}`:tpPair.a.type==='atr'?`TP×${tpPair.a.m}ATR`:`TP${tpPair.a.m}%`) : '';
-        const name = buildName(btCfg, pvL, pvR, slDesc, tpDesc, {}, {maP, maType:_mType, htfRatio, stw:sTrendWin, atrP, adxL});
+        const name = buildName(btCfg, pvL, pvR, slDesc, tpDesc, {}, {maP, maType:_mType, htfRatio, stw:sTrendWin, atrP, adxL, adxHtfRatio});
         if (!_resultNames.has(name)) {
           _resultNames.add(name);
           const _cfg_tpe = {usePivot:usePv,pvL,pvR,useEngulf:useEng,usePinBar:usePin,pinRatio,
@@ -1617,9 +1633,10 @@ async function runOpt() {
               useTime,timeBars,timeMode,usePartial,partRR,partPct,partBE,
               useClimax:useClimaxExit&&HAS_VOLUME,clxVolMult,clxBodyMult,clxMode,
               useMA:maP>0,maType:_mType,maP,htfRatio,
-              useADX:useAdx&&adxT>0,adxThresh:adxT,adxLen:adxL,
+              useADX:useAdx&&adxT>0,adxThresh:adxT,adxLen:adxL,adxHtfRatio,useAdxSlope,adxSlopeBars,
               useRSI:useRsi,rsiOS:rsiPair.os,rsiOB:rsiPair.ob,
               useVolF:useVolF&&vfM>0,volFMult:vfM,
+              useAtrExp:useAtrExp&&atrExpM>0,atrExpMult:atrExpM,
               useStruct,structLen,strPvL,strPvR,
               useConfirm:useConfirm&&confN>0,confN,confMatType:_confType,confHtfRatio:_confHtf,
               useMaDist:useMaDist&&mdMax>0,maDistMax:mdMax,
@@ -1847,9 +1864,15 @@ async function runOpt() {
 
         for(const adxT of (adxTs.length?adxTs:[0])) {
           if(_mcDone) break;
+          for(const adxHtfRatio of (adxHtfArr.length?adxHtfArr:[1])) {
+          if(_mcDone) break;
+          const _adxCk=adxL+'_htf'+adxHtfRatio;
+          if(!adxCache[_adxCk]) adxCache[_adxCk]=adxHtfRatio>1?calcHTFADX(DATA,adxHtfRatio,adxL):calcADX(adxL);
           for(const rsiPair of rsiPairs) {
             if(_mcDone) break;
             for(const vfM of (vfMs.length?vfMs:[0])) {
+              if(_mcDone) break;
+              for(const atrExpM of (atrExpMs.length?atrExpMs:[0])) {
               if(_mcDone) break;
               for(const mdMax of (mdMaxs.length?mdMaxs:[0])) {
                 if(_mcDone) break;
@@ -1976,10 +1999,11 @@ async function runOpt() {
                                       useClimax:useClimaxExit&&HAS_VOLUME,clxVolMult,clxBodyMult,clxMode,
                                       // Filters
                                       useMA:maP>0,maArr,maType:mType,maP,htfRatio,
-                                      useADX:useAdx&&adxT>0,adxArr:(()=>{if(!adxCache[adxL])adxCache[adxL]=calcADX(adxL);return adxCache[adxL];})(),adxThresh:adxT,adxLen:adxL,
+                                      useADX:useAdx&&adxT>0,adxArr:adxCache[_adxCk],adxThresh:adxT,adxLen:adxL,adxHtfRatio,useAdxSlope,adxSlopeBars,
                                       useRSI:useRsi,rsiArr:useRsi?calcRSI(14):null,
                                       rsiOS:rsiPair.os,rsiOB:rsiPair.ob,
                                       useVolF:useVolF&&vfM>0,atrAvg,volFMult:vfM,
+                                      useAtrExp:useAtrExp&&atrExpM>0,atrExpMult:atrExpM,
                                       useStruct,structBull,structBear,strPvL,strPvR,
                                       useConfirm:useConfirm&&confN>0,confN,confMatType:_confType,confHtfRatio:_confHtf,maArrConfirm:confMAArr,
                                       useMaDist:useMaDist&&mdMax>0,maDistMax:mdMax,
@@ -2028,7 +2052,7 @@ async function runOpt() {
                                         tpDesc=tpPair.a.type==='rr'?`RR×${tpPair.a.m}`:tpPair.a.type==='atr'?`TP×${tpPair.a.m}ATR`:`TP${tpPair.a.m}%`;
                                       }
                                       const name=buildName(btCfg,pvL,pvR,slDesc,tpDesc,{},{
-                                        maP,maType:mType,htfRatio,stw:sTrendWin,atrP,adxL
+                                        maP,maType:mType,htfRatio,stw:sTrendWin,atrP,adxL,adxHtfRatio
                                       });
                                       if (_resultNames.has(name)) { /* дубль — пропускаем */ } else {
                                       _resultNames.add(name);
@@ -2064,9 +2088,10 @@ async function runOpt() {
                                           usePartial, partRR, partPct, partBE,
                                           useClimax:useClimaxExit&&HAS_VOLUME, clxVolMult, clxBodyMult, clxMode,
                                           useMA:maP>0, maType:mType, maP, htfRatio,
-                                          useADX:useAdx&&adxT>0, adxThresh:adxT, adxLen:adxL,
+                                          useADX:useAdx&&adxT>0, adxThresh:adxT, adxLen:adxL, adxHtfRatio, useAdxSlope, adxSlopeBars,
                                           useRSI:useRsi, rsiOS:rsiPair.os, rsiOB:rsiPair.ob,
                                           useVolF:useVolF&&vfM>0, volFMult:vfM,
+                                          useAtrExp:useAtrExp&&atrExpM>0, atrExpMult:atrExpM,
                                           useStruct, structLen, strPvL, strPvR,
                                           useConfirm:useConfirm&&confN>0, confN, confMatType:_confType, confHtfRatio:_confHtf,
                                           useMaDist:useMaDist&&mdMax>0, maDistMax:mdMax,
@@ -2111,8 +2136,10 @@ async function runOpt() {
                   } // wtT
                 } // freshMax
               } // mdMax
+              } // atrExpM
             } // vfM
           } // rsiPair
+          } // adxHtfRatio
         } // adxT
         }} // htfRatio, mType
       } // maP
@@ -2189,7 +2216,8 @@ function _calcIndicators(cfg) {
 
   // ── ADX ───────────────────────────────────────────────────
   const adxLen = cfg.adxLen || 14;
-  const adxArr = cfg.useADX ? calcADX(adxLen) : null;
+  const adxHtfRatioInd = cfg.adxHtfRatio || 1;
+  const adxArr = cfg.useADX ? (adxHtfRatioInd > 1 ? calcHTFADX(DATA, adxHtfRatioInd, adxLen) : calcADX(adxLen)) : null;
 
   // ── RSI ───────────────────────────────────────────────────
   const rsiArr = cfg.useRSI ? calcRSI(14) : null;
@@ -2587,6 +2615,9 @@ function buildBtCfg(cfg, ind) {
     adxArr:   ind.adxArr,
     adxThresh: cfg.adxThresh || 25,
     adxLen:    cfg.adxLen    || 14,
+    adxHtfRatio: cfg.adxHtfRatio || 1,
+    useAdxSlope: cfg.useAdxSlope || false,
+    adxSlopeBars: cfg.adxSlopeBars || 3,
     useRSI:   cfg.useRSI   || false,
     rsiArr:   ind.rsiArr,
     rsiOS:    cfg.rsiOS    || 30,
@@ -2594,6 +2625,8 @@ function buildBtCfg(cfg, ind) {
     useVolF:  cfg.useVolF  || false,
     atrAvg:   ind.atrAvg,
     volFMult: cfg.volFMult || 1.5,
+    useAtrExp: cfg.useAtrExp || false,
+    atrExpMult: cfg.atrExpMult || 0.8,
     useStruct:  cfg.useStruct  || false,
     structBull: ind.structBull,
     structBear: ind.structBear,
@@ -2951,8 +2984,8 @@ let _robSliceCacheDataHash = '';
 const HC_NUMERIC_PARAMS = [
   // Базовые
   ['pvL',5],['pvR',2],['atrPeriod',14],['maP',0],
-  ['adxLen',14],['adxThresh',25],
-  ['rsiOS',30],['rsiOB',70],['atrBoMult',2],
+  ['adxLen',14],['adxThresh',25],['adxHtfRatio',1],['adxSlopeBars',3],
+  ['rsiOS',30],['rsiOB',70],['atrBoMult',2],['atrExpMult',0.8],
   // Выходы
   ['beTrig',1.0],['beOff',0],['trTrig',1.0],['trDist',0.5],['timeBars',20],
   // RevSig

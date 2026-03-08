@@ -30,9 +30,41 @@ const FILTER_REGISTRY = [
   {
     id:       'adx',
     flag:     'useADX',
-    blocksL:  (cfg, i) => cfg.adxArr && cfg.adxArr[i-1] < cfg.adxThresh,
-    blocksS:  (cfg, i) => cfg.adxArr && cfg.adxArr[i-1] < cfg.adxThresh,
-    nameLabel: (cfg, ex) => `ADX(${(ex&&ex.adxL)||cfg.adxLen||14}>${cfg.adxThresh})`,
+    blocksL:  (cfg, i) => {
+      if (!cfg.adxArr) return false;
+      const adx = cfg.adxArr[i-1];
+      if (adx <= 0 || adx < cfg.adxThresh) return true;
+      if (cfg.useAdxSlope) {
+        const sb = cfg.adxSlopeBars||3;
+        if (i-1 > sb && cfg.adxArr[i-1-sb] > 0) return adx <= cfg.adxArr[i-1-sb];
+      }
+      return false;
+    },
+    blocksS:  (cfg, i) => {
+      if (!cfg.adxArr) return false;
+      const adx = cfg.adxArr[i-1];
+      if (adx <= 0 || adx < cfg.adxThresh) return true;
+      if (cfg.useAdxSlope) {
+        const sb = cfg.adxSlopeBars||3;
+        if (i-1 > sb && cfg.adxArr[i-1-sb] > 0) return adx <= cfg.adxArr[i-1-sb];
+      }
+      return false;
+    },
+    nameLabel: (cfg, ex) => {
+      const l = (ex&&ex.adxL)||cfg.adxLen||14;
+      const htf = (cfg.adxHtfRatio&&cfg.adxHtfRatio>1) ? '×'+cfg.adxHtfRatio+'tf' : '';
+      const slope = cfg.useAdxSlope ? '↑' : '';
+      return `ADX(${l}>${cfg.adxThresh})${htf}${slope}`;
+    },
+  },
+
+  // ── ATR Expanding (anti-flat) ─────────────────────────────
+  {
+    id:       'atrexp',
+    flag:     'useAtrExp',
+    blocksL:  (cfg, i, ac) => !cfg.atrAvg || cfg.atrAvg[i-1] <= 0 || ac < cfg.atrAvg[i-1] * cfg.atrExpMult,
+    blocksS:  (cfg, i, ac) => !cfg.atrAvg || cfg.atrAvg[i-1] <= 0 || ac < cfg.atrAvg[i-1] * cfg.atrExpMult,
+    nameLabel: (cfg) => `AtrExp>${cfg.atrExpMult}×`,
   },
 
   // ── RSI Extremes ──────────────────────────────────────────
