@@ -4,14 +4,14 @@
 > Также обновляй вручную когда вливаешь ветки в main.
 
 ## Последняя ручная сессия
-- **Дата:** 2026-03-08 19:20
+- **Дата:** 2026-03-08 19:46
 - **Ветка:** `main`
 - **Последние коммиты:**
+  - aa3cfa6 chore: update STATE.md
   - 8e45bef chore: update STATE.md
   - 22aaff1 chore: update STATE.md
   - 5cbb40b chore: update STATE.md
   - 2ec327d chore: update STATE.md
-  - 58122eb fix: null toFixed crash when only long or short trades exist
 
 ## Последний цикл
 - **Дата:** 2026-03-03-20 (ручной исследовательский цикл)
