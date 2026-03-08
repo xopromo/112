@@ -421,6 +421,126 @@ function applyFiltersDebounced() {
   _applyFiltersTimer = setTimeout(applyFilters, 150);
 }
 
+// ══════════════════════════════════════════════════════════════
+// TABLE FILTER TEMPLATES — мини-шаблоны фильтров таблицы
+// ══════════════════════════════════════════════════════════════
+const _TBL_TPL_KEY = 'use_tbl_tpl';
+
+const _TF_NUM_IDS  = ['f_name','f_pnl','f_wr','f_n','f_dd','f_pdd','f_sig','f_gt','f_cvr','f_sortino','f_kr','f_sqn','f_cpcv','f_omega','f_pain','f_avg','f_p1','f_p2','f_dwr','f_tv_dpnl','f_tv_ddd','f_tv_dpdd'];
+const _TF_SEL_IDS  = ['f_fav','f_split','f_ls','f_rob','f_oos','f_walk','f_param','f_noise','f_mc','f_tv_score'];
+
+// map filter-input-id → column CSS class (for visibleOnly mode)
+const _TF_COL_MAP  = {
+  f_pnl:'col-pnl', f_wr:'col-wr', f_n:'col-n', f_dd:'col-dd', f_pdd:'col-pdd',
+  f_sig:'col-sig', f_gt:'col-gt', f_cvr:'col-cvr', f_sortino:'col-sor', f_kr:'col-kr',
+  f_sqn:'col-sqn', f_cpcv:'col-cpcv', f_omega:'col-omg', f_pain:'col-pain',
+  f_avg:'col-avg', f_p1:'col-p1', f_p2:'col-p2', f_dwr:'col-dwr',
+  f_split:'col-split', f_ls:'col-ls',
+  f_tv_dpnl:'col-tv-dpnl', f_tv_ddd:'col-tv-ddd', f_tv_dpdd:'col-tv-dpdd',
+  f_rob:'col-rob', f_oos:'col-rob-oos', f_walk:'col-rob-walk',
+  f_param:'col-rob-param', f_noise:'col-rob-noise', f_mc:'col-rob-mc',
+};
+
+function _gatherTableFilters() {
+  const f = {};
+  _TF_NUM_IDS.forEach(id => { f[id] = $(id)?.value ?? ''; });
+  _TF_SEL_IDS.forEach(id => { f[id] = $(id)?.value ?? ''; });
+  // capture current sort
+  const sortCol = Object.keys(sortDirs)[0] ?? null;
+  f._sortCol = sortCol;
+  f._sortDir = sortCol !== null ? sortDirs[sortCol] : null;
+  return f;
+}
+
+function _applyTableFilters(f, visibleOnly) {
+  const allIds = [..._TF_NUM_IDS, ..._TF_SEL_IDS];
+  allIds.forEach(id => {
+    const el = $(id); if (!el) return;
+    if (visibleOnly) {
+      const colCls = _TF_COL_MAP[id];
+      if (colCls && document.querySelector('.' + colCls + '.col-hidden')) return; // skip hidden col
+    }
+    el.value = f[id] ?? '';
+  });
+  // restore sort
+  sortDirs = {};
+  if (f._sortCol !== null && f._sortCol !== undefined) {
+    sortDirs[f._sortCol] = f._sortDir;
+  }
+  applyFilters();
+}
+
+async function openTableTplPopover() {
+  // close if already open
+  const existing = document.getElementById('tbl-tpl-popover');
+  if (existing) { existing.remove(); return; }
+
+  const tpls = (await storeLoad(_TBL_TPL_KEY)) || [];
+  const btn  = $('btn-tbl-tpl');
+
+  const pop = document.createElement('div');
+  pop.id = 'tbl-tpl-popover';
+
+  const saveRow = `<div style="display:flex;gap:5px;margin-bottom:8px">
+    <button class="tpl-ibtn" style="flex:1;font-size:.68em;padding:4px" onclick="saveTableTpl()">💾 Сохранить текущий</button>
+  </div>`;
+
+  const toggleHelp = `<div style="font-size:.6em;color:var(--text3);margin-bottom:6px">
+    Клик = применить ко всем (вкл. скрытые колонки) &nbsp;·&nbsp; Shift+Клик = только видимые колонки
+  </div>`;
+
+  const items = tpls.length
+    ? tpls.map((t, i) => `
+      <div class="tbl-tpl-item">
+        <div style="flex:1;min-width:0">
+          <div class="tbl-tpl-name">${t.name}</div>
+          <div class="tbl-tpl-date">${new Date(t.ts).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</div>
+        </div>
+        <button class="tpl-ibtn" style="font-size:.62em;padding:2px 6px" onclick="applyTableTpl(${i},false)" title="Применить ко всем колонкам">▶</button>
+        <button class="tpl-ibtn" style="font-size:.62em;padding:2px 6px;border-color:var(--accent2);color:var(--accent2)" onclick="applyTableTpl(${i},true)" title="Применить только к видимым колонкам">👁▶</button>
+        <button class="tpl-ibtn del" style="font-size:.62em;padding:2px 5px" onclick="deleteTableTpl(${i})" title="Удалить">✕</button>
+      </div>`).join('')
+    : '<div style="font-size:.65em;color:var(--text3);padding:4px 0">Нет сохранённых шаблонов</div>';
+
+  pop.innerHTML = saveRow + toggleHelp + items;
+  btn.parentElement.appendChild(pop);
+
+  // close on outside click
+  setTimeout(() => {
+    document.addEventListener('mousedown', function _close(e) {
+      if (!pop.contains(e.target) && e.target !== btn) {
+        pop.remove();
+        document.removeEventListener('mousedown', _close);
+      }
+    });
+  }, 0);
+}
+
+async function saveTableTpl() {
+  const tpls = (await storeLoad(_TBL_TPL_KEY)) || [];
+  const name = prompt('Название шаблона фильтров:',
+    `Фильтр ${new Date().toLocaleString('ru-RU',{hour:'2-digit',minute:'2-digit'})}`);
+  if (!name?.trim()) return;
+  tpls.push({ name: name.trim(), filters: _gatherTableFilters(), ts: Date.now() });
+  await storeSave(_TBL_TPL_KEY, tpls);
+  openTableTplPopover(); // refresh
+}
+
+async function applyTableTpl(i, visibleOnly) {
+  const tpls = (await storeLoad(_TBL_TPL_KEY)) || [];
+  if (!tpls[i]) return;
+  _applyTableFilters(tpls[i].filters, visibleOnly);
+  const pop = document.getElementById('tbl-tpl-popover');
+  if (pop) pop.remove();
+}
+
+async function deleteTableTpl(i) {
+  const tpls = (await storeLoad(_TBL_TPL_KEY)) || [];
+  tpls.splice(i, 1);
+  await storeSave(_TBL_TPL_KEY, tpls);
+  openTableTplPopover();
+}
+
 function resetAllFilters() {
   // Сбрасываем все текстовые/числовые инпуты
   ['f_name','f_pnl','f_wr','f_n','f_dd','f_pdd','f_sig','f_gt','f_cvr','f_sortino','f_kr','f_sqn','f_cpcv','f_omega','f_pain','f_avg','f_p1','f_p2','f_dwr', // ##OMG ##PAIN

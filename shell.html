@@ -79,15 +79,23 @@ header .sub {
 }
 
 /* PANELS */
-.panels { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.panels-toolbar {
+  display: flex; gap: 6px; align-items: center; margin-bottom: 4px; flex-wrap: wrap;
+}
+.panels { display: grid; grid-template-columns: repeat(auto-fill, minmax(205px, 1fr)); gap: 4px; align-items: start; margin-bottom: 6px; }
 .panel {
   background: var(--bg2);
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 10px;
   position: relative;
-  overflow: hidden;
+  overflow: visible;
 }
+/* Collapsed panel */
+.panel.panel-collapsed > *:not(h3) { display: none !important; }
+.panel.panel-collapsed > h3::after { content: ' ▼' !important; opacity: .5; font-size: .8em; }
+.panel h3 { cursor: pointer; user-select: none; }
+.panel h3::after { content: ' ▲'; opacity: .35; font-size: .8em; }
 .panel::before {
   content: '';
   position: absolute;
@@ -684,24 +692,24 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
 /* confirm filter */
 .confirm-hint { font-size:.6em; color:var(--text3); margin:2px 0 5px; line-height:1.4; }
 
-[data-tip] { position: relative; cursor: help; }
-[data-tip]::after {
-  content: attr(data-tip);
-  position: absolute;
-  bottom: 120%; left: 0;
+[data-tip] { cursor: help; }
+/* Custom JS tooltip replaces CSS :after for panels — see initCustomTooltip() */
+#custom-tip {
+  position: fixed; z-index: 99999;
   background: var(--bg4);
   border: 1px solid var(--border2);
-  border-radius: 4px;
-  padding: 4px 8px;
-  font-size: .65em;
+  border-radius: 5px;
+  padding: 7px 11px;
+  font-size: .82em;
   color: var(--text);
-  white-space: nowrap;
+  max-width: 340px;
+  white-space: normal;
+  line-height: 1.5;
   pointer-events: none;
-  opacity: 0;
-  transition: opacity .2s;
-  z-index: 100;
+  display: none;
+  box-shadow: 0 4px 20px rgba(0,0,0,.6);
+  font-family: var(--font-mono);
 }
-[data-tip]:hover::after { opacity: 1; }
 /* OOS Compare на новых данных */
 .oos-cmp-table { width:100%; border-collapse:collapse; font-size:.7em; }
 .oos-cmp-table th { background:var(--bg4); color:var(--text2); padding:5px 8px; text-align:right; border-bottom:1px solid var(--border2); white-space:nowrap; }
@@ -740,6 +748,56 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
 #oos-rtbl tr:hover td { background:var(--bg3); }
 #oos-rtbl td:first-child { font-size:.66em; color:var(--accent); max-width:200px; overflow:hidden; text-overflow:ellipsis; }
 
+/* NOTEPAD */
+#notepad-panel {
+  position: fixed; bottom: 70px; right: 18px; z-index: 8001;
+  width: 320px; max-height: 480px;
+  background: var(--bg2); border: 1px solid var(--border2); border-radius: 10px;
+  display: none; flex-direction: column;
+  box-shadow: 0 8px 32px rgba(0,0,0,.7);
+}
+#notepad-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 12px; border-bottom: 1px solid var(--border);
+  font-size: .72em; color: var(--accent); letter-spacing: .05em;
+  cursor: move; user-select: none;
+}
+#notepad-area {
+  flex: 1; resize: none; background: transparent; border: none; outline: none;
+  color: var(--text); font-family: var(--font-mono); font-size: .75em;
+  padding: 10px 12px; line-height: 1.6; min-height: 200px;
+}
+#notepad-footer {
+  padding: 4px 12px; font-size: .6em; color: var(--text3);
+  border-top: 1px solid var(--border); text-align: right;
+}
+#notepad-fab {
+  position: fixed; bottom: 18px; right: 18px; z-index: 8002;
+  width: 42px; height: 42px; border-radius: 50%;
+  background: var(--bg3); border: 1px solid var(--border2);
+  color: var(--text2); font-size: 1.2em; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 2px 10px rgba(0,0,0,.5); transition: all .2s;
+}
+#notepad-fab:hover { background: var(--bg4); color: var(--accent); border-color: var(--accent); }
+#notepad-fab.active { color: var(--accent); border-color: var(--accent); background: rgba(0,212,255,.08); }
+
+/* TABLE FILTER TEMPLATE popover */
+#tbl-tpl-popover {
+  position: absolute; top: 100%; right: 0; z-index: 5000; margin-top: 3px;
+  background: var(--bg2); border: 1px solid var(--border2); border-radius: 8px;
+  padding: 10px; min-width: 260px; max-height: 400px; overflow-y: auto;
+  box-shadow: 0 6px 24px rgba(0,0,0,.7);
+}
+.tbl-tpl-item {
+  display: flex; align-items: center; gap: 6px; padding: 5px 0;
+  border-bottom: 1px solid var(--border);
+}
+.tbl-tpl-item:last-child { border-bottom: none; }
+.tbl-tpl-name { flex: 1; font-size: .7em; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tbl-tpl-date { font-size: .58em; color: var(--text3); }
+.panels-toolbar .tpl-ibtn { font-size: .63em; padding: 3px 8px; }
+
 </style>
 </head>
 <body>
@@ -757,6 +815,11 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
   <span id="proj-new-badge" style="display:none;background:var(--orange);color:#000;border-radius:8px;padding:1px 7px;font-size:.9em;cursor:pointer" onclick="refreshProjectFiles()" title="Найдены новые файлы — нажми чтобы обновить">● новые файлы</span>
   <button onclick="openProjSwitcher()" style="padding:2px 8px;background:var(--bg3);border:1px solid var(--border2);border-radius:4px;color:var(--text2);cursor:pointer;font-size:.95em" title="Список проектов">▼</button>
   <button onclick="openCreateProject()" style="padding:2px 8px;background:rgba(0,212,255,.1);border:1px solid var(--accent2);border-radius:4px;color:var(--accent);cursor:pointer;font-size:.95em" title="Новый проект">+ проект</button>
+</div>
+
+<div class="panels-toolbar">
+  <button class="tpl-ibtn" onclick="collapseInactivePanels()" title="Свернуть все панели без активных опций">↗ Свернуть неактивные</button>
+  <button class="tpl-ibtn" onclick="expandAllPanels()" title="Развернуть все панели">↙ Развернуть все</button>
 </div>
 
 <div class="panels" id="panels">
@@ -1340,6 +1403,9 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
     <button class="tbl-mode-btn" id="tbl-btn-fav" onclick="switchTableMode('fav')">Избранные <span id="tbl-cnt-fav">0</span></button>
     <button class="tbl-mode-btn oos-mode" id="tbl-btn-oos" onclick="switchTableMode('oos')" style="display:none">OOS <span id="tbl-cnt-oos">0</span></button>
     <button class="tbl-mode-btn" id="btn-reset-filters" onclick="resetAllFilters()" title="Сбросить все фильтры и сортировку" style="margin-left:auto">✕ Сброс</button>
+    <div style="position:relative">
+      <button class="tbl-mode-btn" id="btn-tbl-tpl" onclick="openTableTplPopover()" title="Шаблоны фильтров — быстро применить сохранённый набор фильтров в 1 клик">🗂 Фильтры ▾</button>
+    </div>
     <button class="tbl-mode-btn" onclick="_downloadSources()" title="Скачать исходные файлы: core.js, opt.js, ui.js, shell.html, build.py, README.md">⬇ Исходники</button>
   </div>
   <div class="tbl-scroll">
@@ -2005,6 +2071,85 @@ const _SRC_FILES = {
 ════════════════════════════════════════════════════════════ -->
 <script>
 /* ##PROJECTS## */
+</script>
+
+<!-- NOTEPAD -->
+<div id="custom-tip"></div>
+<button id="notepad-fab" onclick="toggleNotepad()" title="Записная книжка (глобальная)">📝</button>
+<div id="notepad-panel">
+  <div id="notepad-header">
+    <span>📝 ЗАПИСНАЯ КНИЖКА</span>
+    <button onclick="toggleNotepad()" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:1em;padding:0 2px">✕</button>
+  </div>
+  <textarea id="notepad-area" placeholder="Записывай мысли, инсайты, идеи...&#10;Данные сохраняются глобально между проектами."></textarea>
+  <div id="notepad-footer"><span id="notepad-saved"></span></div>
+</div>
+
+<script>
+// ── Custom tooltip (replaces CSS :after) ──────────────────────
+(function() {
+  const tip = document.getElementById('custom-tip');
+  let _visible = false;
+  function pos(e) {
+    if (!_visible) return;
+    const x = e.clientX + 14, y = e.clientY + 18;
+    const tw = tip.offsetWidth, th = tip.offsetHeight;
+    const vw = window.innerWidth, vh = window.innerHeight;
+    tip.style.left = (x + tw > vw - 4 ? Math.max(4, x - tw - 20) : x) + 'px';
+    tip.style.top  = (y + th > vh - 4 ? Math.max(4, y - th - 24) : y) + 'px';
+  }
+  document.addEventListener('mouseover', e => {
+    const el = e.target.closest('[data-tip]');
+    if (!el || !el.dataset.tip) { tip.style.display = 'none'; _visible = false; return; }
+    tip.textContent = el.dataset.tip;
+    tip.style.display = 'block';
+    _visible = true;
+    pos(e);
+  });
+  document.addEventListener('mousemove', pos);
+  document.addEventListener('mouseout', e => {
+    if (!e.relatedTarget || !e.relatedTarget.closest('[data-tip]')) {
+      tip.style.display = 'none'; _visible = false;
+    }
+  });
+})();
+
+// ── Panel collapse ────────────────────────────────────────────
+document.querySelectorAll('.panels .panel h3').forEach(h3 => {
+  h3.addEventListener('click', () => h3.closest('.panel').classList.toggle('panel-collapsed'));
+});
+function collapseInactivePanels() {
+  document.querySelectorAll('.panels .panel').forEach(panel => {
+    const hasActive = panel.querySelector('input[type=checkbox]:checked');
+    if (!hasActive) panel.classList.add('panel-collapsed');
+  });
+}
+function expandAllPanels() {
+  document.querySelectorAll('.panels .panel').forEach(p => p.classList.remove('panel-collapsed'));
+}
+
+// ── Notepad ────────────────────────────────────────────────────
+const _NP_KEY = 'use_notepad';
+let _npTimer;
+document.getElementById('notepad-area').addEventListener('input', function() {
+  clearTimeout(_npTimer);
+  document.getElementById('notepad-saved').textContent = '…';
+  _npTimer = setTimeout(() => {
+    localStorage.setItem(_NP_KEY, this.value);
+    document.getElementById('notepad-saved').textContent = '✓ сохранено';
+    setTimeout(() => { document.getElementById('notepad-saved').textContent = ''; }, 2000);
+  }, 700);
+});
+function toggleNotepad() {
+  const panel = document.getElementById('notepad-panel');
+  const fab = document.getElementById('notepad-fab');
+  const open = panel.style.display === 'flex';
+  if (!open) {
+    document.getElementById('notepad-area').value = localStorage.getItem(_NP_KEY) || '';
+  }
+  panel.style.display = open ? 'none' : 'flex';
+  fab.classList.toggle('active', !open);
+}
 </script>
 
 </body>
