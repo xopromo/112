@@ -9,6 +9,11 @@
 //
 // Вызов: generatePineScript(r)  где r — объект результата из results[]
 // Возвращает строку — готовый Pine Script v6 индикатор
+//
+// ── ПОКРЫТИЕ ФИЛЬТРОВ (читается test/pine_check.js) ─────────
+// PINE_EXPORTED_FILTERS: useMA, useConfirm, useMaDist, useADX, useVolF, useAtrExp, useCandleF, useStruct, useVSA, useLiq, useVolDir, useSTrend
+// PINE_NOT_EXPORTED: useRSI, useConsec, useFresh, useWT, useFat
+// ─────────────────────────────────────────────────────────────
 // ============================================================
 
 function generatePineScript(r) {
