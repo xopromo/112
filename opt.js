@@ -611,6 +611,48 @@ async function runOpt() {
   const useWT=HAS_VOLUME&&$c('f_wt');
   const useFat=HAS_VOLUME&&$c('f_fat');
 
+  // ── Powerset фильтров ────────────────────────────────────────────────
+  // Перебирает все 2^N комбинаций включённых фильтров.
+  // Каждый элемент _filterCombos — объект {useMa, useAdx, ...} с bool-флагами.
+  // Флаги только для тех фильтров, которые вообще включены пользователем.
+  // При powerset=off: единственный элемент {} → все флаги берутся из внешней области.
+  const _usePowerset = $c('c_powerset');
+  const _psFilterDefs = [
+    {key:'useMa',     active:useMa},
+    {key:'useAdx',    active:useAdx},
+    {key:'useRsi',    active:useRsi},
+    {key:'useVolF',   active:useVolF},
+    {key:'useStruct', active:useStruct},
+    {key:'useMaDist', active:useMaDist},
+    {key:'useCandleF',active:useCandleF},
+    {key:'useConsec', active:useConsec},
+    {key:'useSTrend', active:useSTrend},
+    {key:'useFresh',  active:useFresh},
+    {key:'useAtrExp', active:useAtrExp},
+    {key:'useConfirm',active:useConfirm},
+    {key:'useVSA',    active:useVSA},
+    {key:'useLiq',    active:useLiq},
+    {key:'useVolDir', active:useVolDir},
+    {key:'useWT',     active:useWT},
+    {key:'useFat',    active:useFat},
+  ].filter(f => f.active); // только те что включены
+  let _filterCombos;
+  if (_usePowerset && _psFilterDefs.length > 0) {
+    const _psN = _psFilterDefs.length;
+    _filterCombos = [];
+    for (let _mask = 0; _mask < (1 << _psN); _mask++) {
+      const combo = {};
+      for (let i = 0; i < _psN; i++) combo[_psFilterDefs[i].key] = !!(_mask & (1 << i));
+      _filterCombos.push(combo);
+    }
+  } else {
+    _filterCombos = [{}]; // один пустой комбо → флаги из внешней области (стандартный режим)
+  }
+  // Предупреждение если много комбо
+  if (_usePowerset && _psFilterDefs.length > 10) {
+    console.warn('[powerset] Активных фильтров:', _psFilterDefs.length, '→', _filterCombos.length, 'комбинаций');
+  }
+
   // Exit flags
   const useBE=$c('x_be'),useTrail=$c('x_tr'),useRev=$c('x_rev');
   const revSrc=document.querySelector('.xmode-btn.active[id^="revsrc_"]')?.id?.replace('revsrc_','')||'same';
@@ -1106,7 +1148,8 @@ async function runOpt() {
     window._ipCombos,
     (tlPvLs.length?tlPvLs:[5]), (tlPvRs.length?tlPvRs:[3]),
     (confTypeArr.length?confTypeArr:['EMA']), (confHtfArr.length?confHtfArr:[1]),
-    (maCrossTypeArr.length?maCrossTypeArr:['EMA'])
+    (maCrossTypeArr.length?maCrossTypeArr:['EMA']),
+    _filterCombos  // powerset фильтров (последнее измерение)
   ];
   const _mcDimSizes = _mcDims.map(d => d.length || 1);
 
@@ -1191,6 +1234,25 @@ async function runOpt() {
       const _confType= _dims[_d][_di[_d++]];
       const _confHtf = _dims[_d][_di[_d++]];
       const _mCrossType= _dims[_d][_di[_d++]];
+      const _fCombo  = _dims[_d][_di[_d++]]; // powerset: объект с bool-флагами фильтров
+      // Эффективные флаги фильтров: берём из _fCombo если там есть, иначе из внешней области
+      const _effUseMa      = _fCombo.useMa      ?? useMa;
+      const _effUseAdx     = _fCombo.useAdx     ?? useAdx;
+      const _effUseRsi     = _fCombo.useRsi     ?? useRsi;
+      const _effUseVolF    = _fCombo.useVolF    ?? useVolF;
+      const _effUseStruct  = _fCombo.useStruct  ?? useStruct;
+      const _effUseMaDist  = _fCombo.useMaDist  ?? useMaDist;
+      const _effUseCandleF = _fCombo.useCandleF ?? useCandleF;
+      const _effUseConsec  = _fCombo.useConsec  ?? useConsec;
+      const _effUseSTrend  = _fCombo.useSTrend  ?? useSTrend;
+      const _effUseFresh   = _fCombo.useFresh   ?? useFresh;
+      const _effUseAtrExp  = _fCombo.useAtrExp  ?? useAtrExp;
+      const _effUseConfirm = _fCombo.useConfirm ?? useConfirm;
+      const _effUseVSA     = _fCombo.useVSA     ?? useVSA;
+      const _effUseLiq     = _fCombo.useLiq     ?? useLiq;
+      const _effUseVolDir  = _fCombo.useVolDir  ?? useVolDir;
+      const _effUseWT      = _fCombo.useWT      ?? useWT;
+      const _effUseFat     = _fCombo.useFat     ?? useFat;
       const adxL        = _ip.adxL        ?? window._ipDef.adxL;
       const sTrendWin   = _ip.sTrendWin   ?? window._ipDef.sTrendWin;
       const confN       = _ip.confN       ?? window._ipDef.confN;
@@ -1244,9 +1306,9 @@ async function runOpt() {
         maArr = maCache[mk];
       }
       let wtScores = null;
-      if (useWT && maArr) wtScores = calcWeightedTrend(maArr, atrCache[atrP], wtN, wtVolW, wtBodyW, wtDistW, wtUseDist);
+      if (_effUseWT && maArr) wtScores = calcWeightedTrend(maArr, atrCache[atrP], wtN, wtVolW, wtBodyW, wtDistW, wtUseDist);
       let confMAArr = null;
-      if (useConfirm && confN > 0) {
+      if (_effUseConfirm && confN > 0) {
         const ck = _confType+'_'+confN+'_htf'+_confHtf;
         if (!maCache[ck]) maCache[ck] = _confHtf>1 ? calcHTFMA(DATA,_confHtf,confN,_confType) : calcMA(closes,confN,_confType);
         confMAArr = maCache[ck];
@@ -1284,24 +1346,24 @@ async function runOpt() {
         useTime,timeBars,timeMode,
         usePartial,partRR,partPct,partBE,
         useClimax:useClimaxExit&&HAS_VOLUME,clxVolMult,clxBodyMult,clxMode,
-        useMA:maP>0,maArr,maType:_mType,maP,htfRatio,
-        useADX:useAdx&&adxT>0,adxArr:adxCache[_adxCk],adxThresh:adxT,adxLen:adxL,adxHtfRatio,useAdxSlope,adxSlopeBars,
-        useRSI:useRsi,rsiArr:useRsi?calcRSI(14):null,rsiOS:rsiPair.os,rsiOB:rsiPair.ob,
-        useVolF:useVolF&&vfM>0,atrAvg,volFMult:vfM,
-        useAtrExp:useAtrExp&&atrExpM>0,atrExpMult:atrExpM,
-        useStruct,structBull,structBear,strPvL,strPvR,
+        useMA:_effUseMa&&maP>0,maArr,maType:_mType,maP,htfRatio,
+        useADX:_effUseAdx&&adxT>0,adxArr:adxCache[_adxCk],adxThresh:adxT,adxLen:adxL,adxHtfRatio,useAdxSlope,adxSlopeBars,
+        useRSI:_effUseRsi,rsiArr:_effUseRsi?calcRSI(14):null,rsiOS:rsiPair.os,rsiOB:rsiPair.ob,
+        useVolF:_effUseVolF&&vfM>0,atrAvg,volFMult:vfM,
+        useAtrExp:_effUseAtrExp&&atrExpM>0,atrExpMult:atrExpM,
+        useStruct:_effUseStruct,structBull,structBear,strPvL,strPvR,
         useSLPiv,slPivOff,slPivMax,slPivL,slPivR,slPivTrail,pivSLLo,pivSLHi,
-        useConfirm:useConfirm&&confN>0,confN,confMatType:_confType,confHtfRatio:_confHtf,maArrConfirm:confMAArr,
-        useMaDist:useMaDist&&mdMax>0,maDistMax:mdMax,
-        useCandleF,candleMin,candleMax,
-        useConsec,consecMax,
-        useSTrend,sTrendWin,
-        useFresh:useFresh&&freshMax>0,freshMax,
-        useVSA:useVSA&&vsaM>0,vsaMult:vsaM,volAvg:volAvgArr,
-        useLiq,liqMin,
-        useVolDir,volDirPeriod:volDirP,
-        useWT:useWT&&wtT>0,wtScores,wtThresh:wtT,
-        useFat,fatConsec,fatVolDrop,
+        useConfirm:_effUseConfirm&&confN>0,confN,confMatType:_confType,confHtfRatio:_confHtf,maArrConfirm:confMAArr,
+        useMaDist:_effUseMaDist&&mdMax>0,maDistMax:mdMax,
+        useCandleF:_effUseCandleF,candleMin,candleMax,
+        useConsec:_effUseConsec,consecMax,
+        useSTrend:_effUseSTrend,sTrendWin,
+        useFresh:_effUseFresh&&freshMax>0,freshMax,
+        useVSA:_effUseVSA&&vsaM>0,vsaMult:vsaM,volAvg:volAvgArr,
+        useLiq:_effUseLiq,liqMin,
+        useVolDir:_effUseVolDir,volDirPeriod:volDirP,
+        useWT:_effUseWT&&wtT>0,wtScores,wtThresh:wtT,
+        useFat:_effUseFat,fatConsec,fatVolDrop,
         bodyAvg:bodyAvgArr,
         start:Math.max(maP||0,50)+2,
         pruning:false, maxDDLimit:maxDD
@@ -1348,20 +1410,20 @@ async function runOpt() {
               useRev,revBars,revMode,revAct,useTime,timeBars,timeMode,
               usePartial,partRR,partPct,partBE,
               useClimax:useClimaxExit&&HAS_VOLUME,clxVolMult,clxBodyMult,clxMode,
-              useMA:maP>0,maType:_mType,maP,htfRatio,
-              useADX:useAdx&&adxT>0,adxThresh:adxT,adxLen:adxL,adxHtfRatio,useAdxSlope,adxSlopeBars,
-              useRSI:useRsi,rsiOS:rsiPair.os,rsiOB:rsiPair.ob,
-              useVolF:useVolF&&vfM>0,volFMult:vfM,
-              useAtrExp:useAtrExp&&atrExpM>0,atrExpMult:atrExpM,
-              useStruct,structLen,strPvL,strPvR,
-              useConfirm:useConfirm&&confN>0,confN,confMatType:_confType,confHtfRatio:_confHtf,
-              useMaDist:useMaDist&&mdMax>0,maDistMax:mdMax,
-              useCandleF,candleMin,candleMax,useConsec,consecMax,
-              useSTrend,sTrendWin,useFresh:useFresh&&freshMax>0,freshMax,
-              useVSA:useVSA&&vsaM>0,vsaMult:vsaM,vsaPeriod:vsaP,
-              useLiq,liqMin,useVolDir,volDirPeriod:volDirP,
-              useWT:useWT&&wtT>0,wtThresh:wtT,wtN,wtVolW,wtBodyW,wtUseDist,
-              useFat,fatConsec,fatVolDrop,
+              useMA:_effUseMa&&maP>0,maType:_mType,maP,htfRatio,
+              useADX:_effUseAdx&&adxT>0,adxThresh:adxT,adxLen:adxL,adxHtfRatio,useAdxSlope,adxSlopeBars,
+              useRSI:_effUseRsi,rsiOS:rsiPair.os,rsiOB:rsiPair.ob,
+              useVolF:_effUseVolF&&vfM>0,volFMult:vfM,
+              useAtrExp:_effUseAtrExp&&atrExpM>0,atrExpMult:atrExpM,
+              useStruct:_effUseStruct,structLen,strPvL,strPvR,
+              useConfirm:_effUseConfirm&&confN>0,confN,confMatType:_confType,confHtfRatio:_confHtf,
+              useMaDist:_effUseMaDist&&mdMax>0,maDistMax:mdMax,
+              useCandleF:_effUseCandleF,candleMin,candleMax,useConsec:_effUseConsec,consecMax,
+              useSTrend:_effUseSTrend,sTrendWin,useFresh:_effUseFresh&&freshMax>0,freshMax,
+              useVSA:_effUseVSA&&vsaM>0,vsaMult:vsaM,vsaPeriod:vsaP,
+              useLiq:_effUseLiq,liqMin,useVolDir:_effUseVolDir,volDirPeriod:volDirP,
+              useWT:_effUseWT&&wtT>0,wtThresh:wtT,wtN,wtVolW,wtBodyW,wtUseDist,
+              useFat:_effUseFat,fatConsec,fatVolDrop,
               atrPeriod:atrP,commission:commTotal,baseComm:comm,spreadVal:spread*2,
               revSkip,revCooldown,revSrc};
           results.push({name,pnl:r.pnl,wr:r.wr,n:r.n,dd:r.dd,pdd,avg:r.avg,sig,gt,
@@ -1459,6 +1521,25 @@ async function runOpt() {
       const _confType= _dims[_d][dimIndices[_d++]];
       const _confHtf = _dims[_d][dimIndices[_d++]];
       const _mCrossType= _dims[_d][dimIndices[_d++]];
+      const _fCombo  = _dims[_d][dimIndices[_d++]]; // powerset: объект с bool-флагами фильтров
+      // Эффективные флаги фильтров (TPE)
+      const _effUseMa      = _fCombo.useMa      ?? useMa;
+      const _effUseAdx     = _fCombo.useAdx     ?? useAdx;
+      const _effUseRsi     = _fCombo.useRsi     ?? useRsi;
+      const _effUseVolF    = _fCombo.useVolF    ?? useVolF;
+      const _effUseStruct  = _fCombo.useStruct  ?? useStruct;
+      const _effUseMaDist  = _fCombo.useMaDist  ?? useMaDist;
+      const _effUseCandleF = _fCombo.useCandleF ?? useCandleF;
+      const _effUseConsec  = _fCombo.useConsec  ?? useConsec;
+      const _effUseSTrend  = _fCombo.useSTrend  ?? useSTrend;
+      const _effUseFresh   = _fCombo.useFresh   ?? useFresh;
+      const _effUseAtrExp  = _fCombo.useAtrExp  ?? useAtrExp;
+      const _effUseConfirm = _fCombo.useConfirm ?? useConfirm;
+      const _effUseVSA     = _fCombo.useVSA     ?? useVSA;
+      const _effUseLiq     = _fCombo.useLiq     ?? useLiq;
+      const _effUseVolDir  = _fCombo.useVolDir  ?? useVolDir;
+      const _effUseWT      = _fCombo.useWT      ?? useWT;
+      const _effUseFat     = _fCombo.useFat     ?? useFat;
       const adxL        = _ip.adxL        ?? window._ipDef.adxL;
       const sTrendWin   = _ip.sTrendWin   ?? window._ipDef.sTrendWin;
       const confN       = _ip.confN       ?? window._ipDef.confN;
@@ -1512,12 +1593,12 @@ async function runOpt() {
       }
       const _wtKey = atrP+'_'+mk;
       let wtScores = null;
-      if (useWT && maArr) {
+      if (_effUseWT && maArr) {
         if (!_tpeWtCache[_wtKey]) _tpeWtCache[_wtKey] = calcWeightedTrend(maArr, atrCache[atrP], wtN, wtVolW, wtBodyW, wtDistW, wtUseDist);
         wtScores = _tpeWtCache[_wtKey];
       }
       let confMAArr = null;
-      if (useConfirm && confN > 0) {
+      if (_effUseConfirm && confN > 0) {
         const ck = _confType+'_'+confN+'_htf'+_confHtf;
         if (!maCache[ck]) maCache[ck] = _confHtf>1 ? calcHTFMA(DATA,_confHtf,confN,_confType) : calcMA(closes,confN,_confType);
         confMAArr = maCache[ck];
@@ -1553,21 +1634,21 @@ async function runOpt() {
         useRev,revBars,revMode,revAct,revSrc,revSkip,revCooldown,
         useTime,timeBars,timeMode,usePartial,partRR,partPct,partBE,
         useClimax:useClimaxExit&&HAS_VOLUME,clxVolMult,clxBodyMult,clxMode,
-        useMA:maP>0,maArr,maType:_mType,maP,htfRatio,
-        useADX:useAdx&&adxT>0,adxArr:adxCache[_adxCk],adxThresh:adxT,adxLen:adxL,adxHtfRatio,useAdxSlope,adxSlopeBars,
-        useRSI:useRsi,rsiArr:_tpeRsiArr,rsiOS:rsiPair.os,rsiOB:rsiPair.ob,
-        useVolF:useVolF&&vfM>0,atrAvg,volFMult:vfM,
-        useAtrExp:useAtrExp&&atrExpM>0,atrExpMult:atrExpM,
-        useStruct,structBull,structBear,strPvL,strPvR,
+        useMA:_effUseMa&&maP>0,maArr,maType:_mType,maP,htfRatio,
+        useADX:_effUseAdx&&adxT>0,adxArr:adxCache[_adxCk],adxThresh:adxT,adxLen:adxL,adxHtfRatio,useAdxSlope,adxSlopeBars,
+        useRSI:_effUseRsi,rsiArr:_effUseRsi?_tpeRsiArr:null,rsiOS:rsiPair.os,rsiOB:rsiPair.ob,
+        useVolF:_effUseVolF&&vfM>0,atrAvg,volFMult:vfM,
+        useAtrExp:_effUseAtrExp&&atrExpM>0,atrExpMult:atrExpM,
+        useStruct:_effUseStruct,structBull,structBear,strPvL,strPvR,
         useSLPiv,slPivOff,slPivMax,slPivL,slPivR,slPivTrail,pivSLLo,pivSLHi,
-        useConfirm:useConfirm&&confN>0,confN,confMatType:_confType,confHtfRatio:_confHtf,maArrConfirm:confMAArr,
-        useMaDist:useMaDist&&mdMax>0,maDistMax:mdMax,
-        useCandleF,candleMin,candleMax,useConsec,consecMax,
-        useSTrend,sTrendWin,useFresh:useFresh&&freshMax>0,freshMax,
-        useVSA:useVSA&&vsaM>0,vsaMult:vsaM,volAvg:volAvgArr,
-        useLiq,liqMin,useVolDir,volDirPeriod:volDirP,
-        useWT:useWT&&wtT>0,wtScores,wtThresh:wtT,
-        useFat,fatConsec,fatVolDrop,bodyAvg:bodyAvgArr,
+        useConfirm:_effUseConfirm&&confN>0,confN,confMatType:_confType,confHtfRatio:_confHtf,maArrConfirm:confMAArr,
+        useMaDist:_effUseMaDist&&mdMax>0,maDistMax:mdMax,
+        useCandleF:_effUseCandleF,candleMin,candleMax,useConsec:_effUseConsec,consecMax,
+        useSTrend:_effUseSTrend,sTrendWin,useFresh:_effUseFresh&&freshMax>0,freshMax,
+        useVSA:_effUseVSA&&vsaM>0,vsaMult:vsaM,volAvg:volAvgArr,
+        useLiq:_effUseLiq,liqMin,useVolDir:_effUseVolDir,volDirPeriod:volDirP,
+        useWT:_effUseWT&&wtT>0,wtScores,wtThresh:wtT,
+        useFat:_effUseFat,fatConsec,fatVolDrop,bodyAvg:bodyAvgArr,
         start:Math.max(maP||0,50)+2,pruning:false,maxDDLimit:maxDD
       };
 
@@ -1632,20 +1713,20 @@ async function runOpt() {
               useRev,revBars,revMode,revAct,revSrc,revSkip,revCooldown,
               useTime,timeBars,timeMode,usePartial,partRR,partPct,partBE,
               useClimax:useClimaxExit&&HAS_VOLUME,clxVolMult,clxBodyMult,clxMode,
-              useMA:maP>0,maType:_mType,maP,htfRatio,
-              useADX:useAdx&&adxT>0,adxThresh:adxT,adxLen:adxL,adxHtfRatio,useAdxSlope,adxSlopeBars,
-              useRSI:useRsi,rsiOS:rsiPair.os,rsiOB:rsiPair.ob,
-              useVolF:useVolF&&vfM>0,volFMult:vfM,
-              useAtrExp:useAtrExp&&atrExpM>0,atrExpMult:atrExpM,
-              useStruct,structLen,strPvL,strPvR,
-              useConfirm:useConfirm&&confN>0,confN,confMatType:_confType,confHtfRatio:_confHtf,
-              useMaDist:useMaDist&&mdMax>0,maDistMax:mdMax,
-              useCandleF,candleMin,candleMax,useConsec,consecMax,
-              useSTrend,sTrendWin,useFresh:useFresh&&freshMax>0,freshMax,
-              useVSA:useVSA&&vsaM>0,vsaMult:vsaM,vsaPeriod:vsaP,
-              useLiq,liqMin,useVolDir,volDirPeriod:volDirP,
-              useWT:useWT&&wtT>0,wtThresh:wtT,wtN,wtVolW,wtBodyW,wtUseDist,
-              useFat,fatConsec,fatVolDrop,
+              useMA:_effUseMa&&maP>0,maType:_mType,maP,htfRatio,
+              useADX:_effUseAdx&&adxT>0,adxThresh:adxT,adxLen:adxL,adxHtfRatio,useAdxSlope,adxSlopeBars,
+              useRSI:_effUseRsi,rsiOS:rsiPair.os,rsiOB:rsiPair.ob,
+              useVolF:_effUseVolF&&vfM>0,volFMult:vfM,
+              useAtrExp:_effUseAtrExp&&atrExpM>0,atrExpMult:atrExpM,
+              useStruct:_effUseStruct,structLen,strPvL,strPvR,
+              useConfirm:_effUseConfirm&&confN>0,confN,confMatType:_confType,confHtfRatio:_confHtf,
+              useMaDist:_effUseMaDist&&mdMax>0,maDistMax:mdMax,
+              useCandleF:_effUseCandleF,candleMin,candleMax,useConsec:_effUseConsec,consecMax,
+              useSTrend:_effUseSTrend,sTrendWin,useFresh:_effUseFresh&&freshMax>0,freshMax,
+              useVSA:_effUseVSA&&vsaM>0,vsaMult:vsaM,vsaPeriod:vsaP,
+              useLiq:_effUseLiq,liqMin,useVolDir:_effUseVolDir,volDirPeriod:volDirP,
+              useWT:_effUseWT&&wtT>0,wtThresh:wtT,wtN,wtVolW,wtBodyW,wtUseDist,
+              useFat:_effUseFat,fatConsec,fatVolDrop,
               atrPeriod:atrP,commission:commTotal,baseComm:comm,spreadVal:spread*2};
           // OOS и тяжёлые метрики НЕ вызываем здесь — это горячий цикл
           // CVR/UPI/Sortino/kRatio вычислятся батчем после завершения TPE

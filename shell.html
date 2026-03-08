@@ -800,6 +800,10 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
     <input type="checkbox" id="c_use_gt">
     <label data-tip="GT-Score = (P/DD) × sig_mult × consistency_mult. Штрафует за малое число сделок (z-тест) и нестабильный WR между половинами. Помогает TPE находить надёжные стратегии, а не overfitted.">Оптимизировать по GT-Score (анти-overfitting)</label>
   </div>
+  <div class="cb" style="margin-top:4px">
+    <input type="checkbox" id="c_powerset">
+    <label data-tip="Перебирает все комбинации включённых фильтров (2^N вариантов). Например, если активны MA+ADX+RSI — тестирует {MA}, {ADX}, {RSI}, {MA+ADX}, {MA+RSI}, {ADX+RSI}, {MA+ADX+RSI} и без фильтров. Позволяет понять какие фильтры реально помогают входу.">Перебор комбо фильтров (powerset)</label>
+  </div>
   <div class="hint">от:до:шаг или a,b,c</div>
 </div>
 
