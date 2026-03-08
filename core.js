@@ -497,8 +497,9 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
           const tpHit2 = hasTP2 ? bar.h >= tp2 : false;
           const slTriggered = cfg.slLogic==='or' ? slHit1 : (slHit1&&slHit2);
           const tpTriggered = cfg.tpLogic==='or' ? tpHit1 : (hasTP2?(tpHit1&&tpHit2):tpHit1);
-          if (slTriggered) { hsl=true; exitPrice=cfg.slLogic==='or'?sl1:(hasSL2?sl2:sl1); }
-          else if (tpTriggered) { htp=true; exitPrice=cfg.tpLogic==='or'?tp1:(hasTP2?tp2:tp1); }
+          // sl1/tp1: nearest for OR, farthest for AND — both are the correct exit level
+          if (slTriggered) { hsl=true; exitPrice=sl1; }
+          else if (tpTriggered) { htp=true; exitPrice=tp1; }
         } else {
           const slHit1 = bar.h >= sl1;
           const slHit2 = hasSL2 ? bar.h >= sl2 : false;
@@ -506,8 +507,8 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
           const tpHit2 = hasTP2 ? bar.l <= tp2 : false;
           const slTriggered = cfg.slLogic==='or' ? slHit1 : (slHit1&&slHit2);
           const tpTriggered = cfg.tpLogic==='or' ? tpHit1 : (hasTP2?(tpHit1&&tpHit2):tpHit1);
-          if (slTriggered) { hsl=true; exitPrice=cfg.slLogic==='or'?sl1:(hasSL2?sl2:sl1); }
-          else if (tpTriggered) { htp=true; exitPrice=cfg.tpLogic==='or'?tp1:(hasTP2?tp2:tp1); }
+          if (slTriggered) { hsl=true; exitPrice=sl1; }
+          else if (tpTriggered) { htp=true; exitPrice=tp1; }
         }
       }
 
@@ -720,15 +721,8 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
         else { tp1=entry+dir*slDist*2; hasTP2=false; }
       }
     }
-    // Track unrealized drawdown during open trades (mark-to-market, matches TradingView equity)
-    if (inTrade && i > entryBar) {
-      const bestPrice  = dir === 1 ? bar.h : bar.l;
-      const worstPrice = dir === 1 ? bar.l : bar.h;
-      const unrealBest  = pnl + dir*(bestPrice-entry)/entry*100 * posSize;
-      const unrealWorst = pnl + dir*(worstPrice-entry)/entry*100 * posSize;
-      maxPnl = Math.max(maxPnl, unrealBest);
-      dd = Math.max(dd, maxPnl - unrealWorst);
-    }
+    // DD tracked only at trade close (matches Pine solve_core: _mpnl/_dd updated on exit).
+    // Closed-equity DD is consistent with what the TV USE indicator shows.
     eq[i] = pnl;
   }
 
