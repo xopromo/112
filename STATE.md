@@ -4,14 +4,14 @@
 > Также обновляй вручную когда вливаешь ветки в main.
 
 ## Последняя ручная сессия
-- **Дата:** 2026-03-08 16:06
+- **Дата:** 2026-03-08 16:22
 - **Ветка:** `claude/max-bars-fix-session_01ApYWQim5RsxuopT6XkFLPG`
 - **Последние коммиты:**
+  - 58122eb fix: null toFixed crash when only long or short trades exist
+  - ff4c64e chore: update STATE.md + rebuilt HTML
   - 659b376 fix: pine_export max_bars = DATA.length - warmup to align TV with optimizer dataset
   - f38b8c1 chore: update STATE.md
   - 040a11f fix: DD calculation + AND SL/TP exit price to match Pine solve_core
-  - 170dc83 feat: project management — per-project data folder, favourites, state
-  - 382dc1f fix: htfRatio не отображался в имени MA-фильтра в MC-режиме
 
 ## Последний цикл
 - **Дата:** 2026-03-03-20 (ручной исследовательский цикл)
