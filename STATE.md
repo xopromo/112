@@ -4,14 +4,14 @@
 > Также обновляй вручную когда вливаешь ветки в main.
 
 ## Последняя ручная сессия
-- **Дата:** 2026-03-08 14:07
+- **Дата:** 2026-03-08 15:32
 - **Ветка:** `main`
 - **Последние коммиты:**
+  - 040a11f fix: DD calculation + AND SL/TP exit price to match Pine solve_core
+  - 170dc83 feat: project management — per-project data folder, favourites, state
   - 382dc1f fix: htfRatio не отображался в имени MA-фильтра в MC-режиме
   - 9d443a8 feat: powerset перебор комбо фильтров
   - 9a72f40 chore: update STATE.md
-  - 4872058 test: add indicator_parity.js — Pine formula verification for JS indicators
-  - 75d864a test: add pine_check.js + regression.js для автоматической защиты от расхождений
 
 ## Последний цикл
 - **Дата:** 2026-03-03-20 (ручной исследовательский цикл)
