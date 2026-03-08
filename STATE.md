@@ -4,14 +4,14 @@
 > Также обновляй вручную когда вливаешь ветки в main.
 
 ## Последняя ручная сессия
-- **Дата:** 2026-03-07 17:15
+- **Дата:** 2026-03-08 08:16
 - **Ветка:** `main`
 - **Последние коммиты:**
+  - d5e8007 feat: HTF ADX + ADX Slope + ATR Expanding anti-flat filters
+  - 6d9aeed fix(pine_export): fix invalid timeframe format in f_tf_str
+  - 9163c2c chore: update STATE.md
   - 5a55af9 fix(filter_registry): add confHtfRatio to confirm MA nameLabel
   - 567f382 fix(pine_export): add HTF MA support and Confirm MA to Pine export
-  - b1e6bbd fix: показывать HTF ratio в названии результата и детальной статистике
-  - 8c25d9f feat: HTF MA поддержка + sweep типов MA
-  - 22d6e5c chore: update STATE.md
 
 ## Последний цикл
 - **Дата:** 2026-03-03-20 (ручной исследовательский цикл)
