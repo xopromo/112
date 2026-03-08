@@ -4,14 +4,14 @@
 > Также обновляй вручную когда вливаешь ветки в main.
 
 ## Последняя ручная сессия
-- **Дата:** 2026-03-08 09:38
+- **Дата:** 2026-03-08 14:07
 - **Ветка:** `main`
 - **Последние коммиты:**
+  - 382dc1f fix: htfRatio не отображался в имени MA-фильтра в MC-режиме
+  - 9d443a8 feat: powerset перебор комбо фильтров
   - 9a72f40 chore: update STATE.md
   - 4872058 test: add indicator_parity.js — Pine formula verification for JS indicators
   - 75d864a test: add pine_check.js + regression.js для автоматической защиты от расхождений
-  - fb12636 chore: update STATE.md
-  - d5e8007 feat: HTF ADX + ADX Slope + ATR Expanding anti-flat filters
 
 ## Последний цикл
 - **Дата:** 2026-03-03-20 (ручной исследовательский цикл)

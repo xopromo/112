@@ -19,11 +19,12 @@ import sys, os
 out  = sys.argv[1] if len(sys.argv) > 1 else 'USE_Optimizer_v6_built.html'
 base = os.path.dirname(os.path.abspath(__file__))
 
-shell = open(os.path.join(base, 'shell.html'), encoding='utf-8').read()
-core  = open(os.path.join(base, 'core.js'),    encoding='utf-8').read()
-opt   = open(os.path.join(base, 'opt.js'),     encoding='utf-8').read()
-ui    = open(os.path.join(base, 'ui.js'),      encoding='utf-8').read()
-pine  = open(os.path.join(base, 'pine_export.js'), encoding='utf-8').read()
+shell    = open(os.path.join(base, 'shell.html'),    encoding='utf-8').read()
+core     = open(os.path.join(base, 'core.js'),       encoding='utf-8').read()
+opt      = open(os.path.join(base, 'opt.js'),        encoding='utf-8').read()
+ui       = open(os.path.join(base, 'ui.js'),         encoding='utf-8').read()
+pine     = open(os.path.join(base, 'pine_export.js'), encoding='utf-8').read()
+projects = open(os.path.join(base, 'projects.js'),   encoding='utf-8').read()
 
 # ── registry files: объединяем в один блок ────────────────────────────────
 REGISTRY_FILES = [
@@ -75,6 +76,9 @@ for ph, content in [
 # ── Шаг 3: вставляем pine_export.js как отдельный <script> перед ##UI##
 assert '/* ##PINE## */' in shell, "Placeholder ##PINE## not found in shell.html"
 shell = shell.replace('/* ##PINE## */', pine, 1)
+
+assert '/* ##PROJECTS## */' in shell, "Placeholder ##PROJECTS## not found in shell.html"
+shell = shell.replace('/* ##PROJECTS## */', projects, 1)
 
 assert '/* ##UI## */' in shell, "Placeholder ##UI## not found in shell.html"
 result = shell.replace('/* ##UI## */', ui_built, 1)

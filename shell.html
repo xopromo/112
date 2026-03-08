@@ -750,6 +750,15 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
   <div class="sub">OHLCV · Полная реплика логики USE · SL/TP И/ИЛИ · Volume-фильтры · Подробные названия</div>
 </header>
 
+<!-- PROJECT BAR -->
+<div id="proj-bar" style="display:flex;align-items:center;gap:8px;padding:5px 8px;margin-bottom:6px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;font-size:.68em">
+  <span style="color:var(--text3)">📂</span>
+  <span id="proj-name" style="color:var(--accent);font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer" onclick="openProjSwitcher()" title="Переключить проект">Нет проекта</span>
+  <span id="proj-new-badge" style="display:none;background:var(--orange);color:#000;border-radius:8px;padding:1px 7px;font-size:.9em;cursor:pointer" onclick="refreshProjectFiles()" title="Найдены новые файлы — нажми чтобы обновить">● новые файлы</span>
+  <button onclick="openProjSwitcher()" style="padding:2px 8px;background:var(--bg3);border:1px solid var(--border2);border-radius:4px;color:var(--text2);cursor:pointer;font-size:.95em" title="Список проектов">▼</button>
+  <button onclick="openCreateProject()" style="padding:2px 8px;background:rgba(0,212,255,.1);border:1px solid var(--accent2);border-radius:4px;color:var(--accent);cursor:pointer;font-size:.95em" title="Новый проект">+ проект</button>
+</div>
+
 <div class="panels" id="panels">
 
 <!-- DATA -->
@@ -1950,6 +1959,53 @@ const _SRC_FILES = {
     </div>
   </div>
 </div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     CREATE PROJECT MODAL
+════════════════════════════════════════════════════════════ -->
+<div id="proj-create-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9000;align-items:center;justify-content:center">
+  <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:24px;min-width:340px;max-width:440px;width:90%">
+    <div style="font-size:.95em;font-weight:700;color:var(--accent);margin-bottom:16px">📂 Новый проект</div>
+
+    <div style="font-size:.7em;color:var(--text3);margin-bottom:6px">Название проекта</div>
+    <input id="proj-create-name" placeholder="BTC Strategy, ETH Scalper..."
+      style="width:100%;background:var(--bg);border:1px solid var(--border2);border-radius:5px;color:var(--text);font-size:.8em;padding:7px 10px;font-family:var(--font-mono);margin-bottom:14px"
+      onkeydown="if(event.key==='Enter')projPickFolder()">
+
+    <div style="font-size:.7em;color:var(--text3);margin-bottom:6px">Папка с данными</div>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">
+      <span id="proj-create-folder" style="flex:1;font-size:.72em;color:var(--text2);background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:5px 8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">не выбрана</span>
+      <button onclick="projPickFolder()" style="padding:5px 12px;background:rgba(0,212,255,.12);border:1px solid var(--accent2);border-radius:4px;color:var(--accent);font-size:.72em;cursor:pointer;white-space:nowrap">Выбрать папку</button>
+    </div>
+    <div style="font-size:.62em;color:var(--text3);margin-bottom:18px">CSV-файлы загружаются из этой папки. Результаты сохраняются туда же.</div>
+
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button id="proj-create-cancel" onclick="closeProjCreate()" style="padding:6px 16px;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;color:var(--text2);font-size:.75em;cursor:pointer">Отмена</button>
+      <button id="proj-create-ok" onclick="confirmCreateProject()" style="padding:6px 18px;background:rgba(0,212,255,.18);border:1px solid var(--accent);border-radius:5px;color:var(--accent);font-size:.75em;cursor:pointer;font-weight:600">Создать</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SWITCH PROJECT MODAL
+════════════════════════════════════════════════════════════ -->
+<div id="proj-switch-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9000;align-items:center;justify-content:center" onclick="if(event.target===this)closeProjSwitcher()">
+  <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:20px;min-width:360px;max-width:520px;width:90%">
+    <div style="font-size:.9em;font-weight:700;color:var(--accent);margin-bottom:14px">📂 Проекты</div>
+    <div id="proj-switch-list" style="display:flex;flex-direction:column;gap:6px;max-height:360px;overflow-y:auto;margin-bottom:14px"></div>
+    <div style="display:flex;gap:8px;justify-content:space-between">
+      <button onclick="openCreateProject();closeProjSwitcher()" style="padding:5px 14px;background:rgba(0,212,255,.1);border:1px solid var(--accent2);border-radius:5px;color:var(--accent);font-size:.72em;cursor:pointer">+ Новый проект</button>
+      <button onclick="closeProjSwitcher()" style="padding:5px 14px;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;color:var(--text2);font-size:.72em;cursor:pointer">Закрыть</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     projects.js
+════════════════════════════════════════════════════════════ -->
+<script>
+/* ##PROJECTS## */
+</script>
 
 </body>
 </html>

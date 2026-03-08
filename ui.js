@@ -181,6 +181,10 @@ function loadFile(file) {
     window._dataHash = (DATA.length + '_' + Math.round((DATA[0]?.c||0)*1000) + '_' + Math.round((DATA[DATA.length-1]?.c||0)*1000)).replace(/[^a-z0-9_]/gi,'_');
     _robSurrogate.load(window._dataHash);
     console.log('[RobSurrogate] dataHash:', window._dataHash);
+    // Track last loaded file for the current project
+    if (typeof ProjectManager !== 'undefined' && ProjectManager.getCurrentId()) {
+      ProjectManager.updateLastFile(file.name);
+    }
   };
   reader.readAsText(file);
 }
@@ -1166,6 +1170,12 @@ let resultCache = new Map();
 let _t0 = 0;
 
 // --- Persistent storage helpers (window.storage API) ---
+// Returns the storage key for the current project's favourites
+function _favKey() {
+  const id = typeof ProjectManager !== 'undefined' ? ProjectManager.getCurrentId() : null;
+  return id ? 'use6_fav_' + id : 'use6_fav';
+}
+
 async function storeSave(key, data) {
   try {
     if (window.storage) await window.storage.set(key, JSON.stringify(data));
@@ -1186,17 +1196,30 @@ async function storeLoad(key) {
 
 // Загружаем при старте
 window.addEventListener('load', async () => {
-  templates  = (await storeLoad('use6_tpl')) || [];
-  favourites = (await storeLoad('use6_fav')) || [];
-  _favNs = localStorage.getItem('use6_fav_ns') || '';
+  templates = (await storeLoad('use6_tpl')) || [];
   const def = templates.find(t => t.isDefault);
   if (def) applySettings(def.settings);
-  renderFavBar();
   renderTplList();
   updateClxExitVisibility();
-  // Восстанавливаем метку ns
+
+  // ── Projects ──────────────────────────────────────────────
+  ProjectManager.init();
+  const projs = ProjectManager.getAll();
+  if (projs.length === 0) {
+    // Первый запуск — мигрируем старые избранные, показываем диалог создания
+    favourites = (await storeLoad(_favKey())) || [];
+    _favNs = localStorage.getItem('use6_fav_ns') || '';
+    openCreateProject(true); // true = первый запуск, нельзя закрыть
+  } else {
+    await setProject(ProjectManager.getCurrentId() || projs[0].id);
+  }
+
+  renderFavBar();
   const nsEl = document.getElementById('fav-ns-label');
   if (nsEl) nsEl.textContent = _favNs ? _favNs : '';
+
+  // Периодическая проверка новых файлов в папке проекта
+  setInterval(_pollNewFiles, 30000);
 });
 
 // --- Mode buttons ---
@@ -1502,7 +1525,7 @@ function toggleFav(idx, event) {
       robScore:r.robScore, robMax:r.robMax, robDetails:r.robDetails
     }, cfg:r.cfg, ts:Date.now() });
   }
-  storeSave('use6_fav', favourites);
+  storeSave(_favKey(), favourites);
   renderFavBar();
   // НЕ вызываем renderResults() — это сбрасывает режим и фильтры!
   // Только перерисовываем звёздочки в текущем виде
@@ -1571,7 +1594,7 @@ function toggleFavBody() {
 }
 function removeFav(i) {
   favourites.splice(i,1);
-  storeSave('use6_fav', favourites);
+  storeSave(_favKey(), favourites);
   renderFavBar();
   _refreshFavStars(); // не сбрасываем фильтры
 }
@@ -1701,7 +1724,7 @@ function loadSession(file) {
       if (Array.isArray(s.favourites)) {
         for (const f of s.favourites) { f.ns = nsToLoad; favourites.push(f); }
       }
-      storeSave('use6_fav', favourites);
+      storeSave(_favKey(), favourites);
       
       // Переключаемся на ns из файла
       _favNs = nsToLoad;
@@ -4594,7 +4617,7 @@ function _hcAddToFav(idx, btn) {
     btn.textContent = '⭐ В избр.';
     btn.style.background = 'rgba(255,170,0,.2)';
   }
-  storeSave('use6_fav', favourites);
+  storeSave(_favKey(), favourites);
   renderFavBar();
 }
 
@@ -5447,3 +5470,203 @@ function _hmRender(grid, xVals, yVals, xParam, yParam, metric, cX, cY) {
   ctx.textAlign = 'right';
   ctx.fillText(lowerBetter ? fmt(maxV) : fmt(maxV) + ' (лучше)', legX + legW, legY + legH + 2);
 }
+
+
+// ═══════════════════════════════════════════════════════════════
+// PROJECT MANAGEMENT UI
+// ═══════════════════════════════════════════════════════════════
+
+// ── Core: switch to a project ──────────────────────────────────
+
+async function setProject(id) {
+  if (!id) return;
+  // Save current project state before switching
+  const curId = ProjectManager.getCurrentId();
+  if (curId && curId !== id) {
+    ProjectManager.saveState({ favNs: _favNs }, curId);
+  }
+
+  await ProjectManager.switchTo(id);
+  const proj = ProjectManager.getCurrent();
+  if (!proj) return;
+
+  // Load per-project favourites
+  favourites = (await storeLoad(_favKey())) || [];
+
+  // Restore last state
+  const state = ProjectManager.loadState(id);
+  _favNs = (state && state.favNs) ? state.favNs : '';
+  localStorage.setItem('use6_fav_ns', _favNs);
+
+  // Update UI
+  _updateProjBar(proj);
+  renderFavBar();
+  const nsEl = document.getElementById('fav-ns-label');
+  if (nsEl) nsEl.textContent = _favNs ? _favNs : '';
+
+  // Auto-load last CSV from project folder
+  if (proj.lastFile) {
+    const file = await ProjectManager.readCSVFile(id, proj.lastFile);
+    if (file) loadFile(file);
+  } else {
+    // No lastFile — try to pick the most recent CSV
+    const files = await ProjectManager.listCSVFiles(id);
+    if (files.length > 0) {
+      const file = await ProjectManager.readCSVFile(id, files[0].name);
+      if (file) { loadFile(file); ProjectManager.updateLastFile(files[0].name); }
+      ProjectManager.markFilesKnown(id, files.map(f => f.name));
+    }
+  }
+
+  closeProjSwitcher();
+}
+
+function _updateProjBar(proj) {
+  const el = document.getElementById('proj-name');
+  if (el) el.textContent = proj ? proj.name : 'Нет проекта';
+}
+
+// ── Create project ─────────────────────────────────────────────
+
+let _projCreateHandle = null;
+let _projCreateFirstLaunch = false;
+
+function openCreateProject(firstLaunch) {
+  _projCreateHandle = null;
+  _projCreateFirstLaunch = !!firstLaunch;
+  const overlay = document.getElementById('proj-create-overlay');
+  if (!overlay) return;
+  document.getElementById('proj-create-name').value = '';
+  document.getElementById('proj-create-folder').textContent = 'не выбрана';
+  // Hide cancel button on first launch
+  const cancelBtn = document.getElementById('proj-create-cancel');
+  if (cancelBtn) cancelBtn.style.display = firstLaunch ? 'none' : '';
+  overlay.style.display = 'flex';
+  setTimeout(() => document.getElementById('proj-create-name').focus(), 50);
+}
+
+function closeProjCreate() {
+  if (_projCreateFirstLaunch) return; // must create on first launch
+  const overlay = document.getElementById('proj-create-overlay');
+  if (overlay) overlay.style.display = 'none';
+}
+
+async function projPickFolder() {
+  if (!window.showDirectoryPicker) {
+    toast('File System Access API не поддерживается в этом браузере', 2500);
+    return;
+  }
+  try {
+    _projCreateHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+    document.getElementById('proj-create-folder').textContent = _projCreateHandle.name;
+  } catch(e) { /* user cancelled */ }
+}
+
+async function confirmCreateProject() {
+  const name = (document.getElementById('proj-create-name').value || '').trim();
+  if (!name) { toast('Введи название проекта', 1500); return; }
+  if (!_projCreateHandle) { toast('Выбери папку', 1500); return; }
+
+  // Snapshot current template
+  const templateSnapshot = templates.find(t => t.isDefault) || null;
+
+  const proj = await ProjectManager.create(name, _projCreateHandle, templateSnapshot);
+  closeProjCreate();
+  await setProject(proj.id);
+  toast('✅ Проект создан: ' + name, 2000);
+}
+
+// ── Switch project ─────────────────────────────────────────────
+
+function openProjSwitcher() {
+  const overlay = document.getElementById('proj-switch-overlay');
+  if (!overlay) return;
+  _renderProjList();
+  overlay.style.display = 'flex';
+}
+
+function closeProjSwitcher() {
+  const overlay = document.getElementById('proj-switch-overlay');
+  if (overlay) overlay.style.display = 'none';
+}
+
+function _renderProjList() {
+  const list = document.getElementById('proj-switch-list');
+  if (!list) return;
+  const projects = ProjectManager.getAll();
+  const curId    = ProjectManager.getCurrentId();
+
+  if (!projects.length) {
+    list.innerHTML = '<div style="font-size:.7em;color:var(--text3);padding:8px">Нет проектов</div>';
+    return;
+  }
+
+  list.innerHTML = projects.map(p => {
+    const active = p.id === curId;
+    const dt = new Date(p.createdAt).toLocaleDateString('ru');
+    return `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:6px;border:1px solid ${active ? 'var(--accent)' : 'var(--border)'};background:${active ? 'rgba(0,212,255,.07)' : 'var(--bg)'};cursor:pointer"
+      onclick="setProject('${p.id}')">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:.78em;color:${active ? 'var(--accent)' : 'var(--text)'};font-weight:${active ? '700' : '400'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name}</div>
+        <div style="font-size:.6em;color:var(--text3);margin-top:2px">${p.lastFile || 'нет файла'} · создан ${dt}</div>
+      </div>
+      ${active ? '<span style="color:var(--accent);font-size:.8em">✓</span>' : ''}
+      <button onclick="event.stopPropagation();_dupProject('${p.id}')" title="Дублировать проект"
+        style="padding:2px 7px;background:var(--bg3);border:1px solid var(--border2);border-radius:3px;color:var(--text3);font-size:.65em;cursor:pointer">⧉</button>
+      <button onclick="event.stopPropagation();_delProject('${p.id}')" title="Удалить проект"
+        style="padding:2px 7px;background:rgba(255,68,102,.08);border:1px solid rgba(255,68,102,.25);border-radius:3px;color:#ff4466;font-size:.65em;cursor:pointer">✕</button>
+    </div>`;
+  }).join('');
+}
+
+async function _dupProject(id) {
+  const newProj = await ProjectManager.duplicate(id);
+  if (newProj) {
+    await setProject(newProj.id);
+    closeProjSwitcher();
+    toast('⧉ Проект продублирован: ' + newProj.name, 2000);
+  }
+}
+
+async function _delProject(id) {
+  const proj = ProjectManager.getById(id);
+  if (!proj) return;
+  if (!confirm(`Удалить проект "${proj.name}"?\nИзбранные и история будут удалены.`)) return;
+  await ProjectManager.remove(id);
+  const remaining = ProjectManager.getAll();
+  if (remaining.length > 0) {
+    await setProject(remaining[0].id);
+  } else {
+    _updateProjBar(null);
+    favourites = [];
+    renderFavBar();
+  }
+  _renderProjList();
+}
+
+// ── New files polling ──────────────────────────────────────────
+
+async function _pollNewFiles() {
+  const id = ProjectManager.getCurrentId();
+  if (!id) return;
+  try {
+    const newFiles = await ProjectManager.checkNewFiles(id);
+    const badge = document.getElementById('proj-new-badge');
+    if (badge) badge.style.display = newFiles.length > 0 ? 'inline' : 'none';
+  } catch(e) {}
+}
+
+async function refreshProjectFiles() {
+  const id = ProjectManager.getCurrentId();
+  if (!id) return;
+  const files = await ProjectManager.listCSVFiles(id);
+  ProjectManager.markFilesKnown(id, files.map(f => f.name));
+  document.getElementById('proj-new-badge').style.display = 'none';
+  // Load the most recent file
+  if (files.length > 0) {
+    const file = await ProjectManager.readCSVFile(id, files[0].name);
+    if (file) { loadFile(file); ProjectManager.updateLastFile(files[0].name); }
+    toast('🔄 Данные обновлены: ' + files[0].name, 2000);
+  }
+}
+
