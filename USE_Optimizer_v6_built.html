@@ -8719,7 +8719,7 @@ function buildCopyText(r, c, slName, tpName) {
   lines.push('PnL: ' + r.pnl.toFixed(1) + '%   WR: ' + r.wr.toFixed(1) + '%   Сделок: ' + r.n);
   lines.push('MaxDD: ' + r.dd.toFixed(1) + '%   P/DD: ' + r.pdd.toFixed(1) + '   Avg: ' + r.avg.toFixed(2) + '%');
   lines.push('1п: ' + r.p1.toFixed(1) + '% (' + r.c1 + ' сд)   2п: ' + r.p2.toFixed(1) + '% (' + r.c2 + ' сд)   ΔWR: ' + r.dwr.toFixed(1) + '%');
-  if (r.wrL != null) lines.push('Лонг: WR ' + r.wrL.toFixed(0) + '% (' + r.nL + ' сд)   Шорт: WR ' + r.wrS.toFixed(0) + '% (' + r.nS + ' сд)   ΔWR L/S: ' + r.dwrLS.toFixed(0) + '%');
+  if (r.wrL != null && r.wrS != null) lines.push('Лонг: WR ' + r.wrL.toFixed(0) + '% (' + r.nL + ' сд)   Шорт: WR ' + r.wrS.toFixed(0) + '% (' + r.nS + ' сд)   ΔWR L/S: ' + (r.dwrLS != null ? r.dwrLS.toFixed(0) : '?') + '%');
   lines.push('');
   lines.push('--- ПАТТЕРНЫ ВХОДА ---');
   lines.push('Pivot Points:       ' + on(c.usePivot,  'Left=' + c.pvL + ', Right=' + c.pvR));
@@ -9250,10 +9250,12 @@ function loadFavAsTpl(i) {
   if (f.cfg) {
     // Строим объект результата из сохранённых данных
     const r = { name: f.name, cfg: f.cfg,
-      pnl: f.stats.pnl, wr: f.stats.wr, n: f.stats.n,
-      dd: f.stats.dd, pdd: f.stats.pdd, avg: f.stats.avg||0,
+      pnl: f.stats.pnl||0, wr: f.stats.wr||0, n: f.stats.n||0,
+      dd: f.stats.dd||0, pdd: f.stats.pdd||0, avg: f.stats.avg||0,
       p1: f.stats.p1||0, p2: f.stats.p2||0, c1: f.stats.c1||0,
-      c2: f.stats.c2||0, dwr: f.stats.dwr||0 };
+      c2: f.stats.c2||0, dwr: f.stats.dwr||0,
+      wrL: f.stats.wrL??null, wrS: f.stats.wrS??null,
+      nL: f.stats.nL||0, nS: f.stats.nS||0, dwrLS: f.stats.dwrLS??null };
     showDetail(r);
   } else {
     alert('Нет сохранённых настроек для этого результата');
