@@ -495,7 +495,7 @@ function applyFiltersDebounced() {
 // ══════════════════════════════════════════════════════════════
 const _TBL_TPL_KEY = 'use_tbl_tpl';
 
-const _TF_NUM_IDS  = ['f_name','f_pnl','f_wr','f_n','f_dd','f_pdd','f_sig','f_gt','f_cvr','f_sortino','f_kr','f_sqn','f_cpcv','f_omega','f_pain','f_avg','f_p1','f_p2','f_dwr','f_tv_dpnl','f_tv_ddd','f_tv_dpdd'];
+const _TF_NUM_IDS  = ['f_name','f_pnl','f_wr','f_n','f_dd','f_pdd','f_sig','f_gt','f_cvr','f_sortino','f_kr','f_sqn','f_cpcv','f_omega','f_pain','f_burke','f_serenity','f_avg','f_p1','f_p2','f_dwr','f_tv_dpnl','f_tv_ddd','f_tv_dpdd']; // ##BURKE ##SRNTY
 const _TF_SEL_IDS  = ['f_fav','f_split','f_ls','f_rob','f_oos','f_walk','f_param','f_noise','f_mc','f_tv_score'];
 
 // map filter-input-id → column CSS class (for visibleOnly mode)
@@ -503,6 +503,7 @@ const _TF_COL_MAP  = {
   f_pnl:'col-pnl', f_wr:'col-wr', f_n:'col-n', f_dd:'col-dd', f_pdd:'col-pdd',
   f_sig:'col-sig', f_gt:'col-gt', f_cvr:'col-cvr', f_sortino:'col-sor', f_kr:'col-kr',
   f_sqn:'col-sqn', f_cpcv:'col-cpcv', f_omega:'col-omg', f_pain:'col-pain',
+  f_burke:'col-burke', f_serenity:'col-srnty', // ##BURKE ##SRNTY
   f_avg:'col-avg', f_p1:'col-p1', f_p2:'col-p2', f_dwr:'col-dwr',
   f_split:'col-split', f_ls:'col-ls',
   f_tv_dpnl:'col-tv-dpnl', f_tv_ddd:'col-tv-ddd', f_tv_dpdd:'col-tv-dpdd',
@@ -612,8 +613,8 @@ async function deleteTableTpl(i) {
 
 function resetAllFilters() {
   // Сбрасываем все текстовые/числовые инпуты
-  ['f_name','f_pnl','f_wr','f_n','f_dd','f_pdd','f_sig','f_gt','f_cvr','f_sortino','f_kr','f_sqn','f_cpcv','f_omega','f_pain','f_avg','f_p1','f_p2','f_dwr', // ##OMG ##PAIN
-   'f_tv_dpnl','f_tv_ddd','f_tv_dpdd'].forEach(id => {
+  ['f_name','f_pnl','f_wr','f_n','f_dd','f_pdd','f_sig','f_gt','f_cvr','f_sortino','f_kr','f_sqn','f_cpcv','f_omega','f_pain','f_burke','f_serenity', // ##OMG ##PAIN ##BURKE ##SRNTY
+   'f_avg','f_p1','f_p2','f_dwr','f_tv_dpnl','f_tv_ddd','f_tv_dpdd'].forEach(id => {
     const el = $(id); if (el) el.value = '';
   });
   // Сбрасываем все select
@@ -640,8 +641,10 @@ function applyFilters() {
   const fKR      = parseFloat($('f_kr').value);      // ##KR
   const fSqn     = parseFloat($('f_sqn').value);     // ##SQN
   const fCpcv    = parseFloat($('f_cpcv').value);    // ##CPCV
-  const fOmega   = parseFloat($('f_omega').value);   // ##OMG
-  const fPain    = parseFloat($('f_pain').value);    // ##PAIN
+  const fOmega    = parseFloat($('f_omega').value);    // ##OMG
+  const fPain     = parseFloat($('f_pain').value);    // ##PAIN
+  const fBurke    = parseFloat($('f_burke').value);   // ##BURKE
+  const fSerenity = parseFloat($('f_serenity').value); // ##SRNTY
   const fAvg   = parseFloat($('f_avg').value);
   const fP1    = parseFloat($('f_p1').value);
   const fP2    = parseFloat($('f_p2').value);
@@ -673,8 +676,10 @@ function applyFilters() {
     if (!isNaN(fKR)      && (r.kRatio??-99)   < fKR)      return false; // ##KR
     if (!isNaN(fSqn)     && (r.sqn??-99)      < fSqn)     return false; // ##SQN
     if (!isNaN(fCpcv)    && (r.cpcvScore??-1) < fCpcv)    return false; // ##CPCV
-    if (!isNaN(fOmega)   && (r.omega??-99)    < fOmega)   return false; // ##OMG
-    if (!isNaN(fPain)    && (r.pain??-99)     < fPain)    return false; // ##PAIN
+    if (!isNaN(fOmega)    && (r.omega??-99)    < fOmega)    return false; // ##OMG
+    if (!isNaN(fPain)     && (r.pain??-99)     < fPain)     return false; // ##PAIN
+    if (!isNaN(fBurke)    && (r.burke??-99)    < fBurke)    return false; // ##BURKE
+    if (!isNaN(fSerenity) && (r.serenity??-99) < fSerenity) return false; // ##SRNTY
     if (!isNaN(fAvg) && r.avg < fAvg) return false;
     if (!isNaN(fP1)  && r.p1  < fP1)  return false;
     if (!isNaN(fP2)  && r.p2  < fP2)  return false;
@@ -843,6 +848,8 @@ function renderVisibleResults() {
       (()=>{ const v=r.sqn??null; if(v===null) return '<td class="col-sqn muted">—</td>'; const vc=v>=3?'pos':v>=1?'warn':'neg'; return `<td class="col-sqn ${vc}" title="SQN = (avg_trade/std_trade)×√n  (Van Tharp)\nМерит качество системы на уровне сделок.\n≥5 = excellent | ≥3 = good | ≥1 = average | &lt;1 = poor">${v.toFixed(1)}</td>`; })() + // ##SQN
       (()=>{ const v=r.omega??null; if(v===null) return '<td class="col-omg muted">—</td>'; const vc=v>=3?'pos':v>=2?'warn':'neg'; return `<td class="col-omg ${vc}" title="Omega Ratio = Σприросты / Σпадения (уровень баров)\nProfit factor без предположения о нормальности.\n≥3 = отлично ✅ | ≥2 = хорошо">${v.toFixed(1)}</td>`; })() + // ##OMG
       (()=>{ const v=r.pain??null; if(v===null) return '<td class="col-pain muted">—</td>'; const vc=v>=5?'pos':v>=3?'warn':'neg'; return `<td class="col-pain ${vc}" title="Pain Ratio = PnL / Pain Index\nPain Index = mean(просадка от пика). Штрафует за длительность любых просадок.\n≥5 = отлично ✅ | ≥3 = хорошо | &lt;1 = плохо">${v.toFixed(1)}</td>`; })() + // ##PAIN
+      (()=>{ const v=r.burke??null; if(v===null) return '<td class="col-burke muted">—</td>'; const vc=v>=3?'pos':v>=2?'warn':'neg'; return `<td class="col-burke ${vc}" title="Burke Ratio = PnL / √(Σ просадок²)\nУчитывает ВСЕ события просадок, не только максимальную.\n≥3 = отлично ✅ | ≥2 = хорошо | &lt;0.5 = плохо">${v.toFixed(1)}</td>`; })() + // ##BURKE
+      (()=>{ const v=r.serenity??null; if(v===null) return '<td class="col-srnty muted">—</td>'; const vc=v>=5?'pos':v>=3?'warn':'neg'; return `<td class="col-srnty ${vc}" title="Serenity Index = PnL / (UlcerIndex × TailFactor)\nTailFactor = CVaR(5%) / mean(убытков) — штраф за хвостовые риски.\n≥5 = отлично ✅ | ≥3 = хорошо | &lt;1 = плохо">${v.toFixed(1)}</td>`; })() + // ##SRNTY
       (()=>{ const v=r.cpcvScore??null; if(v===null) return '<td class="col-cpcv muted">—</td>'; const vc=v>=80?'pos':v>=60?'warn':'neg'; return `<td class="col-cpcv ${vc}" title="CPCV% — блочная валидация: % прибыльных блоков.\nЗаполняется после открытия детали. ≥80% = устойчива ✅">${v}%</td>`; })() + // ##CPCV lazy
       `<td class="col-avg">${r.avg.toFixed(2)}</td>` +
       `<td class="col-p1 ${r.p1 >= 0 ? 'pos' : 'neg'}">${r.p1.toFixed(1)}</td>` +
@@ -983,7 +990,7 @@ function showDetail(r) {
   const _fwd = r.cfg && r.cfg._oos && r.cfg._oos.forward;
   const _hasLS = r.wrL != null;
   // Column count: 9 base + Avg + CVR + UPI + Sortino + (1 ΔWR L/S if applicable)
-  const _ncols = 15 + (_hasLS ? 1 : 0); // ##SOR +1 ##OMG +1 ##PAIN +1
+  const _ncols = 17 + (_hasLS ? 1 : 0); // ##SOR +1 ##OMG +1 ##PAIN +1 ##BURKE +1 ##SRNTY +1
 
   // Build one row of dp-stat cells (same structure for both IS and TV)
   function _statsRow(v) {
@@ -997,8 +1004,12 @@ function showDetail(r) {
     const sorV = v.sortino!=null ? v.sortino.toFixed(1) : '—'; // ##SOR
     const omgC = v.omega!=null ? (v.omega>=3?'pos':v.omega>=2?'warn':'neg') : 'muted'; // ##OMG
     const omgV = v.omega!=null ? v.omega.toFixed(1) : '—'; // ##OMG
-    const painC = v.pain!=null ? (v.pain>=5?'pos':v.pain>=3?'warn':'neg') : 'muted'; // ##PAIN
-    const painV = v.pain!=null ? v.pain.toFixed(1) : '—'; // ##PAIN
+    const painC   = v.pain!=null   ? (v.pain>=5?'pos':v.pain>=3?'warn':'neg')     : 'muted'; // ##PAIN
+    const painV   = v.pain!=null   ? v.pain.toFixed(1)   : '—'; // ##PAIN
+    const burkeC  = v.burke!=null  ? (v.burke>=3?'pos':v.burke>=2?'warn':'neg')   : 'muted'; // ##BURKE
+    const burkeV  = v.burke!=null  ? v.burke.toFixed(1)  : '—'; // ##BURKE
+    const srntyC  = v.serenity!=null ? (v.serenity>=5?'pos':v.serenity>=3?'warn':'neg') : 'muted'; // ##SRNTY
+    const srntyV  = v.serenity!=null ? v.serenity.toFixed(1) : '—'; // ##SRNTY
     let h =
       `<div class="dp-stat"><div class="v ${v.pnl>=0?'pos':'neg'}">${v.pnl.toFixed(1)}%</div><div class="l">PnL</div></div>`+
       `<div class="dp-stat"><div class="v">${v.wr.toFixed(1)}%</div><div class="l">WinRate</div></div>`+
@@ -1013,7 +1024,9 @@ function showDetail(r) {
       `<div class="dp-stat" title="Ulcer Performance Index = PnL / sqrt(mean(просадка²))\nЛучше Calmar: учитывает длительность и частоту просадок.\n≥5 = устойчива ✅ | 2–5 = умеренно | &lt;2 = нестабильна"><div class="v ${upiC}">${upiV}</div><div class="l">UPI</div></div>`+
       `<div class="dp-stat" title="Sortino Ratio = PnL / downside_dev\ndownside_dev = sqrt(mean(min(Δeq,0)²)) — только отриц. движения.\n≥3 = отлично ✅ | ≥2 = хорошо | &lt;1 = нестабильно"><div class="v ${sorC}">${sorV}</div><div class="l">Sortino</div></div>`+ // ##SOR
       `<div class="dp-stat" title="Omega Ratio = Σприросты / Σпадения (уровень баров)\nProfit factor без предположения о нормальности. ≥3 = отлично ✅ | ≥2 = хорошо."><div class="v ${omgC}">${omgV}</div><div class="l">Omega</div></div>`+ // ##OMG
-      `<div class="dp-stat" title="Pain Ratio = PnL / Pain Index\nPain Index = mean(просадка от пика). Штрафует за длительность любых просадок.\n≥5 = отлично ✅ | ≥3 = хорошо | &lt;1 = плохо"><div class="v ${painC}">${painV}</div><div class="l">Pain</div></div>`; // ##PAIN
+      `<div class="dp-stat" title="Pain Ratio = PnL / Pain Index\nPain Index = mean(просадка от пика). Штрафует за длительность любых просадок.\n≥5 = отлично ✅ | ≥3 = хорошо | &lt;1 = плохо"><div class="v ${painC}">${painV}</div><div class="l">Pain</div></div>`+ // ##PAIN
+      `<div class="dp-stat" title="Burke Ratio = PnL / √(Σ просадок²)\nУчитывает ВСЕ события просадок, не только максимальную.\n≥3 = отлично ✅ | ≥2 = хорошо | &lt;0.5 = плохо"><div class="v ${burkeC}">${burkeV}</div><div class="l">Burke</div></div>`+ // ##BURKE
+      `<div class="dp-stat" title="Serenity = PnL / (UlcerIdx × TailFactor)\nTailFactor = CVaR(5%) / mean(убытков). Штраф за хвостовые риски.\n≥5 = отлично ✅ | ≥3 = хорошо | &lt;1 = плохо"><div class="v ${srntyC}">${srntyV}</div><div class="l">Serenity</div></div>`; // ##SRNTY
     if (_hasLS) {
       const lsC = v.dwrLS!=null ? (v.dwrLS<10?'ok':v.dwrLS<25?'warn':'bad') : 'muted';
       h += `<div class="dp-stat" title="Разница WR лонгов и шортов. L:${v.nL||0}сд WR${v.wrL!=null?v.wrL.toFixed(0):'?'}% · S:${v.nS||0}сд WR${v.wrS!=null?v.wrS.toFixed(0):'?'}%"><div class="v ${lsC}">${v.dwrLS!=null?v.dwrLS.toFixed(0)+'%':'—'}</div><div class="l">ΔWR L/S</div></div>`;
@@ -1029,6 +1042,7 @@ function showDetail(r) {
     p1: r.p1, p2: r.p2, c1: r.c1, c2: r.c2, avg: r.avg, cvr: r.cvr??null, upi: r.upi??null,
     sortino: r.sortino??null, // ##SOR
     omega: r.omega??null, pain: r.pain??null, // ##OMG ##PAIN
+    burke: r.burke??null, serenity: r.serenity??null, // ##BURKE ##SRNTY
     dwrLS: r.dwrLS??null, wrL: r.wrL??null, nL: r.nL||0, wrS: r.wrS??null, nS: r.nS||0
   });
 
@@ -1043,6 +1057,7 @@ function showDetail(r) {
         avg: _fwd.avg??0, cvr: _fwd.cvr??null, upi: _fwd.upi??null,
         sortino: _fwd.sortino??null, // ##SOR
         omega: _fwd.omega??null, pain: _fwd.pain??null, // ##OMG ##PAIN
+        burke: _fwd.burke??null, serenity: _fwd.serenity??null, // ##BURKE ##SRNTY
         dwrLS: _fwd.dwrLS??null, wrL: _fwd.wrL??null, nL: _fwd.nL||0, wrS: _fwd.wrS??null, nS: _fwd.nS||0
       });
   }
@@ -3047,6 +3062,10 @@ function doSort(col) {
     arr.sort((a,b) => d * ((a.omega??-99) - (b.omega??-99)));
   } else if (col === 31) { // ##PAIN
     arr.sort((a,b) => d * ((a.pain??-99) - (b.pain??-99)));
+  } else if (col === 32) { // ##BURKE
+    arr.sort((a,b) => d * ((a.burke??-99) - (b.burke??-99)));
+  } else if (col === 33) { // ##SRNTY
+    arr.sort((a,b) => d * ((a.serenity??-99) - (b.serenity??-99)));
   } else if (col <= 11) {
     const keys = ['name','pnl','wr','n','dd','pdd','avg','p1','p2','dwr','dwr','robScore'];
     const key = keys[col];
@@ -3267,6 +3286,8 @@ const _COL_DEFS = [
   { id: 'col-sqn',        label: 'SQN',                 default: true },  // ##SQN
   { id: 'col-omg',        label: 'Omega',               default: true },  // ##OMG
   { id: 'col-pain',       label: 'Pain',                default: true },  // ##PAIN
+  { id: 'col-burke',      label: 'Burke',               default: true },  // ##BURKE
+  { id: 'col-srnty',      label: 'Serenity',            default: true },  // ##SRNTY
   { id: 'col-cpcv',       label: 'CPCV%',               default: false }, // ##CPCV lazy
   { id: 'col-avg',        label: 'Avg%',                default: true },
   { id: 'col-p1',         label: '1п PnL',              default: true },

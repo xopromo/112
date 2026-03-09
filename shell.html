@@ -1489,7 +1489,9 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
           <th class="col-kr"   data-sort="27" title="K-Ratio = slope_OLS(equity) / se(slope). Равномерность роста equity. ≥2 = отлично, ≥1 = хорошо." style="min-width:52px;resize:horizontal;overflow:auto;cursor:pointer;color:var(--accent)">K-Ratio ↕</th>
           <th class="col-sqn"  data-sort="28" title="SQN = (avg/std)×√n (Van Tharp). Качество системы на уровне сделок. ≥5 excellent, ≥3 good, ≥1 average." style="min-width:44px;resize:horizontal;overflow:auto;cursor:pointer;color:var(--accent)">SQN ↕</th>
           <th class="col-omg"  data-sort="30" title="Omega Ratio = Σприросты / Σпадения (уровень баров). Profit factor без предположения о нормальности. ≥3 = отлично, ≥2 = хорошо." style="min-width:52px;resize:horizontal;overflow:auto;cursor:pointer;color:var(--accent)">Omega ↕</th>
-          <th class="col-pain" data-sort="31" title="Pain Ratio = PnL / Pain Index. Pain Index = mean(просадка от пика). Штрафует за длительность любых просадок. ≥5 = отлично, ≥3 = хорошо." style="min-width:44px;resize:horizontal;overflow:auto;cursor:pointer;color:var(--accent)">Pain ↕</th>
+          <th class="col-pain"  data-sort="31" title="Pain Ratio = PnL / Pain Index. Pain Index = mean(просадка от пика). Штрафует за длительность любых просадок. ≥5 = отлично, ≥3 = хорошо." style="min-width:44px;resize:horizontal;overflow:auto;cursor:pointer;color:var(--accent)">Pain ↕</th>
+          <th class="col-burke" data-sort="32" title="Burke Ratio = PnL / √(Σ просадок²). Учитывает ВСЕ события просадок, не только максимальную. ≥3 = отлично, ≥2 = хорошо." style="min-width:52px;resize:horizontal;overflow:auto;cursor:pointer;color:var(--accent)">Burke ↕</th>
+          <th class="col-srnty" data-sort="33" title="Serenity Index = PnL / (UlcerIdx × TailFactor). TailFactor = CVaR(5%) / mean(убытков). Штраф за хвостовые риски. ≥5 = отлично, ≥3 = хорошо." style="min-width:56px;resize:horizontal;overflow:auto;cursor:pointer;color:var(--accent)">Serenity ↕</th>
           <th class="col-cpcv" data-sort="29" title="CPCV% — блочная валидация. Заполняется после открытия детали (lazy). ≥80% = устойчива." style="min-width:52px;resize:horizontal;overflow:auto;cursor:pointer;color:var(--accent)">CPCV% ↕</th>
           <th class="col-avg" data-sort="6" style="min-width:44px;resize:horizontal;overflow:auto;cursor:pointer">Avg% ↕</th>
           <th class="col-p1" data-sort="7" style="min-width:52px;resize:horizontal;overflow:auto;cursor:pointer">1п PnL ↕</th>
@@ -1526,7 +1528,9 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
           <th class="col-kr"><input   class="tf-inp" id="f_kr"      placeholder="≥" oninput="applyFiltersDebounced()"></th>
           <th class="col-sqn"><input  class="tf-inp" id="f_sqn"     placeholder="≥" oninput="applyFiltersDebounced()"></th>
           <th class="col-omg"><input  class="tf-inp" id="f_omega"   placeholder="≥" oninput="applyFiltersDebounced()"></th>
-          <th class="col-pain"><input class="tf-inp" id="f_pain"    placeholder="≥" oninput="applyFiltersDebounced()"></th>
+          <th class="col-pain" ><input class="tf-inp" id="f_pain"     placeholder="≥" oninput="applyFiltersDebounced()"></th>
+          <th class="col-burke"><input class="tf-inp" id="f_burke"    placeholder="≥" oninput="applyFiltersDebounced()"></th>
+          <th class="col-srnty"><input class="tf-inp" id="f_serenity" placeholder="≥" oninput="applyFiltersDebounced()"></th>
           <th class="col-cpcv"><input class="tf-inp" id="f_cpcv"    placeholder="≥" oninput="applyFiltersDebounced()"></th>
           <th class="col-avg"><input class="tf-inp" id="f_avg" placeholder="≥" oninput="applyFiltersDebounced()"></th>
           <th class="col-p1"><input class="tf-inp" id="f_p1" placeholder="≥" oninput="applyFiltersDebounced()"></th>

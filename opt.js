@@ -219,6 +219,73 @@ function _calcPainRatio(eq) {
 }
 // ─────────────────────────────────────────────────────────────────
 
+// ── Burke Ratio ───────────────────────────────────────────────────
+// Burke = PnL / sqrt(Σ di²), где di — глубина каждого отдельного события просадки.
+// Отличие от Calmar: учитывает ВСЕ просадки (квадраты суммируются),
+// не только максимальную. Стратегия с 10 просадками по 10% хуже,
+// чем с одной просадкой 15%.
+// Burke ≥ 2 = хорошо, ≥ 3 = отлично, < 0.5 = плохо.
+// Откат: удалить эту функцию + поле burke во всех results.push() (opt.js)
+//        + batch-update burke (opt.js) + _attachOOS.forward (opt.js)
+//        + _statsRow/table/filter/sort/col (ui.js) + col-burke / f_burke (shell.html)
+function _calcBurke(eq) {
+  if (!eq || eq.length < 20) return null;
+  const N = eq.length;
+  let peak = eq[0], maxDepth = 0, sumSqDD = 0, inDD = false;
+  for (let i = 1; i < N; i++) {
+    if (eq[i] >= peak) {
+      if (inDD) { sumSqDD += maxDepth * maxDepth; maxDepth = 0; inDD = false; }
+      peak = eq[i];
+    } else {
+      const depth = peak - eq[i];
+      if (depth > maxDepth) maxDepth = depth;
+      inDD = true;
+    }
+  }
+  if (inDD) sumSqDD += maxDepth * maxDepth; // финальная незакрытая просадка
+  if (sumSqDD < 1e-9) return eq[N - 1] > 0 ? 99.9 : null;
+  return Math.round(eq[N - 1] / Math.sqrt(sumSqDD) * 10) / 10;
+}
+// ─────────────────────────────────────────────────────────────────
+
+// ── Serenity Index (Rosenthal 2012) ───────────────────────────────
+// Serenity = PnL / (UlcerIndex × TailFactor)
+// TailFactor = CVaR(5%) / mean(|negative bars|) — усиливает штраф
+// когда хвостовые потери непропорционально хуже средних.
+// Дополняет UPI: UPI не знает о "жирном хвосте" плохих дней.
+// Serenity ≥ 5 = отлично, ≥ 3 = хорошо, < 1 = плохо.
+// Откат: удалить эту функцию + поле serenity во всех results.push() (opt.js)
+//        + batch-update serenity (opt.js) + _attachOOS.forward (opt.js)
+//        + _statsRow/table/filter/sort/col (ui.js) + col-srnty / f_serenity (shell.html)
+function _calcSerenity(eq) {
+  if (!eq || eq.length < 20) return null;
+  const N = eq.length;
+  // Ulcer Index
+  let peak = eq[0], sumSqUI = 0;
+  for (let i = 0; i < N; i++) {
+    if (eq[i] > peak) peak = eq[i];
+    const dd = peak - eq[i];
+    sumSqUI += dd * dd;
+  }
+  const ui = Math.sqrt(sumSqUI / N);
+  if (ui < 0.001) return null;
+  // Tail factor: CVaR(5%) / mean(|negative returns|)
+  const neg = [];
+  for (let i = 1; i < N; i++) { const r = eq[i] - eq[i - 1]; if (r < 0) neg.push(r); }
+  if (neg.length === 0) return Math.round(eq[N - 1] / ui * 10) / 10;
+  let sumNeg = 0;
+  for (const r of neg) sumNeg += r;
+  const meanNeg = -sumNeg / neg.length;
+  neg.sort((a, b) => a - b); // ascending (worst first)
+  const k = Math.max(1, Math.floor(neg.length * 0.05));
+  let cvarSum = 0;
+  for (let i = 0; i < k; i++) cvarSum += neg[i];
+  const cvar5 = -cvarSum / k;
+  const tailFactor = meanNeg > 0.001 ? Math.max(1, cvar5 / meanNeg) : 1;
+  return Math.round(eq[N - 1] / (ui * tailFactor) * 10) / 10;
+}
+// ─────────────────────────────────────────────────────────────────
+
 // ── MC Permutation Test (поиск 2026-03-06) ───────────────────────
 // p-value = доля из 1000 случайных перемешиваний сделок,
 // где shuffled Calmar ≥ actual Calmar.
@@ -547,7 +614,8 @@ async function runOpt() {
       wrL: rFull.wrL??null, nL: rFull.nL||0, wrS: rFull.wrS??null, nS: rFull.nS||0,
       dwrLS: rFull.dwrLS??null, cvr: _calcCVR(rFull.eq), upi: _calcUlcerIdx(rFull.eq),
       sortino: _calcSortino(rFull.eq), kRatio: _calcKRatio(rFull.eq), sqn: rFull.sqn??null,
-      omega: _calcOmega(rFull.eq), pain: _calcPainRatio(rFull.eq) }; // ##OMG ##PAIN
+      omega: _calcOmega(rFull.eq), pain: _calcPainRatio(rFull.eq),
+      burke: _calcBurke(rFull.eq), serenity: _calcSerenity(rFull.eq) }; // ##OMG ##PAIN ##BURKE ##SRNTY
     // Обновляем глобальный equities полной кривой — чтобы график показывал 100% данных
     // с правильным split-маркером на IS/OOS границе, а не растянутую IS-кривую.
     if (name && typeof equities !== 'undefined') equities[name] = rFull.eq;
@@ -1451,7 +1519,8 @@ async function runOpt() {
           results.push({name,pnl:r.pnl,wr:r.wr,n:r.n,dd:r.dd,pdd,avg:r.avg,sig,gt,
             p1:r.p1,p2:r.p2,dwr:r.dwr,c1:r.c1,c2:r.c2,nL:r.nL||0,pL:r.pL||0,wrL:r.wrL,nS:r.nS||0,pS:r.pS||0,wrS:r.wrS,dwrLS:r.dwrLS,
             cvr:_calcCVR(r.eq),upi:_calcUlcerIdx(r.eq),sortino:_calcSortino(r.eq),kRatio:_calcKRatio(r.eq),sqn:r.sqn??null,
-            omega:_calcOmega(r.eq),pain:_calcPainRatio(r.eq),cfg:_cfg}); // ##OMG ##PAIN
+            omega:_calcOmega(r.eq),pain:_calcPainRatio(r.eq),
+            burke:_calcBurke(r.eq),serenity:_calcSerenity(r.eq),cfg:_cfg}); // ##OMG ##PAIN ##BURKE ##SRNTY
           equities[name] = r.eq;
         }
       }
@@ -1765,7 +1834,7 @@ async function runOpt() {
           results.push({name,pnl:r.pnl,wr:r.wr,n:r.n,dd:r.dd,pdd,avg:r.avg,sig,gt,
             p1:r.p1,p2:r.p2,dwr:r.dwr,c1:r.c1,c2:r.c2,nL:r.nL||0,pL:r.pL||0,wrL:r.wrL,nS:r.nS||0,pS:r.pS||0,wrS:r.wrS,dwrLS:r.dwrLS,
             cvr:null,upi:null,sortino:null,kRatio:null,sqn:r.sqn??null,
-            omega:null,pain:null,cfg:_cfg_tpe}); // ##OMG ##PAIN (null — вычислятся батчем)
+            omega:null,pain:null,burke:null,serenity:null,cfg:_cfg_tpe}); // ##OMG ##PAIN ##BURKE ##SRNTY (null — батч)
           equities[name] = r.eq;
         }
       }
@@ -1925,8 +1994,10 @@ async function runOpt() {
           results[oi].upi     = _calcUlcerIdx(_eq);
           results[oi].sortino = _calcSortino(_eq);
           results[oi].kRatio  = _calcKRatio(_eq);
-          results[oi].omega   = _calcOmega(_eq);   // ##OMG
-          results[oi].pain    = _calcPainRatio(_eq); // ##PAIN
+          results[oi].omega    = _calcOmega(_eq);    // ##OMG
+          results[oi].pain     = _calcPainRatio(_eq); // ##PAIN
+          results[oi].burke    = _calcBurke(_eq);    // ##BURKE
+          results[oi].serenity = _calcSerenity(_eq); // ##SRNTY
         }
         if (oi % 100 === 0) { await yieldToUI(); }
       }
@@ -2222,7 +2293,8 @@ async function runOpt() {
                                       results.push({name,pnl:r.pnl,wr:r.wr,n:r.n,dd:r.dd,pdd,avg:r.avg,sig,gt,
                                         p1:r.p1,p2:r.p2,dwr:r.dwr,c1:r.c1,c2:r.c2,nL:r.nL||0,pL:r.pL||0,wrL:r.wrL,nS:r.nS||0,pS:r.pS||0,wrS:r.wrS,dwrLS:r.dwrLS,
                                         cvr:_calcCVR(r.eq),upi:_calcUlcerIdx(r.eq),sortino:_calcSortino(r.eq),kRatio:_calcKRatio(r.eq),sqn:r.sqn??null,
-                                        omega:_calcOmega(r.eq),pain:_calcPainRatio(r.eq),cfg:_cfg_ex}); // ##OMG ##PAIN
+                                        omega:_calcOmega(r.eq),pain:_calcPainRatio(r.eq),
+                                        burke:_calcBurke(r.eq),serenity:_calcSerenity(r.eq),cfg:_cfg_ex}); // ##OMG ##PAIN ##BURKE ##SRNTY
                                       equities[name]=r.eq;
                                       } // end else (не дубль)
                                     } // end if(r passed filter)

@@ -1489,7 +1489,9 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
           <th class="col-kr"   data-sort="27" title="K-Ratio = slope_OLS(equity) / se(slope). Равномерность роста equity. ≥2 = отлично, ≥1 = хорошо." style="min-width:52px;resize:horizontal;overflow:auto;cursor:pointer;color:var(--accent)">K-Ratio ↕</th>
           <th class="col-sqn"  data-sort="28" title="SQN = (avg/std)×√n (Van Tharp). Качество системы на уровне сделок. ≥5 excellent, ≥3 good, ≥1 average." style="min-width:44px;resize:horizontal;overflow:auto;cursor:pointer;color:var(--accent)">SQN ↕</th>
           <th class="col-omg"  data-sort="30" title="Omega Ratio = Σприросты / Σпадения (уровень баров). Profit factor без предположения о нормальности. ≥3 = отлично, ≥2 = хорошо." style="min-width:52px;resize:horizontal;overflow:auto;cursor:pointer;color:var(--accent)">Omega ↕</th>
-          <th class="col-pain" data-sort="31" title="Pain Ratio = PnL / Pain Index. Pain Index = mean(просадка от пика). Штрафует за длительность любых просадок. ≥5 = отлично, ≥3 = хорошо." style="min-width:44px;resize:horizontal;overflow:auto;cursor:pointer;color:var(--accent)">Pain ↕</th>
+          <th class="col-pain"  data-sort="31" title="Pain Ratio = PnL / Pain Index. Pain Index = mean(просадка от пика). Штрафует за длительность любых просадок. ≥5 = отлично, ≥3 = хорошо." style="min-width:44px;resize:horizontal;overflow:auto;cursor:pointer;color:var(--accent)">Pain ↕</th>
+          <th class="col-burke" data-sort="32" title="Burke Ratio = PnL / √(Σ просадок²). Учитывает ВСЕ события просадок, не только максимальную. ≥3 = отлично, ≥2 = хорошо." style="min-width:52px;resize:horizontal;overflow:auto;cursor:pointer;color:var(--accent)">Burke ↕</th>
+          <th class="col-srnty" data-sort="33" title="Serenity Index = PnL / (UlcerIdx × TailFactor). TailFactor = CVaR(5%) / mean(убытков). Штраф за хвостовые риски. ≥5 = отлично, ≥3 = хорошо." style="min-width:56px;resize:horizontal;overflow:auto;cursor:pointer;color:var(--accent)">Serenity ↕</th>
           <th class="col-cpcv" data-sort="29" title="CPCV% — блочная валидация. Заполняется после открытия детали (lazy). ≥80% = устойчива." style="min-width:52px;resize:horizontal;overflow:auto;cursor:pointer;color:var(--accent)">CPCV% ↕</th>
           <th class="col-avg" data-sort="6" style="min-width:44px;resize:horizontal;overflow:auto;cursor:pointer">Avg% ↕</th>
           <th class="col-p1" data-sort="7" style="min-width:52px;resize:horizontal;overflow:auto;cursor:pointer">1п PnL ↕</th>
@@ -1526,7 +1528,9 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
           <th class="col-kr"><input   class="tf-inp" id="f_kr"      placeholder="≥" oninput="applyFiltersDebounced()"></th>
           <th class="col-sqn"><input  class="tf-inp" id="f_sqn"     placeholder="≥" oninput="applyFiltersDebounced()"></th>
           <th class="col-omg"><input  class="tf-inp" id="f_omega"   placeholder="≥" oninput="applyFiltersDebounced()"></th>
-          <th class="col-pain"><input class="tf-inp" id="f_pain"    placeholder="≥" oninput="applyFiltersDebounced()"></th>
+          <th class="col-pain" ><input class="tf-inp" id="f_pain"     placeholder="≥" oninput="applyFiltersDebounced()"></th>
+          <th class="col-burke"><input class="tf-inp" id="f_burke"    placeholder="≥" oninput="applyFiltersDebounced()"></th>
+          <th class="col-srnty"><input class="tf-inp" id="f_serenity" placeholder="≥" oninput="applyFiltersDebounced()"></th>
           <th class="col-cpcv"><input class="tf-inp" id="f_cpcv"    placeholder="≥" oninput="applyFiltersDebounced()"></th>
           <th class="col-avg"><input class="tf-inp" id="f_avg" placeholder="≥" oninput="applyFiltersDebounced()"></th>
           <th class="col-p1"><input class="tf-inp" id="f_p1" placeholder="≥" oninput="applyFiltersDebounced()"></th>
@@ -5741,6 +5745,73 @@ function _calcPainRatio(eq) {
 }
 // ─────────────────────────────────────────────────────────────────
 
+// ── Burke Ratio ───────────────────────────────────────────────────
+// Burke = PnL / sqrt(Σ di²), где di — глубина каждого отдельного события просадки.
+// Отличие от Calmar: учитывает ВСЕ просадки (квадраты суммируются),
+// не только максимальную. Стратегия с 10 просадками по 10% хуже,
+// чем с одной просадкой 15%.
+// Burke ≥ 2 = хорошо, ≥ 3 = отлично, < 0.5 = плохо.
+// Откат: удалить эту функцию + поле burke во всех results.push() (opt.js)
+//        + batch-update burke (opt.js) + _attachOOS.forward (opt.js)
+//        + _statsRow/table/filter/sort/col (ui.js) + col-burke / f_burke (shell.html)
+function _calcBurke(eq) {
+  if (!eq || eq.length < 20) return null;
+  const N = eq.length;
+  let peak = eq[0], maxDepth = 0, sumSqDD = 0, inDD = false;
+  for (let i = 1; i < N; i++) {
+    if (eq[i] >= peak) {
+      if (inDD) { sumSqDD += maxDepth * maxDepth; maxDepth = 0; inDD = false; }
+      peak = eq[i];
+    } else {
+      const depth = peak - eq[i];
+      if (depth > maxDepth) maxDepth = depth;
+      inDD = true;
+    }
+  }
+  if (inDD) sumSqDD += maxDepth * maxDepth; // финальная незакрытая просадка
+  if (sumSqDD < 1e-9) return eq[N - 1] > 0 ? 99.9 : null;
+  return Math.round(eq[N - 1] / Math.sqrt(sumSqDD) * 10) / 10;
+}
+// ─────────────────────────────────────────────────────────────────
+
+// ── Serenity Index (Rosenthal 2012) ───────────────────────────────
+// Serenity = PnL / (UlcerIndex × TailFactor)
+// TailFactor = CVaR(5%) / mean(|negative bars|) — усиливает штраф
+// когда хвостовые потери непропорционально хуже средних.
+// Дополняет UPI: UPI не знает о "жирном хвосте" плохих дней.
+// Serenity ≥ 5 = отлично, ≥ 3 = хорошо, < 1 = плохо.
+// Откат: удалить эту функцию + поле serenity во всех results.push() (opt.js)
+//        + batch-update serenity (opt.js) + _attachOOS.forward (opt.js)
+//        + _statsRow/table/filter/sort/col (ui.js) + col-srnty / f_serenity (shell.html)
+function _calcSerenity(eq) {
+  if (!eq || eq.length < 20) return null;
+  const N = eq.length;
+  // Ulcer Index
+  let peak = eq[0], sumSqUI = 0;
+  for (let i = 0; i < N; i++) {
+    if (eq[i] > peak) peak = eq[i];
+    const dd = peak - eq[i];
+    sumSqUI += dd * dd;
+  }
+  const ui = Math.sqrt(sumSqUI / N);
+  if (ui < 0.001) return null;
+  // Tail factor: CVaR(5%) / mean(|negative returns|)
+  const neg = [];
+  for (let i = 1; i < N; i++) { const r = eq[i] - eq[i - 1]; if (r < 0) neg.push(r); }
+  if (neg.length === 0) return Math.round(eq[N - 1] / ui * 10) / 10;
+  let sumNeg = 0;
+  for (const r of neg) sumNeg += r;
+  const meanNeg = -sumNeg / neg.length;
+  neg.sort((a, b) => a - b); // ascending (worst first)
+  const k = Math.max(1, Math.floor(neg.length * 0.05));
+  let cvarSum = 0;
+  for (let i = 0; i < k; i++) cvarSum += neg[i];
+  const cvar5 = -cvarSum / k;
+  const tailFactor = meanNeg > 0.001 ? Math.max(1, cvar5 / meanNeg) : 1;
+  return Math.round(eq[N - 1] / (ui * tailFactor) * 10) / 10;
+}
+// ─────────────────────────────────────────────────────────────────
+
 // ── MC Permutation Test (поиск 2026-03-06) ───────────────────────
 // p-value = доля из 1000 случайных перемешиваний сделок,
 // где shuffled Calmar ≥ actual Calmar.
@@ -6069,7 +6140,8 @@ async function runOpt() {
       wrL: rFull.wrL??null, nL: rFull.nL||0, wrS: rFull.wrS??null, nS: rFull.nS||0,
       dwrLS: rFull.dwrLS??null, cvr: _calcCVR(rFull.eq), upi: _calcUlcerIdx(rFull.eq),
       sortino: _calcSortino(rFull.eq), kRatio: _calcKRatio(rFull.eq), sqn: rFull.sqn??null,
-      omega: _calcOmega(rFull.eq), pain: _calcPainRatio(rFull.eq) }; // ##OMG ##PAIN
+      omega: _calcOmega(rFull.eq), pain: _calcPainRatio(rFull.eq),
+      burke: _calcBurke(rFull.eq), serenity: _calcSerenity(rFull.eq) }; // ##OMG ##PAIN ##BURKE ##SRNTY
     // Обновляем глобальный equities полной кривой — чтобы график показывал 100% данных
     // с правильным split-маркером на IS/OOS границе, а не растянутую IS-кривую.
     if (name && typeof equities !== 'undefined') equities[name] = rFull.eq;
@@ -6973,7 +7045,8 @@ async function runOpt() {
           results.push({name,pnl:r.pnl,wr:r.wr,n:r.n,dd:r.dd,pdd,avg:r.avg,sig,gt,
             p1:r.p1,p2:r.p2,dwr:r.dwr,c1:r.c1,c2:r.c2,nL:r.nL||0,pL:r.pL||0,wrL:r.wrL,nS:r.nS||0,pS:r.pS||0,wrS:r.wrS,dwrLS:r.dwrLS,
             cvr:_calcCVR(r.eq),upi:_calcUlcerIdx(r.eq),sortino:_calcSortino(r.eq),kRatio:_calcKRatio(r.eq),sqn:r.sqn??null,
-            omega:_calcOmega(r.eq),pain:_calcPainRatio(r.eq),cfg:_cfg}); // ##OMG ##PAIN
+            omega:_calcOmega(r.eq),pain:_calcPainRatio(r.eq),
+            burke:_calcBurke(r.eq),serenity:_calcSerenity(r.eq),cfg:_cfg}); // ##OMG ##PAIN ##BURKE ##SRNTY
           equities[name] = r.eq;
         }
       }
@@ -7287,7 +7360,7 @@ async function runOpt() {
           results.push({name,pnl:r.pnl,wr:r.wr,n:r.n,dd:r.dd,pdd,avg:r.avg,sig,gt,
             p1:r.p1,p2:r.p2,dwr:r.dwr,c1:r.c1,c2:r.c2,nL:r.nL||0,pL:r.pL||0,wrL:r.wrL,nS:r.nS||0,pS:r.pS||0,wrS:r.wrS,dwrLS:r.dwrLS,
             cvr:null,upi:null,sortino:null,kRatio:null,sqn:r.sqn??null,
-            omega:null,pain:null,cfg:_cfg_tpe}); // ##OMG ##PAIN (null — вычислятся батчем)
+            omega:null,pain:null,burke:null,serenity:null,cfg:_cfg_tpe}); // ##OMG ##PAIN ##BURKE ##SRNTY (null — батч)
           equities[name] = r.eq;
         }
       }
@@ -7447,8 +7520,10 @@ async function runOpt() {
           results[oi].upi     = _calcUlcerIdx(_eq);
           results[oi].sortino = _calcSortino(_eq);
           results[oi].kRatio  = _calcKRatio(_eq);
-          results[oi].omega   = _calcOmega(_eq);   // ##OMG
-          results[oi].pain    = _calcPainRatio(_eq); // ##PAIN
+          results[oi].omega    = _calcOmega(_eq);    // ##OMG
+          results[oi].pain     = _calcPainRatio(_eq); // ##PAIN
+          results[oi].burke    = _calcBurke(_eq);    // ##BURKE
+          results[oi].serenity = _calcSerenity(_eq); // ##SRNTY
         }
         if (oi % 100 === 0) { await yieldToUI(); }
       }
@@ -7744,7 +7819,8 @@ async function runOpt() {
                                       results.push({name,pnl:r.pnl,wr:r.wr,n:r.n,dd:r.dd,pdd,avg:r.avg,sig,gt,
                                         p1:r.p1,p2:r.p2,dwr:r.dwr,c1:r.c1,c2:r.c2,nL:r.nL||0,pL:r.pL||0,wrL:r.wrL,nS:r.nS||0,pS:r.pS||0,wrS:r.wrS,dwrLS:r.dwrLS,
                                         cvr:_calcCVR(r.eq),upi:_calcUlcerIdx(r.eq),sortino:_calcSortino(r.eq),kRatio:_calcKRatio(r.eq),sqn:r.sqn??null,
-                                        omega:_calcOmega(r.eq),pain:_calcPainRatio(r.eq),cfg:_cfg_ex}); // ##OMG ##PAIN
+                                        omega:_calcOmega(r.eq),pain:_calcPainRatio(r.eq),
+                                        burke:_calcBurke(r.eq),serenity:_calcSerenity(r.eq),cfg:_cfg_ex}); // ##OMG ##PAIN ##BURKE ##SRNTY
                                       equities[name]=r.eq;
                                       } // end else (не дубль)
                                     } // end if(r passed filter)
@@ -8424,7 +8500,7 @@ function applyFiltersDebounced() {
 // ══════════════════════════════════════════════════════════════
 const _TBL_TPL_KEY = 'use_tbl_tpl';
 
-const _TF_NUM_IDS  = ['f_name','f_pnl','f_wr','f_n','f_dd','f_pdd','f_sig','f_gt','f_cvr','f_sortino','f_kr','f_sqn','f_cpcv','f_omega','f_pain','f_avg','f_p1','f_p2','f_dwr','f_tv_dpnl','f_tv_ddd','f_tv_dpdd'];
+const _TF_NUM_IDS  = ['f_name','f_pnl','f_wr','f_n','f_dd','f_pdd','f_sig','f_gt','f_cvr','f_sortino','f_kr','f_sqn','f_cpcv','f_omega','f_pain','f_burke','f_serenity','f_avg','f_p1','f_p2','f_dwr','f_tv_dpnl','f_tv_ddd','f_tv_dpdd']; // ##BURKE ##SRNTY
 const _TF_SEL_IDS  = ['f_fav','f_split','f_ls','f_rob','f_oos','f_walk','f_param','f_noise','f_mc','f_tv_score'];
 
 // map filter-input-id → column CSS class (for visibleOnly mode)
@@ -8432,6 +8508,7 @@ const _TF_COL_MAP  = {
   f_pnl:'col-pnl', f_wr:'col-wr', f_n:'col-n', f_dd:'col-dd', f_pdd:'col-pdd',
   f_sig:'col-sig', f_gt:'col-gt', f_cvr:'col-cvr', f_sortino:'col-sor', f_kr:'col-kr',
   f_sqn:'col-sqn', f_cpcv:'col-cpcv', f_omega:'col-omg', f_pain:'col-pain',
+  f_burke:'col-burke', f_serenity:'col-srnty', // ##BURKE ##SRNTY
   f_avg:'col-avg', f_p1:'col-p1', f_p2:'col-p2', f_dwr:'col-dwr',
   f_split:'col-split', f_ls:'col-ls',
   f_tv_dpnl:'col-tv-dpnl', f_tv_ddd:'col-tv-ddd', f_tv_dpdd:'col-tv-dpdd',
@@ -8541,8 +8618,8 @@ async function deleteTableTpl(i) {
 
 function resetAllFilters() {
   // Сбрасываем все текстовые/числовые инпуты
-  ['f_name','f_pnl','f_wr','f_n','f_dd','f_pdd','f_sig','f_gt','f_cvr','f_sortino','f_kr','f_sqn','f_cpcv','f_omega','f_pain','f_avg','f_p1','f_p2','f_dwr', // ##OMG ##PAIN
-   'f_tv_dpnl','f_tv_ddd','f_tv_dpdd'].forEach(id => {
+  ['f_name','f_pnl','f_wr','f_n','f_dd','f_pdd','f_sig','f_gt','f_cvr','f_sortino','f_kr','f_sqn','f_cpcv','f_omega','f_pain','f_burke','f_serenity', // ##OMG ##PAIN ##BURKE ##SRNTY
+   'f_avg','f_p1','f_p2','f_dwr','f_tv_dpnl','f_tv_ddd','f_tv_dpdd'].forEach(id => {
     const el = $(id); if (el) el.value = '';
   });
   // Сбрасываем все select
@@ -8569,8 +8646,10 @@ function applyFilters() {
   const fKR      = parseFloat($('f_kr').value);      // ##KR
   const fSqn     = parseFloat($('f_sqn').value);     // ##SQN
   const fCpcv    = parseFloat($('f_cpcv').value);    // ##CPCV
-  const fOmega   = parseFloat($('f_omega').value);   // ##OMG
-  const fPain    = parseFloat($('f_pain').value);    // ##PAIN
+  const fOmega    = parseFloat($('f_omega').value);    // ##OMG
+  const fPain     = parseFloat($('f_pain').value);    // ##PAIN
+  const fBurke    = parseFloat($('f_burke').value);   // ##BURKE
+  const fSerenity = parseFloat($('f_serenity').value); // ##SRNTY
   const fAvg   = parseFloat($('f_avg').value);
   const fP1    = parseFloat($('f_p1').value);
   const fP2    = parseFloat($('f_p2').value);
@@ -8602,8 +8681,10 @@ function applyFilters() {
     if (!isNaN(fKR)      && (r.kRatio??-99)   < fKR)      return false; // ##KR
     if (!isNaN(fSqn)     && (r.sqn??-99)      < fSqn)     return false; // ##SQN
     if (!isNaN(fCpcv)    && (r.cpcvScore??-1) < fCpcv)    return false; // ##CPCV
-    if (!isNaN(fOmega)   && (r.omega??-99)    < fOmega)   return false; // ##OMG
-    if (!isNaN(fPain)    && (r.pain??-99)     < fPain)    return false; // ##PAIN
+    if (!isNaN(fOmega)    && (r.omega??-99)    < fOmega)    return false; // ##OMG
+    if (!isNaN(fPain)     && (r.pain??-99)     < fPain)     return false; // ##PAIN
+    if (!isNaN(fBurke)    && (r.burke??-99)    < fBurke)    return false; // ##BURKE
+    if (!isNaN(fSerenity) && (r.serenity??-99) < fSerenity) return false; // ##SRNTY
     if (!isNaN(fAvg) && r.avg < fAvg) return false;
     if (!isNaN(fP1)  && r.p1  < fP1)  return false;
     if (!isNaN(fP2)  && r.p2  < fP2)  return false;
@@ -8772,6 +8853,8 @@ function renderVisibleResults() {
       (()=>{ const v=r.sqn??null; if(v===null) return '<td class="col-sqn muted">—</td>'; const vc=v>=3?'pos':v>=1?'warn':'neg'; return `<td class="col-sqn ${vc}" title="SQN = (avg_trade/std_trade)×√n  (Van Tharp)\nМерит качество системы на уровне сделок.\n≥5 = excellent | ≥3 = good | ≥1 = average | &lt;1 = poor">${v.toFixed(1)}</td>`; })() + // ##SQN
       (()=>{ const v=r.omega??null; if(v===null) return '<td class="col-omg muted">—</td>'; const vc=v>=3?'pos':v>=2?'warn':'neg'; return `<td class="col-omg ${vc}" title="Omega Ratio = Σприросты / Σпадения (уровень баров)\nProfit factor без предположения о нормальности.\n≥3 = отлично ✅ | ≥2 = хорошо">${v.toFixed(1)}</td>`; })() + // ##OMG
       (()=>{ const v=r.pain??null; if(v===null) return '<td class="col-pain muted">—</td>'; const vc=v>=5?'pos':v>=3?'warn':'neg'; return `<td class="col-pain ${vc}" title="Pain Ratio = PnL / Pain Index\nPain Index = mean(просадка от пика). Штрафует за длительность любых просадок.\n≥5 = отлично ✅ | ≥3 = хорошо | &lt;1 = плохо">${v.toFixed(1)}</td>`; })() + // ##PAIN
+      (()=>{ const v=r.burke??null; if(v===null) return '<td class="col-burke muted">—</td>'; const vc=v>=3?'pos':v>=2?'warn':'neg'; return `<td class="col-burke ${vc}" title="Burke Ratio = PnL / √(Σ просадок²)\nУчитывает ВСЕ события просадок, не только максимальную.\n≥3 = отлично ✅ | ≥2 = хорошо | &lt;0.5 = плохо">${v.toFixed(1)}</td>`; })() + // ##BURKE
+      (()=>{ const v=r.serenity??null; if(v===null) return '<td class="col-srnty muted">—</td>'; const vc=v>=5?'pos':v>=3?'warn':'neg'; return `<td class="col-srnty ${vc}" title="Serenity Index = PnL / (UlcerIndex × TailFactor)\nTailFactor = CVaR(5%) / mean(убытков) — штраф за хвостовые риски.\n≥5 = отлично ✅ | ≥3 = хорошо | &lt;1 = плохо">${v.toFixed(1)}</td>`; })() + // ##SRNTY
       (()=>{ const v=r.cpcvScore??null; if(v===null) return '<td class="col-cpcv muted">—</td>'; const vc=v>=80?'pos':v>=60?'warn':'neg'; return `<td class="col-cpcv ${vc}" title="CPCV% — блочная валидация: % прибыльных блоков.\nЗаполняется после открытия детали. ≥80% = устойчива ✅">${v}%</td>`; })() + // ##CPCV lazy
       `<td class="col-avg">${r.avg.toFixed(2)}</td>` +
       `<td class="col-p1 ${r.p1 >= 0 ? 'pos' : 'neg'}">${r.p1.toFixed(1)}</td>` +
@@ -8912,7 +8995,7 @@ function showDetail(r) {
   const _fwd = r.cfg && r.cfg._oos && r.cfg._oos.forward;
   const _hasLS = r.wrL != null;
   // Column count: 9 base + Avg + CVR + UPI + Sortino + (1 ΔWR L/S if applicable)
-  const _ncols = 15 + (_hasLS ? 1 : 0); // ##SOR +1 ##OMG +1 ##PAIN +1
+  const _ncols = 17 + (_hasLS ? 1 : 0); // ##SOR +1 ##OMG +1 ##PAIN +1 ##BURKE +1 ##SRNTY +1
 
   // Build one row of dp-stat cells (same structure for both IS and TV)
   function _statsRow(v) {
@@ -8926,8 +9009,12 @@ function showDetail(r) {
     const sorV = v.sortino!=null ? v.sortino.toFixed(1) : '—'; // ##SOR
     const omgC = v.omega!=null ? (v.omega>=3?'pos':v.omega>=2?'warn':'neg') : 'muted'; // ##OMG
     const omgV = v.omega!=null ? v.omega.toFixed(1) : '—'; // ##OMG
-    const painC = v.pain!=null ? (v.pain>=5?'pos':v.pain>=3?'warn':'neg') : 'muted'; // ##PAIN
-    const painV = v.pain!=null ? v.pain.toFixed(1) : '—'; // ##PAIN
+    const painC   = v.pain!=null   ? (v.pain>=5?'pos':v.pain>=3?'warn':'neg')     : 'muted'; // ##PAIN
+    const painV   = v.pain!=null   ? v.pain.toFixed(1)   : '—'; // ##PAIN
+    const burkeC  = v.burke!=null  ? (v.burke>=3?'pos':v.burke>=2?'warn':'neg')   : 'muted'; // ##BURKE
+    const burkeV  = v.burke!=null  ? v.burke.toFixed(1)  : '—'; // ##BURKE
+    const srntyC  = v.serenity!=null ? (v.serenity>=5?'pos':v.serenity>=3?'warn':'neg') : 'muted'; // ##SRNTY
+    const srntyV  = v.serenity!=null ? v.serenity.toFixed(1) : '—'; // ##SRNTY
     let h =
       `<div class="dp-stat"><div class="v ${v.pnl>=0?'pos':'neg'}">${v.pnl.toFixed(1)}%</div><div class="l">PnL</div></div>`+
       `<div class="dp-stat"><div class="v">${v.wr.toFixed(1)}%</div><div class="l">WinRate</div></div>`+
@@ -8942,7 +9029,9 @@ function showDetail(r) {
       `<div class="dp-stat" title="Ulcer Performance Index = PnL / sqrt(mean(просадка²))\nЛучше Calmar: учитывает длительность и частоту просадок.\n≥5 = устойчива ✅ | 2–5 = умеренно | &lt;2 = нестабильна"><div class="v ${upiC}">${upiV}</div><div class="l">UPI</div></div>`+
       `<div class="dp-stat" title="Sortino Ratio = PnL / downside_dev\ndownside_dev = sqrt(mean(min(Δeq,0)²)) — только отриц. движения.\n≥3 = отлично ✅ | ≥2 = хорошо | &lt;1 = нестабильно"><div class="v ${sorC}">${sorV}</div><div class="l">Sortino</div></div>`+ // ##SOR
       `<div class="dp-stat" title="Omega Ratio = Σприросты / Σпадения (уровень баров)\nProfit factor без предположения о нормальности. ≥3 = отлично ✅ | ≥2 = хорошо."><div class="v ${omgC}">${omgV}</div><div class="l">Omega</div></div>`+ // ##OMG
-      `<div class="dp-stat" title="Pain Ratio = PnL / Pain Index\nPain Index = mean(просадка от пика). Штрафует за длительность любых просадок.\n≥5 = отлично ✅ | ≥3 = хорошо | &lt;1 = плохо"><div class="v ${painC}">${painV}</div><div class="l">Pain</div></div>`; // ##PAIN
+      `<div class="dp-stat" title="Pain Ratio = PnL / Pain Index\nPain Index = mean(просадка от пика). Штрафует за длительность любых просадок.\n≥5 = отлично ✅ | ≥3 = хорошо | &lt;1 = плохо"><div class="v ${painC}">${painV}</div><div class="l">Pain</div></div>`+ // ##PAIN
+      `<div class="dp-stat" title="Burke Ratio = PnL / √(Σ просадок²)\nУчитывает ВСЕ события просадок, не только максимальную.\n≥3 = отлично ✅ | ≥2 = хорошо | &lt;0.5 = плохо"><div class="v ${burkeC}">${burkeV}</div><div class="l">Burke</div></div>`+ // ##BURKE
+      `<div class="dp-stat" title="Serenity = PnL / (UlcerIdx × TailFactor)\nTailFactor = CVaR(5%) / mean(убытков). Штраф за хвостовые риски.\n≥5 = отлично ✅ | ≥3 = хорошо | &lt;1 = плохо"><div class="v ${srntyC}">${srntyV}</div><div class="l">Serenity</div></div>`; // ##SRNTY
     if (_hasLS) {
       const lsC = v.dwrLS!=null ? (v.dwrLS<10?'ok':v.dwrLS<25?'warn':'bad') : 'muted';
       h += `<div class="dp-stat" title="Разница WR лонгов и шортов. L:${v.nL||0}сд WR${v.wrL!=null?v.wrL.toFixed(0):'?'}% · S:${v.nS||0}сд WR${v.wrS!=null?v.wrS.toFixed(0):'?'}%"><div class="v ${lsC}">${v.dwrLS!=null?v.dwrLS.toFixed(0)+'%':'—'}</div><div class="l">ΔWR L/S</div></div>`;
@@ -8958,6 +9047,7 @@ function showDetail(r) {
     p1: r.p1, p2: r.p2, c1: r.c1, c2: r.c2, avg: r.avg, cvr: r.cvr??null, upi: r.upi??null,
     sortino: r.sortino??null, // ##SOR
     omega: r.omega??null, pain: r.pain??null, // ##OMG ##PAIN
+    burke: r.burke??null, serenity: r.serenity??null, // ##BURKE ##SRNTY
     dwrLS: r.dwrLS??null, wrL: r.wrL??null, nL: r.nL||0, wrS: r.wrS??null, nS: r.nS||0
   });
 
@@ -8972,6 +9062,7 @@ function showDetail(r) {
         avg: _fwd.avg??0, cvr: _fwd.cvr??null, upi: _fwd.upi??null,
         sortino: _fwd.sortino??null, // ##SOR
         omega: _fwd.omega??null, pain: _fwd.pain??null, // ##OMG ##PAIN
+        burke: _fwd.burke??null, serenity: _fwd.serenity??null, // ##BURKE ##SRNTY
         dwrLS: _fwd.dwrLS??null, wrL: _fwd.wrL??null, nL: _fwd.nL||0, wrS: _fwd.wrS??null, nS: _fwd.nS||0
       });
   }
@@ -10976,6 +11067,10 @@ function doSort(col) {
     arr.sort((a,b) => d * ((a.omega??-99) - (b.omega??-99)));
   } else if (col === 31) { // ##PAIN
     arr.sort((a,b) => d * ((a.pain??-99) - (b.pain??-99)));
+  } else if (col === 32) { // ##BURKE
+    arr.sort((a,b) => d * ((a.burke??-99) - (b.burke??-99)));
+  } else if (col === 33) { // ##SRNTY
+    arr.sort((a,b) => d * ((a.serenity??-99) - (b.serenity??-99)));
   } else if (col <= 11) {
     const keys = ['name','pnl','wr','n','dd','pdd','avg','p1','p2','dwr','dwr','robScore'];
     const key = keys[col];
@@ -11577,6 +11672,8 @@ const _COL_DEFS = [
   { id: 'col-sqn',        label: 'SQN',                 default: true },  // ##SQN
   { id: 'col-omg',        label: 'Omega',               default: true },  // ##OMG
   { id: 'col-pain',       label: 'Pain',                default: true },  // ##PAIN
+  { id: 'col-burke',      label: 'Burke',               default: true },  // ##BURKE
+  { id: 'col-srnty',      label: 'Serenity',            default: true },  // ##SRNTY
   { id: 'col-cpcv',       label: 'CPCV%',               default: false }, // ##CPCV lazy
   { id: 'col-avg',        label: 'Avg%',                default: true },
   { id: 'col-p1',         label: '1п PnL',              default: true },
