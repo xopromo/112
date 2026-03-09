@@ -555,8 +555,17 @@ function updatePreview() {
   $('prog').textContent = '≈ '+fmtNum(t)+' вар.';
 }
 
+// ── SYNTHESIS MODE ────────────────────────────────────────────
+let optMode = 'mc'; // 'mc', 'tpe', 'exhaustive', 'synthesis'
+let synthesisModeOptions = {}; // опции для synthesis режима
+
 async function runOpt() {
   if (!DATA) return;
+
+  // ── SYNTHESIS MODE ────────────────────────────────────────────
+  if (optMode === 'synthesis') {
+    return await runSynthesis();
+  }
   stopped=false; paused=false; results=[]; equities={};
   resultCache.clear();
   const _resultNames = new Set(); // П.1: дедупликация
@@ -3321,4 +3330,268 @@ function _robCacheLoad() {
     }
     if (loaded > 0) console.log('[RobCache] Loaded ' + loaded + ' entries from localStorage');
   } catch(e) {}
+}
+
+// ============================================================
+// STRATEGY SYNTHESIS — REVERSE ENGINEERING MODE
+// ============================================================
+
+async function runSynthesis() {
+  if (!DATA || typeof StrategySpace === 'undefined' || typeof TPEOptimizer === 'undefined') {
+    alert('Synthesis engine not loaded. Please ensure synthesis.js is included.');
+    return;
+  }
+
+  stopped = false;
+  paused = false;
+  results = [];
+  equities = {};
+  resultCache.clear();
+
+  const _resultNames = new Set();
+  $('tb').innerHTML = '';
+  $('bst').style.display = 'none';
+  $('eqc').style.display = 'none';
+
+  // Show pause/stop, hide run
+  $('rbtn').style.display = 'none';
+  $('pbtn').style.display = 'inline-block';
+  $('pbtn').textContent = '⏸ Пауза';
+  $('sbtn').style.display = 'inline-block';
+  $('pbar').style.width = '0%';
+
+  _t0 = Date.now();
+
+  const N = DATA.length;
+  const closes = DATA.map(r => r.c);
+  const volumes = DATA.map(r => r.v);
+
+  // Get options
+  const opts = synthesisModeOptions;
+  const varyEntries = opts.varyEntries !== false;
+  const varyFilters = opts.varyFilters !== false;
+  const varyFilterParams = opts.varyFilterParams !== false;
+  const varyExits = opts.varyExits !== false;
+  const varySLTP = opts.varySLTP !== false;
+  const varyRisk = opts.varyRisk !== false;
+
+  const minTrades = opts.minTrades || 10;
+  const maxDD = opts.maxDD !== undefined ? opts.maxDD : 100;
+  const minWR = opts.minWR || 0;
+  const minSig = opts.minSig || 0;
+
+  const targetCount = opts.targetCount || 1000;
+  const maxIter = opts.maxIter || 50000;
+  const gamma = opts.gamma || 0.25;
+  const weights = opts.weights || { gt: 0.5, sortino: 0.3, sig: 0.2 };
+
+  const useOOS = $c('c_oos');
+  const _fullDATA = DATA;
+  const _isN = useOOS ? Math.floor(N * 0.70) : N;
+
+  // Initialize StrategySpace and TPE
+  const space = new StrategySpace({
+    varyEntries,
+    varyFilters,
+    varyFilterParams,
+    varyExits,
+    varySLTP,
+    varyRisk,
+    minTrades,
+    maxDD,
+    minWR,
+    minSig,
+  });
+
+  const tpe = new TPEOptimizer(space, {
+    maxIter,
+    gamma,
+    batchSize: 100,
+  });
+
+  // Pareto front
+  const pareto = new ParetoFront({
+    weights,
+    minTrades,
+    maxDD,
+    minWR,
+    minSig,
+  });
+
+  let totalEvaluated = 0;
+  let paretoFound = 0;
+
+  // Helper: evaluate single configuration
+  async function evaluateCfg(cfg) {
+    try {
+      // Calculate indicators
+      const ind = _calcIndicators(cfg);
+      if (!ind) return null;
+
+      // Build backtest config
+      const btCfg = buildBtCfg(cfg, ind);
+
+      // Run backtest
+      const r = backtest(ind.pvLo, ind.pvHi, ind.atrArr, btCfg);
+      if (!r) return null;
+
+      // Attach OOS if needed
+      if (useOOS) {
+        const rFull = (() => {
+          const origDATA = DATA;
+          DATA = _fullDATA;
+          try {
+            const indFull = _calcIndicators(cfg);
+            const btCfgFull = buildBtCfg(cfg, indFull);
+            return backtest(indFull.pvLo, indFull.pvHi, indFull.atrArr, btCfgFull);
+          } finally {
+            DATA = origDATA;
+          }
+        })();
+
+        if (rFull && rFull.eq) {
+          r.eq = rFull.eq;
+        }
+      }
+
+      // Calculate metrics
+      const gt = _calcGTScore(r) || 0;
+      const sortino = _calcSortino(r.eq) || 0;
+      const sig = _calcStatSig(r) || 0;
+
+      return {
+        ...r,
+        gt,
+        sortino,
+        sig,
+        name: buildName(cfg, ind),
+        cfg,
+      };
+    } catch (e) {
+      console.warn('[runSynthesis] eval error:', e);
+      return null;
+    }
+  }
+
+  // Main synthesis loop
+  try {
+    while (tpe.iterations < maxIter && results.length < targetCount && !stopped) {
+      // Pause
+      while (paused && !stopped) {
+        await new Promise(r => setTimeout(r, 100));
+      }
+      if (stopped) break;
+
+      // Get next batch
+      const batch = tpe.getNextBatch(100);
+
+      for (const cfg of batch) {
+        if (stopped || paused) break;
+
+        // Evaluate
+        const result = await evaluateCfg(cfg);
+        if (!result) continue;
+
+        // Add to TPE history
+        tpe.addObservation(cfg, {
+          gt: result.gt,
+          sortino: result.sortino,
+          sig: result.sig,
+          pnl: result.pnl,
+          dd: result.dd,
+          wr: result.wr,
+          n: result.n,
+        });
+
+        // Check if added to Pareto
+        if (pareto.addResult(result)) {
+          paretoFound++;
+        }
+
+        // Add to results if not duplicate
+        const resultKey = result.name;
+        if (!_resultNames.has(resultKey)) {
+          _resultNames.add(resultKey);
+          results.push(result);
+          equities[result.name] = result.eq;
+        }
+
+        totalEvaluated++;
+
+        // Update UI every 50 iterations
+        if (totalEvaluated % 50 === 0) {
+          const elapsed = (Date.now() - _t0) / 1000;
+          const itPerSec = (totalEvaluated / elapsed).toFixed(1);
+          const remaining = Math.ceil((targetCount - results.length) / itPerSec);
+
+          $('prog').textContent =
+            `Синтез: ${results.length}/${targetCount} стр., ${paretoFound} Парето, ${totalEvaluated} оцен. (${itPerSec} оц/с, ~${remaining}с)`;
+          $('pbar').style.width = Math.min(100, (results.length / targetCount) * 100) + '%';
+
+          // Render top results
+          const topResults = pareto.getRankedByWeights(weights, 50);
+          renderSynthesisResults(
+            topResults.map(t => t.result),
+            pareto.getFrontier()
+          );
+
+          // Check stop conditions
+          if (results.length >= targetCount) break;
+        }
+      }
+
+      // Update progress
+      if (totalEvaluated % 500 === 0) {
+        const elapsed = Date.now() - _t0;
+        console.log(`[Synthesis] ${totalEvaluated} evaluated, ${results.length} unique, ${paretoFound} Pareto (${Math.round(totalEvaluated / (elapsed / 1000))}/s)`);
+      }
+    }
+  } catch (e) {
+    console.error('[runSynthesis] Error:', e);
+    alert('Synthesis error: ' + e.message);
+  }
+
+  // Final results
+  results = pareto.getRankedByWeights(weights, Math.min(results.length, targetCount)).map(r => r.result);
+
+  // Finalize UI
+  renderSynthesisResults(results, pareto.getFrontier());
+
+  const elapsed = ((Date.now() - _t0) / 1000).toFixed(1);
+  $('prog').textContent = `✓ Синтез завершен: ${results.length} стратегий найдено, ${paretoFound} Парето (${elapsed}с)`;
+
+  // Show best
+  if (results.length > 0) {
+    const best = results[0];
+    $('bst').style.display = 'block';
+    $('bst').innerHTML = `
+      <strong>Лучшая:</strong> ${best.name}<br/>
+      GT-Score: <strong>${(best.gt || 0).toFixed(2)}</strong> |
+      Sortino: <strong>${(best.sortino || 0).toFixed(2)}</strong> |
+      Sig%: <strong>${(best.sig || 0).toFixed(0)}%</strong> |
+      PnL: <strong>${fmtNum(best.pnl || 0)}</strong> |
+      WR: <strong>${(best.wr || 0).toFixed(1)}%</strong>
+    `;
+  }
+
+  // Save session if enabled
+  if (opts.saveHistory) {
+    try {
+      saveSynthesisSession(
+        `Synthesis ${new Date().toLocaleString('ru-RU')}`,
+        results,
+        pareto.getFrontier(),
+        opts
+      );
+    } catch (e) {
+      console.warn('[runSynthesis] Failed to save session:', e);
+    }
+  }
+
+  // Restore UI
+  $('rbtn').style.display = 'inline-block';
+  $('pbtn').style.display = 'none';
+  $('sbtn').style.display = 'none';
+
+  optMode = 'mc'; // Reset to default mode
 }
