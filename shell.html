@@ -913,7 +913,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
   <div class="sep"></div>
   <div class="cb"><input type="checkbox" id="e_mat"><label data-tip="Сигнал при касании (или кросс-овере) MA: цена возвращается к MA и отбивается">Касание MA</label></div>
   <div class="g2">
-    <div class="field"><label>MA тип</label><select id="e_matt"><option>EMA</option><option>SMA</option><option>WMA</option></select></div>
+    <div class="field"><label>MA тип</label><select id="e_matt"><option>EMA</option><option>SMA</option><option>WMA</option><option>DEMA</option><option>TEMA</option></select></div>
     <div class="field"><label>MA период</label><input id="e_matp" value="20" data-tip="Период скользящей средней для сигнала касания"></div>
   </div>
   <div class="field"><label>Зона касания %</label><input id="e_matz" value="0.2" data-tip="Допустимое отклонение цены от MA (% от цены). 0.2% = цена должна быть в пределах 0.2% от MA"></div>
@@ -961,7 +961,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
   <div class="cb"><input type="checkbox" id="e_macr"><label data-tip="Пересечение MA: цена пересекает скользящую среднюю (закрытие выше после закрытия ниже = лонг). В отличие от MA Touch — без требования касания зоны">MA Crossover</label></div>
   <div class="g2">
     <div class="field"><label>Период MA</label><input id="e_macr_p" value="20" data-tip="Период скользящей средней для пересечения"></div>
-    <div class="field"><label>Тип MA</label><select id="e_macr_t"><option value="EMA">EMA</option><option value="SMA">SMA</option><option value="WMA">WMA</option><option value="RMA">RMA</option></select></div>
+    <div class="field"><label>Тип MA</label><select id="e_macr_t"><option value="EMA">EMA</option><option value="SMA">SMA</option><option value="WMA">WMA</option><option value="RMA">RMA</option><option value="DEMA">DEMA</option><option value="TEMA">TEMA</option></select></div>
   </div>
   <div class="field"><label data-tip="Перебирать все типы MA (EMA, SMA, WMA) для MA Crossover входа"><input type="checkbox" id="e_macr_sweep_types"> Все типы MA</label></div>
 
@@ -987,6 +987,13 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
 
   <div class="cb"><input type="checkbox" id="e_nrev"><label data-tip="Разворот после N свечей: N последовательных медвежьих свечей, затем бычья = лонг. N последовательных бычьих свечей, затем медвежья = шорт">N-Candle Reversal</label></div>
   <div class="field"><label>N свечей</label><input id="e_nrev_n" value="3" data-tip="Количество последовательных направленных свечей перед разворотом"></div>
+
+  <div class="sep"></div>
+  <div class="cb"><input type="checkbox" id="e_eis"><label data-tip="Elder Impulse System: лонг когда EMA растёт И MACD-гистограмма растёт (двойное согласование импульса и тренда). Шорт — оба падают">Elder Impulse System</label></div>
+  <div class="field"><label>EMA период</label><input id="e_eis_p" value="13" data-tip="Период EMA для определения тренда. Классическое значение = 13. MACD гистограмма использует фиксированные 12/26/9"></div>
+
+  <div class="cb"><input type="checkbox" id="e_soldiers"><label data-tip="3 White Soldiers (лонг): 3 бычьих свечи подряд, каждая открывается внутри тела предыдущей, каждая закрывается выше. 3 Black Crows (шорт): зеркально">3 White Soldiers / 3 Black Crows</label></div>
+
   <div class="cb"><input type="checkbox" id="e_st"><label data-tip="Supertrend: вход при смене направления тренда. Лонг — Supertrend флипнулся с медвежьего на бычий (close пересёк нижнюю полосу снизу вверх). Шорт — наоборот.">Supertrend</label></div>
   <div class="g2">
     <div class="field"><label>ATR период</label><input id="e_st_atrp" value="10" data-tip="Период ATR для расчёта Supertrend. Больше = медленнее реагирует, меньше сигналов"></div>
@@ -1123,7 +1130,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
 
   <div class="cb"><input type="checkbox" id="f_ma" checked><label data-tip="Разрешает лонги только когда цена выше MA, шорты — только ниже MA. Основной трендовый фильтр">MA фильтр тренда</label></div>
   <div class="g2">
-    <div class="field"><label>Тип MA</label><select id="f_mat"><option>EMA</option><option>SMA</option><option>WMA</option></select></div>
+    <div class="field"><label>Тип MA</label><select id="f_mat"><option>EMA</option><option>SMA</option><option>WMA</option><option>DEMA</option><option>TEMA</option></select></div>
     <div class="field"><label>Период</label><input id="f_map" value="50,100,200" data-tip="Период MA. Можно задать несколько через запятую для оптимизации: 50,100,200"></div>
   </div>
   <div class="g2">
@@ -1154,7 +1161,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
   <div class="cb"><input type="checkbox" id="f_confirm"><label data-tip="Вторая MA как дополнительный фильтр (аналог MTF MA в USE). Лонг: close > вторая MA. Шорт: close &lt; вторая MA. Позволяет задать более медленную MA для фильтрации направления">Вторая MA (доп. фильтр)</label></div>
   <div class="confirm-hint">Лонг: close &gt; вторая MA. Шорт: close &lt; вторая MA.</div>
   <div class="g2">
-    <div class="field"><label>Тип MA</label><select id="f_conf_mat"><option>EMA</option><option>SMA</option><option>WMA</option><option>HMA</option></select></div>
+    <div class="field"><label>Тип MA</label><select id="f_conf_mat"><option>EMA</option><option>SMA</option><option>WMA</option><option>HMA</option><option>DEMA</option><option>TEMA</option></select></div>
     <div class="field"><label>Период</label><input id="f_confn" value="50,100,200" data-tip="Период второй MA. Например 200 для трендового фильтра, 50 для среднесрочного"></div>
   </div>
   <div class="g2">
@@ -1190,6 +1197,16 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
 
   <div class="cb"><input type="checkbox" id="f_atrexp"><label data-tip="ATR расширяется: торговать только когда волатильность выше среднего. Избегает флета и консолидации">ATR расширяется (антифлет)</label></div>
   <div class="field"><label>Мин ATR/сред ×</label><input id="f_atrexpm" value="0.8,1.0,1.2" data-tip="Минимальное отношение текущего ATR к среднему. 1.0 = ATR выше среднего. 0.8 = допускает умеренный флет"></div>
+
+  <div class="sep"></div>
+  <div class="cb"><input type="checkbox" id="f_macd"><label data-tip="MACD Direction: лонг только когда MACD line &gt; signal (бычий импульс), шорт — наоборот. Параметры берутся из MACD Entry">MACD Direction</label></div>
+  <div class="hint">Параметры: Fast/Slow/Signal из блока MACD Entry выше</div>
+
+  <div class="cb"><input type="checkbox" id="f_er"><label data-tip="Efficiency Ratio (Perry Kaufman): ER = |net_change_N| / sum(|bar_changes|). ER→1 = чистый тренд, ER→0 = хаос. Блокирует вход при ER ниже порога">Efficiency Ratio (тренд)</label></div>
+  <div class="g2">
+    <div class="field"><label>Период</label><input id="f_erp" value="10" data-tip="Период расчёта ER. 10 баров = смотрим эффективность движения за 10 баров"></div>
+    <div class="field"><label>Мин ER</label><input id="f_ert" value="0.3" data-tip="Минимальный ER для входа. 0.3 = движение должно быть ≥30% эффективным. 0.5 = сильный тренд"></div>
+  </div>
 </div>
 
 <!-- VOLUME FILTERS -->

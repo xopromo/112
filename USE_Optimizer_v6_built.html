@@ -913,7 +913,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
   <div class="sep"></div>
   <div class="cb"><input type="checkbox" id="e_mat"><label data-tip="Сигнал при касании (или кросс-овере) MA: цена возвращается к MA и отбивается">Касание MA</label></div>
   <div class="g2">
-    <div class="field"><label>MA тип</label><select id="e_matt"><option>EMA</option><option>SMA</option><option>WMA</option></select></div>
+    <div class="field"><label>MA тип</label><select id="e_matt"><option>EMA</option><option>SMA</option><option>WMA</option><option>DEMA</option><option>TEMA</option></select></div>
     <div class="field"><label>MA период</label><input id="e_matp" value="20" data-tip="Период скользящей средней для сигнала касания"></div>
   </div>
   <div class="field"><label>Зона касания %</label><input id="e_matz" value="0.2" data-tip="Допустимое отклонение цены от MA (% от цены). 0.2% = цена должна быть в пределах 0.2% от MA"></div>
@@ -961,7 +961,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
   <div class="cb"><input type="checkbox" id="e_macr"><label data-tip="Пересечение MA: цена пересекает скользящую среднюю (закрытие выше после закрытия ниже = лонг). В отличие от MA Touch — без требования касания зоны">MA Crossover</label></div>
   <div class="g2">
     <div class="field"><label>Период MA</label><input id="e_macr_p" value="20" data-tip="Период скользящей средней для пересечения"></div>
-    <div class="field"><label>Тип MA</label><select id="e_macr_t"><option value="EMA">EMA</option><option value="SMA">SMA</option><option value="WMA">WMA</option><option value="RMA">RMA</option></select></div>
+    <div class="field"><label>Тип MA</label><select id="e_macr_t"><option value="EMA">EMA</option><option value="SMA">SMA</option><option value="WMA">WMA</option><option value="RMA">RMA</option><option value="DEMA">DEMA</option><option value="TEMA">TEMA</option></select></div>
   </div>
   <div class="field"><label data-tip="Перебирать все типы MA (EMA, SMA, WMA) для MA Crossover входа"><input type="checkbox" id="e_macr_sweep_types"> Все типы MA</label></div>
 
@@ -987,6 +987,13 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
 
   <div class="cb"><input type="checkbox" id="e_nrev"><label data-tip="Разворот после N свечей: N последовательных медвежьих свечей, затем бычья = лонг. N последовательных бычьих свечей, затем медвежья = шорт">N-Candle Reversal</label></div>
   <div class="field"><label>N свечей</label><input id="e_nrev_n" value="3" data-tip="Количество последовательных направленных свечей перед разворотом"></div>
+
+  <div class="sep"></div>
+  <div class="cb"><input type="checkbox" id="e_eis"><label data-tip="Elder Impulse System: лонг когда EMA растёт И MACD-гистограмма растёт (двойное согласование импульса и тренда). Шорт — оба падают">Elder Impulse System</label></div>
+  <div class="field"><label>EMA период</label><input id="e_eis_p" value="13" data-tip="Период EMA для определения тренда. Классическое значение = 13. MACD гистограмма использует фиксированные 12/26/9"></div>
+
+  <div class="cb"><input type="checkbox" id="e_soldiers"><label data-tip="3 White Soldiers (лонг): 3 бычьих свечи подряд, каждая открывается внутри тела предыдущей, каждая закрывается выше. 3 Black Crows (шорт): зеркально">3 White Soldiers / 3 Black Crows</label></div>
+
   <div class="cb"><input type="checkbox" id="e_st"><label data-tip="Supertrend: вход при смене направления тренда. Лонг — Supertrend флипнулся с медвежьего на бычий (close пересёк нижнюю полосу снизу вверх). Шорт — наоборот.">Supertrend</label></div>
   <div class="g2">
     <div class="field"><label>ATR период</label><input id="e_st_atrp" value="10" data-tip="Период ATR для расчёта Supertrend. Больше = медленнее реагирует, меньше сигналов"></div>
@@ -1123,7 +1130,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
 
   <div class="cb"><input type="checkbox" id="f_ma" checked><label data-tip="Разрешает лонги только когда цена выше MA, шорты — только ниже MA. Основной трендовый фильтр">MA фильтр тренда</label></div>
   <div class="g2">
-    <div class="field"><label>Тип MA</label><select id="f_mat"><option>EMA</option><option>SMA</option><option>WMA</option></select></div>
+    <div class="field"><label>Тип MA</label><select id="f_mat"><option>EMA</option><option>SMA</option><option>WMA</option><option>DEMA</option><option>TEMA</option></select></div>
     <div class="field"><label>Период</label><input id="f_map" value="50,100,200" data-tip="Период MA. Можно задать несколько через запятую для оптимизации: 50,100,200"></div>
   </div>
   <div class="g2">
@@ -1154,7 +1161,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
   <div class="cb"><input type="checkbox" id="f_confirm"><label data-tip="Вторая MA как дополнительный фильтр (аналог MTF MA в USE). Лонг: close > вторая MA. Шорт: close &lt; вторая MA. Позволяет задать более медленную MA для фильтрации направления">Вторая MA (доп. фильтр)</label></div>
   <div class="confirm-hint">Лонг: close &gt; вторая MA. Шорт: close &lt; вторая MA.</div>
   <div class="g2">
-    <div class="field"><label>Тип MA</label><select id="f_conf_mat"><option>EMA</option><option>SMA</option><option>WMA</option><option>HMA</option></select></div>
+    <div class="field"><label>Тип MA</label><select id="f_conf_mat"><option>EMA</option><option>SMA</option><option>WMA</option><option>HMA</option><option>DEMA</option><option>TEMA</option></select></div>
     <div class="field"><label>Период</label><input id="f_confn" value="50,100,200" data-tip="Период второй MA. Например 200 для трендового фильтра, 50 для среднесрочного"></div>
   </div>
   <div class="g2">
@@ -1190,6 +1197,16 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
 
   <div class="cb"><input type="checkbox" id="f_atrexp"><label data-tip="ATR расширяется: торговать только когда волатильность выше среднего. Избегает флета и консолидации">ATR расширяется (антифлет)</label></div>
   <div class="field"><label>Мин ATR/сред ×</label><input id="f_atrexpm" value="0.8,1.0,1.2" data-tip="Минимальное отношение текущего ATR к среднему. 1.0 = ATR выше среднего. 0.8 = допускает умеренный флет"></div>
+
+  <div class="sep"></div>
+  <div class="cb"><input type="checkbox" id="f_macd"><label data-tip="MACD Direction: лонг только когда MACD line &gt; signal (бычий импульс), шорт — наоборот. Параметры берутся из MACD Entry">MACD Direction</label></div>
+  <div class="hint">Параметры: Fast/Slow/Signal из блока MACD Entry выше</div>
+
+  <div class="cb"><input type="checkbox" id="f_er"><label data-tip="Efficiency Ratio (Perry Kaufman): ER = |net_change_N| / sum(|bar_changes|). ER→1 = чистый тренд, ER→0 = хаос. Блокирует вход при ER ниже порога">Efficiency Ratio (тренд)</label></div>
+  <div class="g2">
+    <div class="field"><label>Период</label><input id="f_erp" value="10" data-tip="Период расчёта ER. 10 баров = смотрим эффективность движения за 10 баров"></div>
+    <div class="field"><label>Мин ER</label><input id="f_ert" value="0.3" data-tip="Минимальный ER для входа. 0.3 = движение должно быть ≥30% эффективным. 0.5 = сильный тренд"></div>
+  </div>
 </div>
 
 <!-- VOLUME FILTERS -->
@@ -4118,6 +4135,57 @@ const ENTRY_REGISTRY = [
     ],
   },
 
+  // ── Elder Impulse System (EIS) ───────────────────────────
+  // Лонг: EMA растёт И MACD гистограмма растёт (двойное согласование)
+  // Шорт: EMA падает И MACD гистограмма падает
+  {
+    id:        'eis',
+    flag:      'useEIS',
+    htmlId:    'e_eis',
+    shortName: c => `EIS(${c.eisPeriod||13})`,
+    detectL: (cfg, i) => {
+      if (!cfg.eisEMAArr || !cfg.eisHistArr || i < 3) return false;
+      return cfg.eisEMAArr[i-1] > cfg.eisEMAArr[i-2] && cfg.eisHistArr[i-1] > cfg.eisHistArr[i-2];
+    },
+    detectS: (cfg, i) => {
+      if (!cfg.eisEMAArr || !cfg.eisHistArr || i < 3) return false;
+      return cfg.eisEMAArr[i-1] < cfg.eisEMAArr[i-2] && cfg.eisHistArr[i-1] < cfg.eisHistArr[i-2];
+    },
+    pineLines: (c, b) => [
+      `use_eis     = input.bool(${b(c.useEIS)}, "Elder Impulse System", group=grp_entry)`,
+      `eis_ema_p   = input.int(${c.eisPeriod||13}, "  EIS EMA период", minval=2, maxval=200, group=grp_entry)`,
+    ],
+  },
+
+  // ── Three White Soldiers / Three Black Crows ─────────────
+  // Лонг: 3 бычьих свечи подряд, каждая открывается внутри тела предыдущей, каждая закрывается выше
+  // Шорт: 3 медвежьих свечи подряд, аналогично
+  {
+    id:        'soldiers',
+    flag:      'useSoldiers',
+    htmlId:    'e_soldiers',
+    shortName: () => '3Soldiers',
+    detectL: (cfg, i) => {
+      if (i < 4) return false;
+      const a = DATA[i-3], b = DATA[i-2], c = DATA[i-1];
+      return a.c > a.o && b.c > b.o && c.c > c.o
+        && b.o >= a.o && b.o <= a.c
+        && c.o >= b.o && c.o <= b.c
+        && b.c > a.c && c.c > b.c;
+    },
+    detectS: (cfg, i) => {
+      if (i < 4) return false;
+      const a = DATA[i-3], b = DATA[i-2], c = DATA[i-1];
+      return a.c < a.o && b.c < b.o && c.c < c.o
+        && b.o <= a.o && b.o >= a.c
+        && c.o <= b.o && c.o >= b.c
+        && b.c < a.c && c.c < b.c;
+    },
+    pineLines: (c, b) => [
+      `use_soldiers = input.bool(${b(c.useSoldiers)}, "3 White Soldiers / 3 Black Crows", group=grp_entry)`,
+    ],
+  },
+
   // ── Разворот после N однонаправленных свечей ─────────────
   // Лонг: N (или более) медвежьих свечей подряд, затем бычья → разворот вверх
   // Шорт: N (или более) бычьих свечей подряд, затем медвежья → разворот вниз
@@ -4426,6 +4494,29 @@ const FILTER_REGISTRY = [
     nameLabel: (cfg) => `WT>${cfg.wtThresh}`,
   },
 
+  // ── MACD Direction ───────────────────────────────────────
+  // Лонг: MACD line > signal line (бычий импульс)
+  // Шорт: MACD line < signal line (медвежий импульс)
+  {
+    id:       'macdfilter',
+    flag:     'useMacdFilter',
+    blocksL:  (cfg, i) => cfg.macdLine && cfg.macdSignal && cfg.macdLine[i-1] <= cfg.macdSignal[i-1],
+    blocksS:  (cfg, i) => cfg.macdLine && cfg.macdSignal && cfg.macdLine[i-1] >= cfg.macdSignal[i-1],
+    nameLabel: () => 'MACDf',
+  },
+
+  // ── Efficiency Ratio (Kaufman) ────────────────────────────
+  // ER = |net_change_N| / sum(|bar_changes_N|)
+  // ER близко к 1 = сильный тренд, к 0 = хаос. Блокировать если ER < threshold.
+  // FIX: первые erPeriod баров = 0 (не прогрет) → блокировать как Pine na
+  {
+    id:       'er',
+    flag:     'useER',
+    blocksL:  (cfg, i) => !cfg.erArr || cfg.erArr[i-1] <= 0 || cfg.erArr[i-1] < cfg.erThresh,
+    blocksS:  (cfg, i) => !cfg.erArr || cfg.erArr[i-1] <= 0 || cfg.erArr[i-1] < cfg.erThresh,
+    nameLabel: (cfg) => `ER>${cfg.erThresh}`,
+  },
+
   // ── Fat Volume (Exhaustion) ───────────────────────────────
   {
     id:       'fat',
@@ -4717,9 +4808,26 @@ function calcPivotLoHi(data, pvL, pvR) {
   }
   return{lo,hi};
 }
+function calcDEMA(data, period) {
+  const ema1 = calcEMA(data, period);
+  const ema2 = calcEMA(Array.from(ema1), period);
+  const N = data.length, r = new Float64Array(N);
+  for (let i = 0; i < N; i++) r[i] = 2 * ema1[i] - ema2[i];
+  return r;
+}
+function calcTEMA(data, period) {
+  const ema1 = calcEMA(data, period);
+  const ema2 = calcEMA(Array.from(ema1), period);
+  const ema3 = calcEMA(Array.from(ema2), period);
+  const N = data.length, r = new Float64Array(N);
+  for (let i = 0; i < N; i++) r[i] = 3 * ema1[i] - 3 * ema2[i] + ema3[i];
+  return r;
+}
 function calcMA(data, period, type) {
   if (type === 'SMA') return calcSMA(data, period);
   if (type === 'WMA') return calcWMA(data, period);
+  if (type === 'DEMA') return calcDEMA(data, period);
+  if (type === 'TEMA') return calcTEMA(data, period);
   return calcEMA(data, period);
 }
 // HTF MA: строит MA на барах старшего ТФ (ratio=4 → 4x текущего).
@@ -5886,6 +5994,8 @@ async function runOpt() {
   const useStExit     = $c('x_st');
   const useWaitEntry  = $c('e_wait_on');
   const useWaitRetrace= useWaitEntry && $c('e_wait_retrace');
+  const useEIS        = $c('e_eis');
+  const useSoldiers   = $c('e_soldiers');
 
   // Filter flags
   const useMa=$c('f_ma'),useAdx=$c('f_adx'),useRsi=$c('f_rsi');
@@ -5912,6 +6022,10 @@ async function runOpt() {
   const useClimaxExit=HAS_VOLUME&&$c('f_clx');
   const useWT=HAS_VOLUME&&$c('f_wt');
   const useFat=HAS_VOLUME&&$c('f_fat');
+  // New filters
+  const useMacdFilter = $c('f_macd');
+  const useER         = $c('f_er');
+  const erThresh      = $n('f_ert') || 0.3;
 
   // ── Powerset фильтров ────────────────────────────────────────────────
   // Перебирает все 2^N комбинаций включённых фильтров.
@@ -5935,8 +6049,10 @@ async function runOpt() {
     {key:'useVSA',    active:useVSA},
     {key:'useLiq',    active:useLiq},
     {key:'useVolDir', active:useVolDir},
-    {key:'useWT',     active:useWT},
-    {key:'useFat',    active:useFat},
+    {key:'useWT',         active:useWT},
+    {key:'useFat',        active:useFat},
+    {key:'useMacdFilter', active:useMacdFilter},
+    {key:'useER',         active:useER},
   ].filter(f => f.active); // только те что включены
   let _filterCombos;
   if (_usePowerset && _psFilterDefs.length > 0) {
@@ -6189,9 +6305,11 @@ async function runOpt() {
   const rsiExitOSA   = useRsiExit    ? parseRange('e_rsix_os') : [$n('e_rsix_os')||30];
   const rsiExitOBA   = useRsiExit    ? parseRange('e_rsix_ob') : [$n('e_rsix_ob')||70];
   const maCrossPArr  = useMaCross    ? parseRange('e_macr_p')  : [$n('e_macr_p') ||20];
-  const macdFastArr  = useMacd       ? parseRange('e_macd_f')  : [$n('e_macd_f') ||12];
-  const macdSlowArr  = useMacd       ? parseRange('e_macd_s')  : [$n('e_macd_s') ||26];
-  const macdSigPArr  = useMacd       ? parseRange('e_macd_sg') : [$n('e_macd_sg')||9];
+  const macdFastArr  = (useMacd||useMacdFilter) ? parseRange('e_macd_f')  : [$n('e_macd_f') ||12];
+  const macdSlowArr  = (useMacd||useMacdFilter) ? parseRange('e_macd_s')  : [$n('e_macd_s') ||26];
+  const macdSigPArr  = (useMacd||useMacdFilter) ? parseRange('e_macd_sg') : [$n('e_macd_sg')||9];
+  const eisPArr      = useEIS        ? parseRange('e_eis_p')   : [$n('e_eis_p')  ||13];
+  const erPArr       = useER         ? parseRange('f_erp')     : [$n('f_erp')    ||10];
   const stochKPArr   = useStochExit  ? parseRange('e_stx_k')   : [$n('e_stx_k')  ||14];
   const stochDPArr   = useStochExit  ? parseRange('e_stx_d')   : [$n('e_stx_d')  ||3];
   const stochOSA     = useStochExit  ? parseRange('e_stx_os')  : [$n('e_stx_os') ||20];
@@ -6424,6 +6542,8 @@ async function runOpt() {
       ['stMult',      stMultArr],
       ['waitBars',    waitBarsArr],
       ['waitRetrace', waitRetraceArr],
+      ['eisPeriod',   eisPArr],
+      ['erPeriod',    erPArr],
     ];
     // Defaults for all params (first element of each array)
     window._ipDef = Object.fromEntries(_allIp.map(([n,a])=>[n,a[0]]));
@@ -6582,14 +6702,20 @@ async function runOpt() {
       const stMult      = _ip.stMult      ?? window._ipDef.stMult;
       const waitBars    = _ip.waitBars    ?? window._ipDef.waitBars;
       const waitRetrace = _ip.waitRetrace ?? window._ipDef.waitRetrace;
+      const eisPeriod   = _ip.eisPeriod   ?? window._ipDef.eisPeriod;
+      const erPeriod    = _ip.erPeriod    ?? window._ipDef.erPeriod;
       const {lo:pivSLLo, hi:pivSLHi} = useSLPiv ? _getPivSL(slPivL, slPivR) : {lo:null, hi:null};
       const rsiExitArr = useRsiExit   ? (rsiExitCache[rsiExitPer]||(rsiExitCache[rsiExitPer]=calcRSI(rsiExitPer))) : null;
       const maCrossArr = useMaCross   ? (()=>{const k=_mCrossType+'_'+maCrossP;return maCrossNewCache[k]||(maCrossNewCache[k]=calcMA(closes,maCrossP,_mCrossType));})() : null;
       const stDir      = (useSupertrend||useStExit) ? (()=>{const k=stAtrP+'_'+stMult;return stDirCache[k]||(stDirCache[k]=calcSupertrend(stAtrP,stMult));})() : null;
       let macdLine=null,macdSignal=null;
-      if(useMacd){const mk=macdFast+'_'+macdSlow+'_'+macdSigP;if(!macdNewCache[mk]){const m=calcMACD(macdFast,macdSlow,macdSigP);macdNewCache[mk]=m;}macdLine=macdNewCache[mk].line;macdSignal=macdNewCache[mk].signal;}
+      if(useMacd||useMacdFilter){const mk=macdFast+'_'+macdSlow+'_'+macdSigP;if(!macdNewCache[mk]){const m=calcMACD(macdFast,macdSlow,macdSigP);macdNewCache[mk]=m;}macdLine=macdNewCache[mk].line;macdSignal=macdNewCache[mk].signal;}
       let stochD=null;
       if(useStochExit){const sk=stochKP+'_'+stochDP;if(!stochNewCache[sk])stochNewCache[sk]=calcStochastic(stochKP,stochDP);stochD=stochNewCache[sk].dArr;}
+      let eisEMAArr=null,eisHistArr=null;
+      if(useEIS){const ep=eisPeriod||13;const ek='eis_'+ep;eisEMAArr=maCache[ek]||(maCache[ek]=calcEMA(closes,ep));if(!macdNewCache['eis_hist']){const m=calcMACD(12,26,9);const h=new Float64Array(N);for(let i=0;i<N;i++)h[i]=m.line[i]-m.signal[i];macdNewCache['eis_hist']=h;}eisHistArr=macdNewCache['eis_hist'];}
+      let erArr=null;
+      if(useER){const ep=erPeriod||10;const ek='er_'+ep;if(!maCache[ek]){const ea=new Float64Array(N);for(let i=ep;i<N;i++){const net=Math.abs(closes[i]-closes[i-ep]);let sum=0;for(let j=i-ep+1;j<=i;j++)sum+=Math.abs(closes[j]-closes[j-1]);ea[i]=sum>0?net/sum:0;}maCache[ek]=ea;}erArr=maCache[ek];}
       const {sigL:tfSigL, sigS:tfSigS} = _getTfSig(tlPvL, tlPvR);
 
       // Пропускаем невалидные BE комбинации
@@ -6637,6 +6763,8 @@ async function runOpt() {
         useInsideBar,
         useNReversal,nReversalN,
         useSupertrend,stDir,stAtrP,stMult,
+        useEIS,eisEMAArr,eisHistArr,eisPeriod:eisPeriod||13,
+        useSoldiers,
         useStExit,
         waitBars:waitBars||0,waitRetrace:waitRetrace||false,waitMaxBars,waitCancelAtr,
         hasSLA:!!(slPair.a),slMult:slPair.a?slPair.a.m:0,hasSLB:!!(slPair.p),slPctMult:slPair.p?slPair.p.m:0,slLogic,
@@ -6667,6 +6795,8 @@ async function runOpt() {
         useWT:_effUseWT&&wtT>0,wtScores,wtThresh:wtT,
         useFat:_effUseFat,fatConsec,fatVolDrop,
         bodyAvg:bodyAvgArr,
+        useMacdFilter:_fCombo.useMacdFilter??useMacdFilter,
+        useER:_fCombo.useER??useER,erArr,erPeriod:erPeriod||10,erThresh,
         start:Math.max(maP||0,50)+2,
         pruning:false, maxDDLimit:maxDD
       };
@@ -6869,14 +6999,20 @@ async function runOpt() {
       const stMult      = _ip.stMult      ?? window._ipDef.stMult;
       const waitBars    = _ip.waitBars    ?? window._ipDef.waitBars;
       const waitRetrace = _ip.waitRetrace ?? window._ipDef.waitRetrace;
+      const eisPeriod   = _ip.eisPeriod   ?? window._ipDef.eisPeriod;
+      const erPeriod    = _ip.erPeriod    ?? window._ipDef.erPeriod;
       const {lo:pivSLLo, hi:pivSLHi} = useSLPiv ? _getPivSL(slPivL, slPivR) : {lo:null, hi:null};
       const rsiExitArr = useRsiExit   ? (rsiExitCache[rsiExitPer]||(rsiExitCache[rsiExitPer]=calcRSI(rsiExitPer))) : null;
       const maCrossArr = useMaCross   ? (()=>{const k=_mCrossType+'_'+maCrossP;return maCrossNewCache[k]||(maCrossNewCache[k]=calcMA(closes,maCrossP,_mCrossType));})() : null;
       const stDir      = (useSupertrend||useStExit) ? (()=>{const k=stAtrP+'_'+stMult;return stDirCache[k]||(stDirCache[k]=calcSupertrend(stAtrP,stMult));})() : null;
       let macdLine=null,macdSignal=null;
-      if(useMacd){const mk=macdFast+'_'+macdSlow+'_'+macdSigP;if(!macdNewCache[mk]){const m=calcMACD(macdFast,macdSlow,macdSigP);macdNewCache[mk]=m;}macdLine=macdNewCache[mk].line;macdSignal=macdNewCache[mk].signal;}
+      if(useMacd||useMacdFilter){const mk=macdFast+'_'+macdSlow+'_'+macdSigP;if(!macdNewCache[mk]){const m=calcMACD(macdFast,macdSlow,macdSigP);macdNewCache[mk]=m;}macdLine=macdNewCache[mk].line;macdSignal=macdNewCache[mk].signal;}
       let stochD=null;
       if(useStochExit){const sk=stochKP+'_'+stochDP;if(!stochNewCache[sk])stochNewCache[sk]=calcStochastic(stochKP,stochDP);stochD=stochNewCache[sk].dArr;}
+      let eisEMAArr=null,eisHistArr=null;
+      if(useEIS){const ep=eisPeriod||13;const ek='eis_'+ep;eisEMAArr=maCache[ek]||(maCache[ek]=calcEMA(closes,ep));if(!macdNewCache['eis_hist']){const m=calcMACD(12,26,9);const h=new Float64Array(N);for(let i=0;i<N;i++)h[i]=m.line[i]-m.signal[i];macdNewCache['eis_hist']=h;}eisHistArr=macdNewCache['eis_hist'];}
+      let erArr=null;
+      if(useER){const ep=erPeriod||10;const ek='er_'+ep;if(!maCache[ek]){const ea=new Float64Array(N);for(let i=ep;i<N;i++){const net=Math.abs(closes[i]-closes[i-ep]);let sum=0;for(let j=i-ep+1;j<=i;j++)sum+=Math.abs(closes[j]-closes[j-1]);ea[i]=sum>0?net/sum:0;}maCache[ek]=ea;}erArr=maCache[ek];}
       const {sigL:tfSigL, sigS:tfSigS} = _getTfSig(tlPvL, tlPvR);
 
       // Пропускаем невалидные BE комбинации
@@ -6927,6 +7063,8 @@ async function runOpt() {
         useInsideBar,
         useNReversal,nReversalN,
         useSupertrend,stDir,stAtrP,stMult,
+        useEIS,eisEMAArr,eisHistArr,eisPeriod:eisPeriod||13,
+        useSoldiers,
         useStExit,
         waitBars:waitBars||0,waitRetrace:waitRetrace||false,waitMaxBars,waitCancelAtr,
         hasSLA:!!(slPair.a),slMult:slPair.a?slPair.a.m:0,hasSLB:!!(slPair.p),slPctMult:slPair.p?slPair.p.m:0,slLogic,
@@ -6951,6 +7089,8 @@ async function runOpt() {
         useLiq:_effUseLiq,liqMin,useVolDir:_effUseVolDir,volDirPeriod:volDirP,
         useWT:_effUseWT&&wtT>0,wtScores,wtThresh:wtT,
         useFat:_effUseFat,fatConsec,fatVolDrop,bodyAvg:bodyAvgArr,
+        useMacdFilter:_fCombo.useMacdFilter??useMacdFilter,
+        useER:_fCombo.useER??useER,erArr,erPeriod:erPeriod||10,erThresh,
         start:Math.max(maP||0,50)+2,pruning:false,maxDDLimit:maxDD
       };
 
@@ -7736,10 +7876,33 @@ function _calcIndicators(cfg) {
 
   // ── MACD ──────────────────────────────────────────────────
   let macdLine = null, macdSignal = null;
-  if (cfg.useMacd) {
+  if (cfg.useMacd || cfg.useMacdFilter) {
     const _macd = calcMACD(cfg.macdFast || 12, cfg.macdSlow || 26, cfg.macdSignalP || 9);
     macdLine   = _macd.line;
     macdSignal = _macd.signal;
+  }
+
+  // ── Elder Impulse System ──────────────────────────────────
+  let eisEMAArr = null, eisHistArr = null;
+  if (cfg.useEIS) {
+    const eisP = cfg.eisPeriod || 13;
+    eisEMAArr = calcEMA(closes, eisP);
+    const _eisMacd = calcMACD(12, 26, 9);
+    eisHistArr = new Float64Array(N);
+    for (let i = 0; i < N; i++) eisHistArr[i] = _eisMacd.line[i] - _eisMacd.signal[i];
+  }
+
+  // ── Efficiency Ratio ──────────────────────────────────────
+  let erArr = null;
+  if (cfg.useER) {
+    const erP = cfg.erPeriod || 10;
+    erArr = new Float64Array(N);
+    for (let i = erP; i < N; i++) {
+      const net = Math.abs(closes[i] - closes[i - erP]);
+      let sum = 0;
+      for (let j = i - erP + 1; j <= i; j++) sum += Math.abs(closes[j] - closes[j-1]);
+      erArr[i] = sum > 0 ? net / sum : 0;
+    }
   }
 
   // ── Stochastic ────────────────────────────────────────────
@@ -7862,6 +8025,8 @@ function _calcIndicators(cfg) {
     macdLine, macdSignal,
     stochD,
     stDir,
+    eisEMAArr, eisHistArr,
+    erArr,
   };
 }
 
@@ -7927,6 +8092,16 @@ function buildBtCfg(cfg, ind) {
     macdFast:      cfg.macdFast      || 12,
     macdSlow:      cfg.macdSlow      || 26,
     macdSignalP:   cfg.macdSignalP   || 9,
+    useMacdFilter: cfg.useMacdFilter || false,
+    useEIS:        cfg.useEIS        || false,
+    eisEMAArr:     ind.eisEMAArr,
+    eisHistArr:    ind.eisHistArr,
+    eisPeriod:     cfg.eisPeriod     || 13,
+    useSoldiers:   cfg.useSoldiers   || false,
+    useER:         cfg.useER         || false,
+    erArr:         ind.erArr,
+    erPeriod:      cfg.erPeriod      || 10,
+    erThresh:      cfg.erThresh      || 0.3,
     useStochExit:  cfg.useStochExit  || false,
     stochD:        ind.stochD,
     stochKP:       cfg.stochKP       || 14,

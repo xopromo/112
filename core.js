@@ -123,9 +123,26 @@ function calcPivotLoHi(data, pvL, pvR) {
   }
   return{lo,hi};
 }
+function calcDEMA(data, period) {
+  const ema1 = calcEMA(data, period);
+  const ema2 = calcEMA(Array.from(ema1), period);
+  const N = data.length, r = new Float64Array(N);
+  for (let i = 0; i < N; i++) r[i] = 2 * ema1[i] - ema2[i];
+  return r;
+}
+function calcTEMA(data, period) {
+  const ema1 = calcEMA(data, period);
+  const ema2 = calcEMA(Array.from(ema1), period);
+  const ema3 = calcEMA(Array.from(ema2), period);
+  const N = data.length, r = new Float64Array(N);
+  for (let i = 0; i < N; i++) r[i] = 3 * ema1[i] - 3 * ema2[i] + ema3[i];
+  return r;
+}
 function calcMA(data, period, type) {
   if (type === 'SMA') return calcSMA(data, period);
   if (type === 'WMA') return calcWMA(data, period);
+  if (type === 'DEMA') return calcDEMA(data, period);
+  if (type === 'TEMA') return calcTEMA(data, period);
   return calcEMA(data, period);
 }
 // HTF MA: строит MA на барах старшего ТФ (ratio=4 → 4x текущего).

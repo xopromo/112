@@ -428,6 +428,57 @@ const ENTRY_REGISTRY = [
     ],
   },
 
+  // ── Elder Impulse System (EIS) ───────────────────────────
+  // Лонг: EMA растёт И MACD гистограмма растёт (двойное согласование)
+  // Шорт: EMA падает И MACD гистограмма падает
+  {
+    id:        'eis',
+    flag:      'useEIS',
+    htmlId:    'e_eis',
+    shortName: c => `EIS(${c.eisPeriod||13})`,
+    detectL: (cfg, i) => {
+      if (!cfg.eisEMAArr || !cfg.eisHistArr || i < 3) return false;
+      return cfg.eisEMAArr[i-1] > cfg.eisEMAArr[i-2] && cfg.eisHistArr[i-1] > cfg.eisHistArr[i-2];
+    },
+    detectS: (cfg, i) => {
+      if (!cfg.eisEMAArr || !cfg.eisHistArr || i < 3) return false;
+      return cfg.eisEMAArr[i-1] < cfg.eisEMAArr[i-2] && cfg.eisHistArr[i-1] < cfg.eisHistArr[i-2];
+    },
+    pineLines: (c, b) => [
+      `use_eis     = input.bool(${b(c.useEIS)}, "Elder Impulse System", group=grp_entry)`,
+      `eis_ema_p   = input.int(${c.eisPeriod||13}, "  EIS EMA период", minval=2, maxval=200, group=grp_entry)`,
+    ],
+  },
+
+  // ── Three White Soldiers / Three Black Crows ─────────────
+  // Лонг: 3 бычьих свечи подряд, каждая открывается внутри тела предыдущей, каждая закрывается выше
+  // Шорт: 3 медвежьих свечи подряд, аналогично
+  {
+    id:        'soldiers',
+    flag:      'useSoldiers',
+    htmlId:    'e_soldiers',
+    shortName: () => '3Soldiers',
+    detectL: (cfg, i) => {
+      if (i < 4) return false;
+      const a = DATA[i-3], b = DATA[i-2], c = DATA[i-1];
+      return a.c > a.o && b.c > b.o && c.c > c.o
+        && b.o >= a.o && b.o <= a.c
+        && c.o >= b.o && c.o <= b.c
+        && b.c > a.c && c.c > b.c;
+    },
+    detectS: (cfg, i) => {
+      if (i < 4) return false;
+      const a = DATA[i-3], b = DATA[i-2], c = DATA[i-1];
+      return a.c < a.o && b.c < b.o && c.c < c.o
+        && b.o <= a.o && b.o >= a.c
+        && c.o <= b.o && c.o >= b.c
+        && b.c < a.c && c.c < b.c;
+    },
+    pineLines: (c, b) => [
+      `use_soldiers = input.bool(${b(c.useSoldiers)}, "3 White Soldiers / 3 Black Crows", group=grp_entry)`,
+    ],
+  },
+
   // ── Разворот после N однонаправленных свечей ─────────────
   // Лонг: N (или более) медвежьих свечей подряд, затем бычья → разворот вверх
   // Шорт: N (или более) бычьих свечей подряд, затем медвежья → разворот вниз

@@ -273,6 +273,29 @@ const FILTER_REGISTRY = [
     nameLabel: (cfg) => `WT>${cfg.wtThresh}`,
   },
 
+  // ── MACD Direction ───────────────────────────────────────
+  // Лонг: MACD line > signal line (бычий импульс)
+  // Шорт: MACD line < signal line (медвежий импульс)
+  {
+    id:       'macdfilter',
+    flag:     'useMacdFilter',
+    blocksL:  (cfg, i) => cfg.macdLine && cfg.macdSignal && cfg.macdLine[i-1] <= cfg.macdSignal[i-1],
+    blocksS:  (cfg, i) => cfg.macdLine && cfg.macdSignal && cfg.macdLine[i-1] >= cfg.macdSignal[i-1],
+    nameLabel: () => 'MACDf',
+  },
+
+  // ── Efficiency Ratio (Kaufman) ────────────────────────────
+  // ER = |net_change_N| / sum(|bar_changes_N|)
+  // ER близко к 1 = сильный тренд, к 0 = хаос. Блокировать если ER < threshold.
+  // FIX: первые erPeriod баров = 0 (не прогрет) → блокировать как Pine na
+  {
+    id:       'er',
+    flag:     'useER',
+    blocksL:  (cfg, i) => !cfg.erArr || cfg.erArr[i-1] <= 0 || cfg.erArr[i-1] < cfg.erThresh,
+    blocksS:  (cfg, i) => !cfg.erArr || cfg.erArr[i-1] <= 0 || cfg.erArr[i-1] < cfg.erThresh,
+    nameLabel: (cfg) => `ER>${cfg.erThresh}`,
+  },
+
   // ── Fat Volume (Exhaustion) ───────────────────────────────
   {
     id:       'fat',
