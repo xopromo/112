@@ -1260,6 +1260,27 @@ function showDetail(r) {
   }
   // ##MC_PERM_END##
 
+  // ##AIC_BIC_MDL_START## — удалить для отката: эти строки + _countCfgParams/_calcInfoCriteria в opt.js
+  {
+    const _ic = _calcInfoCriteria(r.n, r.wr, r.cfg);
+    let _icHtml = '';
+    if (_ic) {
+      const { k, aic, bic, mdl, deltaBic } = _ic;
+      const kLabel = k <= 5 ? 'простая' : k <= 10 ? 'умеренная' : k <= 16 ? 'сложная' : 'очень сложная';
+      const dC = deltaBic > 10 ? 'pos' : deltaBic > 0 ? 'warn' : 'neg';
+      const dLabel = deltaBic > 10 ? 'стратегия оправдывает сложность ✅' : deltaBic > 0 ? 'слабое превосходство над случайной' : 'хуже случайного — возможный перефиттинг';
+      _icHtml += row('k (параметров)', `${k} <span style="opacity:.6;font-size:.85em">${kLabel} стратегия</span>`, '');
+      _icHtml += row('AIC', `${aic.toFixed(1)} <span style="opacity:.5;font-size:.8em">↓ лучше · 2k − 2·logL</span>`, 'muted');
+      _icHtml += row('BIC', `${bic.toFixed(1)} <span style="opacity:.5;font-size:.8em">↓ лучше · k·ln(n) − 2·logL</span>`, 'muted');
+      _icHtml += row('MDL (bits)', `${mdl.toFixed(1)} <span style="opacity:.5;font-size:.8em">↓ лучше · BIC/2</span>`, 'muted');
+      _icHtml += row('ΔBIC vs случайной', `<span class="${dC}">${deltaBic > 0 ? '+' : ''}${deltaBic.toFixed(1)}</span> <span style="opacity:.6;font-size:.85em">${dLabel}</span>`, '');
+    } else {
+      _icHtml += row('IC', 'нет данных — нужно ≥5 сделок', 'muted');
+    }
+    html = section('🧮', 'AIC · BIC · MDL (сложность модели)', _icHtml) + html;
+  }
+  // ##AIC_BIC_MDL_END##
+
   $('dp-body').innerHTML = html;
 
   // Build copy text

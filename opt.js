@@ -286,6 +286,45 @@ function _calcSerenity(eq) {
 }
 // ─────────────────────────────────────────────────────────────────
 
+// ── Information Criteria: AIC / BIC / MDL ────────────────────────
+// Основаны на биномиальной модели WR: logL = n_w·ln(WR) + n_l·ln(1-WR)
+// k = число активных use* флагов в cfg (= число независимых правил стратегии)
+// AIC  = 2k − 2·logL            (штраф пропорционален k)
+// BIC  = k·ln(n) − 2·logL      (штраф растёт с объёмом данных, строже AIC)
+// MDL  = BIC / 2                (в битах, информационная трактовка)
+// ΔBIC = BIC_null − BIC_actual  (превышение над случайной стратегией с WR=50%)
+//        > 0 = стратегия лучше случайной, > 10 = существенно лучше
+// AIC/BIC используются для СРАВНЕНИЯ стратегий между собой:
+// более сложная стратегия (высокое k) с той же WR получает ХУДШИЙ (больший) BIC.
+// Откат: удалить эти функции + ##AIC_BIC_MDL## блок в showDetail (ui.js)
+function _countCfgParams(cfg) {
+  if (!cfg) return 2;
+  let k = 2; // базовые 2: вход + управление позицией всегда присутствуют
+  for (const val of Object.values(cfg)) {
+    if (val === true) k++; // каждый активный use* флаг = +1 правило
+  }
+  return Math.max(k, 2);
+}
+
+function _calcInfoCriteria(n, wr, cfg) {
+  if (!n || n < 5 || wr == null) return null;
+  const p = wr / 100;
+  if (p <= 0.001 || p >= 0.999) return null;
+  const nw = Math.round(n * p), nl = n - nw;
+  if (nw < 1 || nl < 1) return null;
+  const logL = nw * Math.log(p) + nl * Math.log(1 - p);
+  const k    = _countCfgParams(cfg);
+  const aic  = 2 * k - 2 * logL;
+  const bic  = k * Math.log(n) - 2 * logL;
+  const mdl  = bic / 2;
+  // ΔBIC: превышение над null-моделью (WR=50%, те же k)
+  // BIC_null = k·ln(n) + 2n·ln(2); k·ln(n) сокращается → ΔBIC = 2n·ln(2) + 2·logL
+  const deltaBic = 2 * n * Math.LN2 + 2 * logL;
+  return { k, aic: Math.round(aic * 10) / 10, bic: Math.round(bic * 10) / 10,
+           mdl: Math.round(mdl * 10) / 10, deltaBic: Math.round(deltaBic * 10) / 10 };
+}
+// ─────────────────────────────────────────────────────────────────
+
 // ── MC Permutation Test (поиск 2026-03-06) ───────────────────────
 // p-value = доля из 1000 случайных перемешиваний сделок,
 // где shuffled Calmar ≥ actual Calmar.
