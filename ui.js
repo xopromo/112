@@ -1599,7 +1599,9 @@ function gatherSettings() {
   // Порядок панелей
   const panelOrder = Array.from(document.querySelectorAll('#panels .panel[data-panel-id]'))
     .map(p => p.dataset.panelId);
-  return { vals, chks, sels, slLogic, tpLogic, revMode, revAct, timeMode, clxMode, colSettings, panelOrder };
+  // Фильтры таблицы (f_pnl, f_wr, сортировка и т.д.)
+  const tableFilters = (typeof _gatherTableFilters === 'function') ? _gatherTableFilters() : null;
+  return { vals, chks, sels, slLogic, tpLogic, revMode, revAct, timeMode, clxMode, colSettings, panelOrder, tableFilters };
 }
 
 function applySettings(s) {
@@ -1621,6 +1623,8 @@ function applySettings(s) {
   }
   // Восстанавливаем порядок панелей
   if (s.panelOrder && typeof _restorePanelOrder === 'function') _restorePanelOrder(s.panelOrder);
+  // Восстанавливаем фильтры таблицы
+  if (s.tableFilters && typeof _applyTableFilters === 'function') _applyTableFilters(s.tableFilters, false);
   updatePreview();
 }
 
