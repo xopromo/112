@@ -164,6 +164,15 @@ document.addEventListener('DOMContentLoaded', () => {
   // Append file input
   const appendInput = document.getElementById('fi_append');
   if (appendInput) appendInput.addEventListener('change', e => appendFile(e.target.files[0]));
+
+  // Multi-file input
+  const multiInput = document.getElementById('fi_multi');
+  if (multiInput) multiInput.addEventListener('change', e => {
+    const files = Array.from(e.target.files);
+    e.target.value = '';
+    if (!files.length) return;
+    loadMultipleFiles(files);
+  });
 });
 
 function loadFile(file) {
@@ -295,6 +304,66 @@ function clearAppendedData() {
   $('btn-clear-data').style.display = 'none';
   $('rbtn').disabled = true;
   alert('Данные сброшены. Загрузи основной CSV заново.');
+}
+
+// ============================================================
+// ЗАГРУЗКА НЕСКОЛЬКИХ CSV ФАЙЛОВ ОДНОВРЕМЕННО
+// ============================================================
+function loadMultipleFiles(files) {
+  // Sort by filename alphabetically (date order for typical TF naming like BTCUSDT_1h_2023.csv)
+  files.sort((a, b) => a.name.localeCompare(b.name));
+  const total = files.length;
+  let loaded = 0;
+  const results = new Array(total);
+  const infoEl = $('finfo-append');
+  if (infoEl) infoEl.textContent = `Загружаю ${total} файлов…`;
+
+  files.forEach((file, idx) => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      results[idx] = { name: file.name, text: e.target.result };
+      loaded++;
+      if (loaded === total) _mergeMultiResults(results);
+    };
+    reader.readAsText(file);
+  });
+}
+
+function _mergeMultiResults(results) {
+  let allBars = [];
+  results.forEach(r => { if (r) allBars = allBars.concat(_parseCSVtoArray(r.text)); });
+
+  if (!allBars.length) { alert('Не удалось прочитать файлы'); return; }
+
+  const hasTime = allBars.some(b => b.t > 0);
+  let merged;
+  if (hasTime) {
+    const seen = new Map();
+    for (const bar of allBars) if (!seen.has(bar.t)) seen.set(bar.t, bar);
+    merged = Array.from(seen.values()).sort((a, b) => a.t - b.t);
+  } else {
+    const seen = new Set(); merged = [];
+    for (const bar of allBars) {
+      const key = `${bar.o},${bar.h},${bar.l},${bar.c},${bar.v}`;
+      if (!seen.has(key)) { seen.add(key); merged.push(bar); }
+    }
+  }
+
+  HAS_VOLUME = merged.some(b => b.v > 0);
+  _rawDATA = merged;
+  _appendedFiles = results.map(r => r.name);
+  _rawDataInfo = `✅ ${results.length} файл(ов)`;
+  DATA = merged;
+  applyMaxBars();
+
+  const infoEl = $('finfo-append');
+  if (infoEl) infoEl.textContent = `Объединено: ${merged.length} баров из ${results.length} файлов`;
+  $('btn-clear-data').style.display = 'inline-block';
+  $('rbtn').disabled = false;
+  updateVolStatus();
+  updatePreview();
+  window._dataHash = (DATA.length + '_' + Math.round((DATA[0]?.c||0)*1000) + '_' + Math.round((DATA[DATA.length-1]?.c||0)*1000)).replace(/[^a-z0-9_]/gi,'_');
+  if (typeof _robSurrogate !== 'undefined') _robSurrogate.load(window._dataHash);
 }
 
 // Парсинг CSV в массив баров (без присваивания в DATA)
