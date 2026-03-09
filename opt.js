@@ -286,6 +286,302 @@ function _calcSerenity(eq) {
 }
 // ─────────────────────────────────────────────────────────────────
 
+// ── Information Ratio — Tier 3 ────────────────────────────────────
+// IR = mean(active_returns) / std(active_returns) × √252
+// active_return[i] = Δeq[i] − buy_hold_return[i] (оба в % от init price)
+// IR > 1.0 = хорошо, > 0.5 = добавляет ценность, < 0 = хуже buy&hold.
+// Требует глобальный DATA (всегда доступен в opt.js).
+// Откат: удалить функцию + поле ir во всех results.push(), _attachOOS.forward,
+//        TPE batch, col-ir/f_ir в shell.html, фильтр/колонку/сортировку в ui.js
+function _calcInfoRatio(eq) {
+  if (!eq || eq.length < 30 || typeof DATA === 'undefined' || !DATA || DATA.length < eq.length) return null;
+  const N = eq.length, c0 = DATA[0].c;
+  if (!c0 || c0 <= 0) return null;
+  let sumD = 0, sumD2 = 0;
+  for (let i = 1; i < N; i++) {
+    const stratR = eq[i] - eq[i - 1];
+    const bhR    = (DATA[i].c - DATA[i - 1].c) / c0 * 100;
+    const d      = stratR - bhR;
+    sumD += d; sumD2 += d * d;
+  }
+  const n = N - 1, mean = sumD / n;
+  const variance = sumD2 / n - mean * mean;
+  if (variance < 1e-12) return mean > 0 ? 9.9 : null;
+  return Math.round(mean / Math.sqrt(variance) * Math.sqrt(252) * 10) / 10;
+}
+// ─────────────────────────────────────────────────────────────────
+
+// ── Normal CDF (shared utility) ────────────────────────────────────
+// Abramowitz & Stegun 26.2.17, max error 7.5×10⁻⁸.
+// Используется PSR и GP EI acquisition.
+// Откат: удалить + убедиться что _calcPSR/_gpEI тоже удалены
+function _normCDF(z) {
+  const t = 1 / (1 + 0.2316419 * Math.abs(z));
+  const p = t * (0.319381530 + t * (-0.356563782 + t * (1.781477937 + t * (-1.821255978 + t * 1.330274429))));
+  const cdf = 1 - Math.exp(-0.5 * z * z) / 2.5066282746 * p;
+  return z >= 0 ? cdf : 1 - cdf;
+}
+// ─────────────────────────────────────────────────────────────────
+
+// ── Probabilistic Sharpe Ratio — Tier 3 ───────────────────────────
+// PSR = Φ(√(n−1) × SR / √(1 − γ₁×SR + (γ₂+1)/4 × SR²))
+// SR = mean/std сделок; γ₁ = skewness; γ₂ = excess kurtosis.
+// Показывает % уверенности что SR > 0. PSR > 95% = статистически значимо.
+// Требует tradePnl[] (cfg.collectTrades=true, доступен в showDetail).
+// Откат: удалить + блок ##PSR в showDetail (ui.js)
+function _calcPSR(tradePnlArr) {
+  if (!tradePnlArr || tradePnlArr.length < 20) return null;
+  const n = tradePnlArr.length;
+  let sum = 0;
+  for (let i = 0; i < n; i++) sum += tradePnlArr[i];
+  const mean = sum / n;
+  let v2 = 0, v3 = 0, v4 = 0;
+  for (let i = 0; i < n; i++) {
+    const d = tradePnlArr[i] - mean;
+    v2 += d * d; v3 += d * d * d; v4 += d * d * d * d;
+  }
+  const std = Math.sqrt(v2 / n);
+  if (std < 1e-10) return mean > 0 ? 99.9 : null;
+  const sr   = mean / std;
+  const skew = v3 / (n * std * std * std);
+  const kurt = v4 / (n * std * std * std * std) - 3; // excess kurtosis
+  const denom2 = 1 - skew * sr + (kurt + 1) / 4 * sr * sr;
+  if (denom2 <= 1e-10) return null;
+  const z = Math.sqrt(n - 1) * sr / Math.sqrt(denom2);
+  return Math.round(_normCDF(z) * 1000) / 10;
+}
+// ─────────────────────────────────────────────────────────────────
+
+// ── Filter Ablation (Feature Importance) — Tier 3 ─────────────────
+// Для каждого активного фильтра отключает его и запускает бэктест.
+// delta > 0 → фильтр лишний (без него лучше). delta < 0 → фильтр важен.
+// Вычисляется лениво только в showDetail, не в горячем цикле.
+// Откат: удалить функцию + блок ##ABLATION в showDetail (ui.js)
+function _calcFilterAblation(cfg) {
+  try {
+    const ind0  = _calcIndicators(cfg);
+    const btc0  = buildBtCfg(cfg, ind0);
+    const base  = backtest(ind0.pvLo, ind0.pvHi, ind0.atrArr, btc0);
+    if (!base || base.n < 5) return null;
+    const basePnl = base.pnl;
+    const items = [];
+    for (const f of FILTER_REGISTRY) {
+      if (!cfg[f.flag]) continue;
+      const cfgOff = Object.assign({}, cfg, { [f.flag]: false });
+      const ind2   = _calcIndicators(cfgOff);
+      const btc2   = buildBtCfg(cfgOff, ind2);
+      const r2     = backtest(ind2.pvLo, ind2.pvHi, ind2.atrArr, btc2);
+      items.push({ id: f.id, delta: Math.round(((r2 ? r2.pnl : basePnl) - basePnl) * 10) / 10 });
+    }
+    items.sort((a, b) => a.delta - b.delta); // важные (отрицательный delta) — вверху
+    return { basePnl, items };
+  } catch (_) { return null; }
+}
+// ─────────────────────────────────────────────────────────────────
+
+// ── HMM Regime Detector — Tier 3 ─────────────────────────────────
+// Gaussian HMM (2 состояния: bull/bear) на log-returns из DATA.
+// Baum-Welch 5 итераций → Viterbi для меток состояний.
+// Возвращает { bullPct, bearPct, regimes Int8Array, bullState, m0, m1, s0, s1, stayProb[] }
+// Вычисляется лениво в showDetail. Откат: удалить + ##HMM / ##REGIME_PERF в ui.js
+function _calcHMM() {
+  if (!DATA || DATA.length < 100) return null;
+  const N = DATA.length, M = N - 1;
+  const obs = new Float64Array(M);
+  for (let i = 1; i < N; i++) obs[i - 1] = Math.log(DATA[i].c / DATA[i - 1].c);
+  // Init: split at median
+  const sorted = Array.from(obs).sort((a, b) => a - b);
+  const med = sorted[Math.floor(M / 2)];
+  let m0 = 0, m1 = 0, c0 = 0, c1 = 0;
+  for (let i = 0; i < M; i++) { if (obs[i] <= med) { m0 += obs[i]; c0++; } else { m1 += obs[i]; c1++; } }
+  m0 /= c0 || 1; m1 /= c1 || 1;
+  let s0 = 0, s1 = 0;
+  for (let i = 0; i < M; i++) { const d = obs[i] - (obs[i] <= med ? m0 : m1); if (obs[i] <= med) s0 += d * d; else s1 += d * d; }
+  s0 = Math.sqrt(s0 / (c0 || 1)) || 0.005; s1 = Math.sqrt(s1 / (c1 || 1)) || 0.005;
+  let A = [[0.95, 0.05], [0.05, 0.95]], pi = [0.5, 0.5];
+  const gPdf = (x, mu, sig) => Math.max(1e-300, Math.exp(-0.5 * ((x - mu) / sig) ** 2) / (sig * 2.5066282746));
+  // Baum-Welch (5 iterations)
+  for (let iter = 0; iter < 5; iter++) {
+    const alpha = [], scale = new Float64Array(M);
+    alpha.push([pi[0] * gPdf(obs[0], m0, s0), pi[1] * gPdf(obs[0], m1, s1)]);
+    scale[0] = alpha[0][0] + alpha[0][1] || 1e-300; alpha[0][0] /= scale[0]; alpha[0][1] /= scale[0];
+    for (let t = 1; t < M; t++) {
+      const a0 = (alpha[t-1][0]*A[0][0] + alpha[t-1][1]*A[1][0]) * gPdf(obs[t], m0, s0);
+      const a1 = (alpha[t-1][0]*A[0][1] + alpha[t-1][1]*A[1][1]) * gPdf(obs[t], m1, s1);
+      scale[t] = a0 + a1 || 1e-300;
+      alpha.push([a0 / scale[t], a1 / scale[t]]);
+    }
+    const beta = new Array(M); beta[M - 1] = [1, 1];
+    for (let t = M - 2; t >= 0; t--) {
+      const sc = scale[t + 1];
+      beta[t] = [
+        (A[0][0]*gPdf(obs[t+1],m0,s0)*beta[t+1][0] + A[0][1]*gPdf(obs[t+1],m1,s1)*beta[t+1][1]) / sc,
+        (A[1][0]*gPdf(obs[t+1],m0,s0)*beta[t+1][0] + A[1][1]*gPdf(obs[t+1],m1,s1)*beta[t+1][1]) / sc
+      ];
+    }
+    const gam = alpha.map((a, t) => { const s = a[0]*beta[t][0] + a[1]*beta[t][1] || 1e-300; return [a[0]*beta[t][0]/s, a[1]*beta[t][1]/s]; });
+    pi = [gam[0][0], gam[0][1]];
+    const newA = [[0, 0], [0, 0]], denomA = [0, 0];
+    for (let t = 0; t < M - 1; t++) {
+      for (let i = 0; i < 2; i++) {
+        newA[i][0] += alpha[t][i]*A[i][0]*gPdf(obs[t+1],m0,s0)*beta[t+1][0]/scale[t+1];
+        newA[i][1] += alpha[t][i]*A[i][1]*gPdf(obs[t+1],m1,s1)*beta[t+1][1]/scale[t+1];
+        denomA[i] += gam[t][i];
+      }
+    }
+    for (let i = 0; i < 2; i++) {
+      const d = denomA[i] || 1e-10;
+      const nm = (newA[i][0] + newA[i][1]) / d || 1;
+      A[i][0] = newA[i][0] / d / nm; A[i][1] = newA[i][1] / d / nm;
+    }
+    let g0 = 0, g1 = 0, nm0 = 0, nm1 = 0;
+    for (let t = 0; t < M; t++) { nm0 += gam[t][0]*obs[t]; g0 += gam[t][0]; nm1 += gam[t][1]*obs[t]; g1 += gam[t][1]; }
+    m0 = nm0 / (g0 || 1); m1 = nm1 / (g1 || 1);
+    let ns0 = 0, ns1 = 0;
+    for (let t = 0; t < M; t++) { ns0 += gam[t][0]*(obs[t]-m0)**2; ns1 += gam[t][1]*(obs[t]-m1)**2; }
+    s0 = Math.sqrt(ns0 / (g0 || 1)) || 0.005; s1 = Math.sqrt(ns1 / (g1 || 1)) || 0.005;
+  }
+  // Viterbi
+  const delta = [[pi[0]*gPdf(obs[0],m0,s0), pi[1]*gPdf(obs[0],m1,s1)]];
+  const psi = new Int8Array(M * 2);
+  for (let t = 1; t < M; t++) {
+    const row = [0, 0];
+    for (let j = 0; j < 2; j++) {
+      const cv = [delta[t-1][0]*A[0][j], delta[t-1][1]*A[1][j]];
+      psi[t*2+j] = cv[0] >= cv[1] ? 0 : 1;
+      row[j] = Math.max(cv[0], cv[1]) * gPdf(obs[t], j === 0 ? m0 : m1, j === 0 ? s0 : s1);
+    }
+    const sc = row[0] + row[1] || 1e-300;
+    delta.push([row[0] / sc, row[1] / sc]);
+  }
+  const regimes = new Int8Array(M);
+  regimes[M - 1] = delta[M - 1][0] > delta[M - 1][1] ? 0 : 1;
+  for (let t = M - 2; t >= 0; t--) regimes[t] = psi[(t + 1) * 2 + regimes[t + 1]];
+  const bullState = m0 > m1 ? 0 : 1;
+  let bull = 0, bear = 0;
+  for (let t = 0; t < M; t++) regimes[t] === bullState ? bull++ : bear++;
+  return {
+    bullPct: Math.round(bull / M * 100), bearPct: Math.round(bear / M * 100),
+    regimes, bullState,
+    m0: +(m0 * 100).toFixed(4), m1: +(m1 * 100).toFixed(4),
+    s0: +(s0 * 100).toFixed(4), s1: +(s1 * 100).toFixed(4),
+    stayProb: [+(A[0][0] * 100).toFixed(1), +(A[1][1] * 100).toFixed(1)]
+  };
+}
+// ─────────────────────────────────────────────────────────────────
+
+// ── Regime Performance (Adaptive Analysis) — Tier 3 ───────────────
+// Разбивает equity curve по bull/bear режимам из HMM.
+// Показывает PnL стратегии отдельно в трендовых vs боковых условиях.
+// Вычисляется лениво в showDetail (параметр hmm передаётся из ##HMM блока).
+// Откат: удалить функцию + блок ##REGIME_PERF в showDetail (ui.js)
+function _calcRegimePerf(cfg, hmm) {
+  if (!hmm || !hmm.regimes) return null;
+  try {
+    const ind = _calcIndicators(cfg);
+    const btc = buildBtCfg(cfg, ind);
+    const r   = backtest(ind.pvLo, ind.pvHi, ind.atrArr, btc);
+    if (!r || r.n < 5) return null;
+    const eq = r.eq, reg = hmm.regimes;
+    const N  = Math.min(eq.length, reg.length + 1);
+    let bullSum = 0, bearSum = 0, bullN = 0, bearN = 0;
+    for (let i = 1; i < N; i++) {
+      const d = eq[i] - eq[i - 1], ri = reg[i - 1];
+      if (ri === hmm.bullState) { bullSum += d; bullN++; } else { bearSum += d; bearN++; }
+    }
+    return {
+      bullPnl: Math.round(bullSum * 10) / 10, bullN,
+      bearPnl: Math.round(bearSum * 10) / 10, bearN
+    };
+  } catch (_) { return null; }
+}
+// ─────────────────────────────────────────────────────────────────
+
+// ── Kalman MA Builder — Tier 3 ────────────────────────────────────
+// Скалярный Kalman фильтр для адаптивной MA.
+// Q (process noise) адаптируется к ATR: при высокой волатильности → K↑ (быстрее).
+// При низкой → K↓ (больше сглаживания). Параметр R (measurement noise) фиксирован.
+// Возвращает Float64Array той же длины что prices.
+// Откат: удалить функцию + kalmanArr в _calcIndicators/buildBtCfg + фильтр в filter_registry.js
+function _buildKalmanMA(prices, baseLen) {
+  const N = prices.length;
+  const kArr = new Float64Array(N);
+  if (N < 10) return kArr;
+  let x = prices[0], P = 1.0;
+  const halfL = Math.max(Math.floor(baseLen / 2), 2);
+  for (let i = 0; i < N; i++) {
+    const w = Math.min(i, halfL);
+    let sumSq = 0;
+    for (let j = i - w; j < i; j++) {
+      const ret = (prices[j + 1] - prices[j]) / (prices[j] || 1);
+      sumSq += ret * ret;
+    }
+    const Q = w > 0 ? sumSq / w : 0.001;
+    P += Q;
+    const K = P / (P + 1); // R normalised to 1
+    x += K * (prices[i] - x);
+    P *= (1 - K);
+    kArr[i] = x;
+  }
+  return kArr;
+}
+// ─────────────────────────────────────────────────────────────────
+
+// ── Gaussian Process helpers — Tier 3 (Bayesian Optimisation) ─────
+// RBF kernel, Cholesky, GP predict, EI acquisition.
+// Откат: удалить все _gp* функции + runBayesOpt + ##BAYES_OPT в ui.js / shell.html
+function _gpCholesky(A, n) {
+  const L = new Float64Array(n * n);
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j <= i; j++) {
+      let s = A[i * n + j];
+      for (let k = 0; k < j; k++) s -= L[i * n + k] * L[j * n + k];
+      L[i * n + j] = i === j ? Math.sqrt(Math.max(s, 1e-10)) : s / (L[j * n + j] || 1e-10);
+    }
+  }
+  return L;
+}
+function _gpFwdSolve(L, b, n) {
+  const x = new Float64Array(n);
+  for (let i = 0; i < n; i++) { let s = b[i]; for (let j = 0; j < i; j++) s -= L[i*n+j]*x[j]; x[i] = s / (L[i*n+i] || 1e-10); }
+  return x;
+}
+function _gpBwdSolve(L, b, n) {
+  const x = new Float64Array(n);
+  for (let i = n-1; i >= 0; i--) { let s = b[i]; for (let j = i+1; j < n; j++) s -= L[j*n+i]*x[j]; x[i] = s / (L[i*n+i] || 1e-10); }
+  return x;
+}
+function _gpRBF(x1, x2, ls2) {
+  let sq = 0; for (let i = 0; i < x1.length; i++) { const d = x1[i]-x2[i]; sq += d*d; } return Math.exp(-sq / (2 * ls2));
+}
+// Fit GP: return { L, alpha } for later prediction
+function _gpFit(Xobs, yobs, noise) {
+  const n = Xobs.length, ls2 = 1.0;
+  const K = new Float64Array(n * n);
+  for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) K[i*n+j] = _gpRBF(Xobs[i], Xobs[j], ls2) + (i===j ? noise : 0);
+  const L = _gpCholesky(K, n);
+  const tmp = _gpFwdSolve(L, yobs, n);
+  const alpha = _gpBwdSolve(L, tmp, n);
+  return { L, alpha, n, ls2 };
+}
+// Predict mu and sigma at xStar
+function _gpPredict(gp, Xobs, xStar) {
+  const { L, alpha, n, ls2 } = gp;
+  const kStar = new Float64Array(n);
+  for (let i = 0; i < n; i++) kStar[i] = _gpRBF(Xobs[i], xStar, ls2);
+  let mu = 0; for (let i = 0; i < n; i++) mu += alpha[i] * kStar[i];
+  const v = _gpFwdSolve(L, kStar, n);
+  let kss = 1; for (let i = 0; i < n; i++) kss -= v[i] * v[i];
+  return { mu, sigma: Math.sqrt(Math.max(kss, 1e-10)) };
+}
+// Expected Improvement
+function _gpEI(mu, sigma, yBest) {
+  if (sigma < 1e-10) return 0;
+  const z = (mu - yBest) / sigma;
+  return (mu - yBest) * _normCDF(z) + sigma * Math.exp(-0.5 * z * z) / 2.5066282746;
+}
+// ─────────────────────────────────────────────────────────────────
+
 // ── Information Criteria: AIC / BIC / MDL ────────────────────────
 // Основаны на биномиальной модели WR: logL = n_w·ln(WR) + n_l·ln(1-WR)
 // k = число активных use* флагов в cfg (= число независимых правил стратегии)
@@ -654,7 +950,8 @@ async function runOpt() {
       dwrLS: rFull.dwrLS??null, cvr: _calcCVR(rFull.eq), upi: _calcUlcerIdx(rFull.eq),
       sortino: _calcSortino(rFull.eq), kRatio: _calcKRatio(rFull.eq), sqn: rFull.sqn??null,
       omega: _calcOmega(rFull.eq), pain: _calcPainRatio(rFull.eq),
-      burke: _calcBurke(rFull.eq), serenity: _calcSerenity(rFull.eq) }; // ##OMG ##PAIN ##BURKE ##SRNTY
+      burke: _calcBurke(rFull.eq), serenity: _calcSerenity(rFull.eq),
+      ir: _calcInfoRatio(rFull.eq) }; // ##OMG ##PAIN ##BURKE ##SRNTY ##IR
     // Обновляем глобальный equities полной кривой — чтобы график показывал 100% данных
     // с правильным split-маркером на IS/OOS границе, а не растянутую IS-кривую.
     if (name && typeof equities !== 'undefined') equities[name] = rFull.eq;
@@ -723,6 +1020,8 @@ async function runOpt() {
   const useMacdFilter = $c('f_macd');
   const useER         = $c('f_er');
   const erThresh      = $n('f_ert') || 0.3;
+  const useKalmanMA   = $c('f_kalman');      // ##KALMAN_MA##
+  const kalmanLen     = $n('f_kalmanl') || 20; // ##KALMAN_MA##
 
   // ── Powerset фильтров ────────────────────────────────────────────────
   // Перебирает все 2^N комбинаций включённых фильтров.
@@ -750,6 +1049,7 @@ async function runOpt() {
     {key:'useFat',        active:useFat},
     {key:'useMacdFilter', active:useMacdFilter},
     {key:'useER',         active:useER},
+    {key:'useKalmanMA',   active:useKalmanMA}, // ##KALMAN_MA##
   ].filter(f => f.active); // только те что включены
   let _filterCombos;
   if (_usePowerset && _psFilterDefs.length > 0) {
@@ -1494,6 +1794,7 @@ async function runOpt() {
         bodyAvg:bodyAvgArr,
         useMacdFilter:_fCombo.useMacdFilter??useMacdFilter,
         useER:_fCombo.useER??useER,erArr,erPeriod:erPeriod||10,erThresh,
+        useKalmanMA:_fCombo.useKalmanMA??useKalmanMA,kalmanArr,kalmanLen, // ##KALMAN_MA##
         start:Math.max(maP||0,50)+2,
         pruning:false, maxDDLimit:maxDD
       };
@@ -1553,13 +1854,14 @@ async function runOpt() {
               useLiq:_effUseLiq,liqMin,useVolDir:_effUseVolDir,volDirPeriod:volDirP,
               useWT:_effUseWT&&wtT>0,wtThresh:wtT,wtN,wtVolW,wtBodyW,wtUseDist,
               useFat:_effUseFat,fatConsec,fatVolDrop,
+              useKalmanMA:_fCombo.useKalmanMA??useKalmanMA,kalmanLen, // ##KALMAN_MA##
               atrPeriod:atrP,commission:commTotal,baseComm:comm,spreadVal:spread*2,
               revSkip,revCooldown,revSrc};
           results.push({name,pnl:r.pnl,wr:r.wr,n:r.n,dd:r.dd,pdd,avg:r.avg,sig,gt,
             p1:r.p1,p2:r.p2,dwr:r.dwr,c1:r.c1,c2:r.c2,nL:r.nL||0,pL:r.pL||0,wrL:r.wrL,nS:r.nS||0,pS:r.pS||0,wrS:r.wrS,dwrLS:r.dwrLS,
             cvr:_calcCVR(r.eq),upi:_calcUlcerIdx(r.eq),sortino:_calcSortino(r.eq),kRatio:_calcKRatio(r.eq),sqn:r.sqn??null,
             omega:_calcOmega(r.eq),pain:_calcPainRatio(r.eq),
-            burke:_calcBurke(r.eq),serenity:_calcSerenity(r.eq),cfg:_cfg}); // ##OMG ##PAIN ##BURKE ##SRNTY
+            burke:_calcBurke(r.eq),serenity:_calcSerenity(r.eq),ir:_calcInfoRatio(r.eq),cfg:_cfg}); // ##OMG ##PAIN ##BURKE ##SRNTY ##IR
           equities[name] = r.eq;
         }
       }
@@ -1789,6 +2091,7 @@ async function runOpt() {
         useFat:_effUseFat,fatConsec,fatVolDrop,bodyAvg:bodyAvgArr,
         useMacdFilter:_fCombo.useMacdFilter??useMacdFilter,
         useER:_fCombo.useER??useER,erArr,erPeriod:erPeriod||10,erThresh,
+        useKalmanMA:_fCombo.useKalmanMA??useKalmanMA,kalmanLen, // ##KALMAN_MA##
         start:Math.max(maP||0,50)+2,pruning:false,maxDDLimit:maxDD
       };
 
@@ -1867,13 +2170,14 @@ async function runOpt() {
               useLiq:_effUseLiq,liqMin,useVolDir:_effUseVolDir,volDirPeriod:volDirP,
               useWT:_effUseWT&&wtT>0,wtThresh:wtT,wtN,wtVolW,wtBodyW,wtUseDist,
               useFat:_effUseFat,fatConsec,fatVolDrop,
+              useKalmanMA:_fCombo.useKalmanMA??useKalmanMA,kalmanLen, // ##KALMAN_MA##
               atrPeriod:atrP,commission:commTotal,baseComm:comm,spreadVal:spread*2};
           // OOS и тяжёлые метрики НЕ вызываем здесь — это горячий цикл
           // CVR/UPI/Sortino/kRatio вычислятся батчем после завершения TPE
           results.push({name,pnl:r.pnl,wr:r.wr,n:r.n,dd:r.dd,pdd,avg:r.avg,sig,gt,
             p1:r.p1,p2:r.p2,dwr:r.dwr,c1:r.c1,c2:r.c2,nL:r.nL||0,pL:r.pL||0,wrL:r.wrL,nS:r.nS||0,pS:r.pS||0,wrS:r.wrS,dwrLS:r.dwrLS,
             cvr:null,upi:null,sortino:null,kRatio:null,sqn:r.sqn??null,
-            omega:null,pain:null,burke:null,serenity:null,cfg:_cfg_tpe}); // ##OMG ##PAIN ##BURKE ##SRNTY (null — батч)
+            omega:null,pain:null,burke:null,serenity:null,ir:null,cfg:_cfg_tpe}); // ##OMG ##PAIN ##BURKE ##SRNTY ##IR (null — батч)
           equities[name] = r.eq;
         }
       }
@@ -2037,6 +2341,7 @@ async function runOpt() {
           results[oi].pain     = _calcPainRatio(_eq); // ##PAIN
           results[oi].burke    = _calcBurke(_eq);    // ##BURKE
           results[oi].serenity = _calcSerenity(_eq); // ##SRNTY
+          results[oi].ir       = _calcInfoRatio(_eq); // ##IR
         }
         if (oi % 100 === 0) { await yieldToUI(); }
       }
@@ -2061,6 +2366,109 @@ async function runOpt() {
     playDone();
     return;
   }
+
+  // ── Bayesian Optimisation (GP) — Tier 3 ─────────────────────────────────
+  // GP surrogate с RBF ядром + EI acquisition function.
+  // Находит оптимум за ~100 итераций vs 500–5000 для Grid/MC.
+  // Работает с теми же _mcDims что TPE (до 6 измерений).
+  // Откат: удалить этот блок + GP-функции выше + ##BAYES_OPT в ui.js + shell.html
+  if (optMode === 'bo') {
+    const boN    = Math.max(20, parseInt($v('bo_n') || '100') || 100);
+    const nDims  = _mcDims.length;
+    const _dsz   = _mcDimSizes;
+    const _boSeen = new Set();
+    // GP data storage
+    const Xobs = []; // array of Float64Array (normalised [0,1]^d)
+    const yobs = []; // Float64Array (scores)
+    let gpModel  = null;
+    let yBest    = -Infinity;
+    const _boNoise = 0.05; // GP noise (σ²)
+
+    // Normalise dim index to [0,1]
+    const normIdx = (idx, d) => _dsz[d] <= 1 ? 0 : idx / (_dsz[d] - 1);
+    const randPoint = () => _mcDims.map((dim, d) => Math.floor(Math.random() * _dsz[d]));
+
+    setMcPhase(`🔬 BO разведка (${Math.min(20, boN)} случайных точек)…`);
+
+    for (let iter = 0; iter < boN && !_mcDone; iter++) {
+      let dimIndices;
+      if (iter < Math.min(20, Math.floor(boN * 0.2)) || gpModel === null) {
+        // Exploration: random LHS
+        dimIndices = randPoint();
+      } else {
+        // Exploitation: maximise EI over random candidates
+        const nCand = 200;
+        let bestEI = -1, bestCand = null;
+        for (let c = 0; c < nCand; c++) {
+          const cand = randPoint();
+          const xCand = Float64Array.from(cand.map((idx, d) => normIdx(idx, d)));
+          const { mu, sigma } = _gpPredict(gpModel, Xobs, xCand);
+          const ei = _gpEI(mu, sigma, yBest);
+          if (ei > bestEI) { bestEI = ei; bestCand = cand; }
+        }
+        dimIndices = bestCand || randPoint();
+      }
+
+      const hash = dimIndices.join(',');
+      if (_boSeen.has(hash)) continue;
+      _boSeen.add(hash);
+
+      const score = await _tpeRunPoint(dimIndices);
+      if (score !== null) {
+        const xNorm = Float64Array.from(dimIndices.map((idx, d) => normIdx(idx, d)));
+        Xobs.push(xNorm);
+        yobs.push(score);
+        if (score > yBest) yBest = score;
+        // Refit GP every 5 obs or when obs count changes significantly
+        if (Xobs.length % 5 === 0 || Xobs.length <= 5) {
+          try { gpModel = _gpFit(Xobs, yobs, _boNoise); } catch (_) { gpModel = null; }
+        }
+      }
+
+      if (iter % 10 === 0 || iter === boN - 1) {
+        updateETA(iter + 1, boN, results.length);
+        setMcPhase(`🔬 BO итерация ${iter + 1}/${boN} · найдено ${results.length} · лучший score ${yBest.toFixed(3)}`);
+        await yieldToUI();
+        await checkPause();
+      }
+    }
+
+    // Batch metrics for BO results (same as TPE)
+    if (results.length > 0) {
+      setMcPhase(`⏳ Расчёт метрик ${results.length} результатов…`);
+      for (let oi = 0; oi < results.length; oi++) {
+        const _eq = equities[results[oi].name];
+        if (_eq) {
+          results[oi].cvr      = _calcCVR(_eq);
+          results[oi].upi      = _calcUlcerIdx(_eq);
+          results[oi].sortino  = _calcSortino(_eq);
+          results[oi].kRatio   = _calcKRatio(_eq);
+          results[oi].omega    = _calcOmega(_eq);
+          results[oi].pain     = _calcPainRatio(_eq);
+          results[oi].burke    = _calcBurke(_eq);
+          results[oi].serenity = _calcSerenity(_eq);
+          results[oi].ir       = _calcInfoRatio(_eq);
+        }
+        if (oi % 100 === 0) { await yieldToUI(); }
+      }
+    }
+    if (_useOOS && results.length > 0) {
+      setMcPhase(`⏳ OOS проверка ${results.length} результатов…`);
+      for (let oi = 0; oi < results.length; oi++) {
+        _attachOOS(results[oi].cfg, results[oi].name, results[oi].n);
+        if (oi % 50 === 0) { await yieldToUI(); }
+      }
+    }
+    _curPage = 0;
+    renderVisibleResults(); showBestStats();
+    updateETA(boN, boN, results.length);
+    $('prog').textContent = `✅ BO завершён ${boN} итераций | ${fmtNum(results.length)} прошли фильтр`;
+    $('pbtn').style.display = 'none'; $('sbtn').style.display = 'none';
+    $('rbtn').style.display = ''; $('rbtn').disabled = false;
+    playDone();
+    return;
+  }
+  // ─────────────────────────────────────────────────────────────────
 
   for(const pvL of pvLs) { for(const pvR of pvRs) {
     if(_mcDone) break;
@@ -2239,6 +2647,7 @@ async function runOpt() {
                                       useVolDir,volDirPeriod:volDirP,
                                       useWT:useWT&&wtT>0,wtScores,wtThresh:wtT,
                                       useFat,fatConsec,fatVolDrop,
+                                      useKalmanMA,kalmanLen, // ##KALMAN_MA##
                                       bodyAvg:bodyAvgArr,
                                       start:Math.max(maP||0,50)+2,
                                       // Pruning
@@ -2327,13 +2736,14 @@ async function runOpt() {
                                           useVolDir, volDirPeriod:volDirP,
                                           useWT:useWT&&wtT>0, wtThresh:wtT, wtN, wtVolW, wtBodyW, wtUseDist,
                                           useFat, fatConsec, fatVolDrop,
+                                          useKalmanMA, kalmanLen, // ##KALMAN_MA##
                                           atrPeriod:atrP, commission:commTotal, baseComm:comm, spreadVal:spread*2
                                         };
                                       results.push({name,pnl:r.pnl,wr:r.wr,n:r.n,dd:r.dd,pdd,avg:r.avg,sig,gt,
                                         p1:r.p1,p2:r.p2,dwr:r.dwr,c1:r.c1,c2:r.c2,nL:r.nL||0,pL:r.pL||0,wrL:r.wrL,nS:r.nS||0,pS:r.pS||0,wrS:r.wrS,dwrLS:r.dwrLS,
                                         cvr:_calcCVR(r.eq),upi:_calcUlcerIdx(r.eq),sortino:_calcSortino(r.eq),kRatio:_calcKRatio(r.eq),sqn:r.sqn??null,
                                         omega:_calcOmega(r.eq),pain:_calcPainRatio(r.eq),
-                                        burke:_calcBurke(r.eq),serenity:_calcSerenity(r.eq),cfg:_cfg_ex}); // ##OMG ##PAIN ##BURKE ##SRNTY
+                                        burke:_calcBurke(r.eq),serenity:_calcSerenity(r.eq),ir:_calcInfoRatio(r.eq),cfg:_cfg_ex}); // ##OMG ##PAIN ##BURKE ##SRNTY ##IR
                                       equities[name]=r.eq;
                                       } // end else (не дубль)
                                     } // end if(r passed filter)
@@ -2429,6 +2839,11 @@ function _calcIndicators(cfg) {
   const maArr = (maP > 0)
     ? (htfRatio > 1 ? calcHTFMA(DATA, htfRatio, maP, maType) : calcMA(closes, maP, maType))
     : null;
+
+  // ── Kalman MA (адаптивная MA) ────────────────────────────────
+  // ##KALMAN_MA## — Откат: удалить 2 строки + kalmanArr из return + buildBtCfg + filter_registry.js
+  const kalmanLen = cfg.kalmanLen || 20;
+  const kalmanArr = cfg.useKalmanMA ? _buildKalmanMA(closes, kalmanLen) : null;
 
   // ── Confirm MA ────────────────────────────────────────────
   const confN = cfg.confN || 0;
@@ -2728,6 +3143,7 @@ function _calcIndicators(cfg) {
     stDir,
     eisEMAArr, eisHistArr,
     erArr,
+    kalmanArr, // ##KALMAN_MA##
   };
 }
 
@@ -2929,6 +3345,10 @@ function buildBtCfg(cfg, ind) {
     fatConsec:  cfg.fatConsec  || 6,
     fatVolDrop: cfg.fatVolDrop || 0.7,
     bodyAvg:    ind.bodyAvgArr,
+
+    useKalmanMA: cfg.useKalmanMA || false, // ##KALMAN_MA##
+    kalmanArr:   ind.kalmanArr,
+    kalmanLen:   cfg.kalmanLen   || 20,
 
     start: Math.max(maP || 0, 50) + 2,
     pruning: false,

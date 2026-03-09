@@ -333,4 +333,27 @@ const FILTER_REGISTRY = [
     },
     nameLabel: (cfg) => `Fat(${cfg.fatConsec}sv)`,
   },
+
+  // ── Kalman MA Direction (Tier 3) ─────────────────────────────
+  // Адаптивная MA: период сжимается при высокой волатильности,
+  // расширяется при низкой. Работает как обычный MA-фильтр по направлению,
+  // но MA адаптируется к рыночным условиям автоматически.
+  // FIX: kalmanArr[i-1] <= 0 → индикатор не прогрелся → блокировать.
+  // Откат: удалить этот объект + _buildKalmanMA/_calcIndicators/buildBtCfg (opt.js)
+  //        + чекбокс f_kalman (shell.html)
+  {
+    id:       'kalman',
+    flag:     'useKalmanMA',
+    blocksL:  (cfg, i) => {
+      if (!cfg.kalmanArr) return false;
+      const kma = cfg.kalmanArr[i - 1];
+      return kma <= 0 || DATA[i - 1].c <= kma; // kma <= 0 = не прогрелась
+    },
+    blocksS:  (cfg, i) => {
+      if (!cfg.kalmanArr) return false;
+      const kma = cfg.kalmanArr[i - 1];
+      return kma <= 0 || DATA[i - 1].c >= kma;
+    },
+    nameLabel: (cfg) => `KalmanMA(${cfg.kalmanLen || 20})`,
+  },
 ];

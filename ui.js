@@ -495,7 +495,7 @@ function applyFiltersDebounced() {
 // ══════════════════════════════════════════════════════════════
 const _TBL_TPL_KEY = 'use_tbl_tpl';
 
-const _TF_NUM_IDS  = ['f_name','f_pnl','f_wr','f_n','f_dd','f_pdd','f_sig','f_gt','f_cvr','f_sortino','f_kr','f_sqn','f_cpcv','f_omega','f_pain','f_burke','f_serenity','f_avg','f_p1','f_p2','f_dwr','f_tv_dpnl','f_tv_ddd','f_tv_dpdd']; // ##BURKE ##SRNTY
+const _TF_NUM_IDS  = ['f_name','f_pnl','f_wr','f_n','f_dd','f_pdd','f_sig','f_gt','f_cvr','f_sortino','f_kr','f_sqn','f_cpcv','f_omega','f_pain','f_burke','f_serenity','f_ir','f_avg','f_p1','f_p2','f_dwr','f_tv_dpnl','f_tv_ddd','f_tv_dpdd']; // ##BURKE ##SRNTY ##IR
 const _TF_SEL_IDS  = ['f_fav','f_split','f_ls','f_rob','f_oos','f_walk','f_param','f_noise','f_mc','f_tv_score'];
 
 // map filter-input-id → column CSS class (for visibleOnly mode)
@@ -503,7 +503,7 @@ const _TF_COL_MAP  = {
   f_pnl:'col-pnl', f_wr:'col-wr', f_n:'col-n', f_dd:'col-dd', f_pdd:'col-pdd',
   f_sig:'col-sig', f_gt:'col-gt', f_cvr:'col-cvr', f_sortino:'col-sor', f_kr:'col-kr',
   f_sqn:'col-sqn', f_cpcv:'col-cpcv', f_omega:'col-omg', f_pain:'col-pain',
-  f_burke:'col-burke', f_serenity:'col-srnty', // ##BURKE ##SRNTY
+  f_burke:'col-burke', f_serenity:'col-srnty', f_ir:'col-ir', // ##BURKE ##SRNTY ##IR
   f_avg:'col-avg', f_p1:'col-p1', f_p2:'col-p2', f_dwr:'col-dwr',
   f_split:'col-split', f_ls:'col-ls',
   f_tv_dpnl:'col-tv-dpnl', f_tv_ddd:'col-tv-ddd', f_tv_dpdd:'col-tv-dpdd',
@@ -613,7 +613,7 @@ async function deleteTableTpl(i) {
 
 function resetAllFilters() {
   // Сбрасываем все текстовые/числовые инпуты
-  ['f_name','f_pnl','f_wr','f_n','f_dd','f_pdd','f_sig','f_gt','f_cvr','f_sortino','f_kr','f_sqn','f_cpcv','f_omega','f_pain','f_burke','f_serenity', // ##OMG ##PAIN ##BURKE ##SRNTY
+  ['f_name','f_pnl','f_wr','f_n','f_dd','f_pdd','f_sig','f_gt','f_cvr','f_sortino','f_kr','f_sqn','f_cpcv','f_omega','f_pain','f_burke','f_serenity','f_ir', // ##OMG ##PAIN ##BURKE ##SRNTY ##IR
    'f_avg','f_p1','f_p2','f_dwr','f_tv_dpnl','f_tv_ddd','f_tv_dpdd'].forEach(id => {
     const el = $(id); if (el) el.value = '';
   });
@@ -645,6 +645,7 @@ function applyFilters() {
   const fPain     = parseFloat($('f_pain').value);    // ##PAIN
   const fBurke    = parseFloat($('f_burke').value);   // ##BURKE
   const fSerenity = parseFloat($('f_serenity').value); // ##SRNTY
+  const fIR       = parseFloat($('f_ir').value);       // ##IR
   const fAvg   = parseFloat($('f_avg').value);
   const fP1    = parseFloat($('f_p1').value);
   const fP2    = parseFloat($('f_p2').value);
@@ -680,6 +681,7 @@ function applyFilters() {
     if (!isNaN(fPain)     && (r.pain??-99)     < fPain)     return false; // ##PAIN
     if (!isNaN(fBurke)    && (r.burke??-99)    < fBurke)    return false; // ##BURKE
     if (!isNaN(fSerenity) && (r.serenity??-99) < fSerenity) return false; // ##SRNTY
+    if (!isNaN(fIR)       && (r.ir??-99)       < fIR)       return false; // ##IR
     if (!isNaN(fAvg) && r.avg < fAvg) return false;
     if (!isNaN(fP1)  && r.p1  < fP1)  return false;
     if (!isNaN(fP2)  && r.p2  < fP2)  return false;
@@ -850,6 +852,7 @@ function renderVisibleResults() {
       (()=>{ const v=r.pain??null; if(v===null) return '<td class="col-pain muted">—</td>'; const vc=v>=5?'pos':v>=3?'warn':'neg'; return `<td class="col-pain ${vc}" title="Pain Ratio = PnL / Pain Index\nPain Index = mean(просадка от пика). Штрафует за длительность любых просадок.\n≥5 = отлично ✅ | ≥3 = хорошо | &lt;1 = плохо">${v.toFixed(1)}</td>`; })() + // ##PAIN
       (()=>{ const v=r.burke??null; if(v===null) return '<td class="col-burke muted">—</td>'; const vc=v>=3?'pos':v>=2?'warn':'neg'; return `<td class="col-burke ${vc}" title="Burke Ratio = PnL / √(Σ просадок²)\nУчитывает ВСЕ события просадок, не только максимальную.\n≥3 = отлично ✅ | ≥2 = хорошо | &lt;0.5 = плохо">${v.toFixed(1)}</td>`; })() + // ##BURKE
       (()=>{ const v=r.serenity??null; if(v===null) return '<td class="col-srnty muted">—</td>'; const vc=v>=5?'pos':v>=3?'warn':'neg'; return `<td class="col-srnty ${vc}" title="Serenity Index = PnL / (UlcerIndex × TailFactor)\nTailFactor = CVaR(5%) / mean(убытков) — штраф за хвостовые риски.\n≥5 = отлично ✅ | ≥3 = хорошо | &lt;1 = плохо">${v.toFixed(1)}</td>`; })() + // ##SRNTY
+      (()=>{ const v=r.ir??null; if(v===null) return '<td class="col-ir muted">—</td>'; const vc=v>=1?'pos':v>=0?'warn':'neg'; return `<td class="col-ir ${vc}" title="Information Ratio = mean(active) / std(active) × √252\nactive_return = стратегия − buy&amp;hold.\n≥1 = хорошо ✅ | ≥0.5 = добавляет ценность | &lt;0 = хуже buy&amp;hold">${v.toFixed(1)}</td>`; })() + // ##IR
       (()=>{ const v=r.cpcvScore??null; if(v===null) return '<td class="col-cpcv muted">—</td>'; const vc=v>=80?'pos':v>=60?'warn':'neg'; return `<td class="col-cpcv ${vc}" title="CPCV% — блочная валидация: % прибыльных блоков.\nЗаполняется после открытия детали. ≥80% = устойчива ✅">${v}%</td>`; })() + // ##CPCV lazy
       `<td class="col-avg">${r.avg.toFixed(2)}</td>` +
       `<td class="col-p1 ${r.p1 >= 0 ? 'pos' : 'neg'}">${r.p1.toFixed(1)}</td>` +
@@ -1010,6 +1013,8 @@ function showDetail(r) {
     const burkeV  = v.burke!=null  ? v.burke.toFixed(1)  : '—'; // ##BURKE
     const srntyC  = v.serenity!=null ? (v.serenity>=5?'pos':v.serenity>=3?'warn':'neg') : 'muted'; // ##SRNTY
     const srntyV  = v.serenity!=null ? v.serenity.toFixed(1) : '—'; // ##SRNTY
+    const irC     = v.ir!=null ? (v.ir>=1?'pos':v.ir>=0?'warn':'neg') : 'muted'; // ##IR
+    const irV     = v.ir!=null ? v.ir.toFixed(1) : '—'; // ##IR
     let h =
       `<div class="dp-stat"><div class="v ${v.pnl>=0?'pos':'neg'}">${v.pnl.toFixed(1)}%</div><div class="l">PnL</div></div>`+
       `<div class="dp-stat"><div class="v">${v.wr.toFixed(1)}%</div><div class="l">WinRate</div></div>`+
@@ -1026,7 +1031,8 @@ function showDetail(r) {
       `<div class="dp-stat" title="Omega Ratio = Σприросты / Σпадения (уровень баров)\nProfit factor без предположения о нормальности. ≥3 = отлично ✅ | ≥2 = хорошо."><div class="v ${omgC}">${omgV}</div><div class="l">Omega</div></div>`+ // ##OMG
       `<div class="dp-stat" title="Pain Ratio = PnL / Pain Index\nPain Index = mean(просадка от пика). Штрафует за длительность любых просадок.\n≥5 = отлично ✅ | ≥3 = хорошо | &lt;1 = плохо"><div class="v ${painC}">${painV}</div><div class="l">Pain</div></div>`+ // ##PAIN
       `<div class="dp-stat" title="Burke Ratio = PnL / √(Σ просадок²)\nУчитывает ВСЕ события просадок, не только максимальную.\n≥3 = отлично ✅ | ≥2 = хорошо | &lt;0.5 = плохо"><div class="v ${burkeC}">${burkeV}</div><div class="l">Burke</div></div>`+ // ##BURKE
-      `<div class="dp-stat" title="Serenity = PnL / (UlcerIdx × TailFactor)\nTailFactor = CVaR(5%) / mean(убытков). Штраф за хвостовые риски.\n≥5 = отлично ✅ | ≥3 = хорошо | &lt;1 = плохо"><div class="v ${srntyC}">${srntyV}</div><div class="l">Serenity</div></div>`; // ##SRNTY
+      `<div class="dp-stat" title="Serenity = PnL / (UlcerIdx × TailFactor)\nTailFactor = CVaR(5%) / mean(убытков). Штраф за хвостовые риски.\n≥5 = отлично ✅ | ≥3 = хорошо | &lt;1 = плохо"><div class="v ${srntyC}">${srntyV}</div><div class="l">Serenity</div></div>` + // ##SRNTY
+      `<div class="dp-stat" title="Information Ratio = mean(active) / std(active) × √252\nactive = стратегия − buy&amp;hold. ≥1 = хорошо ✅ | ≥0.5 = ценность | &lt;0 = хуже рынка"><div class="v ${irC}">${irV}</div><div class="l">IR</div></div>`; // ##IR
     if (_hasLS) {
       const lsC = v.dwrLS!=null ? (v.dwrLS<10?'ok':v.dwrLS<25?'warn':'bad') : 'muted';
       h += `<div class="dp-stat" title="Разница WR лонгов и шортов. L:${v.nL||0}сд WR${v.wrL!=null?v.wrL.toFixed(0):'?'}% · S:${v.nS||0}сд WR${v.wrS!=null?v.wrS.toFixed(0):'?'}%"><div class="v ${lsC}">${v.dwrLS!=null?v.dwrLS.toFixed(0)+'%':'—'}</div><div class="l">ΔWR L/S</div></div>`;
@@ -1042,7 +1048,7 @@ function showDetail(r) {
     p1: r.p1, p2: r.p2, c1: r.c1, c2: r.c2, avg: r.avg, cvr: r.cvr??null, upi: r.upi??null,
     sortino: r.sortino??null, // ##SOR
     omega: r.omega??null, pain: r.pain??null, // ##OMG ##PAIN
-    burke: r.burke??null, serenity: r.serenity??null, // ##BURKE ##SRNTY
+    burke: r.burke??null, serenity: r.serenity??null, ir: r.ir??null, // ##BURKE ##SRNTY ##IR
     dwrLS: r.dwrLS??null, wrL: r.wrL??null, nL: r.nL||0, wrS: r.wrS??null, nS: r.nS||0
   });
 
@@ -1057,7 +1063,7 @@ function showDetail(r) {
         avg: _fwd.avg??0, cvr: _fwd.cvr??null, upi: _fwd.upi??null,
         sortino: _fwd.sortino??null, // ##SOR
         omega: _fwd.omega??null, pain: _fwd.pain??null, // ##OMG ##PAIN
-        burke: _fwd.burke??null, serenity: _fwd.serenity??null, // ##BURKE ##SRNTY
+        burke: _fwd.burke??null, serenity: _fwd.serenity??null, ir: _fwd.ir??null, // ##BURKE ##SRNTY ##IR
         dwrLS: _fwd.dwrLS??null, wrL: _fwd.wrL??null, nL: _fwd.nL||0, wrS: _fwd.wrS??null, nS: _fwd.nS||0
       });
   }
@@ -1281,6 +1287,73 @@ function showDetail(r) {
   }
   // ##AIC_BIC_MDL_END##
 
+  // ##PSR_START## — удалить для отката: эти строки + _calcPSR/_normCDF в opt.js
+  {
+    const _pArr2 = typeof _rKS !== 'undefined' && _rKS ? _rKS.tradePnl : null;
+    const _psr   = _calcPSR(_pArr2);
+    let _psrHtml = '';
+    if (_psr !== null) {
+      const _psrC = _psr >= 95 ? 'pos' : _psr >= 70 ? 'warn' : 'neg';
+      const _psrLabel = _psr >= 95 ? 'статистически значимо ✅' : _psr >= 70 ? 'умеренно значимо' : 'недостаточно значимо';
+      _psrHtml += row('PSR',
+        `<span class="${_psrC}">${_psr.toFixed(1)}%</span>` +
+        ` <span style="opacity:.6;font-size:.85em">${_psrLabel}</span>`, '');
+      _psrHtml += row('Интерпретация',
+        'Вероятность что SR > 0 с учётом skewness и kurtosis сделок. PSR ≥ 95% = уверенный позитивный Sharpe.', 'muted');
+    } else {
+      _psrHtml += row('PSR', 'нет данных — нужно ≥20 сделок', 'muted');
+    }
+    html = section('📈', 'PSR — ВЕРОЯТНОСТНЫЙ SHARPE RATIO', _psrHtml) + html;
+  }
+  // ##PSR_END##
+
+  // ##ABLATION_START## — удалить для отката: эти строки + _calcFilterAblation в opt.js
+  {
+    const _abl = _calcFilterAblation(r.cfg);
+    let _ablHtml = '';
+    if (_abl && _abl.items.length > 0) {
+      _ablHtml += row('Базовый PnL', `${_abl.basePnl.toFixed(1)}%`, 'muted');
+      for (const itm of _abl.items) {
+        const dC = itm.delta <= -1 ? 'pos' : itm.delta >= 1 ? 'neg' : 'muted';
+        const sign = itm.delta > 0 ? '+' : '';
+        const label = itm.delta <= -2 ? '🔑 критичен' : itm.delta <= -0.5 ? '✅ важен' : itm.delta >= 2 ? '❌ мешает' : itm.delta >= 0.5 ? '⚠️ лишний?' : '→ нейтральный';
+        _ablHtml += row(`${itm.id}`, `<span class="${dC}">${sign}${itm.delta.toFixed(1)}%</span> <span style="opacity:.55;font-size:.82em">${label}</span>`, '');
+      }
+    } else {
+      _ablHtml += row('Статус', 'нет активных фильтров для анализа', 'muted');
+    }
+    html = section('🔬', 'FEATURE IMPORTANCE (ABLATION)', _ablHtml) + html;
+  }
+  // ##ABLATION_END##
+
+  // ##HMM_START## — удалить для отката: эти строки + _calcHMM/_calcRegimePerf в opt.js
+  {
+    const _hmm = _calcHMM();
+    let _hmmHtml = '';
+    if (_hmm) {
+      const bState = _hmm.bullState, beState = 1 - bState;
+      const bMean  = bState === 0 ? _hmm.m0 : _hmm.m1;
+      const bkMean = bState === 0 ? _hmm.m1 : _hmm.m0;
+      const bStay  = _hmm.stayProb[bState], beStay = _hmm.stayProb[beState];
+      const bullC  = _hmm.bullPct >= 60 ? 'pos' : _hmm.bullPct >= 40 ? 'warn' : 'neg';
+      _hmmHtml += row('Bull режим', `<span class="${bullC}">${_hmm.bullPct}% баров</span> · ср.return ${bMean > 0 ? '+' : ''}${bMean.toFixed(3)}%/бар · остаётся ${bStay}% времени`, '');
+      _hmmHtml += row('Bear режим', `<span class="neg">${_hmm.bearPct}% баров</span> · ср.return ${bkMean > 0 ? '+' : ''}${bkMean.toFixed(3)}%/бар · остаётся ${beStay}% времени`, '');
+      // Regime Performance
+      const _rp = _calcRegimePerf(r.cfg, _hmm);
+      if (_rp) {
+        const bpC = _rp.bullPnl >= 0 ? 'pos' : 'neg', bkpC = _rp.bearPnl >= 0 ? 'pos' : 'neg';
+        _hmmHtml += row('PnL в bull', `<span class="${bpC}">${_rp.bullPnl > 0 ? '+' : ''}${_rp.bullPnl.toFixed(1)}%</span> <span style="opacity:.55;font-size:.82em">(${_rp.bullN} баров)</span>`, '');
+        _hmmHtml += row('PnL в bear', `<span class="${bkpC}">${_rp.bearPnl > 0 ? '+' : ''}${_rp.bearPnl.toFixed(1)}%</span> <span style="opacity:.55;font-size:.82em">(${_rp.bearN} баров)</span>`, '');
+        const regimeBias = _rp.bullPnl > _rp.bearPnl ? 'тренд-стратегия ✅' : _rp.bearPnl > _rp.bullPnl ? 'боковик-стратегия' : 'нейтральная';
+        _hmmHtml += row('Характер', regimeBias, 'muted');
+      }
+    } else {
+      _hmmHtml += row('HMM', 'нет данных — нужно ≥100 баров', 'muted');
+    }
+    html = section('🌊', 'HMM РЕЖИМЫ + ПРОИЗВОДИТЕЛЬНОСТЬ', _hmmHtml) + html;
+  }
+  // ##HMM_END##
+
   $('dp-body').innerHTML = html;
 
   // Build copy text
@@ -1450,9 +1523,10 @@ window.addEventListener('load', async () => {
 // --- Mode buttons ---
 function setOptMode(m) {
   optMode = m;
-  ['full','prune','mc','tpe'].forEach(x => { const el=document.getElementById('mode_'+x); if(el) el.classList.toggle('active', x===m); });
+  ['full','prune','mc','tpe','bo'].forEach(x => { const el=document.getElementById('mode_'+x); if(el) el.classList.toggle('active', x===m); });
   document.getElementById('mc_n').style.display = m==='mc' ? 'inline-block' : 'none';
   const _tpeInputsEl = document.getElementById('tpe_inputs'); if(_tpeInputsEl) _tpeInputsEl.style.display = m==='tpe' ? 'inline-flex' : 'none';
+  const _boInputsEl  = document.getElementById('bo_inputs');  if(_boInputsEl)  _boInputsEl.style.display  = m==='bo'  ? 'inline-flex' : 'none'; // ##BAYES_OPT
   updatePreview();
 }
 function setXMode(type, val) {
@@ -3087,6 +3161,8 @@ function doSort(col) {
     arr.sort((a,b) => d * ((a.burke??-99) - (b.burke??-99)));
   } else if (col === 33) { // ##SRNTY
     arr.sort((a,b) => d * ((a.serenity??-99) - (b.serenity??-99)));
+  } else if (col === 34) { // ##IR
+    arr.sort((a,b) => d * ((a.ir??-99) - (b.ir??-99)));
   } else if (col <= 11) {
     const keys = ['name','pnl','wr','n','dd','pdd','avg','p1','p2','dwr','dwr','robScore'];
     const key = keys[col];
@@ -3309,6 +3385,7 @@ const _COL_DEFS = [
   { id: 'col-pain',       label: 'Pain',                default: true },  // ##PAIN
   { id: 'col-burke',      label: 'Burke',               default: true },  // ##BURKE
   { id: 'col-srnty',      label: 'Serenity',            default: true },  // ##SRNTY
+  { id: 'col-ir',         label: 'IR',                  default: true },  // ##IR
   { id: 'col-cpcv',       label: 'CPCV%',               default: false }, // ##CPCV lazy
   { id: 'col-avg',        label: 'Avg%',                default: true },
   { id: 'col-p1',         label: '1п PnL',              default: true },

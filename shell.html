@@ -1292,6 +1292,10 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
     <div class="field"><label>Свечей подряд мин</label><input id="f_fatc" value="6" data-tip="Минимальное число одноцветных свечей подряд для определения усталости тренда"></div>
     <div class="field"><label>Пад. объёма ×</label><input id="f_fatv" value="0.7" data-tip="Объём последней свечи серии должен быть ниже N × среднего. 0.7 = ниже 70% нормы"></div>
   </div>
+  <div class="cb"><input type="checkbox" id="f_kalman"><label data-tip="Kalman MA: адаптивная MA с автоматической подстройкой периода к волатильности. При высоком ATR — быстрее реагирует. При низком — сглаживает сильнее. Работает как MA-фильтр по направлению.">Kalman MA (адаптивная)</label></div>
+  <div class="g2">
+    <div class="field"><label>База период</label><input id="f_kalmanl" value="20" data-tip="Базовый период для Kalman MA. Фактический период адаптируется ±N в зависимости от текущей волатильности."></div>
+  </div>
 </div>
 
 </div><!-- end panels -->
@@ -1314,6 +1318,12 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
       <input id="tpe_n" value="50000" style="width:60px;background:var(--bg);border:1px solid rgba(100,100,100,.3);border-radius:4px;color:var(--text2);font-size:.65em;padding:3px 5px;font-family:var(--font-mono)"
         title="🔒 МАКС. ИТЕРАЦИЙ — жёсткий лимит бюджета&#10;TPE остановится по этому лимиту если цель недостижима&#10;(редкое пространство, слишком строгие фильтры)&#10;&#10;Рекомендации:&#10;• 10000–50000 — для большинства задач&#10;• 100000+ — если цель большая или пространство разреженное&#10;• Обычно TPE достигает цели задолго до этого лимита">
       <span style="color:var(--text3);font-size:.6em" title="Максимальный бюджет итераций (защита от зависания)">макс</span>
+    </span>
+    <div class="mode-btn" id="mode_bo" onclick="setOptMode('bo')" title="Bayesian Optimisation: Gaussian Process surrogate + EI acquisition. Находит оптимум за ~100 итераций. Использует те же параметры что TPE." style="border-color:rgba(50,200,150,.6);color:#34d399">BO</div>
+    <span id="bo_inputs" style="display:none;align-items:center;gap:3px">
+      <input id="bo_n" value="100" style="width:50px;background:var(--bg);border:1px solid rgba(50,200,150,.4);border-radius:4px;color:#34d399;font-size:.65em;padding:3px 5px;font-family:var(--font-mono)"
+        title="Кол-во итераций BO (20 случайных разведок + N−20 GP-направленных)">
+      <span style="color:var(--text3);font-size:.6em">итер</span>
     </span>
   </div>
   <div class="sound-grp">
@@ -1492,6 +1502,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
           <th class="col-pain"  data-sort="31" title="Pain Ratio = PnL / Pain Index. Pain Index = mean(просадка от пика). Штрафует за длительность любых просадок. ≥5 = отлично, ≥3 = хорошо." style="min-width:44px;resize:horizontal;overflow:auto;cursor:pointer;color:var(--accent)">Pain ↕</th>
           <th class="col-burke" data-sort="32" title="Burke Ratio = PnL / √(Σ просадок²). Учитывает ВСЕ события просадок, не только максимальную. ≥3 = отлично, ≥2 = хорошо." style="min-width:52px;resize:horizontal;overflow:auto;cursor:pointer;color:var(--accent)">Burke ↕</th>
           <th class="col-srnty" data-sort="33" title="Serenity Index = PnL / (UlcerIdx × TailFactor). TailFactor = CVaR(5%) / mean(убытков). Штраф за хвостовые риски. ≥5 = отлично, ≥3 = хорошо." style="min-width:56px;resize:horizontal;overflow:auto;cursor:pointer;color:var(--accent)">Serenity ↕</th>
+          <th class="col-ir" data-sort="34" title="Information Ratio = mean(active_returns) / std(active_returns) × √252. active_return = стратегия − buy&hold. IR > 1 = хорошо, > 0.5 = добавляет ценность, < 0 = хуже buy&hold." style="min-width:44px;resize:horizontal;overflow:auto;cursor:pointer;color:var(--accent)">IR ↕</th>
           <th class="col-cpcv" data-sort="29" title="CPCV% — блочная валидация. Заполняется после открытия детали (lazy). ≥80% = устойчива." style="min-width:52px;resize:horizontal;overflow:auto;cursor:pointer;color:var(--accent)">CPCV% ↕</th>
           <th class="col-avg" data-sort="6" style="min-width:44px;resize:horizontal;overflow:auto;cursor:pointer">Avg% ↕</th>
           <th class="col-p1" data-sort="7" style="min-width:52px;resize:horizontal;overflow:auto;cursor:pointer">1п PnL ↕</th>
@@ -1531,6 +1542,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
           <th class="col-pain" ><input class="tf-inp" id="f_pain"     placeholder="≥" oninput="applyFiltersDebounced()"></th>
           <th class="col-burke"><input class="tf-inp" id="f_burke"    placeholder="≥" oninput="applyFiltersDebounced()"></th>
           <th class="col-srnty"><input class="tf-inp" id="f_serenity" placeholder="≥" oninput="applyFiltersDebounced()"></th>
+          <th class="col-ir"><input class="tf-inp" id="f_ir" placeholder="≥" oninput="applyFiltersDebounced()" title="Мин. Information Ratio (> 0 = бьёт buy&hold)"></th>
           <th class="col-cpcv"><input class="tf-inp" id="f_cpcv"    placeholder="≥" oninput="applyFiltersDebounced()"></th>
           <th class="col-avg"><input class="tf-inp" id="f_avg" placeholder="≥" oninput="applyFiltersDebounced()"></th>
           <th class="col-p1"><input class="tf-inp" id="f_p1" placeholder="≥" oninput="applyFiltersDebounced()"></th>
