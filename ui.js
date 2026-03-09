@@ -1527,7 +1527,10 @@ function gatherSettings() {
   ['c_atr','c_comm','c_mint','c_maxdd','c_spread'].forEach(id => { const el=$(id); if(el) vals[id]=el.value; });
   // Настройки видимости столбиков
   const colSettings = getColSettings();
-  return { vals, chks, sels, slLogic, tpLogic, revMode, revAct, timeMode, clxMode, colSettings };
+  // Порядок панелей
+  const panelOrder = Array.from(document.querySelectorAll('#panels .panel[data-panel-id]'))
+    .map(p => p.dataset.panelId);
+  return { vals, chks, sels, slLogic, tpLogic, revMode, revAct, timeMode, clxMode, colSettings, panelOrder };
 }
 
 function applySettings(s) {
@@ -1547,6 +1550,8 @@ function applySettings(s) {
     _saveColSettings(s.colSettings);
     _applyColSettings(s.colSettings);
   }
+  // Восстанавливаем порядок панелей
+  if (s.panelOrder && typeof _restorePanelOrder === 'function') _restorePanelOrder(s.panelOrder);
   updatePreview();
 }
 
