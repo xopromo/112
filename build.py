@@ -25,6 +25,9 @@ opt      = open(os.path.join(base, 'opt.js'),        encoding='utf-8').read()
 ui       = open(os.path.join(base, 'ui.js'),         encoding='utf-8').read()
 pine     = open(os.path.join(base, 'pine_export.js'), encoding='utf-8').read()
 projects = open(os.path.join(base, 'projects.js'),   encoding='utf-8').read()
+synthesis = open(os.path.join(base, 'synthesis.js'),   encoding='utf-8').read()
+pareto   = open(os.path.join(base, 'pareto_front.js'), encoding='utf-8').read()
+synthesis_ui = open(os.path.join(base, 'synthesis_ui.js'), encoding='utf-8').read()
 
 # ── registry files: объединяем в один блок ────────────────────────────────
 REGISTRY_FILES = [
@@ -76,6 +79,15 @@ for ph, content in [
 # ── Шаг 3: вставляем pine_export.js как отдельный <script> перед ##UI##
 assert '/* ##PINE## */' in shell, "Placeholder ##PINE## not found in shell.html"
 shell = shell.replace('/* ##PINE## */', pine, 1)
+
+assert '/* ##SYNTHESIS## */' in shell, "Placeholder ##SYNTHESIS## not found in shell.html"
+shell = shell.replace('/* ##SYNTHESIS## */', synthesis, 1)
+
+assert '/* ##PARETO## */' in shell, "Placeholder ##PARETO## not found in shell.html"
+shell = shell.replace('/* ##PARETO## */', pareto, 1)
+
+assert '/* ##SYNTHESIS_UI## */' in shell, "Placeholder ##SYNTHESIS_UI## not found in shell.html"
+shell = shell.replace('/* ##SYNTHESIS_UI## */', synthesis_ui, 1)
 
 assert '/* ##PROJECTS## */' in shell, "Placeholder ##PROJECTS## not found in shell.html"
 shell = shell.replace('/* ##PROJECTS## */', projects, 1)

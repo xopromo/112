@@ -3423,6 +3423,686 @@ function _addActivePinev6(code) {
 
 <script>
 // ============================================================
+// synthesis.js — STRATEGY SYNTHESIS ENGINE
+// ============================================================
+// Обратный инжинириг для генерации оптимальных стратегий
+// через TPE-based search максимизируя GT-Score, Sortino, Sig%
+// ============================================================
+
+// ============================================================
+// STRATEGY SPACE — Кодирование/декодирование конфигов
+// ============================================================
+
+class StrategySpace {
+  constructor(options = {}) {
+    this.varyEntries = options.varyEntries !== false;
+    this.varyFilters = options.varyFilters !== false;
+    this.varyFilterParams = options.varyFilterParams !== false;
+    this.varyExits = options.varyExits !== false;
+    this.varySLTP = options.varySLTP !== false;
+    this.varyRisk = options.varyRisk !== false;
+
+    this.minTrades = options.minTrades || 10;
+    this.maxDD = options.maxDD !== undefined ? options.maxDD : 100;
+    this.minWR = options.minWR || 0;
+    this.minSig = options.minSig || 0;
+  }
+
+  encode(cfg) {
+    const v = [];
+    if (this.varyEntries) {
+      v.push(cfg.usePivot ? 1 : 0);
+      v.push((cfg.pvL || 5) / 10);
+      v.push((cfg.pvR || 2) / 5);
+    }
+    if (this.varyFilters) {
+      v.push(cfg.useMA ? 1 : 0);
+      v.push(cfg.useADX ? 1 : 0);
+      v.push(cfg.useRSI ? 1 : 0);
+      v.push((cfg.maP || 20) / 200);
+      v.push((cfg.adxThresh || 25) / 40);
+    }
+    if (this.varyExits) {
+      v.push(cfg.useBE ? 1 : 0);
+      v.push(cfg.useTrail ? 1 : 0);
+      v.push(cfg.useRev ? 1 : 0);
+    }
+    if (this.varyRisk) {
+      v.push((cfg.atrP || 14) / 50);
+    }
+    return v;
+  }
+
+  decode(vector) {
+    const cfg = {};
+    let idx = 0;
+
+    if (this.varyEntries) {
+      cfg.usePivot = vector[idx++] > 0.5;
+      cfg.pvL = Math.round(2 + vector[idx++] * 8);
+      cfg.pvR = Math.round(1 + vector[idx++] * 4);
+    }
+
+    if (this.varyFilters) {
+      cfg.useMA = vector[idx++] > 0.5;
+      cfg.useADX = vector[idx++] > 0.5;
+      cfg.useRSI = vector[idx++] > 0.5;
+      cfg.maP = Math.round(vector[idx++] * 200);
+      cfg.adxThresh = Math.round(vector[idx++] * 40);
+    }
+
+    if (this.varyExits) {
+      cfg.useBE = vector[idx++] > 0.5;
+      cfg.useTrail = vector[idx++] > 0.5;
+      cfg.useRev = vector[idx++] > 0.5;
+    }
+
+    if (this.varyRisk) {
+      cfg.atrP = Math.round(5 + vector[idx++] * 45);
+    }
+
+    return cfg;
+  }
+}
+
+// ============================================================
+// TPE ALGORITHM (Tree-structured Parzen Estimator)
+// ============================================================
+
+class TPEOptimizer {
+  constructor(space, options = {}) {
+    this.space = space;
+    this.maxIter = options.maxIter || 50000;
+    this.batchSize = options.batchSize || 100;
+    this.gamma = options.gamma || 0.25;
+    this.history = [];
+    this.iterations = 0;
+  }
+
+  getNextBatch(size = 100) {
+    const batch = [];
+
+    if (this.iterations < 500) {
+      batch.push(...this._latinHypercubeSample(size));
+    } else {
+      batch.push(...this._tpeSample(size));
+    }
+
+    return batch.map(v => this.space.decode(v));
+  }
+
+  addObservation(cfg, metrics) {
+    const vector = this.space.encode(cfg);
+    this.history.push({ vector, metrics, cfg });
+    this.iterations++;
+  }
+
+  _latinHypercubeSample(n) {
+    const samples = [];
+    const d = 15; // dimension
+
+    for (let i = 0; i < n; i++) {
+      const sample = new Array(d);
+      for (let j = 0; j < d; j++) {
+        const segment = Math.random();
+        const position = (i + segment) / n;
+        sample[j] = position;
+      }
+      samples.push(sample);
+    }
+
+    for (let j = 0; j < d; j++) {
+      for (let i = 0; i < n - 1; i++) {
+        const k = i + Math.floor(Math.random() * (n - i));
+        [samples[i][j], samples[k][j]] = [samples[k][j], samples[i][j]];
+      }
+    }
+
+    return samples;
+  }
+
+  _tpeSample(n) {
+    if (this.history.length === 0) return this._latinHypercubeSample(n);
+
+    const samples = [];
+    const d = 15;
+
+    const scored = this.history.map((h, i) => ({
+      idx: i,
+      score: this._computeScore(h.metrics),
+      metrics: h.metrics,
+    }));
+    scored.sort((a, b) => b.score - a.score);
+
+    const splitIdx = Math.max(1, Math.ceil(this.history.length * this.gamma));
+    const goodHist = scored.slice(0, splitIdx).map(s => this.history[s.idx]);
+
+    for (let i = 0; i < n; i++) {
+      const sample = new Array(d);
+
+      for (let j = 0; j < d; j++) {
+        if (goodHist.length > 0 && Math.random() < 0.8) {
+          const goodVals = goodHist.map(h => h.vector[j]);
+          const mean = goodVals.reduce((a, b) => a + b) / goodVals.length;
+          const std = Math.sqrt(goodVals.reduce((a, b) => a + (b - mean) ** 2) / goodVals.length + 0.01);
+          sample[j] = Math.max(0, Math.min(1, this._gaussianRandom(mean, std)));
+        } else {
+          sample[j] = Math.random();
+        }
+      }
+
+      samples.push(sample);
+    }
+
+    return samples;
+  }
+
+  _computeScore(metrics) {
+    const gtNorm = Math.min((metrics.gt || 0) / 10, 1);
+    const sortinoNorm = Math.min((metrics.sortino || 0) / 5, 1);
+    const sigNorm = Math.min((metrics.sig || 0) / 100, 1);
+    return gtNorm * 0.5 + sortinoNorm * 0.3 + sigNorm * 0.2;
+  }
+
+  _gaussianRandom(mean = 0, std = 1) {
+    const u1 = Math.random();
+    const u2 = Math.random();
+    const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+    return mean + std * z;
+  }
+
+  getParetoFront() {
+    if (this.history.length === 0) return [];
+
+    const pareto = [];
+
+    for (let i = 0; i < this.history.length; i++) {
+      const cand = this.history[i];
+      let dominated = false;
+
+      for (let j = 0; j < this.history.length; j++) {
+        if (i === j) continue;
+        const other = this.history[j];
+
+        const candScore = this._computeScore(cand.metrics);
+        const otherScore = this._computeScore(other.metrics);
+
+        if (otherScore > candScore) {
+          const c = cand.metrics;
+          const o = other.metrics;
+          if ((o.gt || 0) >= (c.gt || 0) &&
+              (o.sortino || 0) >= (c.sortino || 0) &&
+              (o.sig || 0) >= (c.sig || 0)) {
+            dominated = true;
+            break;
+          }
+        }
+      }
+
+      if (!dominated) {
+        pareto.push({
+          ...cand,
+          score: this._computeScore(cand.metrics),
+        });
+      }
+    }
+
+    return pareto.sort((a, b) => b.score - a.score);
+  }
+}
+
+</script>
+
+<script>
+// ============================================================
+// pareto_front.js — MULTI-OBJECTIVE OPTIMIZATION
+// ============================================================
+
+class ParetoFront {
+  constructor(options = {}) {
+    this.front = [];
+    this.archived = [];
+    this.weights = {
+      gt: options.weights?.gt || 0.5,
+      sortino: options.weights?.sortino || 0.3,
+      sig: options.weights?.sig || 0.2,
+    };
+    this.minTrades = options.minTrades || 10;
+    this.maxDD = options.maxDD !== undefined ? options.maxDD : 100;
+    this.minWR = options.minWR || 0;
+    this.minSig = options.minSig || 0;
+  }
+
+  addResult(result) {
+    if (!this._satisfiesConstraints(result)) {
+      this.archived.push(result);
+      return false;
+    }
+
+    this.archived.push(result);
+
+    for (let i = 0; i < this.front.length; i++) {
+      const existing = this.front[i];
+      if (this._dominates(existing, result)) {
+        return false;
+      }
+    }
+
+    this.front = this.front.filter(existing => !this._dominates(result, existing));
+
+    const score = this._computeWeightedScore(result);
+    this.front.push({
+      result,
+      metrics: {
+        gt: result.gt || 0,
+        sortino: result.sortino || 0,
+        sig: result.sig || 0,
+        pnl: result.pnl || 0,
+        dd: result.dd || 0,
+        wr: result.wr || 0,
+        n: result.n || 0,
+      },
+      score,
+    });
+
+    return true;
+  }
+
+  getTopByMetric(metric, n = 100) {
+    const sorted = [...this.front].sort((a, b) => {
+      const aVal = a.metrics[metric] || 0;
+      const bVal = b.metrics[metric] || 0;
+      if (metric === 'dd') return aVal - bVal;
+      return bVal - aVal;
+    });
+    return sorted.slice(0, n);
+  }
+
+  getRankedByWeights(weights = null, n = 100) {
+    const w = weights || this.weights;
+    const scored = this.front.map(item => ({
+      ...item,
+      weightedScore: this._computeScore(item.metrics, w),
+    }));
+    scored.sort((a, b) => b.weightedScore - a.weightedScore);
+    return scored.slice(0, n);
+  }
+
+  getFrontier(n = null) {
+    const sorted = [...this.front].sort((a, b) => b.score - a.score);
+    return n ? sorted.slice(0, n) : sorted;
+  }
+
+  calculateCrowdingDistance() {
+    if (this.front.length === 0) return [];
+
+    const results = this.front.map((item, idx) => ({
+      idx,
+      item,
+      distance: 0,
+    }));
+
+    const objectives = ['gt', 'sortino', 'sig'];
+    const minMax = {};
+
+    objectives.forEach(obj => {
+      const vals = this.front.map(item => item.metrics[obj] || 0);
+      minMax[obj] = {
+        min: Math.min(...vals),
+        max: Math.max(...vals),
+      };
+    });
+
+    objectives.forEach(obj => {
+      const sorted = results.sort((a, b) => a.item.metrics[obj] - b.item.metrics[obj]);
+      sorted[0].distance = Infinity;
+      sorted[sorted.length - 1].distance = Infinity;
+
+      const range = minMax[obj].max - minMax[obj].min;
+      if (range === 0) return;
+
+      for (let i = 1; i < sorted.length - 1; i++) {
+        const dist = (sorted[i + 1].item.metrics[obj] - sorted[i - 1].item.metrics[obj]) / range;
+        sorted[i].distance += dist;
+      }
+    });
+
+    return results.sort((a, b) => a.idx - b.idx).map(r => r.distance);
+  }
+
+  selectDiverse(n = 100) {
+    const distances = this.calculateCrowdingDistance();
+    const indexed = this.front.map((item, idx) => ({
+      idx,
+      item,
+      distance: distances[idx],
+    }));
+    indexed.sort((a, b) => b.distance - a.distance);
+    return indexed.slice(0, n).sort((a, b) => a.idx - b.idx).map(r => r.item);
+  }
+
+  export() {
+    return {
+      front: this.front.map(item => ({
+        metrics: item.metrics,
+        score: item.score,
+        result: item.result,
+      })),
+      archived: this.archived,
+      weights: this.weights,
+    };
+  }
+
+  _dominates(a, b) {
+    const aMet = a.metrics || a.result?.metrics || a;
+    const bMet = b.metrics || b.result?.metrics || b;
+
+    const aGt = aMet.gt || 0;
+    const bGt = bMet.gt || 0;
+    const aSortino = aMet.sortino || 0;
+    const bSortino = bMet.sortino || 0;
+    const aSig = aMet.sig || 0;
+    const bSig = bMet.sig || 0;
+
+    const gtOk = aGt >= bGt;
+    const sortinoOk = aSortino >= bSortino;
+    const sigOk = aSig >= bSig;
+
+    if (!gtOk || !sortinoOk || !sigOk) return false;
+    return aGt > bGt || aSortino > bSortino || aSig > bSig;
+  }
+
+  _satisfiesConstraints(result) {
+    if (result.n && result.n < this.minTrades) return false;
+    if (result.dd && result.dd > this.maxDD) return false;
+    if (result.wr && result.wr < this.minWR) return false;
+    if (result.sig && result.sig < this.minSig) return false;
+    return true;
+  }
+
+  _computeWeightedScore(result) {
+    const gt = result.gt || 0;
+    const sortino = result.sortino || 0;
+    const sig = result.sig || 0;
+    return this._computeScore({ gt, sortino, sig }, this.weights);
+  }
+
+  _computeScore(metrics, weights) {
+    const gtNorm = Math.min((metrics.gt || 0) / 10, 1);
+    const sortinoNorm = Math.min((metrics.sortino || 0) / 5, 1);
+    const sigNorm = Math.min((metrics.sig || 0) / 100, 1);
+    return (gtNorm * weights.gt + sortinoNorm * weights.sortino + sigNorm * weights.sig);
+  }
+}
+
+</script>
+
+<script>
+// ============================================================
+// synthesis_ui.js — UI INTEGRATION FOR STRATEGY SYNTHESIS
+// ============================================================
+
+function openSynthesisModal() {
+  const modal = document.getElementById('synthesis-modal');
+  if (!modal) {
+    console.error('synthesis-modal not found');
+    return;
+  }
+
+  const defaults = {
+    varyEntries: true,
+    varyFilters: true,
+    varyFilterParams: true,
+    varyExits: true,
+    varySLTP: true,
+    varyRisk: true,
+    metricsGT: true,
+    metricsSortino: true,
+    metricsSig: true,
+    minTrades: 10,
+    maxDD: 50,
+    minWR: 0,
+    minSig: 0,
+    targetCount: 1000,
+    maxIter: 50000,
+    gamma: 0.25,
+    weightGT: 0.5,
+    weightSortino: 0.3,
+    weightSig: 0.2,
+    startMode: 'zero',
+    saveHistory: true,
+  };
+
+  const saved = localStorage.getItem('synthesis-settings');
+  if (saved) {
+    try {
+      Object.assign(defaults, JSON.parse(saved));
+    } catch (e) {
+      console.warn('Failed to load synthesis settings', e);
+    }
+  }
+
+  _setSynthesisDefaults(defaults);
+  modal.style.display = 'block';
+  modal.querySelector('.modal-content')?.scrollTo(0, 0);
+}
+
+function closeSynthesisModal() {
+  const modal = document.getElementById('synthesis-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+function _setSynthesisDefaults(defaults) {
+  document.getElementById('c_synth_vary_entries').checked = defaults.varyEntries;
+  document.getElementById('c_synth_vary_filters').checked = defaults.varyFilters;
+  document.getElementById('c_synth_vary_filter_params').checked = defaults.varyFilterParams;
+  document.getElementById('c_synth_vary_exits').checked = defaults.varyExits;
+  document.getElementById('c_synth_vary_sltp').checked = defaults.varySLTP;
+  document.getElementById('c_synth_vary_risk').checked = defaults.varyRisk;
+
+  document.getElementById('c_synth_metric_gt').checked = defaults.metricsGT;
+  document.getElementById('c_synth_metric_sortino').checked = defaults.metricsSortino;
+  document.getElementById('c_synth_metric_sig').checked = defaults.metricsSig;
+
+  document.getElementById('c_synth_min_trades').value = defaults.minTrades;
+  document.getElementById('c_synth_max_dd').value = defaults.maxDD;
+  document.getElementById('c_synth_min_wr').value = defaults.minWR;
+  document.getElementById('c_synth_min_sig').value = defaults.minSig;
+
+  document.getElementById('c_synth_target_count').value = defaults.targetCount;
+  document.getElementById('c_synth_max_iter').value = defaults.maxIter;
+  document.getElementById('c_synth_gamma').value = defaults.gamma;
+  document.getElementById('c_synth_gamma_val').textContent = defaults.gamma;
+
+  document.getElementById('c_synth_weight_gt').value = defaults.weightGT;
+  document.getElementById('c_synth_weight_sortino').value = defaults.weightSortino;
+  document.getElementById('c_synth_weight_sig').value = defaults.weightSig;
+
+  document.getElementById('c_synth_start_mode').value = defaults.startMode;
+  document.getElementById('c_synth_save_history').checked = defaults.saveHistory;
+}
+
+async function runSynthesis() {
+  const opts = {
+    varyEntries: document.getElementById('c_synth_vary_entries').checked,
+    varyFilters: document.getElementById('c_synth_vary_filters').checked,
+    varyFilterParams: document.getElementById('c_synth_vary_filter_params').checked,
+    varyExits: document.getElementById('c_synth_vary_exits').checked,
+    varySLTP: document.getElementById('c_synth_vary_sltp').checked,
+    varyRisk: document.getElementById('c_synth_vary_risk').checked,
+    metrics: [],
+    minTrades: parseInt(document.getElementById('c_synth_min_trades').value) || 10,
+    maxDD: parseInt(document.getElementById('c_synth_max_dd').value) || 100,
+    minWR: parseFloat(document.getElementById('c_synth_min_wr').value) || 0,
+    minSig: parseFloat(document.getElementById('c_synth_min_sig').value) || 0,
+    targetCount: parseInt(document.getElementById('c_synth_target_count').value) || 1000,
+    maxIter: parseInt(document.getElementById('c_synth_max_iter').value) || 50000,
+    gamma: parseFloat(document.getElementById('c_synth_gamma').value) || 0.25,
+    weights: {
+      gt: parseFloat(document.getElementById('c_synth_weight_gt').value) || 0.5,
+      sortino: parseFloat(document.getElementById('c_synth_weight_sortino').value) || 0.3,
+      sig: parseFloat(document.getElementById('c_synth_weight_sig').value) || 0.2,
+    },
+    startMode: document.getElementById('c_synth_start_mode').value || 'zero',
+    saveHistory: document.getElementById('c_synth_save_history').checked,
+  };
+
+  if (document.getElementById('c_synth_metric_gt').checked) opts.metrics.push('gt');
+  if (document.getElementById('c_synth_metric_sortino').checked) opts.metrics.push('sortino');
+  if (document.getElementById('c_synth_metric_sig').checked) opts.metrics.push('sig');
+
+  if (opts.metrics.length === 0) {
+    alert('Выбери хотя бы одну целевую метрику');
+    return;
+  }
+
+  localStorage.setItem('synthesis-settings', JSON.stringify(opts));
+  closeSynthesisModal();
+
+  optMode = 'synthesis';
+  synthesisModeOptions = opts;
+  await runOpt();
+}
+
+function switchToSynthesisMode() {
+  optMode = 'synthesis';
+  const modeButtons = document.querySelectorAll('[data-mode], .mode-btn');
+  modeButtons.forEach(btn => btn.classList.remove('active'));
+
+  const synthBtn = document.getElementById('mode_synthesis');
+  if (synthBtn) synthBtn.classList.add('active');
+
+  openSynthesisModal();
+}
+
+function renderSynthesisResults(results, pareto = null) {
+  const tb = document.getElementById('tb');
+  if (!tb) return;
+
+  tb.innerHTML = '';
+
+  const cols = ['#', 'Название', 'PnL', 'WR', 'n', 'DD', 'GT', 'Sort', 'Sig%', '★'];
+  const thead = document.createElement('thead');
+  const headerRow = document.createElement('tr');
+  cols.forEach(col => {
+    const th = document.createElement('th');
+    th.textContent = col;
+    headerRow.appendChild(th);
+  });
+  thead.appendChild(headerRow);
+  tb.appendChild(thead);
+
+  const tbody = document.createElement('tbody');
+  results.forEach((r, idx) => {
+    const row = document.createElement('tr');
+    const isParetoMember = pareto && pareto.some(p => p.result === r);
+    if (isParetoMember) row.style.backgroundColor = '#ffffcc';
+
+    let td = document.createElement('td');
+    td.textContent = idx + 1;
+    row.appendChild(td);
+
+    td = document.createElement('td');
+    td.textContent = r.name || 'Strategy #' + (idx + 1);
+    td.style.cursor = 'pointer';
+    td.onclick = () => showDetail(r);
+    row.appendChild(td);
+
+    td = document.createElement('td');
+    td.textContent = fmtNum(r.pnl || 0);
+    row.appendChild(td);
+
+    td = document.createElement('td');
+    td.textContent = ((r.wr || 0).toFixed(1)) + '%';
+    row.appendChild(td);
+
+    td = document.createElement('td');
+    td.textContent = r.n || 0;
+    row.appendChild(td);
+
+    td = document.createElement('td');
+    td.textContent = ((r.dd || 0).toFixed(1)) + '%';
+    row.appendChild(td);
+
+    td = document.createElement('td');
+    const gt = r.gt || 0;
+    td.textContent = gt.toFixed(2);
+    td.style.color = gt >= 5 ? 'green' : (gt >= 2 ? 'orange' : 'red');
+    row.appendChild(td);
+
+    td = document.createElement('td');
+    const sortino = r.sortino || 0;
+    td.textContent = sortino.toFixed(2);
+    row.appendChild(td);
+
+    td = document.createElement('td');
+    const sig = r.sig || 0;
+    td.textContent = sig.toFixed(0) + '%';
+    td.style.color = sig >= 90 ? 'green' : (sig >= 70 ? 'orange' : 'red');
+    row.appendChild(td);
+
+    td = document.createElement('td');
+    td.textContent = isParetoMember ? '★' : '';
+    td.style.textAlign = 'center';
+    row.appendChild(td);
+
+    tbody.appendChild(row);
+  });
+
+  tb.appendChild(tbody);
+  updatePreview();
+}
+
+function drawParetoScatter(results) {
+  const canvas = document.getElementById('pareto-scatter');
+  if (!canvas) return;
+
+  const ctx = canvas.getContext('2d');
+  canvas.width = 400;
+  canvas.height = 300;
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  if (results.length === 0) return;
+
+  const gts = results.map(r => r.gt || 0);
+  const sortinos = results.map(r => r.sortino || 0);
+  const minGt = Math.min(...gts), maxGt = Math.max(...gts);
+  const minSortino = Math.min(...sortinos), maxSortino = Math.max(...sortinos);
+
+  const padding = 40;
+  const w = canvas.width - 2 * padding;
+  const h = canvas.height - 2 * padding;
+
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(padding, canvas.height - padding);
+  ctx.lineTo(canvas.width - padding, canvas.height - padding);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(padding, padding);
+  ctx.lineTo(padding, canvas.height - padding);
+  ctx.stroke();
+
+  results.forEach((r) => {
+    const gt = r.gt || 0;
+    const sortino = r.sortino || 0;
+    const x = padding + ((gt - minGt) / (maxGt - minGt || 1)) * w;
+    const y = canvas.height - padding - ((sortino - minSortino) / (maxSortino - minSortino || 1)) * h;
+
+    ctx.fillStyle = '#0066cc';
+    ctx.beginPath();
+    ctx.arc(x, y, 3, 0, 2 * Math.PI);
+    ctx.fill();
+  });
+}
+
+</script>
+
+<script>
+// ============================================================
 // ⚠️  CLAUDE: ЧИТАЙ MANIFEST.md ПЕРВЫМ ПЕРЕД ЛЮБЫМ ИЗМЕНЕНИЕМ
 // Контрольный список критичных функций — в MANIFEST.md
 // Проверяй его ДО и ПОСЛЕ каждой правки.
