@@ -1,0 +1,107 @@
+name: arXiv Daily Digest
+
+on:
+  schedule:
+    - cron: '4 8 * * *'   # тест: 08:04 UTC (после теста заменить на нужное время)
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch arXiv RSS and build digest
+        run: |
+          python3 << 'PYEOF'
+          import urllib.request, xml.etree.ElementTree as ET, json, datetime, re
+
+          CATEGORIES = [
+              ('q-fin.TR', 'Trading and Market Microstructure'),
+              ('q-fin.CP', 'Computational Finance'),
+              ('q-fin.PM', 'Portfolio Management'),
+          ]
+
+          entries = []
+
+          for cat, cat_name in CATEGORIES:
+              url = f'https://export.arxiv.org/rss/{cat}'
+              try:
+                  req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+                  with urllib.request.urlopen(req, timeout=20) as r:
+                      xml_data = r.read()
+                  root = ET.fromstring(xml_data)
+                  ns = {'dc': 'http://purl.org/dc/elements/1.1/'}
+                  channel = root.find('channel')
+                  items = channel.findall('item') if channel else []
+                  for item in items[:8]:  # топ-8 на категорию
+                      title   = (item.findtext('title') or '').strip()
+                      link    = (item.findtext('link') or '').strip()
+                      desc    = (item.findtext('description') or '').strip()
+                      # strip HTML tags from description
+                      desc    = re.sub(r'<[^>]+>', ' ', desc)
+                      desc    = re.sub(r'\s+', ' ', desc).strip()[:600]
+                      entries.append({
+                          'cat':   cat,
+                          'title': title,
+                          'url':   link,
+                          'abs':   desc,
+                      })
+                  print(f'{cat}: {len(items)} papers fetched')
+              except Exception as e:
+                  print(f'{cat}: ERROR {e}')
+
+          # Build markdown digest
+          today = datetime.datetime.utcnow().strftime('%Y-%m-%d')
+          lines = [f'# arXiv Digest — {today}', '']
+          lines.append(f'Всего статей: {len(entries)}')
+          lines.append('')
+
+          for cat, cat_name in CATEGORIES:
+              cat_entries = [e for e in entries if e['cat'] == cat]
+              if not cat_entries:
+                  continue
+              lines.append(f'## {cat} — {cat_name}')
+              lines.append('')
+              for e in cat_entries:
+                  lines.append(f'**{e["title"]}**')
+                  lines.append(f'URL: {e["url"]}')
+                  lines.append(f'{e["abs"]}')
+                  lines.append('')
+
+          digest = '\n'.join(lines)
+          with open('arxiv_digest.md', 'w') as f:
+              f.write(digest)
+
+          # Also save JSON for machine use
+          with open('arxiv_digest.json', 'w') as f:
+              json.dump({'date': today, 'count': len(entries), 'entries': entries}, f,
+                        ensure_ascii=False, indent=2)
+
+          print(f'Done: {len(entries)} entries saved')
+          PYEOF
+
+      - name: Push digest to research-data branch
+        run: |
+          git config user.email "actions@github.com"
+          git config user.name "GitHub Actions"
+
+          cp arxiv_digest.md /tmp/arxiv_digest.md
+          cp arxiv_digest.json /tmp/arxiv_digest.json
+
+          git fetch origin research-data 2>/dev/null && \
+              git checkout -B research-data origin/research-data || \
+              git checkout --orphan research-data
+
+          git rm -rf . --quiet 2>/dev/null || true
+
+          cp /tmp/arxiv_digest.md arxiv_digest.md
+          cp /tmp/arxiv_digest.json arxiv_digest.json
+
+          TODAY=$(date -u +%Y-%m-%d)
+          git add arxiv_digest.md arxiv_digest.json
+          git commit -m "arXiv digest: $TODAY"
+          git push -f origin research-data

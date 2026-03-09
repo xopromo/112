@@ -13,3 +13,7 @@ https://raw.githubusercontent.com/mementum/backtrader/master/changelog.txt
 
 # Документация по системной торговле
 https://raw.githubusercontent.com/robcarver17/pysystemtrade/master/docs/backtesting.md
+
+# arXiv дайджест (генерируется GitHub Actions arxiv_fetch.yml, обновляется ежедневно)
+# Откат: удалить эту строку + удалить .github/workflows/arxiv_fetch.yml
+https://raw.githubusercontent.com/xopromo/112/research-data/arxiv_digest.md
