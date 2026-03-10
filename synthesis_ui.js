@@ -249,12 +249,30 @@ function _startSynthesisWorker(opts) {
         if (payload.status === 'success') {
           _setSynthProgress(100, '✅ Синтез завершён!');
           console.log('[SYNTHESIS] Worker completed:', payload.elapsedMs, 'ms');
+
+          // Display results
+          if (payload.results && payload.results.length > 0) {
+            _setSynthProgress(null, `📊 Отображение ${payload.results.length} результатов...`);
+
+            // Sort by score
+            payload.results.sort((a, b) => (b.score || 0) - (a.score || 0));
+
+            // Store in global results
+            if (typeof renderSynthesisResults === 'function') {
+              setTimeout(() => {
+                renderSynthesisResults(payload.results);
+                _setSynthProgress(null, '✅ Готово к просмотру!');
+              }, 500);
+            }
+          } else {
+            _setSynthProgress(0, '⚠️ Синтез завершён, но результатов не найдено');
+          }
         } else if (payload.status === 'error') {
           _setSynthProgress(0, '❌ ОШИБКА в worker: ' + payload.error);
         } else if (payload.status === 'stopped') {
           // Normal stop
         }
-        _hideSynthProgressSection();
+        setTimeout(() => _hideSynthProgressSection(), 1000);
       }
     };
 

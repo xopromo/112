@@ -22,6 +22,15 @@ class StrategySpace {
     this.maxDD = options.maxDD !== undefined ? options.maxDD : 100;
     this.minWR = options.minWR || 0;
     this.minSig = options.minSig || 0;
+
+    // Parameter ranges (configurable)
+    this.paramRanges = options.paramRanges || {
+      pvL: [2, 10],
+      pvR: [1, 5],
+      maP: [5, 200],
+      adxThresh: [10, 50],
+      atrP: [5, 50],
+    };
   }
 
   encode(cfg) {
@@ -55,16 +64,20 @@ class StrategySpace {
 
     if (this.varyEntries) {
       cfg.usePivot = vector[idx++] > 0.5;
-      cfg.pvL = Math.round(2 + vector[idx++] * 8);
-      cfg.pvR = Math.round(1 + vector[idx++] * 4);
+      const [pvL_min, pvL_max] = this.paramRanges.pvL;
+      cfg.pvL = Math.round(pvL_min + vector[idx++] * (pvL_max - pvL_min));
+      const [pvR_min, pvR_max] = this.paramRanges.pvR;
+      cfg.pvR = Math.round(pvR_min + vector[idx++] * (pvR_max - pvR_min));
     }
 
     if (this.varyFilters) {
       cfg.useMA = vector[idx++] > 0.5;
       cfg.useADX = vector[idx++] > 0.5;
       cfg.useRSI = vector[idx++] > 0.5;
-      cfg.maP = Math.round(vector[idx++] * 200);
-      cfg.adxThresh = Math.round(vector[idx++] * 40);
+      const [maP_min, maP_max] = this.paramRanges.maP;
+      cfg.maP = Math.round(maP_min + vector[idx++] * (maP_max - maP_min));
+      const [adxThresh_min, adxThresh_max] = this.paramRanges.adxThresh;
+      cfg.adxThresh = Math.round(adxThresh_min + vector[idx++] * (adxThresh_max - adxThresh_min));
     }
 
     if (this.varyExits) {
@@ -74,7 +87,8 @@ class StrategySpace {
     }
 
     if (this.varyRisk) {
-      cfg.atrP = Math.round(5 + vector[idx++] * 45);
+      const [atrP_min, atrP_max] = this.paramRanges.atrP;
+      cfg.atrP = Math.round(atrP_min + vector[idx++] * (atrP_max - atrP_min));
     }
 
     return cfg;
@@ -174,6 +188,17 @@ class TPEOptimizer {
   }
 
   _computeScore(metrics) {
+    // Hard constraints: if not met, return very low score
+    const wr = metrics.wr || 0;
+    const sig = metrics.sig || 0;
+    const trades = metrics.n || 0;
+    const dd = metrics.dd || 0;
+
+    if (this.space.minWR > 0 && wr < this.space.minWR) return -1000;
+    if (this.space.minSig > 0 && sig < this.space.minSig) return -1000;
+    if (this.space.minTrades > 0 && trades < this.space.minTrades) return -1000;
+    if (this.space.maxDD < 100 && dd > this.space.maxDD) return -1000;
+
     const gtNorm = Math.min((metrics.gt || 0) / 10, 1);
     const sortinoNorm = Math.min((metrics.sortino || 0) / 5, 1);
     const sigNorm = Math.min((metrics.sig || 0) / 100, 1);
