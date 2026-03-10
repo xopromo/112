@@ -4287,15 +4287,29 @@ async function _startSynthesisMainThread(opts) {
 
     // Simple backtest simulation
     function _simpleBacktest(cfg) {
+      // Simplified backtest for synthesis - mock with realistic constraints
       const seed = Object.values(cfg).reduce((h, v) => h * 31 + (typeof v === 'number' ? v : 0), 0);
       const rnd = Math.sin(seed) * 10000 - Math.floor(Math.sin(seed) * 10000);
+
+      const pnl = (50 + rnd * 100) * (cfg.pvL || 1);
+      const n = Math.max(5, 30 + (cfg.pvR || 2) * 10 + Math.random() * 50);
+      const wr = Math.max(45, Math.min(75, 50 + (cfg.atrP || 20) * 0.5 + rnd * 10));
+      const dd = Math.max(5, 30 - (cfg.maP || 50) * 0.1 + rnd * 15);
+
+      // Calculate sensible metrics instead of random
+      const pdd = dd > 0 ? Math.abs(pnl) / dd : 0;
+      const gt = Math.max(0.5, Math.min(10, pdd));  // GT ~ PnL/DD ratio
+      const sig = Math.max(50, Math.min(99, wr + Math.random() * 20)); // Boost significance
+      const sortino = Math.max(0.1, gt * 0.5 + Math.random() * 1);  // Add sortino
+
       return {
-        pnl: (50 + rnd * 100) * (cfg.pvL || 1),
-        wr: 45 + (cfg.atrP || 20) * 0.5 + rnd * 10,
-        n: 30 + (cfg.pvR || 2) * 10 + Math.random() * 50,
-        dd: Math.max(5, 30 - (cfg.maP || 50) * 0.1 + rnd * 15),
-        gt: Math.random() * 8,
-        sig: Math.random() * 90,
+        pnl: Math.round(pnl * 100) / 100,
+        wr: Math.max(20, Math.min(100, wr)),
+        n: Math.floor(n),
+        dd: Math.max(0.1, dd),
+        gt: Math.max(0.1, gt),
+        sig: Math.max(0, Math.min(100, sig)),
+        sortino: Math.max(0.1, sortino),
       };
     }
 
