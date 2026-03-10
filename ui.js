@@ -1373,10 +1373,10 @@ function buildCopyText(r, c, slName, tpName) {
   lines.push('=== USE OPTIMIZER v6 — НАСТРОЙКИ ===');
   lines.push('Конфиг: ' + r.name);
   lines.push('');
-  lines.push('PnL: ' + r.pnl.toFixed(1) + '%   WR: ' + r.wr.toFixed(1) + '%   Сделок: ' + r.n);
-  lines.push('MaxDD: ' + r.dd.toFixed(1) + '%   P/DD: ' + r.pdd.toFixed(1) + '   Avg: ' + r.avg.toFixed(2) + '%');
-  lines.push('1п: ' + r.p1.toFixed(1) + '% (' + r.c1 + ' сд)   2п: ' + r.p2.toFixed(1) + '% (' + r.c2 + ' сд)   ΔWR: ' + r.dwr.toFixed(1) + '%');
-  if (r.wrL != null && r.wrS != null) lines.push('Лонг: WR ' + r.wrL.toFixed(0) + '% (' + r.nL + ' сд)   Шорт: WR ' + r.wrS.toFixed(0) + '% (' + r.nS + ' сд)   ΔWR L/S: ' + (r.dwrLS != null ? r.dwrLS.toFixed(0) : '?') + '%');
+  lines.push('PnL: ' + (r.pnl??0).toFixed(1) + '%   WR: ' + (r.wr??0).toFixed(1) + '%   Сделок: ' + (r.n??0));
+  lines.push('MaxDD: ' + (r.dd??0).toFixed(1) + '%   P/DD: ' + (r.pdd??0).toFixed(1) + '   Avg: ' + (r.avg??0).toFixed(2) + '%');
+  lines.push('1п: ' + (r.p1??0).toFixed(1) + '% (' + (r.c1??0) + ' сд)   2п: ' + (r.p2??0).toFixed(1) + '% (' + (r.c2??0) + ' сд)   ΔWR: ' + (r.dwr??0).toFixed(1) + '%');
+  if (r.wrL != null && r.wrS != null) lines.push('Лонг: WR ' + r.wrL.toFixed(0) + '% (' + (r.nL??0) + ' сд)   Шорт: WR ' + r.wrS.toFixed(0) + '% (' + (r.nS??0) + ' сд)   ΔWR L/S: ' + (r.dwrLS != null ? r.dwrLS.toFixed(0) : '?') + '%');
   lines.push('');
   lines.push('--- ПАТТЕРНЫ ВХОДА ---');
   lines.push('Pivot Points:       ' + on(c.usePivot,  'Left=' + c.pvL + ', Right=' + c.pvR));
