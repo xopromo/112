@@ -26,9 +26,9 @@ function openSynthesisModal() {
     targetCount: 200,
     maxIter: 10000,
     gamma: 0.25,
-    weightGT: 0.5,
-    weightSortino: 0.3,
-    weightSig: 0.2,
+    weightGT: 2,
+    weightSortino: 0.1,
+    weightSig: 0.7,
     startMode: 'zero',
     saveHistory: true,
   };
@@ -321,13 +321,21 @@ function _startSynthesisWorkerMode(opts) {
               console.log('[SYNTHESIS] Worker stored', enrichedResults.length, 'results in window.results');
 
               setTimeout(() => {
-                // Trigger main UI to display results
+                // Close synthesis modal
+                if (typeof closeSynthesisModal === 'function') {
+                  closeSynthesisModal();
+                  console.log('[SYNTHESIS] Worker closed synthesis modal');
+                }
+
+                // Switch to results mode and display
+                if (typeof switchTableMode === 'function') {
+                  switchTableMode('results');
+                  console.log('[SYNTHESIS] Worker switched to results mode');
+                }
+
                 if (typeof applyFilters === 'function') {
                   console.log('[SYNTHESIS] Worker calling applyFilters');
                   applyFilters();
-                } else if (typeof renderSynthesisResults === 'function') {
-                  console.log('[SYNTHESIS] Worker falling back to renderSynthesisResults');
-                  renderSynthesisResults(enrichedResults);
                 }
                 _setSynthProgress(null, '✅ Готово к просмотру!');
               }, 500);
@@ -557,13 +565,19 @@ async function _startSynthesisMainThread(opts) {
         console.log('[SYNTHESIS] Stored', enrichedResults.length, 'results in window.results');
 
         setTimeout(() => {
-          // Trigger main UI to display results
+          // Close synthesis modal
+          closeSynthesisModal();
+          console.log('[SYNTHESIS] Closed synthesis modal');
+
+          // Switch to results mode and display
+          if (typeof switchTableMode === 'function') {
+            switchTableMode('results');
+            console.log('[SYNTHESIS] Switched to results mode');
+          }
+
           if (typeof applyFilters === 'function') {
             console.log('[SYNTHESIS] Calling applyFilters');
             applyFilters();
-          } else if (typeof renderSynthesisResults === 'function') {
-            console.log('[SYNTHESIS] Falling back to renderSynthesisResults');
-            renderSynthesisResults(enrichedResults);
           }
           _setSynthProgress(null, '✅ Готово к просмотру!');
         }, 500);
