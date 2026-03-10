@@ -23,6 +23,10 @@ class StrategySpace {
     this.minWR = options.minWR || 0;
     this.minSig = options.minSig || 0;
 
+    // Commission and spread settings
+    this.commission = options.commission || 0.08;
+    this.spreadVal = options.spreadVal || 0;
+
     // Parameter ranges (configurable)
     this.paramRanges = options.paramRanges || {
       pvL: [2, 10],
@@ -137,6 +141,10 @@ class StrategySpace {
       const [atrP_min, atrP_max] = this.paramRanges.atrP;
       cfg.atrP = Math.round(atrP_min + vector[idx++] * (atrP_max - atrP_min));
     }
+
+    // Add commission and spread from settings
+    cfg.baseComm = this.commission;
+    cfg.spreadVal = this.spreadVal;
 
     return cfg;
   }

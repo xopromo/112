@@ -187,6 +187,8 @@ async function runSynthesis() {
         sig: parseFloat(el('c_synth_weight_sig')?.value) || 0.2,
       },
       startMode: el('c_synth_start_mode')?.value || 'zero',
+      commission: parseFloat(document.getElementById('c_comm')?.value) || 0.08,
+      spreadVal: parseFloat(document.getElementById('c_spread')?.value) || 0,
       saveHistory: el('c_synth_save_history')?.checked || true,
     };
 
@@ -292,6 +294,7 @@ async function _runSynthesisMainThread(opts) {
         varySLTP: opts.varySLTP, varyRisk: opts.varyRisk,
         minTrades: opts.minTrades, maxDD: opts.maxDD,
         minWR: opts.minWR, minSig: opts.minSig,
+        commission: opts.commission, spreadVal: opts.spreadVal,
       });
 
       const tpe = new TPEOptimizer(space, {
@@ -332,7 +335,8 @@ async function _runSynthesisMainThread(opts) {
             const pdd = result.dd > 0 ? result.pnl / result.dd : (result.pnl > 0 ? 50 : 0);
             const z = (result.wr - 50) / Math.sqrt(2500 / Math.max(result.n, 1));
             const sigMult = 1 + Math.min(Math.max(z, 0), 3) * 0.3;
-            const gt = pdd > 0 ? pdd * sigMult * 0.75 : 0;
+            const consistMult = 0.5 + Math.min(Math.max(1 - (result.dwr || 0) / 100, 0), 1) * 0.5;
+            const gt = pdd > 0 ? pdd * sigMult * consistMult : (pdd <= 0 ? -2 : 0);
             const t = 1 / (1 + 0.2316419 * z);
             const p = (1/Math.sqrt(2*Math.PI)) * Math.exp(-z*z/2) * t*(0.319382+t*(-0.356564+t*(1.781478+t*(-1.821256+t*1.330274))));
             const sig = Math.min(99, Math.max(0, Math.round((1 - p) * 100)));
@@ -344,6 +348,9 @@ async function _runSynthesisMainThread(opts) {
                 metrics.wr >= space.minWR && metrics.sig >= space.minSig && metrics.pnl > 0) {
               const pdd = result.dd > 0 ? result.pnl / result.dd : (result.pnl > 0 ? 50 : 0);
               const resultName = 'Synth_' + iter + '_' + foundResults.length;
+              // Ensure cfg has all required fields for UI display
+              cfg.atrPeriod = cfg.atrP; // UI uses atrPeriod, synthesis uses atrP
+              cfg.commission = opts.commission;
               const newResult = {
                 name: resultName,
                 cfg, pnl: result.pnl, wr: result.wr, n: result.n, dd: result.dd, pdd, avg: result.avg || 0,
