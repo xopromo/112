@@ -343,8 +343,9 @@ async function _runSynthesisMainThread(opts) {
             if (metrics.n >= space.minTrades && metrics.dd <= space.maxDD &&
                 metrics.wr >= space.minWR && metrics.sig >= space.minSig && metrics.pnl > 0) {
               const pdd = result.dd > 0 ? result.pnl / result.dd : (result.pnl > 0 ? 50 : 0);
+              const resultName = 'Synth_' + iter + '_' + foundResults.length;
               const newResult = {
-                name: 'Synth_' + iter + '_' + foundResults.length,
+                name: resultName,
                 cfg, pnl: result.pnl, wr: result.wr, n: result.n, dd: result.dd, pdd, avg: result.avg || 0,
                 sig, gt, sortino: 0, kRatio: null, sqn: null,
                 cvr: null, upi: null, omega: null, pain: null, burke: null, serenity: null, ir: null,
@@ -355,6 +356,10 @@ async function _runSynthesisMainThread(opts) {
                 dwrLS: result.dwrLS || null,
                 eq: result.eq || []
               };
+              // Сохранить equity в глобальный объект для графика
+              if (typeof equities !== 'undefined' && result.eq) {
+                equities[resultName] = result.eq;
+              }
               foundResults.push(newResult);
               results.push(newResult);
               if (typeof renderResults === 'function') renderResults();

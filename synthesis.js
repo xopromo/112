@@ -87,7 +87,9 @@ class StrategySpace {
       useClimaxExit: false, climaxBars: 5, climaxPct: 10,
       useTimeExit: false, timeMaxBars: 100,
       waitBars: 0, waitRetrace: false, waitMaxBars: 0, waitCancelAtr: 0,
-      slPair: {}, tpPair: {}, slLogic: 'or', tpLogic: 'or',
+      slPair: {a:{type:'atr',m:1.5},p:null,combo:false},
+      tpPair: {a:{type:'rr',m:2},b:null,combo:false},
+      slLogic: 'or', tpLogic: 'or',
       hasTPA: false, hasTPB: false,
       commission: 0,
       atrP: 14, start: 50, pruning: false, maxDDLimit: 50,
@@ -125,6 +127,10 @@ class StrategySpace {
       cfg.slMult = Math.round((sl_min + vector[idx++] * (sl_max - sl_min)) * 10) / 10;
       const [tp_min, tp_max] = this.paramRanges.tpMult;
       cfg.tpMult = Math.round((tp_min + vector[idx++] * (tp_max - tp_min)) * 10) / 10;
+
+      // Create slPair and tpPair from multipliers
+      cfg.slPair = {a:{type:'atr',m:cfg.slMult},p:null,combo:false};
+      cfg.tpPair = {a:{type:'rr',m:cfg.tpMult},b:null,combo:false};
     }
 
     if (this.varyRisk) {
