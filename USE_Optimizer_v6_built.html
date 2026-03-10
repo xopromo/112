@@ -8920,7 +8920,7 @@ async function runOpt() {
     // Дедупликация: Set уже виденных комбинаций
     _tpeSeen = new Set();
 
-    setMcPhase('🔮 TPE разведка ' + _exploreN + ' точек…');
+    if (optMode !== 'bo') setMcPhase('🔮 TPE разведка ' + _exploreN + ' точек…');
 
     // Предвычисляем RSI(14) один раз — не зависит от параметров оптимизации
     _tpeRsiArr = useRsi ? calcRSI(14) : null;
@@ -9212,6 +9212,10 @@ async function runOpt() {
       return score;
     }
 
+    // ── TPE фазы: запускаются только для tpe/synthesis, не для bo ──────
+    // BO использует только _tpeRunPoint и _dims/_dsz, не сам TPE цикл
+    if (optMode !== 'bo') {
+
     // ── Фаза 1: LHS разведка ─────────────────────────────────────────
     const _lhsIndices = [];
     {
@@ -9399,8 +9403,8 @@ async function runOpt() {
     $('pbtn').style.display='none'; $('sbtn').style.display='none';
     $('rbtn').style.display=''; $('rbtn').disabled=false;
     playDone();
-    // Только для TPE/Synthesis режимов — BO продолжит работу ниже
-    if (optMode !== 'bo') return;
+    return; // TPE/Synthesis завершён, BO сюда не доходит
+    } // if (optMode !== 'bo')
   }
 
   // ── Bayesian Optimisation (GP) — Tier 3 ─────────────────────────────────
