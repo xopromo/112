@@ -4322,6 +4322,9 @@ async function _startSynthesisMainThread(opts) {
         tpe.addObservation(cfg, metrics);
 
         const score = tpe._computeScore(metrics);
+        if (iter === 0 && results.length === 0) {
+          console.log('[SYNTHESIS] First score:', score, 'metrics:', metrics);
+        }
         if (score > 0) {
           results.push({
             name: `Synth_${iter}_${results.length}`,
