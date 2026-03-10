@@ -10581,6 +10581,8 @@ function renderVisibleResults() {
   const end   = Math.min(start + _pageSize, total);
   const page  = _visibleResults.slice(start, end);
 
+  console.log('[RENDER] renderVisibleResults:', {total, page_length: page.length, _tableMode, _curPage, _totalPages});
+
   // Строим HTML строкой — намного быстрее чем createElement в цикле
   // ── OOS-режим: рендер через applyOOSFilters (своя фильтрация) ──
   if (_tableMode === 'oos') {
@@ -10696,7 +10698,16 @@ function renderVisibleResults() {
   }
 
   const tbody = $('tb');
+  console.log('[RENDER] tbody element:', {exists: !!tbody, id: tbody?.id, class: tbody?.className, html_length: html.length, html_preview: html.substring(0, 100)});
+
+  if (!tbody) {
+    console.error('[RENDER] КРИТИЧЕСКАЯ ОШИБКА: element tb не найден!');
+    return;
+  }
+
   tbody.innerHTML = html;
+  console.log('[RENDER] HTML вставлен в tbody. Первая строка таблицы:', tbody.querySelector('tr'));
+
   // Применяем настройки видимости колонок к только что созданным td
   if (typeof _applyColSettings === 'function') _applyColSettings(getColSettings());
   tbody.onclick = function(e) {
