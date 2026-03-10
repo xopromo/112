@@ -7713,6 +7713,13 @@ async function runOpt() {
   const commTotal = comm + spread; // итоговая стоимость одной стороны сделки
   const minTrades=$n('c_mint')||30;
   const maxDD=$n('c_maxdd')||300;
+  // Получаем ограничения из synthesis режима если доступны
+  const minWR = _isSynthMode && typeof synthesisModeOptions !== 'undefined'
+    ? (synthesisModeOptions.minWR || 0)
+    : ($n('c_minwr') || 0);
+  const minSig = _isSynthMode && typeof synthesisModeOptions !== 'undefined'
+    ? (synthesisModeOptions.minSig || 0)
+    : ($n('c_minsig') || 0);
   const _useGT = $c('c_use_gt');
 
   // Entry flags
@@ -8668,7 +8675,8 @@ async function runOpt() {
   }
 
   // ── TPE РЕЖИМ ──────────────────────────────────────────────────────────────
-  if (optMode === 'tpe') {
+  // Синтез использует TPE вместо MC для полноценной оптимизации
+  if (optMode === 'tpe' || optMode === 'synthesis') {
     // tpe_target = целевое кол-во результатов (TPE останавливается когда найдено)
     // tpe_n      = жёсткий лимит итераций (защита от бесконечного цикла)
     const tpeTarget  = Math.max(10, parseInt($v('tpe_target')||'1000') || 1000);
@@ -8898,7 +8906,8 @@ async function runOpt() {
       const sig = _calcStatSig(r);
       const gt = _calcGTScore(r);
 
-      if (r && r.n >= minTrades && r.dd <= maxDD) {
+      // Проверяем все ограничения: минимум трейдов, максимум DD, минимум WR, минимум Sig%
+      if (r && r.n >= minTrades && r.dd <= maxDD && r.wr >= minWR && sig >= minSig) {
         let slDesc = slPair.combo ? `SL(ATR×${slPair.a.m}${slLogic==='or'?'|OR|':'|AND|'}${slPair.p.m}%)` : slPair.a ? `SL×${slPair.a.m}ATR` : `SL${slPair.p.m}%`;
         if(useSLPiv) slDesc+=`+SPiv(L${slPivL}/R${slPivR}×${slPivOff})`;
         let tpDesc = tpPair.combo ? (()=>{const n1=tpPair.a.type==='rr'?`RR${tpPair.a.m}`:tpPair.a.type==='atr'?`TP×${tpPair.a.m}ATR`:`TP${tpPair.a.m}%`;const n2=tpPair.b.type==='rr'?`RR${tpPair.b.m}`:tpPair.b.type==='atr'?`TP×${tpPair.b.m}ATR`:`TP${tpPair.b.m}%`;return `TP(${n1}${tpLogic==='or'?'|OR|':'|AND|'}${n2})`;})() : tpPair.a ? (tpPair.a.type==='rr'?`RR×${tpPair.a.m}`:tpPair.a.type==='atr'?`TP×${tpPair.a.m}ATR`:`TP${tpPair.a.m}%`) : '';
@@ -9569,11 +9578,23 @@ async function runOpt() {
   if (_useOOS && results.length > 0) {
     setMcPhase(`⏳ OOS проверка ${results.length} результатов…`);
     if (_isSynthMode && typeof _setSynthProgress !== 'undefined') {
-      _setSynthProgress(85, '🔍 Проверка результатов на OOS данных (' + results.length + ' стратегий)');
+      if (!_isSynthMode) {  // Синтез отложит OOS вычисления до открытия detail модала
+        _setSynthProgress(85, '🔍 Проверка результатов на OOS данных (' + results.length + ' стратегий)');
+      }
     }
-    for (let oi = 0; oi < results.length; oi++) {
-      _attachOOS(results[oi].cfg, results[oi].name, results[oi].n);
-      if (oi % 50 === 0) { await yieldToUI(); }
+    // OOS вычисляется только если не synthesis режим (для synthesis отложено до detail modal)
+    if (!_isSynthMode) {
+      for (let oi = 0; oi < results.length; oi++) {
+        _attachOOS(results[oi].cfg, results[oi].name, results[oi].n);
+        if (oi % 50 === 0) { await yieldToUI(); }
+      }
+    } else {
+      // Для synthesis: инициализируем пустой _oos объект для каждого результата
+      for (let oi = 0; oi < results.length; oi++) {
+        if (!results[oi].cfg._oos) {
+          results[oi].cfg._oos = { isPct: Math.round(_isN / N * 100), forward: null };
+        }
+      }
     }
   }
   results.sort((a,b)=>b.pdd-a.pdd);
