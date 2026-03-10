@@ -4184,8 +4184,6 @@ function _startSynthesisWorkerMode(opts) {
             // Store in global window.results for main UI
             if (typeof window !== 'undefined') {
               window.results = enrichedResults;
-              // Also assign to global scope so renderResults() can access it
-              try { results = enrichedResults; } catch(e) { console.warn('[SYNTHESIS] Worker could not set global results:', e); }
               console.log('[SYNTHESIS] Worker stored', enrichedResults.length, 'results');
 
               setTimeout(() => {
@@ -10493,6 +10491,10 @@ function applyFilters() {
 
 function renderResults() {
   _curPage = 0;
+  // Sync results from window.results if set (e.g., from synthesis_ui)
+  if (window.results && Array.isArray(window.results)) {
+    results = window.results;
+  }
   // При новом запуске оптимизации — возвращаемся в режим results
   if (_tableMode !== 'results') switchTableMode('results');
   _visibleResults = [...results]; // сброс фильтра при новом запуске

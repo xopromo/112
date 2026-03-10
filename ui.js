@@ -755,6 +755,10 @@ function applyFilters() {
 
 function renderResults() {
   _curPage = 0;
+  // Sync results from window.results if set (e.g., from synthesis_ui)
+  if (window.results && Array.isArray(window.results)) {
+    results = window.results;
+  }
   // При новом запуске оптимизации — возвращаемся в режим results
   if (_tableMode !== 'results') switchTableMode('results');
   _visibleResults = [...results]; // сброс фильтра при новом запуске

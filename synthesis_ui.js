@@ -318,8 +318,6 @@ function _startSynthesisWorkerMode(opts) {
             // Store in global window.results for main UI
             if (typeof window !== 'undefined') {
               window.results = enrichedResults;
-              // Also assign to global scope so renderResults() can access it
-              try { results = enrichedResults; } catch(e) { console.warn('[SYNTHESIS] Worker could not set global results:', e); }
               console.log('[SYNTHESIS] Worker stored', enrichedResults.length, 'results');
 
               setTimeout(() => {
