@@ -310,19 +310,22 @@ async function _runSynthesisMainThread(opts) {
       };
 
       const foundResults = [];
+      let totalTested = 0;
       let lastReportTime = Date.now();
 
       for (let iter = 0; iter < opts.maxIter && foundResults.length < opts.targetCount; iter++) {
         const batch = tpe.getNextBatch(100);
 
         for (const cfg of batch) {
+          totalTested++;
+
           try {
             const ind = _calcIndicators(cfg);
             const btc = buildBtCfg(cfg, ind);
             const result = backtest(ind.pvLo, ind.pvHi, ind.atrArr, btc);
 
             if (!result) {
-              tpe.addObservation(cfg, { pnl: 0, wr: 0, n: 0, dd: 100, gt: 0, sig: 0 });
+              tpe.addObservation(cfg, { pnl: 0, wr: 0, n: 0, dd: 100, gt: 0, sig: 0, dwr: 0 });
               continue;
             }
 
@@ -334,12 +337,15 @@ async function _runSynthesisMainThread(opts) {
             const p = (1/Math.sqrt(2*Math.PI)) * Math.exp(-z*z/2) * t*(0.319382+t*(-0.356564+t*(1.781478+t*(-1.821256+t*1.330274))));
             const sig = Math.min(99, Math.max(0, Math.round((1 - p) * 100)));
 
-            const metrics = { pnl: result.pnl, wr: result.wr, n: result.n, dd: result.dd, gt, sig, sortino: 0 };
+            const metrics = { pnl: result.pnl, wr: result.wr, n: result.n, dd: result.dd, gt, sig, sortino: 0, dwr: result.dwr || 0 };
             tpe.addObservation(cfg, metrics);
 
             if (metrics.n >= space.minTrades && metrics.dd <= space.maxDD &&
                 metrics.wr >= space.minWR && metrics.sig >= space.minSig && metrics.pnl > 0) {
-              foundResults.push({ name: 'Synth_' + iter + '_' + foundResults.length, cfg, ...metrics });
+              const newResult = { name: 'Synth_' + iter + '_' + foundResults.length, cfg, ...metrics };
+              foundResults.push(newResult);
+              results.push(newResult);
+              updatePreview();
             }
           } catch (e) {
             // skip bad config
@@ -348,8 +354,8 @@ async function _runSynthesisMainThread(opts) {
 
         if (Date.now() - lastReportTime > 500) {
           const pct = Math.min(100, Math.round((iter / opts.maxIter) * 100));
-          const rate = iter / ((Date.now() - startTime) / 1000);
-          _setSynthProgress(pct, `📊 Итерация ${iter}/${opts.maxIter} | Найдено ${foundResults.length}`, rate);
+          const rate = totalTested / ((Date.now() - startTime) / 1000);
+          _setSynthProgress(pct, `📊 Проверено ${totalTested} | Найдено ${foundResults.length}`, rate);
           lastReportTime = Date.now();
 
           // Yield to prevent blocking
@@ -357,8 +363,6 @@ async function _runSynthesisMainThread(opts) {
         }
       }
 
-      results = foundResults;
-      updatePreview();
       _setSynthProgress(100, `✅ Синтез завершён! Найдено ${foundResults.length} стратегий`);
       resolve();
     } catch (err) {
