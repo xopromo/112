@@ -4168,15 +4168,15 @@ async function _runSynthesisInWorker(payload) {
     // Store globals
     self.DATA = data;
     self.window = { _ipDef: ipDef };
-    DATA = data;
-    window = { _ipDef: ipDef };
+    if (typeof DATA === 'undefined') self.DATA = data;
+    if (typeof window === 'undefined') self.window = { _ipDef: ipDef };
 
-    HAS_VOLUME = data.length > 0 && data[0].v !== undefined;
-    results = [];
-    favourites = {};
-    equities = {};
-    stopped = false;
-    paused = false;
+    if (typeof HAS_VOLUME === 'undefined') self.HAS_VOLUME = data.length > 0 && data[0].v !== undefined;
+    if (typeof results === 'undefined') self.results = [];
+    if (typeof favourites === 'undefined') self.favourites = {};
+    if (typeof equities === 'undefined') self.equities = {};
+    if (typeof stopped === 'undefined') self.stopped = false;
+    if (typeof paused === 'undefined') self.paused = false;
 
     _synthWorkerStartTime = Date.now();
     self.postMessage({ type: 'LOG', payload: '🔍 Инициализация параметров синтеза...' });
