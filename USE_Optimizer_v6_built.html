@@ -4181,11 +4181,20 @@ function _startSynthesisWorkerMode(opts) {
 
             console.log('[SYNTHESIS] Worker enriched sample:', enrichedResults[0]);
 
-            // Store in global results
-            if (typeof renderSynthesisResults === 'function') {
+            // Store in global window.results for main UI
+            if (typeof window !== 'undefined') {
+              window.results = enrichedResults;
+              console.log('[SYNTHESIS] Worker stored', enrichedResults.length, 'results in window.results');
+
               setTimeout(() => {
-                console.log('[SYNTHESIS] Worker calling renderSynthesisResults');
-                renderSynthesisResults(enrichedResults);
+                // Trigger main UI to display results
+                if (typeof applyFilters === 'function') {
+                  console.log('[SYNTHESIS] Worker calling applyFilters');
+                  applyFilters();
+                } else if (typeof renderSynthesisResults === 'function') {
+                  console.log('[SYNTHESIS] Worker falling back to renderSynthesisResults');
+                  renderSynthesisResults(enrichedResults);
+                }
                 _setSynthProgress(null, '✅ Готово к просмотру!');
               }, 500);
             }
@@ -4408,10 +4417,20 @@ async function _startSynthesisMainThread(opts) {
 
       console.log('[SYNTHESIS] Enriched sample:', enrichedResults[0]);
 
-      if (typeof renderSynthesisResults === 'function') {
+      if (typeof window !== 'undefined') {
+        // Store results in global window.results for main UI
+        window.results = enrichedResults;
+        console.log('[SYNTHESIS] Stored', enrichedResults.length, 'results in window.results');
+
         setTimeout(() => {
-          console.log('[SYNTHESIS] Calling renderSynthesisResults with', enrichedResults.length, 'items');
-          renderSynthesisResults(enrichedResults);
+          // Trigger main UI to display results
+          if (typeof applyFilters === 'function') {
+            console.log('[SYNTHESIS] Calling applyFilters');
+            applyFilters();
+          } else if (typeof renderSynthesisResults === 'function') {
+            console.log('[SYNTHESIS] Falling back to renderSynthesisResults');
+            renderSynthesisResults(enrichedResults);
+          }
           _setSynthProgress(null, '✅ Готово к просмотру!');
         }, 500);
       }
