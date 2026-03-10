@@ -3864,8 +3864,8 @@ function openSynthesisModal() {
     maxDD: 50,
     minWR: 0,
     minSig: 0,
-    targetCount: 1000,
-    maxIter: 50000,
+    targetCount: 200,
+    maxIter: 10000,
     gamma: 0.25,
     weightGT: 0.5,
     weightSortino: 0.3,
@@ -3896,6 +3896,7 @@ function closeSynthesisModal() {
 // ──── Synthesis Logging ────────────────────────────────────────
 let _synthStartTime = 0;
 let _synthLogCount = 0;
+let _synthWorker = null;
 
 function _showSynthProgressSection() {
   const section = document.getElementById('synth-progress-section');
@@ -3914,11 +3915,28 @@ function _hideSynthProgressSection() {
   if (stopBtn) stopBtn.style.display = 'none';
 }
 
-function _setSynthProgress(percent, text) {
+function _setSynthProgress(percent, text, ratePerSec = null) {
   const fill = document.getElementById('synth-progress-fill');
   const txt = document.getElementById('synth-progress-text');
   if (fill) fill.style.width = Math.min(Math.max(percent, 0), 100) + '%';
-  if (txt) txt.textContent = Math.round(percent) + '%';
+
+  // Calculate ETA if progress rate is known
+  let displayText = Math.round(percent) + '%';
+  if (ratePerSec && ratePerSec > 0 && percent > 0 && percent < 100) {
+    const elapsedMs = Date.now() - _synthStartTime;
+    const elapsedSec = elapsedMs / 1000;
+    const remainingPercent = 100 - percent;
+    const remainingSeconds = (remainingPercent / percent) * elapsedSec;
+
+    if (remainingSeconds > 60) {
+      const mins = Math.round(remainingSeconds / 60);
+      displayText += ` (⏱ ~${mins}мин)`;
+    } else if (remainingSeconds > 0) {
+      displayText += ` (⏱ ~${Math.round(remainingSeconds)}с)`;
+    }
+  }
+  if (txt) txt.textContent = displayText;
+
   if (text) {
     const logs = document.getElementById('synth-logs');
     if (logs) {
@@ -3933,7 +3951,10 @@ function _setSynthProgress(percent, text) {
 }
 
 function stopSynthesis() {
-  // Сигнал остановки (используется в runOpt через globalную переменную)
+  // Send stop signal to worker or global
+  if (_synthWorker) {
+    _synthWorker.postMessage({ type: 'STOP_SYNTHESIS' });
+  }
   if (typeof stopped !== 'undefined') stopped = true;
   _setSynthProgress(0, '⏹ Синтез остановлен пользователем');
   _hideSynthProgressSection(); // только скрываем кнопку стопа, модал остаётся
@@ -4028,8 +4049,18 @@ async function runSynthesis() {
     optMode = 'synthesis';
     synthesisModeOptions = opts;
 
-    _setSynthProgress(10, '🚀 Запуск оптимизации...');
-    await runOpt();
+    _setSynthProgress(10, '🚀 Запуск оптимизации в фоне...');
+
+    // Try to use Web Worker for background computation
+    if (typeof Worker !== 'undefined') {
+      _startSynthesisWorker(opts);
+    } else {
+      // Fallback to main thread if workers not supported
+      console.warn('[synthesis] Web Workers not supported, running in main thread');
+      optMode = 'synthesis';
+      synthesisModeOptions = opts;
+      await runOpt();
+    }
   } catch (err) {
     const errMsg = err.message || err.toString();
     _setSynthProgress(0, '❌ ОШИБКА: ' + errMsg);
@@ -4037,6 +4068,62 @@ async function runSynthesis() {
     console.error('[runSynthesis] Stack:', err.stack);
     console.log('[DEBUG] window._ipDef:', window._ipDef);
     setTimeout(() => _hideSynthProgressSection(), 2000);
+  }
+}
+
+function _startSynthesisWorker(opts) {
+  try {
+    // Create worker if not exists
+    if (!_synthWorker) {
+      _synthWorker = new Worker('synthesis_worker.js');
+    }
+
+    // Set up message handler
+    _synthWorker.onmessage = (event) => {
+      const { type, payload } = event.data;
+
+      if (type === 'PROGRESS') {
+        _setSynthProgress(payload.percent, payload.message, payload.ratePerSec);
+      } else if (type === 'LOG') {
+        _setSynthProgress(null, payload);
+      } else if (type === 'COMPLETE') {
+        if (payload.status === 'success') {
+          _setSynthProgress(100, '✅ Синтез завершён!');
+          console.log('[SYNTHESIS] Worker completed:', payload.elapsedMs, 'ms');
+        } else if (payload.status === 'error') {
+          _setSynthProgress(0, '❌ ОШИБКА в worker: ' + payload.error);
+        } else if (payload.status === 'stopped') {
+          // Normal stop
+        }
+        _hideSynthProgressSection();
+      }
+    };
+
+    _synthWorker.onerror = (err) => {
+      _setSynthProgress(0, '❌ ОШИБКА worker: ' + (err.message || err.toString()));
+      console.error('[SYNTHESIS] Worker error:', err);
+      _hideSynthProgressSection();
+    };
+
+    // Prepare data to send to worker
+    // For now, send minimal data. In production, send DATA array and ipDef
+    const workerPayload = {
+      data: typeof DATA !== 'undefined' ? DATA : [],
+      ipDef: window._ipDef || {},
+      opts: opts,
+    };
+
+    // Send synthesis start message to worker
+    _synthWorker.postMessage({
+      type: 'START_SYNTHESIS',
+      payload: workerPayload,
+    });
+
+    console.log('[SYNTHESIS] Worker started');
+  } catch (err) {
+    console.error('[_startSynthesisWorker] Error:', err);
+    _setSynthProgress(0, '❌ ОШИБКА при запуске worker: ' + err.message);
+    _hideSynthProgressSection();
   }
 }
 
