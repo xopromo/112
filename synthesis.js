@@ -65,7 +65,35 @@ class StrategySpace {
   }
 
   decode(vector) {
-    const cfg = {};
+    // Start with comprehensive defaults (matches opt.js expectations)
+    const cfg = {
+      usePivot: false, pvL: 5, pvR: 2,
+      useEngulf: false, usePinBar: false, pinRatio: 2,
+      useBoll: false, useDonch: false, useAtrBo: false, atrBoMult: 2,
+      useMaTouch: false, useSqueeze: false, sqzMinBars: 1,
+      useTLTouch: false, useTLBreak: false, useFlag: false, useTri: false,
+      useRsiExit: false, rsiExitPeriod: 14, rsiExitOS: 30, rsiExitOB: 70,
+      useMaCross: false, maCrossP: 20, maCrossType: 'EMA',
+      useMA: false, maP: 20, maType: 'EMA', maDistDir: 'both',
+      useADX: false, adxP: 14, adxThresh: 25,
+      useRSI: false, rsiP: 14, rsiOsLevel: 30, rsiObLevel: 70,
+      useConfirm: false, confirmType: 'and', confirmRSI: false,
+      useBB: false, bbP: 20, bbMult: 2,
+      useDonchian: false, donchP: 20,
+      useWMA: false, wmaP: 10,
+      useBE: false, beTrig: 2, beOff: 0.5, usePartial: false, partPct: 50, partRR: 0.5, partBE: false,
+      useTrail: false, trTrig: 2, trDist: 1,
+      useRev: false, revBars: 5, revMode: 'any', revAct: 'exit', revSkip: 0, revCooldown: 0,
+      useClimaxExit: false, climaxBars: 5, climaxPct: 10,
+      useTimeExit: false, timeMaxBars: 100,
+      waitBars: 0, waitRetrace: false, waitMaxBars: 0, waitCancelAtr: 0,
+      slPair: {}, tpPair: {}, slLogic: 'or', tpLogic: 'or',
+      hasTPA: false, hasTPB: false,
+      commission: 0,
+      atrP: 14, start: 50, pruning: false, maxDDLimit: 50,
+      collectTrades: false,
+    };
+
     let idx = 0;
 
     if (this.varyEntries) {

@@ -107,6 +107,36 @@ async function _runSynthesisInWorker(payload) {
     const results = [];
     let lastReportTime = Date.now();
 
+    // Compute metrics from backtest result
+    function _computeMetrics(r) {
+      if (!r) return null;
+      // GT-Score: (pnl/dd) × sig_mult × consistency_mult
+      const pdd = r.dd > 0 ? r.pnl / r.dd : (r.pnl > 0 ? 50 : 0);
+      const z = (r.wr - 50) / Math.sqrt(2500 / Math.max(r.n, 1));
+      const sigMult = 1 + Math.min(Math.max(z, 0), 3) * 0.3;
+      const dwr = r.dwr !== undefined ? r.dwr : 0;
+      const consistMult = 0.5 + Math.min(Math.max(1 - dwr / 100, 0), 1) * 0.5;
+      const gt = pdd > 0 ? pdd * sigMult * consistMult : 0;
+      // Significance: z-test that WR > 50%
+      const t = 1 / (1 + 0.2316419 * z);
+      const p = (1/Math.sqrt(2*Math.PI)) * Math.exp(-z*z/2) *
+        t*(0.319382+t*(-0.356564+t*(1.781478+t*(-1.821256+t*1.330274))));
+      const sig = Math.min(99, Math.max(0, Math.round((1 - p) * 100)));
+      // Sortino: pnl / downside_std
+      let sortino = 0;
+      if (r.eq && r.eq.length > 1) {
+        let sumDown = 0, cnt = 0;
+        for (let i = 1; i < r.eq.length; i++) {
+          const dd = Math.min(r.eq[i] - r.eq[i-1], 0);
+          sumDown += dd * dd;
+          cnt++;
+        }
+        const downStd = cnt > 0 ? Math.sqrt(sumDown / cnt) : 1;
+        sortino = downStd > 0.01 ? r.pnl / downStd : 0;
+      }
+      return { gt, sig, sortino };
+    }
+
     // Real backtest using core.js + opt.js
     function _realBacktest(cfg) {
       try {
@@ -122,16 +152,17 @@ async function _runSynthesisInWorker(payload) {
           return null;
         }
 
+        const metrics = _computeMetrics(result);
         return {
           pnl: result.pnl || 0,
           wr: Math.max(0, Math.min(100, result.wr || 0)),
           n: Math.max(1, result.n || 1),
           dd: Math.max(0, result.dd || 0),
-          gt: result.gt || 0,
-          sig: result.sig || 0,
-          sortino: result.sortino || 0,
-          upi: result.upi || 0,
-          kratio: result.kratio || 0,
+          gt: metrics?.gt || 0,
+          sig: metrics?.sig || 0,
+          sortino: metrics?.sortino || 0,
+          upi: 0,
+          kratio: 0,
           eq: result.eq || null,
         };
       } catch (err) {
@@ -156,9 +187,15 @@ async function _runSynthesisInWorker(payload) {
 
         tpe.addObservation(cfg, metrics);
 
-        // Add to results if passes constraints
+        // Add to results if passes hard constraints (don't wait for weighted score)
         const score = tpe._computeScore(metrics);
-        if (score > 0) {
+        const passesConstraints =
+          metrics.n >= space.minTrades &&
+          metrics.dd <= space.maxDD &&
+          metrics.wr >= space.minWR &&
+          metrics.sig >= space.minSig;
+
+        if (passesConstraints && metrics.pnl > 0) {
           results.push({
             name: `Synth_${iter}_${results.length}`,
             cfg,
