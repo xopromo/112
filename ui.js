@@ -1432,8 +1432,8 @@ function buildCopyText(r, c, slName, tpName) {
   lines.push('');
   lines.push('--- ОБЩЕЕ ---');
   lines.push('ATR период: ' + c.atrPeriod);
-  const _cc = c.baseComm !== undefined ? c.baseComm : c.commission;
-  const _sp = c.spreadVal !== undefined ? c.spreadVal : 0;
+  const _cc = (c.baseComm !== undefined ? c.baseComm : c.commission) ?? 0;
+  const _sp = (c.spreadVal !== undefined ? c.spreadVal : 0) ?? 0;
   lines.push('Комиссия: ' + _cc.toFixed(3) + '% (1 ст.) = ' + (_cc*2).toFixed(3) + '% (round-trip)' + (_sp>0 ? ', Спред: ' + _sp.toFixed(3) + '% (r/t)' : ''));
   return lines.join('\n');
 }
