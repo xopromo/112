@@ -3893,6 +3893,53 @@ function closeSynthesisModal() {
   if (modal) modal.style.display = 'none';
 }
 
+// ──── Synthesis Logging ────────────────────────────────────────
+let _synthStartTime = 0;
+let _synthLogCount = 0;
+
+function _showSynthProgressSection() {
+  const section = document.getElementById('synth-progress-section');
+  const runBtn = document.getElementById('synth-run-btn');
+  const stopBtn = document.getElementById('synth-stop-btn');
+  if (section) section.style.display = 'block';
+  if (runBtn) runBtn.style.display = 'none';
+  if (stopBtn) stopBtn.style.display = 'inline-block';
+}
+
+function _hideSynthProgressSection() {
+  const section = document.getElementById('synth-progress-section');
+  const runBtn = document.getElementById('synth-run-btn');
+  const stopBtn = document.getElementById('synth-stop-btn');
+  if (section) section.style.display = 'none';
+  if (runBtn) runBtn.style.display = 'inline-block';
+  if (stopBtn) stopBtn.style.display = 'none';
+}
+
+function _setSynthProgress(percent, text) {
+  const fill = document.getElementById('synth-progress-fill');
+  const txt = document.getElementById('synth-progress-text');
+  if (fill) fill.style.width = Math.min(Math.max(percent, 0), 100) + '%';
+  if (txt) txt.textContent = Math.round(percent) + '%';
+  if (text) {
+    const logs = document.getElementById('synth-logs');
+    if (logs) {
+      const time = new Date().toLocaleTimeString('ru-RU');
+      const line = `[${time}] ${text}`;
+      logs.innerHTML += line + '<br>';
+      logs.scrollTop = logs.scrollHeight;
+      _synthLogCount++;
+      console.log('[SYNTHESIS]', text);
+    }
+  }
+}
+
+function stopSynthesis() {
+  // Сигнал остановки (используется в runOpt через globalную переменную)
+  if (typeof stopped !== 'undefined') stopped = true;
+  _setSynthProgress(0, '⏹ Синтез остановлен пользователем');
+  setTimeout(() => _hideSynthProgressSection(), 1000);
+}
+
 function _setSynthesisDefaults(defaults) {
   const el = (id) => document.getElementById(id);
 
@@ -3934,45 +3981,61 @@ function _setSynthesisDefaults(defaults) {
 async function runSynthesis() {
   const el = (id) => document.getElementById(id);
 
-  const opts = {
-    varyEntries: el('c_synth_vary_entries')?.checked || true,
-    varyFilters: el('c_synth_vary_filters')?.checked || true,
-    varyFilterParams: el('c_synth_vary_filter_params')?.checked || true,
-    varyExits: el('c_synth_vary_exits')?.checked || true,
-    varySLTP: el('c_synth_vary_sltp')?.checked || true,
-    varyRisk: el('c_synth_vary_risk')?.checked || true,
-    metrics: [],
-    minTrades: parseInt(el('c_synth_min_trades')?.value) || 10,
-    maxDD: parseInt(el('c_synth_max_dd')?.value) || 100,
-    minWR: parseFloat(el('c_synth_min_wr')?.value) || 0,
-    minSig: parseFloat(el('c_synth_min_sig')?.value) || 0,
-    targetCount: parseInt(el('c_synth_target_count')?.value) || 1000,
-    maxIter: parseInt(el('c_synth_max_iter')?.value) || 50000,
-    gamma: parseFloat(el('c_synth_gamma')?.value) || 0.25,
-    weights: {
-      gt: parseFloat(el('c_synth_weight_gt')?.value) || 0.5,
-      sortino: parseFloat(el('c_synth_weight_sortino')?.value) || 0.3,
-      sig: parseFloat(el('c_synth_weight_sig')?.value) || 0.2,
-    },
-    startMode: el('c_synth_start_mode')?.value || 'zero',
-    saveHistory: el('c_synth_save_history')?.checked || true,
-  };
+  try {
+    _synthStartTime = Date.now();
+    _synthLogCount = 0;
+    _showSynthProgressSection();
+    _setSynthProgress(1, '🔍 Загрузка параметров синтеза...');
 
-  if (el('c_synth_metric_gt')?.checked) opts.metrics.push('gt');
-  if (el('c_synth_metric_sortino')?.checked) opts.metrics.push('sortino');
-  if (el('c_synth_metric_sig')?.checked) opts.metrics.push('sig');
+    const opts = {
+      varyEntries: el('c_synth_vary_entries')?.checked || true,
+      varyFilters: el('c_synth_vary_filters')?.checked || true,
+      varyFilterParams: el('c_synth_vary_filter_params')?.checked || true,
+      varyExits: el('c_synth_vary_exits')?.checked || true,
+      varySLTP: el('c_synth_vary_sltp')?.checked || true,
+      varyRisk: el('c_synth_vary_risk')?.checked || true,
+      metrics: [],
+      minTrades: parseInt(el('c_synth_min_trades')?.value) || 10,
+      maxDD: parseInt(el('c_synth_max_dd')?.value) || 100,
+      minWR: parseFloat(el('c_synth_min_wr')?.value) || 0,
+      minSig: parseFloat(el('c_synth_min_sig')?.value) || 0,
+      targetCount: parseInt(el('c_synth_target_count')?.value) || 1000,
+      maxIter: parseInt(el('c_synth_max_iter')?.value) || 50000,
+      gamma: parseFloat(el('c_synth_gamma')?.value) || 0.25,
+      weights: {
+        gt: parseFloat(el('c_synth_weight_gt')?.value) || 0.5,
+        sortino: parseFloat(el('c_synth_weight_sortino')?.value) || 0.3,
+        sig: parseFloat(el('c_synth_weight_sig')?.value) || 0.2,
+      },
+      startMode: el('c_synth_start_mode')?.value || 'zero',
+      saveHistory: el('c_synth_save_history')?.checked || true,
+    };
 
-  if (opts.metrics.length === 0) {
-    alert('Выбери хотя бы одну целевую метрику');
-    return;
+    if (el('c_synth_metric_gt')?.checked) opts.metrics.push('gt');
+    if (el('c_synth_metric_sortino')?.checked) opts.metrics.push('sortino');
+    if (el('c_synth_metric_sig')?.checked) opts.metrics.push('sig');
+
+    if (opts.metrics.length === 0) {
+      alert('Выбери хотя бы одну целевую метрику');
+      _hideSynthProgressSection();
+      return;
+    }
+
+    _setSynthProgress(5, '✅ Параметры загружены: ' + opts.metrics.join(', '));
+    _setSynthProgress(7, '📊 Конфигурация: ' + opts.targetCount + ' стратегий, ' + opts.maxIter + ' итераций');
+
+    localStorage.setItem('synthesis-settings', JSON.stringify(opts));
+
+    optMode = 'synthesis';
+    synthesisModeOptions = opts;
+
+    _setSynthProgress(10, '🚀 Запуск оптимизации...');
+    await runOpt();
+  } catch (err) {
+    _setSynthProgress(0, '❌ ОШИБКА: ' + (err.message || err));
+    console.error('[runSynthesis] error:', err);
+    setTimeout(() => _hideSynthProgressSection(), 2000);
   }
-
-  localStorage.setItem('synthesis-settings', JSON.stringify(opts));
-  closeSynthesisModal();
-
-  optMode = 'synthesis';
-  synthesisModeOptions = opts;
-  await runOpt();
 }
 
 function switchToSynthesisMode() {
@@ -7104,7 +7167,10 @@ function updatePreview() {
 }
 
 async function runOpt() {
-  if (!DATA) return;
+  if (!DATA) {
+    if (typeof _setSynthProgress !== 'undefined') _setSynthProgress(0, '❌ Нет данных для оптимизации');
+    return;
+  }
   stopped=false; paused=false; results=[]; equities={};
   resultCache.clear();
   const _resultNames = new Set(); // П.1: дедупликация
@@ -7116,6 +7182,12 @@ async function runOpt() {
   $('sbtn').style.display='inline-block';
   $('pbar').style.width='0%';
   _t0 = Date.now();
+
+  // Synthesis mode logging
+  const _isSynthMode = optMode === 'synthesis';
+  if (_isSynthMode && typeof _setSynthProgress !== 'undefined') {
+    _setSynthProgress(15, '📈 ' + DATA.length + ' баров данных загружено');
+  }
 
   const N=DATA.length;
   const closes=DATA.map(r=>r.c);
@@ -9035,6 +9107,9 @@ async function runOpt() {
   // Exhaustive завершён — батч OOS
   if (_useOOS && results.length > 0) {
     setMcPhase(`⏳ OOS проверка ${results.length} результатов…`);
+    if (_isSynthMode && typeof _setSynthProgress !== 'undefined') {
+      _setSynthProgress(85, '🔍 Проверка результатов на OOS данных (' + results.length + ' стратегий)');
+    }
     for (let oi = 0; oi < results.length; oi++) {
       _attachOOS(results[oi].cfg, results[oi].name, results[oi].n);
       if (oi % 50 === 0) { await yieldToUI(); }
@@ -9047,6 +9122,18 @@ async function runOpt() {
   renderResults();
   if(results.length>0) showBestStats();
   updateETA(done, total, results.length);
+
+  // Synthesis mode completion logging
+  if (_isSynthMode && typeof _setSynthProgress !== 'undefined') {
+    const elapsed = Math.round((Date.now() - _t0) / 1000);
+    _setSynthProgress(100, '✅ Синтез завершен! Найдено ' + results.length + ' стратегий за ' + elapsed + 'с');
+    setTimeout(() => {
+      if (typeof _hideSynthProgressSection !== 'undefined') {
+        _hideSynthProgressSection();
+      }
+    }, 3000);
+  }
+
   $('prog').textContent='✅ ' + fmtNum(results.length) + ' / ' + fmtNum(done) + ' прошли фильтр';
   // Restore buttons
   $('pbtn').style.display='none';
@@ -10780,6 +10867,17 @@ function updateETA(done, total, found) {
     ? '⟳ ' + fmtNum(total) + ' вар.'
     : fmtNum(done) + ' / ' + fmtNum(total) + ' вар.';
   $('eta-found').textContent = found > 0 ? '✅ ' + fmtNum(found) + ' ok' : '';
+
+  // Synthesis mode progress logging
+  if (optMode === 'synthesis' && typeof _setSynthProgress !== 'undefined') {
+    const overallPct = Math.max(15, Math.min(85, 10 + pct * 75)); // 10-85% range
+    const rate = _t0 > 0 ? done / ((Date.now() - _t0) / 1000) : 0;
+    let logMsg = '🔨 ' + fmtNum(done) + '/' + fmtNum(total) + ' стратегий тестировано';
+    if (found > 0) logMsg += ' · ✅ ' + found + ' годных';
+    if (rate > 0) logMsg += ' (' + Math.round(rate) + '/с)';
+    _setSynthProgress(overallPct, logMsg);
+  }
+
   if (_t0 > 0) {
     const elapsed = (Date.now() - _t0) / 1000;
     if (done > 5 && elapsed > 0.3) {
@@ -16238,8 +16336,18 @@ function toggleNotepad() {
       <label style="font-size:.7em;display:flex;align-items:center;gap:6px;margin:4px 0"><input type="checkbox" id="c_synth_save_history" checked style="accent-color:var(--accent)"> Сохранить сессию в истории</label>
     </fieldset>
 
+    <div id="synth-progress-section" style="display:none;margin-bottom:12px;border:1px solid var(--border2);padding:8px;border-radius:4px">
+      <div style="font-size:.7em;color:var(--text2);margin-bottom:6px">Прогресс синтеза</div>
+      <div id="synth-progress-bar" style="width:100%;height:16px;background:var(--bg2);border:1px solid var(--border);border-radius:2px;overflow:hidden">
+        <div id="synth-progress-fill" style="height:100%;background:linear-gradient(90deg,#7cff7c,#00ff00);width:0%;transition:width 0.2s"></div>
+      </div>
+      <div style="font-size:.65em;color:var(--text2);margin-top:4px;text-align:center" id="synth-progress-text">0%</div>
+      <div id="synth-logs" style="font-size:.65em;background:var(--bg3);border:1px solid var(--border);border-radius:2px;padding:6px;max-height:150px;overflow-y:auto;margin-top:6px;color:var(--text2);font-family:monospace;line-height:1.3"></div>
+    </div>
+
     <div class="tpl-row" style="margin-top:12px">
-      <button class="tpl-btn2 ok" onclick="runSynthesis()" style="flex:1;background:rgba(100,255,100,.2);border-color:rgba(100,255,100,.6);color:#7cff7c">▶ Начать синтез</button>
+      <button class="tpl-btn2 ok" id="synth-run-btn" onclick="runSynthesis()" style="flex:1;background:rgba(100,255,100,.2);border-color:rgba(100,255,100,.6);color:#7cff7c">▶ Начать синтез</button>
+      <button class="tpl-btn2 cancel" id="synth-stop-btn" onclick="stopSynthesis()" style="flex:1;display:none;background:rgba(255,100,100,.2);border-color:rgba(255,100,100,.6);color:#ff7c7c">⏹ Остановить</button>
       <button class="tpl-btn2 cancel" onclick="closeSynthesisModal()" style="flex:1">Отмена</button>
     </div>
   </div>

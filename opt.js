@@ -852,7 +852,10 @@ function updatePreview() {
 }
 
 async function runOpt() {
-  if (!DATA) return;
+  if (!DATA) {
+    if (typeof _setSynthProgress !== 'undefined') _setSynthProgress(0, '❌ Нет данных для оптимизации');
+    return;
+  }
   stopped=false; paused=false; results=[]; equities={};
   resultCache.clear();
   const _resultNames = new Set(); // П.1: дедупликация
@@ -864,6 +867,12 @@ async function runOpt() {
   $('sbtn').style.display='inline-block';
   $('pbar').style.width='0%';
   _t0 = Date.now();
+
+  // Synthesis mode logging
+  const _isSynthMode = optMode === 'synthesis';
+  if (_isSynthMode && typeof _setSynthProgress !== 'undefined') {
+    _setSynthProgress(15, '📈 ' + DATA.length + ' баров данных загружено');
+  }
 
   const N=DATA.length;
   const closes=DATA.map(r=>r.c);
@@ -2783,6 +2792,9 @@ async function runOpt() {
   // Exhaustive завершён — батч OOS
   if (_useOOS && results.length > 0) {
     setMcPhase(`⏳ OOS проверка ${results.length} результатов…`);
+    if (_isSynthMode && typeof _setSynthProgress !== 'undefined') {
+      _setSynthProgress(85, '🔍 Проверка результатов на OOS данных (' + results.length + ' стратегий)');
+    }
     for (let oi = 0; oi < results.length; oi++) {
       _attachOOS(results[oi].cfg, results[oi].name, results[oi].n);
       if (oi % 50 === 0) { await yieldToUI(); }
@@ -2795,6 +2807,18 @@ async function runOpt() {
   renderResults();
   if(results.length>0) showBestStats();
   updateETA(done, total, results.length);
+
+  // Synthesis mode completion logging
+  if (_isSynthMode && typeof _setSynthProgress !== 'undefined') {
+    const elapsed = Math.round((Date.now() - _t0) / 1000);
+    _setSynthProgress(100, '✅ Синтез завершен! Найдено ' + results.length + ' стратегий за ' + elapsed + 'с');
+    setTimeout(() => {
+      if (typeof _hideSynthProgressSection !== 'undefined') {
+        _hideSynthProgressSection();
+      }
+    }, 3000);
+  }
+
   $('prog').textContent='✅ ' + fmtNum(results.length) + ' / ' + fmtNum(done) + ' прошли фильтр';
   // Restore buttons
   $('pbtn').style.display='none';

@@ -1590,6 +1590,17 @@ function updateETA(done, total, found) {
     ? '⟳ ' + fmtNum(total) + ' вар.'
     : fmtNum(done) + ' / ' + fmtNum(total) + ' вар.';
   $('eta-found').textContent = found > 0 ? '✅ ' + fmtNum(found) + ' ok' : '';
+
+  // Synthesis mode progress logging
+  if (optMode === 'synthesis' && typeof _setSynthProgress !== 'undefined') {
+    const overallPct = Math.max(15, Math.min(85, 10 + pct * 75)); // 10-85% range
+    const rate = _t0 > 0 ? done / ((Date.now() - _t0) / 1000) : 0;
+    let logMsg = '🔨 ' + fmtNum(done) + '/' + fmtNum(total) + ' стратегий тестировано';
+    if (found > 0) logMsg += ' · ✅ ' + found + ' годных';
+    if (rate > 0) logMsg += ' (' + Math.round(rate) + '/с)';
+    _setSynthProgress(overallPct, logMsg);
+  }
+
   if (_t0 > 0) {
     const elapsed = (Date.now() - _t0) / 1000;
     if (done > 5 && elapsed > 0.3) {

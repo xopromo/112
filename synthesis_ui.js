@@ -52,6 +52,53 @@ function closeSynthesisModal() {
   if (modal) modal.style.display = 'none';
 }
 
+// ──── Synthesis Logging ────────────────────────────────────────
+let _synthStartTime = 0;
+let _synthLogCount = 0;
+
+function _showSynthProgressSection() {
+  const section = document.getElementById('synth-progress-section');
+  const runBtn = document.getElementById('synth-run-btn');
+  const stopBtn = document.getElementById('synth-stop-btn');
+  if (section) section.style.display = 'block';
+  if (runBtn) runBtn.style.display = 'none';
+  if (stopBtn) stopBtn.style.display = 'inline-block';
+}
+
+function _hideSynthProgressSection() {
+  const section = document.getElementById('synth-progress-section');
+  const runBtn = document.getElementById('synth-run-btn');
+  const stopBtn = document.getElementById('synth-stop-btn');
+  if (section) section.style.display = 'none';
+  if (runBtn) runBtn.style.display = 'inline-block';
+  if (stopBtn) stopBtn.style.display = 'none';
+}
+
+function _setSynthProgress(percent, text) {
+  const fill = document.getElementById('synth-progress-fill');
+  const txt = document.getElementById('synth-progress-text');
+  if (fill) fill.style.width = Math.min(Math.max(percent, 0), 100) + '%';
+  if (txt) txt.textContent = Math.round(percent) + '%';
+  if (text) {
+    const logs = document.getElementById('synth-logs');
+    if (logs) {
+      const time = new Date().toLocaleTimeString('ru-RU');
+      const line = `[${time}] ${text}`;
+      logs.innerHTML += line + '<br>';
+      logs.scrollTop = logs.scrollHeight;
+      _synthLogCount++;
+      console.log('[SYNTHESIS]', text);
+    }
+  }
+}
+
+function stopSynthesis() {
+  // Сигнал остановки (используется в runOpt через globalную переменную)
+  if (typeof stopped !== 'undefined') stopped = true;
+  _setSynthProgress(0, '⏹ Синтез остановлен пользователем');
+  setTimeout(() => _hideSynthProgressSection(), 1000);
+}
+
 function _setSynthesisDefaults(defaults) {
   const el = (id) => document.getElementById(id);
 
@@ -93,45 +140,61 @@ function _setSynthesisDefaults(defaults) {
 async function runSynthesis() {
   const el = (id) => document.getElementById(id);
 
-  const opts = {
-    varyEntries: el('c_synth_vary_entries')?.checked || true,
-    varyFilters: el('c_synth_vary_filters')?.checked || true,
-    varyFilterParams: el('c_synth_vary_filter_params')?.checked || true,
-    varyExits: el('c_synth_vary_exits')?.checked || true,
-    varySLTP: el('c_synth_vary_sltp')?.checked || true,
-    varyRisk: el('c_synth_vary_risk')?.checked || true,
-    metrics: [],
-    minTrades: parseInt(el('c_synth_min_trades')?.value) || 10,
-    maxDD: parseInt(el('c_synth_max_dd')?.value) || 100,
-    minWR: parseFloat(el('c_synth_min_wr')?.value) || 0,
-    minSig: parseFloat(el('c_synth_min_sig')?.value) || 0,
-    targetCount: parseInt(el('c_synth_target_count')?.value) || 1000,
-    maxIter: parseInt(el('c_synth_max_iter')?.value) || 50000,
-    gamma: parseFloat(el('c_synth_gamma')?.value) || 0.25,
-    weights: {
-      gt: parseFloat(el('c_synth_weight_gt')?.value) || 0.5,
-      sortino: parseFloat(el('c_synth_weight_sortino')?.value) || 0.3,
-      sig: parseFloat(el('c_synth_weight_sig')?.value) || 0.2,
-    },
-    startMode: el('c_synth_start_mode')?.value || 'zero',
-    saveHistory: el('c_synth_save_history')?.checked || true,
-  };
+  try {
+    _synthStartTime = Date.now();
+    _synthLogCount = 0;
+    _showSynthProgressSection();
+    _setSynthProgress(1, '🔍 Загрузка параметров синтеза...');
 
-  if (el('c_synth_metric_gt')?.checked) opts.metrics.push('gt');
-  if (el('c_synth_metric_sortino')?.checked) opts.metrics.push('sortino');
-  if (el('c_synth_metric_sig')?.checked) opts.metrics.push('sig');
+    const opts = {
+      varyEntries: el('c_synth_vary_entries')?.checked || true,
+      varyFilters: el('c_synth_vary_filters')?.checked || true,
+      varyFilterParams: el('c_synth_vary_filter_params')?.checked || true,
+      varyExits: el('c_synth_vary_exits')?.checked || true,
+      varySLTP: el('c_synth_vary_sltp')?.checked || true,
+      varyRisk: el('c_synth_vary_risk')?.checked || true,
+      metrics: [],
+      minTrades: parseInt(el('c_synth_min_trades')?.value) || 10,
+      maxDD: parseInt(el('c_synth_max_dd')?.value) || 100,
+      minWR: parseFloat(el('c_synth_min_wr')?.value) || 0,
+      minSig: parseFloat(el('c_synth_min_sig')?.value) || 0,
+      targetCount: parseInt(el('c_synth_target_count')?.value) || 1000,
+      maxIter: parseInt(el('c_synth_max_iter')?.value) || 50000,
+      gamma: parseFloat(el('c_synth_gamma')?.value) || 0.25,
+      weights: {
+        gt: parseFloat(el('c_synth_weight_gt')?.value) || 0.5,
+        sortino: parseFloat(el('c_synth_weight_sortino')?.value) || 0.3,
+        sig: parseFloat(el('c_synth_weight_sig')?.value) || 0.2,
+      },
+      startMode: el('c_synth_start_mode')?.value || 'zero',
+      saveHistory: el('c_synth_save_history')?.checked || true,
+    };
 
-  if (opts.metrics.length === 0) {
-    alert('Выбери хотя бы одну целевую метрику');
-    return;
+    if (el('c_synth_metric_gt')?.checked) opts.metrics.push('gt');
+    if (el('c_synth_metric_sortino')?.checked) opts.metrics.push('sortino');
+    if (el('c_synth_metric_sig')?.checked) opts.metrics.push('sig');
+
+    if (opts.metrics.length === 0) {
+      alert('Выбери хотя бы одну целевую метрику');
+      _hideSynthProgressSection();
+      return;
+    }
+
+    _setSynthProgress(5, '✅ Параметры загружены: ' + opts.metrics.join(', '));
+    _setSynthProgress(7, '📊 Конфигурация: ' + opts.targetCount + ' стратегий, ' + opts.maxIter + ' итераций');
+
+    localStorage.setItem('synthesis-settings', JSON.stringify(opts));
+
+    optMode = 'synthesis';
+    synthesisModeOptions = opts;
+
+    _setSynthProgress(10, '🚀 Запуск оптимизации...');
+    await runOpt();
+  } catch (err) {
+    _setSynthProgress(0, '❌ ОШИБКА: ' + (err.message || err));
+    console.error('[runSynthesis] error:', err);
+    setTimeout(() => _hideSynthProgressSection(), 2000);
   }
-
-  localStorage.setItem('synthesis-settings', JSON.stringify(opts));
-  closeSynthesisModal();
-
-  optMode = 'synthesis';
-  synthesisModeOptions = opts;
-  await runOpt();
 }
 
 function switchToSynthesisMode() {
