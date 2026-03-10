@@ -10811,19 +10811,19 @@ function showDetail(r) {
     if (!pair) return '—';
     if (pair.combo) {
       const lg = c.slLogic==='or' ? 'ИЛИ (выход по ближнему)' : 'И (выход по дальнему)';
-      return `ATR ×${pair.a.m}  ${c.slLogic.toUpperCase()}  ${pair.p.m}%  [${lg}]`;
+      return `ATR ×${pair.a?.m??0}  ${c.slLogic.toUpperCase()}  ${pair.p?.m??0}%  [${lg}]`;
     }
-    if (pair.a) return `ATR × ${pair.a.m}`;
-    if (pair.p) return `${pair.p.m}% от цены`;
+    if (pair.a) return `ATR × ${pair.a.m??0}`;
+    if (pair.p) return `${pair.p.m??0}% от цены`;
     return '—';
   }
   function tpName(pair) {
     if (!pair) return '—';
     function one(t) {
       if (!t) return '—';
-      if (t.type==='rr') return `R:R = ${t.m} (от SL)`;
-      if (t.type==='atr') return `ATR × ${t.m}`;
-      return `${t.m}% от цены`;
+      if (t.type==='rr') return `R:R = ${t.m??0} (от SL)`;
+      if (t.type==='atr') return `ATR × ${t.m??0}`;
+      return `${t.m??0}% от цены`;
     }
     if (pair.combo) {
       const lg = c.tpLogic==='or' ? 'ИЛИ (выход по ближнему)' : 'И (выход по дальнему)';
