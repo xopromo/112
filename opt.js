@@ -1229,6 +1229,7 @@ async function runOpt() {
   const rsiPairs=[];
   if(useRsi) { rsiOSArr.forEach(os=>{ rsiOBArr.forEach(ob=>{ if(os<ob) rsiPairs.push({os,ob}); }); }); }
   else rsiPairs.push({os:30,ob:70});
+  if(!rsiPairs.length) rsiPairs.push({os:30,ob:70}); // защита: пустой массив → crash в MC/TPE/BO decode
 
   // Precompute indicators
   const pvCache={},atrCache={},atrAvgCache={},maCache={};
@@ -1671,7 +1672,9 @@ async function runOpt() {
     }
 
     const _mType = $v('f_mat') || 'EMA';
+    updateETA(0, mcTotal, 0); await yieldToUI(); // показать начальное состояние до цикла
     for (let _mi = 0; _mi < mcTotal && !stopped; _mi++) {
+      try {
       // Декодируем индекс в параметры через деление с остатком
       let _idx = _mcSampled[_mi];
       const _dims = _mcDims;
@@ -1929,6 +1932,11 @@ async function runOpt() {
         await checkPause();
       }
       if (stopped) break;
+      } catch(_mcErr) {
+        console.error('[MC] Ошибка на итерации', _mi, ':', _mcErr);
+        if (_mi < 3) setMcPhase('❌ Ошибка MC [ит.' + _mi + ']: ' + _mcErr.message);
+        done++;
+      }
     }
     // MC завершён — батч OOS + финальная обработка
     if (_useOOS && results.length > 0) {
@@ -2171,6 +2179,7 @@ async function runOpt() {
       if (_useOOS) DATA = _isData;
       let r;
       try { r = backtest(pvCache[pk].lo, pvCache[pk].hi, atrCache[atrP], btCfg); }
+      catch(_btErr) { console.error('[TPE] backtest ошибка:', _btErr); r = null; }
       finally { if (_useOOS) DATA = _fullDATA; }
       done++;
       // Мягкий score: градация для всех результатов, не только прошедших фильтр
@@ -2298,6 +2307,7 @@ async function runOpt() {
     }
 
     console.log('[TPE-Phase1] LHS индексов:', _lhsIndices.length, 'первые 5:', _lhsIndices.slice(0,5));
+    updateETA(0, _tpeMaxIter, 0); await yieldToUI(); // показать начальное состояние TPE до цикла
 
     for (let ei = 0; ei < _lhsIndices.length && !stopped; ei++) {
       let _idx = _lhsIndices[ei];
@@ -2490,6 +2500,7 @@ async function runOpt() {
     const randPoint = () => _mcDims.map((dim, d) => Math.floor(Math.random() * _dsz[d]));
 
     setMcPhase(`🔬 BO разведка (${Math.min(20, boN)} случайных точек)…`);
+    updateETA(0, boN, 0); await yieldToUI(); // показать начальное состояние BO до цикла
 
     for (let iter = 0; iter < boN && !_mcDone; iter++) {
       let dimIndices;
