@@ -35,9 +35,19 @@ async function _runSynthesisInWorker(payload) {
       throw new Error('Нет данных для синтеза');
     }
 
-    // Store globals
+    // Store globals (both self and global scope for function access)
     self.DATA = data;
     self.window = { _ipDef: ipDef };
+    DATA = data;  // For functions that need global DATA
+    window = { _ipDef: ipDef };  // For functions that need window
+
+    // Initialize stub globals required by opt.js
+    HAS_VOLUME = data.length > 0 && data[0].v !== undefined;
+    results = [];
+    favourites = {};
+    equities = {};
+    stopped = false;
+    paused = false;
 
     _postMessage('LOG', '🔍 Инициализация параметров синтеза...');
     _postMessage('LOG', `📊 Целевые метрики: ${opts.metrics.join(', ')}`);
@@ -97,22 +107,37 @@ async function _runSynthesisInWorker(payload) {
     const results = [];
     let lastReportTime = Date.now();
 
-    // Helper: simple backtest simulation based on config
-    // Real implementation would use _calcIndicators + backtest from opt.js
-    function _simpleBacktest(cfg) {
-      // Minimal metrics generation for testing
-      // In production, this should call the real backtest engine
-      const seed = Object.values(cfg).reduce((h, v) => h * 31 + (typeof v === 'number' ? v : 0), 0);
-      const rnd = Math.sin(seed) * 10000 - Math.floor(Math.sin(seed) * 10000);
+    // Real backtest using core.js + opt.js
+    function _realBacktest(cfg) {
+      try {
+        if (typeof _calcIndicators !== 'function' || typeof buildBtCfg !== 'function' || typeof backtest !== 'function') {
+          throw new Error('Missing backtest functions: _calcIndicators, buildBtCfg, or backtest');
+        }
 
-      return {
-        pnl: (50 + rnd * 100) * (cfg.pvL || 1),
-        wr: 45 + (cfg.atrP || 20) * 0.5 + rnd * 10,
-        n: 30 + (cfg.pvR || 2) * 10 + Math.random() * 50,
-        dd: Math.max(5, 30 - (cfg.maP || 50) * 0.1 + rnd * 15),
-        gt: Math.random() * 8,
-        sig: Math.random() * 90,
-      };
+        const ind = _calcIndicators(cfg);
+        const btc = buildBtCfg(cfg, ind);
+        const result = backtest(ind.pvLo, ind.pvHi, ind.atrArr, btc);
+
+        if (!result) {
+          return null;
+        }
+
+        return {
+          pnl: result.pnl || 0,
+          wr: Math.max(0, Math.min(100, result.wr || 0)),
+          n: Math.max(1, result.n || 1),
+          dd: Math.max(0, result.dd || 0),
+          gt: result.gt || 0,
+          sig: result.sig || 0,
+          sortino: result.sortino || 0,
+          upi: result.upi || 0,
+          kratio: result.kratio || 0,
+          eq: result.eq || null,
+        };
+      } catch (err) {
+        console.error('[synthesis_worker] Backtest error:', err.message);
+        return null;
+      }
     }
 
     // Synthesis loop
@@ -120,16 +145,14 @@ async function _runSynthesisInWorker(payload) {
       const batch = tpe.getNextBatch(100);
 
       for (const cfg of batch) {
-        // Run backtest (simplified version)
-        const metrics = _simpleBacktest(cfg);
+        // Run real backtest
+        const metrics = _realBacktest(cfg);
 
-        // Ensure valid metrics
-        metrics.pnl = metrics.pnl || 0;
-        metrics.wr = Math.max(0, Math.min(100, metrics.wr || 0));
-        metrics.n = Math.max(1, Math.floor(metrics.n || 1));
-        metrics.dd = Math.max(0, metrics.dd || 0);
-        metrics.gt = metrics.gt || 0;
-        metrics.sig = metrics.sig || 0;
+        if (!metrics) {
+          // Backtest failed, skip this config
+          tpe.addObservation(cfg, { pnl: 0, wr: 0, n: 0, dd: 100, gt: 0, sig: 0 });
+          continue;
+        }
 
         tpe.addObservation(cfg, metrics);
 
@@ -145,6 +168,10 @@ async function _runSynthesisInWorker(payload) {
             dd: metrics.dd,
             gt: metrics.gt,
             sig: metrics.sig,
+            sortino: metrics.sortino,
+            upi: metrics.upi,
+            kratio: metrics.kratio,
+            eq: metrics.eq,
             score,
           });
         }
