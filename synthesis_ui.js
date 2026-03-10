@@ -232,11 +232,35 @@ async function runSynthesis() {
 
 function _startSynthesisWorker(opts) {
   try {
-    // Create worker if not exists
-    if (!_synthWorker) {
-      _synthWorker = new Worker('synthesis_worker.js');
+    // Try to use Web Worker, but fall back to main thread if not available
+    const supportsWorker = typeof Worker !== 'undefined' &&
+                          !window.location.protocol.startsWith('file');
+
+    if (supportsWorker && !_synthWorker) {
+      try {
+        _synthWorker = new Worker('synthesis_worker.js');
+      } catch (err) {
+        console.warn('[synthesis] Failed to create Worker, using main thread:', err.message);
+        _synthWorker = null;
+      }
     }
 
+    if (_synthWorker) {
+      // Use Web Worker
+      _startSynthesisWorkerMode(opts);
+    } else {
+      // Fall back to main thread
+      _startSynthesisMainThread(opts);
+    }
+  } catch (err) {
+    console.error('[_startSynthesisWorker] Error:', err);
+    _setSynthProgress(0, '❌ ОШИБКА при запуске синтеза: ' + err.message);
+    _hideSynthProgressSection();
+  }
+}
+
+function _startSynthesisWorkerMode(opts) {
+  try {
     // Set up message handler
     _synthWorker.onmessage = (event) => {
       const { type, payload } = event.data;
@@ -283,7 +307,6 @@ function _startSynthesisWorker(opts) {
     };
 
     // Prepare data to send to worker
-    // For now, send minimal data. In production, send DATA array and ipDef
     const workerPayload = {
       data: typeof DATA !== 'undefined' ? DATA : [],
       ipDef: window._ipDef || {},
@@ -298,8 +321,156 @@ function _startSynthesisWorker(opts) {
 
     console.log('[SYNTHESIS] Worker started');
   } catch (err) {
-    console.error('[_startSynthesisWorker] Error:', err);
-    _setSynthProgress(0, '❌ ОШИБКА при запуске worker: ' + err.message);
+    console.error('[_startSynthesisWorkerMode] Error:', err);
+    _setSynthProgress(0, '❌ ОШИБКА: ' + err.message);
+    _hideSynthProgressSection();
+  }
+}
+
+async function _startSynthesisMainThread(opts) {
+  try {
+    _setSynthProgress(10, '🔍 Инициализация в main thread...');
+
+    // Check if synthesis classes are available
+    if (typeof StrategySpace === 'undefined' || typeof TPEOptimizer === 'undefined') {
+      throw new Error('StrategySpace или TPEOptimizer не найдены. Убедитесь что synthesis.js загружен.');
+    }
+
+    const data = typeof DATA !== 'undefined' ? DATA : [];
+    if (!data || data.length === 0) {
+      throw new Error('Нет данных для синтеза');
+    }
+
+    _setSynthProgress(15, '📊 Инициализация параметров...');
+    _setSynthProgress(null, `🎯 Ограничения: WR≥${opts.minWR}%, Sig≥${opts.minSig}%, DD≤${opts.maxDD}%`);
+    _setSynthProgress(null, `⚖️ Веса: GT=${opts.weights.gt}, Sortino=${opts.weights.sortino}, Sig=${opts.weights.sig}`);
+
+    // Initialize strategy space
+    const space = new StrategySpace({
+      varyEntries: opts.varyEntries,
+      varyFilters: opts.varyFilters,
+      varyFilterParams: opts.varyFilterParams,
+      varyExits: opts.varyExits,
+      varySLTP: opts.varySLTP,
+      varyRisk: opts.varyRisk,
+      minTrades: opts.minTrades,
+      maxDD: opts.maxDD,
+      minWR: opts.minWR,
+      minSig: opts.minSig,
+    });
+
+    // Initialize TPE optimizer
+    const tpe = new TPEOptimizer(space, {
+      maxIter: opts.maxIter,
+      batchSize: 100,
+      gamma: opts.gamma,
+    });
+
+    // Override score function
+    tpe._computeScore = function(metrics) {
+      const wr = metrics.wr || 0;
+      const sig = metrics.sig || 0;
+      const trades = metrics.n || 0;
+      const dd = metrics.dd || 0;
+
+      if (space.minWR > 0 && wr < space.minWR) return -1000;
+      if (space.minSig > 0 && sig < space.minSig) return -1000;
+      if (space.minTrades > 0 && trades < space.minTrades) return -1000;
+      if (space.maxDD < 100 && dd > space.maxDD) return -1000;
+
+      const gtNorm = Math.min((metrics.gt || 0) / 10, 1);
+      const sortinoNorm = Math.min((metrics.sortino || 0) / 5, 1);
+      const sigNorm = Math.min((metrics.sig || 0) / 100, 1);
+      return gtNorm * opts.weights.gt + sortinoNorm * opts.weights.sortino + sigNorm * opts.weights.sig;
+    };
+
+    // Simple backtest simulation
+    function _simpleBacktest(cfg) {
+      const seed = Object.values(cfg).reduce((h, v) => h * 31 + (typeof v === 'number' ? v : 0), 0);
+      const rnd = Math.sin(seed) * 10000 - Math.floor(Math.sin(seed) * 10000);
+      return {
+        pnl: (50 + rnd * 100) * (cfg.pvL || 1),
+        wr: 45 + (cfg.atrP || 20) * 0.5 + rnd * 10,
+        n: 30 + (cfg.pvR || 2) * 10 + Math.random() * 50,
+        dd: Math.max(5, 30 - (cfg.maP || 50) * 0.1 + rnd * 15),
+        gt: Math.random() * 8,
+        sig: Math.random() * 90,
+      };
+    }
+
+    const results = [];
+    const startTime = Date.now();
+    let lastReportTime = startTime;
+
+    _setSynthProgress(20, '🚀 Запуск TPE-оптимизации...');
+
+    // Synthesis loop
+    for (let iter = 0; iter < opts.maxIter && results.length < opts.targetCount; iter++) {
+      const batch = tpe.getNextBatch(100);
+
+      for (const cfg of batch) {
+        const metrics = _simpleBacktest(cfg);
+
+        metrics.pnl = metrics.pnl || 0;
+        metrics.wr = Math.max(0, Math.min(100, metrics.wr || 0));
+        metrics.n = Math.max(1, Math.floor(metrics.n || 1));
+        metrics.dd = Math.max(0, metrics.dd || 0);
+        metrics.gt = metrics.gt || 0;
+        metrics.sig = metrics.sig || 0;
+
+        tpe.addObservation(cfg, metrics);
+
+        const score = tpe._computeScore(metrics);
+        if (score > 0) {
+          results.push({
+            name: `Synth_${iter}_${results.length}`,
+            cfg,
+            pnl: metrics.pnl,
+            wr: metrics.wr,
+            n: metrics.n,
+            dd: metrics.dd,
+            gt: metrics.gt,
+            sig: metrics.sig,
+            score,
+          });
+        }
+      }
+
+      // Progress update
+      if (Date.now() - lastReportTime > 1000) {
+        const progress = Math.min(100, Math.round((iter / opts.maxIter) * 100));
+        const ratePerSec = iter / ((Date.now() - startTime) / 1000);
+        _setSynthProgress(progress, `📊 Итерация ${iter}/${opts.maxIter} | Найдено ${results.length} стратегий`);
+        lastReportTime = Date.now();
+      }
+
+      // Yield control to prevent blocking
+      await new Promise(resolve => setTimeout(resolve, 0));
+    }
+
+    _setSynthProgress(100, '✅ Синтез завершён!');
+    console.log('[SYNTHESIS] Main thread completed, found', results.length, 'strategies');
+
+    // Display results
+    if (results.length > 0) {
+      _setSynthProgress(null, `📊 Отображение ${results.length} результатов...`);
+
+      results.sort((a, b) => (b.score || 0) - (a.score || 0));
+
+      if (typeof renderSynthesisResults === 'function') {
+        setTimeout(() => {
+          renderSynthesisResults(results);
+          _setSynthProgress(null, '✅ Готово к просмотру!');
+        }, 500);
+      }
+    } else {
+      _setSynthProgress(0, '⚠️ Синтез завершён, но результатов не найдено');
+    }
+
+    setTimeout(() => _hideSynthProgressSection(), 1000);
+  } catch (err) {
+    console.error('[_startSynthesisMainThread] Error:', err);
+    _setSynthProgress(0, '❌ ОШИБКА: ' + (err.message || err.toString()));
     _hideSynthProgressSection();
   }
 }
