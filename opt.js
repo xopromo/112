@@ -2618,6 +2618,9 @@ async function runOpt() {
                                        confMAArr = maCache[ck];
                                      }
 
+                                    // Trendline signals (calculate from default parameters)
+                                    const {sigL:tfSigL, sigS:tfSigS} = useTrendFigures ? _getTfSig(tlPvL, tlPvR) : {sigL:null, sigS:null};
+
                                      const btCfg={
                                       comm: commTotal,
                                       usePivot:usePv,useEngulf:useEng,usePinBar:usePin,pinRatio,
