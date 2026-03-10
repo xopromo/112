@@ -11129,43 +11129,43 @@ function buildCopyText(r, c, slName, tpName) {
   if (c.tpPair && c.tpPair.combo) lines.push('Логика TP: ' + (c.tpLogic==='or' ? 'ИЛИ (выход по ближнему)' : 'И (выход по дальнему)'));
   lines.push('');
   lines.push('--- МЕХАНИКИ ВЫХОДА ---');
-  lines.push('Безубыток:       ' + on(c.useBE,      'триггер=' + c.beTrig + 'xATR, оффсет=' + c.beOff + 'xATR'));
-  lines.push('Trailing Stop:   ' + on(c.useTrail,   'триггер=' + c.trTrig + 'xATR, дист=' + c.trDist + 'xATR'));
+  lines.push('Безубыток:       ' + on(c.useBE,      'триггер=' + (c.beTrig??0) + 'xATR, оффсет=' + (c.beOff??0) + 'xATR'));
+  lines.push('Trailing Stop:   ' + on(c.useTrail,   'триггер=' + (c.trTrig??0) + 'xATR, дист=' + (c.trDist??0) + 'xATR'));
   lines.push('Обратный сигнал: ' + on(c.useRev,
-    'мин=' + c.revBars + ' баров' +
+    'мин=' + (c.revBars??0) + ' баров' +
     ' | skip=' + (c.revSkip||0) +
     ' | cooldown=' + (c.revCooldown||0) +
     ' | mode=' + (c.revMode||'any') +
     ' | act=' + (c.revAct||'exit') +
     ' | src=' + (c.revSrc||'same')
   ));
-  lines.push('Выход по времени:' + on(c.useTime,    'макс=' + c.timeBars + ' баров'));
-  lines.push('Частичный TP1:   ' + on(c.usePartial, 'уровень=SLx' + c.partRR + ', закрыть ' + c.partPct + '%' + (c.partBE ? ', потом BE' : '')));
-  lines.push('Climax выход:    ' + on(c.useClimax,  'объём>' + c.clxVolMult + 'x, тело>' + c.clxBodyMult + 'x'));
+  lines.push('Выход по времени:' + on(c.useTime,    'макс=' + (c.timeBars??0) + ' баров'));
+  lines.push('Частичный TP1:   ' + on(c.usePartial, 'уровень=SLx' + (c.partRR??0) + ', закрыть ' + (c.partPct??0) + '%' + (c.partBE ? ', потом BE' : '')));
+  lines.push('Climax выход:    ' + on(c.useClimax,  'объём>' + (c.clxVolMult??0) + 'x, тело>' + (c.clxBodyMult??0) + 'x'));
   lines.push('');
   lines.push('--- ФИЛЬТРЫ ТРЕНДА ---');
-  lines.push('MA фильтр:        ' + on(c.useMA,      c.maType + ' период=' + c.maP + ((c.htfRatio&&c.htfRatio>1) ? ' HTF×'+c.htfRatio+'tf' : '')));
-  lines.push('ADX:              ' + on(c.useADX,     'ADX>' + c.adxThresh + ((c.adxHtfRatio&&c.adxHtfRatio>1) ? ' HTF×'+c.adxHtfRatio+'tf' : '') + (c.useAdxSlope ? ' slope↑('+c.adxSlopeBars+'b)' : '')));
+  lines.push('MA фильтр:        ' + on(c.useMA,      (c.maType||'EMA') + ' период=' + (c.maP??0) + ((c.htfRatio&&c.htfRatio>1) ? ' HTF×'+c.htfRatio+'tf' : '')));
+  lines.push('ADX:              ' + on(c.useADX,     'ADX>' + (c.adxThresh??0) + ((c.adxHtfRatio&&c.adxHtfRatio>1) ? ' HTF×'+c.adxHtfRatio+'tf' : '') + (c.useAdxSlope ? ' slope↑('+(c.adxSlopeBars??0)+'b)' : '')));
   lines.push('ATR расширяется:  ' + on(c.useAtrExp,  'ATR>' + (c.atrExpMult||1.0) + 'x среднего'));
-  lines.push('RSI:              ' + on(c.useRSI,     'лонг<' + c.rsiOS + ', шорт>' + c.rsiOB));
-  lines.push('Простой тренд:    ' + on(c.useSTrend,  'окно=' + c.sTrendWin + ' баров'));
-  lines.push('Структура рынка:  ' + on(c.useStruct,  'lookback=' + c.structLen));
-  lines.push('Свежесть тренда:  ' + on(c.useFresh,   'макс=' + c.freshMax + ' баров'));
-  lines.push('Волатильность ATR:' + on(c.useVolF,    'ATR<' + c.volFMult + 'x среднего'));
-  lines.push('Дистанция от MA:  ' + on(c.useMaDist,  'макс=' + c.maDistMax + 'xATR'));
-  lines.push('Размер свечи:     ' + on(c.useCandleF, '' + c.candleMin + '-' + c.candleMax + 'xATR'));
-  lines.push('Серия свечей:     ' + on(c.useConsec,  'макс=' + c.consecMax + ' одноцветных'));
-  lines.push('Подтв. тренда:    ' + on(c.useConfirm, 'MA тип=' + (c.confMatType||'EMA') + ' период=' + c.confN + ((c.confHtfRatio&&c.confHtfRatio>1) ? ' HTF×'+c.confHtfRatio+'tf' : '')));
+  lines.push('RSI:              ' + on(c.useRSI,     'лонг<' + (c.rsiOS??0) + ', шорт>' + (c.rsiOB??0)));
+  lines.push('Простой тренд:    ' + on(c.useSTrend,  'окно=' + (c.sTrendWin??0) + ' баров'));
+  lines.push('Структура рынка:  ' + on(c.useStruct,  'lookback=' + (c.structLen??0)));
+  lines.push('Свежесть тренда:  ' + on(c.useFresh,   'макс=' + (c.freshMax??0) + ' баров'));
+  lines.push('Волатильность ATR:' + on(c.useVolF,    'ATR<' + (c.volFMult??0) + 'x среднего'));
+  lines.push('Дистанция от MA:  ' + on(c.useMaDist,  'макс=' + (c.maDistMax??0) + 'xATR'));
+  lines.push('Размер свечи:     ' + on(c.useCandleF, '' + (c.candleMin??0) + '-' + (c.candleMax??0) + 'xATR'));
+  lines.push('Серия свечей:     ' + on(c.useConsec,  'макс=' + (c.consecMax??0) + ' одноцветных'));
+  lines.push('Подтв. тренда:    ' + on(c.useConfirm, 'MA тип=' + (c.confMatType||'EMA') + ' период=' + (c.confN??0) + ((c.confHtfRatio&&c.confHtfRatio>1) ? ' HTF×'+c.confHtfRatio+'tf' : '')));
   lines.push('');
   lines.push('--- ОБЪЁМНЫЕ ФИЛЬТРЫ ---');
-  lines.push('VSA (объём):      ' + on(c.useVSA,     'объём>' + c.vsaMult + 'x за ' + c.vsaPeriod + ' баров'));
-  lines.push('Ликвидность:      ' + on(c.useLiq,     'мин=' + c.liqMin + 'x среднего'));
-  lines.push('Направл. объёма:  ' + on(c.useVolDir,  'окно=' + c.volDirPeriod + ' баров'));
-  lines.push('Взвеш. тренд WT:  ' + on(c.useWT,      'score>' + c.wtThresh + ', N=' + c.wtN + ', volW=' + c.wtVolW + ', bodyW=' + c.wtBodyW + (c.wtUseDist ? ', distMA=да' : '')));
-  lines.push('Усталость тренда: ' + on(c.useFat,     c.fatConsec + ' свечей, vol<' + c.fatVolDrop + 'x'));
+  lines.push('VSA (объём):      ' + on(c.useVSA,     'объём>' + (c.vsaMult??0) + 'x за ' + (c.vsaPeriod??0) + ' баров'));
+  lines.push('Ликвидность:      ' + on(c.useLiq,     'мин=' + (c.liqMin??0) + 'x среднего'));
+  lines.push('Направл. объёма:  ' + on(c.useVolDir,  'окно=' + (c.volDirPeriod??0) + ' баров'));
+  lines.push('Взвеш. тренд WT:  ' + on(c.useWT,      'score>' + (c.wtThresh??0) + ', N=' + (c.wtN??0) + ', volW=' + (c.wtVolW??0) + ', bodyW=' + (c.wtBodyW??0) + (c.wtUseDist ? ', distMA=да' : '')));
+  lines.push('Усталость тренда: ' + on(c.useFat,     (c.fatConsec??0) + ' свечей, vol<' + (c.fatVolDrop??0) + 'x'));
   lines.push('');
   lines.push('--- ОБЩЕЕ ---');
-  lines.push('ATR период: ' + c.atrPeriod);
+  lines.push('ATR период: ' + (c.atrPeriod??0));
   const _cc = (c.baseComm !== undefined ? c.baseComm : c.commission) ?? 0;
   const _sp = (c.spreadVal !== undefined ? c.spreadVal : 0) ?? 0;
   lines.push('Комиссия: ' + _cc.toFixed(3) + '% (1 ст.) = ' + (_cc*2).toFixed(3) + '% (round-trip)' + (_sp>0 ? ', Спред: ' + _sp.toFixed(3) + '% (r/t)' : ''));
