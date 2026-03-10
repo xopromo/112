@@ -1119,10 +1119,19 @@ async function runOpt() {
   const trDists=useTrail?parseRange('x_trd'):[0.5];  // Default 0.5 when Trail disabled
   const timeBarsArr=useTime?parseRange('x_timeb'):[0];  // Default 0 when TimeExit disabled
 
-  // SL configs
+  // ── SYNTHESIS MODE: расширенный перебор SL/TP ──────────────────────
+  // При synthesis режиме игнорируем UI чекбоксы и используем широкий диапазон
   let slCfgs=[];
-  if ($c('s_atr')) parseRange('s_atrv').forEach(v=>slCfgs.push({type:'atr',m:v}));
-  if ($c('s_pct')) parseRange('s_pctv').forEach(v=>slCfgs.push({type:'pct',m:v}));
+  if (_isSynthMode) {
+    // Synthesis: автоматически перебираем разные SL мультипликаторы
+    [0.8, 1.0, 1.2, 1.5, 2.0, 2.5, 3.0].forEach(m => slCfgs.push({type:'atr',m}));
+    if (_isSynthMode && typeof _setSynthProgress !== 'undefined') {
+      _setSynthProgress(18, '📋 SL параметры (synthesis): ' + slCfgs.map(s => s.m).join(', '));
+    }
+  } else {
+    if ($c('s_atr')) parseRange('s_atrv').forEach(v=>slCfgs.push({type:'atr',m:v}));
+    if ($c('s_pct')) parseRange('s_pctv').forEach(v=>slCfgs.push({type:'pct',m:v}));
+  }
   // Combinations AND/OR: generate pairs if both enabled
   let slPairs=[];
   const slATRs=slCfgs.filter(s=>s.type==='atr');
@@ -1143,9 +1152,17 @@ async function runOpt() {
 
   // TP configs — same approach
   let tpCfgs=[];
-  if ($c('t_rr')) parseRange('t_rrv').forEach(v=>tpCfgs.push({type:'rr',m:v}));
-  if ($c('t_atr')) parseRange('t_atrv').forEach(v=>tpCfgs.push({type:'atr',m:v}));
-  if ($c('t_pct')) parseRange('t_pctv').forEach(v=>tpCfgs.push({type:'pct',m:v}));
+  if (_isSynthMode) {
+    // Synthesis: автоматически перебираем разные TP мультипликаторы
+    [1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0].forEach(m => tpCfgs.push({type:'rr',m}));
+    if (_isSynthMode && typeof _setSynthProgress !== 'undefined') {
+      _setSynthProgress(19, '📋 TP параметры (synthesis): ' + tpCfgs.map(t => t.m).join(', '));
+    }
+  } else {
+    if ($c('t_rr')) parseRange('t_rrv').forEach(v=>tpCfgs.push({type:'rr',m:v}));
+    if ($c('t_atr')) parseRange('t_atrv').forEach(v=>tpCfgs.push({type:'atr',m:v}));
+    if ($c('t_pct')) parseRange('t_pctv').forEach(v=>tpCfgs.push({type:'pct',m:v}));
+  }
   let tpPairs=[];
   const tpTypes=['rr','atr','pct'];
   const tpByType={rr:tpCfgs.filter(t=>t.type==='rr'),atr:tpCfgs.filter(t=>t.type==='atr'),pct:tpCfgs.filter(t=>t.type==='pct')};

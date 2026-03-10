@@ -30,6 +30,8 @@ class StrategySpace {
       maP: [5, 200],
       adxThresh: [10, 50],
       atrP: [5, 50],
+      slMult: [0.5, 3.0],
+      tpMult: [1.0, 5.0],
     };
   }
 
@@ -51,6 +53,10 @@ class StrategySpace {
       v.push(cfg.useBE ? 1 : 0);
       v.push(cfg.useTrail ? 1 : 0);
       v.push(cfg.useRev ? 1 : 0);
+    }
+    if (this.varySLTP) {
+      v.push((cfg.slMult || 1.5) / 3.0);
+      v.push((cfg.tpMult || 2.0) / 5.0);
     }
     if (this.varyRisk) {
       v.push((cfg.atrP || 14) / 50);
@@ -84,6 +90,13 @@ class StrategySpace {
       cfg.useBE = vector[idx++] > 0.5;
       cfg.useTrail = vector[idx++] > 0.5;
       cfg.useRev = vector[idx++] > 0.5;
+    }
+
+    if (this.varySLTP) {
+      const [sl_min, sl_max] = this.paramRanges.slMult;
+      cfg.slMult = Math.round((sl_min + vector[idx++] * (sl_max - sl_min)) * 10) / 10;
+      const [tp_min, tp_max] = this.paramRanges.tpMult;
+      cfg.tpMult = Math.round((tp_min + vector[idx++] * (tp_max - tp_min)) * 10) / 10;
     }
 
     if (this.varyRisk) {
