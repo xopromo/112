@@ -2525,6 +2525,9 @@ async function runOpt() {
           maArr=maCache[mk];
         }
 
+        // Get adxL from _ipDef for cache keys (used before _ip loop below)
+        const adxL = window._ipDef?.adxL || 14;
+
         for(const adxT of (adxTs.length?adxTs:[0])) {
           if(_mcDone) break;
           for(const adxHtfRatio of (adxHtfArr.length?adxHtfArr:[1])) {
