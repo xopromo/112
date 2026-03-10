@@ -802,12 +802,12 @@ function calcTotal() {
   const mdMaxs=useMaDist?parseRange('f_madv'):[0];
   const freshMaxs=useFresh?parseRange('f_freshm'):[20];
   const beOffs=useBE?parseRange('x_beo'):[0];
-  const beTrigs_ct=useBE?parseRange('x_bet'):[1];
+  const beTrigs_ct=useBE?parseRange('x_bet'):[0.5];  // Default 0.5 when BE disabled
   let beCount=1;
   if(useBE){let v=0;beTrigs_ct.forEach(t=>{beOffs.forEach(o=>{if(o<t)v++;});});beCount=v||1;}
-  const trTrigs=useTrail?parseRange('x_trt'):[1.5];
-  const trDists=useTrail?parseRange('x_trd'):[1.0];
-  const timeBarsA=useTime?parseRange('x_timeb'):[50];
+  const trTrigs=useTrail?parseRange('x_trt'):[0.5];  // Default 0.5 when Trail disabled
+  const trDists=useTrail?parseRange('x_trd'):[0.5];  // Default 0.5 when Trail disabled
+  const timeBarsA=useTime?parseRange('x_timeb'):[0];  // Default 0 when TimeExit disabled
   const revBarsA=($c('x_rev')&&$v('x_revb'))?parseRange('x_revb'):[2];
   const revSkipA=$c('x_rev')?parseRange('x_revskip'):[0];
   const revCooldownA=$c('x_rev')?parseRange('x_revcd'):[0];
@@ -1106,9 +1106,9 @@ async function runOpt() {
   const freshMaxs=useFresh?parseRange('f_freshm'):[20];
   const beOffs=useBE?parseRange('x_beo'):[0];
   if(!beOffs.length) beOffs.push(0);
-  const trTrigs=useTrail?parseRange('x_trt'):[1.5];
-  const trDists=useTrail?parseRange('x_trd'):[1.0];
-  const timeBarsArr=useTime?parseRange('x_timeb'):[50];
+  const trTrigs=useTrail?parseRange('x_trt'):[0.5];  // Default 0.5 when Trail disabled
+  const trDists=useTrail?parseRange('x_trd'):[0.5];  // Default 0.5 when Trail disabled
+  const timeBarsArr=useTime?parseRange('x_timeb'):[0];  // Default 0 when TimeExit disabled
 
   // SL configs
   let slCfgs=[];
@@ -1153,9 +1153,9 @@ async function runOpt() {
 
   // Fixed params — read as ranges; single value = no extra loop overhead
   const pinRatio=$n('e_pinr')||2;
-  const beTrigs=useBE?parseRange('x_bet'):[1];
-  if(!beTrigs.length) beTrigs.push(1);
-  const revBarsArr=useRev?(()=>{const _a=parseRange('x_revb');return _a.length?_a:[2];})():[2];
+  const beTrigs=useBE?parseRange('x_bet'):[0.5];  // Default 0.5 when BE disabled
+  if(!beTrigs.length) beTrigs.push(0.5);
+  const revBarsArr=useRev?(()=>{const _a=parseRange('x_revb');return _a.length?_a:[2];})():[0];  // Default 0 when Reverse disabled
   const partRR=$n('x_partr')||1;
   const partPct=$n('x_partp')||50;
   const rsiOS=parseRange('f_rsios');
