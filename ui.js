@@ -795,7 +795,11 @@ function renderVisibleResults() {
   const end   = Math.min(start + _pageSize, total);
   const page  = _visibleResults.slice(start, end);
 
-  console.log('[RENDER] renderVisibleResults:', {total, page_length: page.length, _tableMode, _curPage, _totalPages});
+  console.log(`[RENDER] renderVisibleResults: total=${total}, page_length=${page.length}, _tableMode=${_tableMode}, _curPage=${_curPage}, _totalPages=${_totalPages}`);
+  if (total > 0 && page.length > 0) {
+    const first = _visibleResults[0];
+    console.log('[RENDER] Первый результат:', `pnl=${first.pnl}, wr=${first.wr}, n=${first.n}, dd=${first.dd}, gt=${first.gt}`);
+  }
 
   // Строим HTML строкой — намного быстрее чем createElement в цикле
   // ── OOS-режим: рендер через applyOOSFilters (своя фильтрация) ──
@@ -912,7 +916,7 @@ function renderVisibleResults() {
   }
 
   const tbody = $('tb');
-  console.log('[RENDER] tbody element:', {exists: !!tbody, id: tbody?.id, class: tbody?.className, html_length: html.length, html_preview: html.substring(0, 100)});
+  console.log(`[RENDER] tbody element: exists=${!!tbody}, html_length=${html.length}`);
 
   if (!tbody) {
     console.error('[RENDER] КРИТИЧЕСКАЯ ОШИБКА: element tb не найден!');
@@ -920,7 +924,9 @@ function renderVisibleResults() {
   }
 
   tbody.innerHTML = html;
-  console.log('[RENDER] HTML вставлен в tbody. Первая строка таблицы:', tbody.querySelector('tr'));
+  const firstTr = tbody.querySelector('tr');
+  const trs = tbody.querySelectorAll('tr');
+  console.log(`[RENDER] HTML вставлен. Всего строк: ${trs.length}, firstTr существует: ${!!firstTr}`);
 
   // Применяем настройки видимости колонок к только что созданным td
   if (typeof _applyColSettings === 'function') _applyColSettings(getColSettings());
