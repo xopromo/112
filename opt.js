@@ -2566,6 +2566,8 @@ async function runOpt() {
                               for(const trTrig of trTrigs) {
                                 for(const trDist of trDists) {
                                   for(const timeBars of (timeBarsArr.length?timeBarsArr:[50])) {
+                                    for(const tlPvL of (tlPvLs.length?tlPvLs:[5])) {
+                                      for(const tlPvR of (tlPvRs.length?tlPvRs:[3])) {
                                     for(const _ip of window._ipCombos) {
                                     if(_mcDone||stopped) break;
                                     const adxL     = _ip.adxL     ?? window._ipDef.adxL;
@@ -2796,6 +2798,8 @@ async function runOpt() {
                                     if(stopped) { _mcDone=true; break; }
                                     }}} // _mCrossTyp, _confHtf, _confType
                                   } // timeBars
+                                      } // tlPvR
+                                    } // tlPvL
                                   } // _ip combo
                                 } // trDist
                               } // trTrig
