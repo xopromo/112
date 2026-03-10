@@ -166,6 +166,7 @@ async function runSynthesis() {
     _showSynthProgressSection();
     _setSynthProgress(1, '🔍 Загрузка параметров синтеза...');
 
+    console.log('[runSynthesis] Loading params from UI...');
     const opts = {
       varyEntries: el('c_synth_vary_entries')?.checked || true,
       varyFilters: el('c_synth_vary_filters')?.checked || true,
@@ -181,6 +182,8 @@ async function runSynthesis() {
       targetCount: parseInt(el('c_synth_target_count')?.value) || 1000,
       maxIter: parseInt(el('c_synth_max_iter')?.value) || 50000,
       gamma: parseFloat(el('c_synth_gamma')?.value) || 0.25,
+      commission: parseFloat(document.getElementById('c_comm')?.value) || 0.08,
+      spreadVal: parseFloat(document.getElementById('c_spread')?.value) || 0,
       weights: {
         gt: parseFloat(el('c_synth_weight_gt')?.value) || 0.5,
         sortino: parseFloat(el('c_synth_weight_sortino')?.value) || 0.3,
@@ -204,6 +207,15 @@ async function runSynthesis() {
 
     _setSynthProgress(5, '✅ Параметры загружены: ' + opts.metrics.join(', '));
     _setSynthProgress(7, '📊 Конфигурация: ' + opts.targetCount + ' стратегий, ' + opts.maxIter + ' итераций');
+
+    console.log('[runSynthesis] Constraints:', {
+      minTrades: opts.minTrades,
+      maxDD: opts.maxDD,
+      minWR: opts.minWR,
+      minSig: opts.minSig,
+      commission: opts.commission,
+      spread: opts.spreadVal
+    });
 
     localStorage.setItem('synthesis-settings', JSON.stringify(opts));
 
@@ -316,6 +328,8 @@ async function _runSynthesisMainThread(opts) {
       let totalTested = 0;
       let lastReportTime = Date.now();
 
+      console.log('[Synthesis] Starting main loop, maxIter=', opts.maxIter, 'targetCount=', opts.targetCount);
+
       for (let iter = 0; iter < opts.maxIter && foundResults.length < opts.targetCount; iter++) {
         const batch = tpe.getNextBatch(100);
 
@@ -343,6 +357,20 @@ async function _runSynthesisMainThread(opts) {
 
             const metrics = { pnl: result.pnl, wr: result.wr, n: result.n, dd: result.dd, gt, sig, sortino: 0, dwr: result.dwr || 0 };
             tpe.addObservation(cfg, metrics);
+
+            // Debug: log why results are rejected
+            const passN = metrics.n >= space.minTrades;
+            const passDD = metrics.dd <= space.maxDD;
+            const passWR = metrics.wr >= space.minWR;
+            const passSig = metrics.sig >= space.minSig;
+            const passPnL = metrics.pnl > 0;
+
+            if (!passN || !passDD || !passWR || !passSig || !passPnL) {
+              if (iter % 500 === 0) { // Log every 500 iterations to avoid spam
+                console.log(`[Synthesis] Rejected: n=${metrics.n}(${passN}), dd=${metrics.dd.toFixed(1)}(${passDD}), wr=${metrics.wr.toFixed(1)}(${passWR}), sig=${metrics.sig}(${passSig}), pnl=${metrics.pnl.toFixed(1)}(${passPnL})`);
+                console.log(`  space: minTrades=${space.minTrades}, maxDD=${space.maxDD}, minWR=${space.minWR}, minSig=${space.minSig}`);
+              }
+            }
 
             if (metrics.n >= space.minTrades && metrics.dd <= space.maxDD &&
                 metrics.wr >= space.minWR && metrics.sig >= space.minSig && metrics.pnl > 0) {
