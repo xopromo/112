@@ -564,8 +564,6 @@ async function _startSynthesisMainThread(opts) {
       if (typeof window !== 'undefined') {
         // Store results in both window.results and global results variable
         window.results = enrichedResults;
-        // Also assign to global scope so renderResults() can access it
-        try { results = enrichedResults; } catch(e) { console.warn('[SYNTHESIS] Could not set global results:', e); }
         console.log('[SYNTHESIS] Stored', enrichedResults.length, 'results');
 
         setTimeout(() => {
