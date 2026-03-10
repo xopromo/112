@@ -1518,38 +1518,38 @@ async function runOpt() {
   //   • Only params where the user typed a range (len > 1) add iterations
   //   • Single-value params contribute no overhead — just provide their default
   //   • This block runs ONCE before the main loop (not inside it!)
-  {
+  try {
     // Collect [name, array] only for params that actually vary
     const _allIp = [
-      ['adxL',        _adxLArr.length > 0 ? _adxLArr : [14]],
-      ['sTrendWin',   _sTrendArr.length > 0 ? _sTrendArr : [12]],
+      ['adxL',        (Array.isArray(_adxLArr) && _adxLArr.length > 0) ? _adxLArr : [14]],
+      ['sTrendWin',   (Array.isArray(_sTrendArr) && _sTrendArr.length > 0) ? _sTrendArr : [12]],
       ['confN',       confNArr.length ? confNArr : [2]],
-      ['revBars',     revBarsArr.length > 0 ? revBarsArr : [5]],
-      ['revSkip',     revSkipArr.length > 0 ? revSkipArr : [2]],
-      ['revCooldown', revCooldownArr.length > 0 ? revCooldownArr : [0]],
-      ['slPivOff',    slPivOffA.length > 0 ? slPivOffA : [0]],
-      ['slPivMax',    slPivMaxA.length > 0 ? slPivMaxA : [50]],
-      ['slPivL',      slPivLArr.length > 0 ? slPivLArr : [5]],
-      ['slPivR',      slPivRArr.length > 0 ? slPivRArr : [3]],
-      ['rsiExitPer',  rsiExitPers.length > 0 ? rsiExitPers : [14]],
-      ['rsiExitOS',   rsiExitOSA.length > 0 ? rsiExitOSA : [30]],
-      ['rsiExitOB',   rsiExitOBA.length > 0 ? rsiExitOBA : [70]],
-      ['maCrossP',    maCrossPArr.length > 0 ? maCrossPArr : [50]],
-      ['macdFast',    macdFastArr.length > 0 ? macdFastArr : [12]],
-      ['macdSlow',    macdSlowArr.length > 0 ? macdSlowArr : [26]],
-      ['macdSigP',    macdSigPArr.length > 0 ? macdSigPArr : [9]],
-      ['stochKP',     stochKPArr.length > 0 ? stochKPArr : [14]],
-      ['stochDP',     stochDPArr.length > 0 ? stochDPArr : [3]],
-      ['stochOS',     stochOSA.length > 0 ? stochOSA : [20]],
-      ['stochOB',     stochOBA.length > 0 ? stochOBA : [80]],
-      ['volMoveMult', volMoveMultA.length > 0 ? volMoveMultA : [1.5]],
-      ['nReversalN',  nRevNArr.length > 0 ? nRevNArr : [3]],
-      ['stAtrP',      stAtrPArr.length > 0 ? stAtrPArr : [10]],
-      ['stMult',      stMultArr.length > 0 ? stMultArr : [3.0]],
-      ['waitBars',    waitBarsArr.length > 0 ? waitBarsArr : [0]],
-      ['waitRetrace', waitRetraceArr.length > 0 ? waitRetraceArr : [0.618]],
-      ['eisPeriod',   eisPArr.length > 0 ? eisPArr : [20]],
-      ['erPeriod',    erPArr.length > 0 ? erPArr : [10]],
+      ['revBars',     (Array.isArray(revBarsArr) && revBarsArr.length > 0) ? revBarsArr : [5]],
+      ['revSkip',     (Array.isArray(revSkipArr) && revSkipArr.length > 0) ? revSkipArr : [2]],
+      ['revCooldown', (Array.isArray(revCooldownArr) && revCooldownArr.length > 0) ? revCooldownArr : [0]],
+      ['slPivOff',    (Array.isArray(slPivOffA) && slPivOffA.length > 0) ? slPivOffA : [0]],
+      ['slPivMax',    (Array.isArray(slPivMaxA) && slPivMaxA.length > 0) ? slPivMaxA : [50]],
+      ['slPivL',      (Array.isArray(slPivLArr) && slPivLArr.length > 0) ? slPivLArr : [5]],
+      ['slPivR',      (Array.isArray(slPivRArr) && slPivRArr.length > 0) ? slPivRArr : [3]],
+      ['rsiExitPer',  (Array.isArray(rsiExitPers) && rsiExitPers.length > 0) ? rsiExitPers : [14]],
+      ['rsiExitOS',   (Array.isArray(rsiExitOSA) && rsiExitOSA.length > 0) ? rsiExitOSA : [30]],
+      ['rsiExitOB',   (Array.isArray(rsiExitOBA) && rsiExitOBA.length > 0) ? rsiExitOBA : [70]],
+      ['maCrossP',    (Array.isArray(maCrossPArr) && maCrossPArr.length > 0) ? maCrossPArr : [50]],
+      ['macdFast',    (Array.isArray(macdFastArr) && macdFastArr.length > 0) ? macdFastArr : [12]],
+      ['macdSlow',    (Array.isArray(macdSlowArr) && macdSlowArr.length > 0) ? macdSlowArr : [26]],
+      ['macdSigP',    (Array.isArray(macdSigPArr) && macdSigPArr.length > 0) ? macdSigPArr : [9]],
+      ['stochKP',     (Array.isArray(stochKPArr) && stochKPArr.length > 0) ? stochKPArr : [14]],
+      ['stochDP',     (Array.isArray(stochDPArr) && stochDPArr.length > 0) ? stochDPArr : [3]],
+      ['stochOS',     (Array.isArray(stochOSA) && stochOSA.length > 0) ? stochOSA : [20]],
+      ['stochOB',     (Array.isArray(stochOBA) && stochOBA.length > 0) ? stochOBA : [80]],
+      ['volMoveMult', (Array.isArray(volMoveMultA) && volMoveMultA.length > 0) ? volMoveMultA : [1.5]],
+      ['nReversalN',  (Array.isArray(nRevNArr) && nRevNArr.length > 0) ? nRevNArr : [3]],
+      ['stAtrP',      (Array.isArray(stAtrPArr) && stAtrPArr.length > 0) ? stAtrPArr : [10]],
+      ['stMult',      (Array.isArray(stMultArr) && stMultArr.length > 0) ? stMultArr : [3.0]],
+      ['waitBars',    (Array.isArray(waitBarsArr) && waitBarsArr.length > 0) ? waitBarsArr : [0]],
+      ['waitRetrace', (Array.isArray(waitRetraceArr) && waitRetraceArr.length > 0) ? waitRetraceArr : [0.618]],
+      ['eisPeriod',   (Array.isArray(eisPArr) && eisPArr.length > 0) ? eisPArr : [20]],
+      ['erPeriod',    (Array.isArray(erPArr) && erPArr.length > 0) ? erPArr : [10]],
     ];
     // Defaults for all params (first element of each array)
     window._ipDef = Object.fromEntries(_allIp.map(([n,a])=>[n,a[0]]));
@@ -1562,6 +1562,20 @@ async function runOpt() {
       combos=next;
     }
     window._ipCombos = combos.length ? combos : [{}];
+  } catch (initErr) {
+    console.error('[runOpt] Error initializing _ipCombos:', initErr);
+    // Fallback: create minimal defaults
+    window._ipDef = {
+      adxL: 14, sTrendWin: 12, confN: 2, revBars: 5, revSkip: 2, revCooldown: 0,
+      slPivOff: 0, slPivMax: 50, slPivL: 5, slPivR: 3, rsiExitPer: 14, rsiExitOS: 30,
+      rsiExitOB: 70, maCrossP: 50, macdFast: 12, macdSlow: 26, macdSigP: 9,
+      stochKP: 14, stochDP: 3, stochOS: 20, stochOB: 80, volMoveMult: 1.5, nReversalN: 3,
+      stAtrP: 10, stMult: 3.0, waitBars: 0, waitRetrace: 0.618, eisPeriod: 20, erPeriod: 10
+    };
+    window._ipCombos = [{}];
+    if (_isSynthMode && typeof _setSynthProgress !== 'undefined') {
+      _setSynthProgress(0, '⚠️ Инициализация с резервными значениями (ошибка в _ipCombos)');
+    }
   }
 
   // _mcDims/_mcDimSizes — общие для MC и TPE, строятся ПОСЛЕ _ipCombos
@@ -1621,6 +1635,15 @@ async function runOpt() {
 
   // ── MC РЕЖИМ: прямой цикл по предвычисленным индексам ──────────────────────
   if (optMode === 'mc' && _mcSampled) {
+    // DEBUG: Check if _ipDef is ready for synthesis
+    if (_isSynthMode && !window._ipDef) {
+      if (typeof _setSynthProgress !== 'undefined') {
+        _setSynthProgress(0, '❌ КРИТИЧЕСКАЯ ОШИБКА: window._ipDef не инициализирован');
+      }
+      console.error('[MC] window._ipDef missing!', {_isSynthMode, _ipDef: window._ipDef});
+      return;
+    }
+
     const _mType = $v('f_mat') || 'EMA';
     for (let _mi = 0; _mi < mcTotal && !stopped; _mi++) {
       // Декодируем индекс в параметры через деление с остатком
@@ -1681,7 +1704,7 @@ async function runOpt() {
       const _effUseVolDir  = _fCombo.useVolDir  ?? useVolDir;
       const _effUseWT      = _fCombo.useWT      ?? useWT;
       const _effUseFat     = _fCombo.useFat     ?? useFat;
-      const adxL        = _ip.adxL        ?? window._ipDef.adxL;
+      const adxL        = (_ip && _ip.adxL) || window._ipDef?.adxL || 14;
       const sTrendWin   = _ip.sTrendWin   ?? window._ipDef.sTrendWin;
       const confN       = _ip.confN       ?? window._ipDef.confN;
       const revBars     = _ip.revBars     ?? window._ipDef.revBars;

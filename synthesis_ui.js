@@ -190,8 +190,11 @@ async function runSynthesis() {
     _setSynthProgress(10, '🚀 Запуск оптимизации...');
     await runOpt();
   } catch (err) {
-    _setSynthProgress(0, '❌ ОШИБКА: ' + (err.message || err));
-    console.error('[runSynthesis] error:', err);
+    const errMsg = err.message || err.toString();
+    _setSynthProgress(0, '❌ ОШИБКА: ' + errMsg);
+    console.error('[runSynthesis] Full error:', err);
+    console.error('[runSynthesis] Stack:', err.stack);
+    console.log('[DEBUG] window._ipDef:', window._ipDef);
     setTimeout(() => _hideSynthProgressSection(), 2000);
   }
 }
