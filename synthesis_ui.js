@@ -277,6 +277,8 @@ function _startSynthesisWorkerMode(opts) {
           // Display results
           if (payload.results && payload.results.length > 0) {
             _setSynthProgress(null, `📊 Отображение ${payload.results.length} результатов...`);
+            console.log('[SYNTHESIS] Worker completed with', payload.results.length, 'results');
+            console.log('[SYNTHESIS] Worker sample result:', payload.results[0]);
 
             // Sort by score
             payload.results.sort((a, b) => (b.score || 0) - (a.score || 0));
@@ -311,9 +313,12 @@ function _startSynthesisWorkerMode(opts) {
               ir: 0,
             }));
 
+            console.log('[SYNTHESIS] Worker enriched sample:', enrichedResults[0]);
+
             // Store in global results
             if (typeof renderSynthesisResults === 'function') {
               setTimeout(() => {
+                console.log('[SYNTHESIS] Worker calling renderSynthesisResults');
                 renderSynthesisResults(enrichedResults);
                 _setSynthProgress(null, '✅ Готово к просмотру!');
               }, 500);
@@ -480,6 +485,7 @@ async function _startSynthesisMainThread(opts) {
 
     _setSynthProgress(100, '✅ Синтез завершён!');
     console.log('[SYNTHESIS] Main thread completed, found', results.length, 'strategies');
+    console.log('[SYNTHESIS] Sample result:', results[0]);
 
     // Display results
     if (results.length > 0) {
@@ -517,8 +523,11 @@ async function _startSynthesisMainThread(opts) {
         ir: 0,
       }));
 
+      console.log('[SYNTHESIS] Enriched sample:', enrichedResults[0]);
+
       if (typeof renderSynthesisResults === 'function') {
         setTimeout(() => {
+          console.log('[SYNTHESIS] Calling renderSynthesisResults with', enrichedResults.length, 'items');
           renderSynthesisResults(enrichedResults);
           _setSynthProgress(null, '✅ Готово к просмотру!');
         }, 500);
