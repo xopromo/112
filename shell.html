@@ -1325,6 +1325,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
         title="Кол-во итераций BO (20 случайных разведок + N−20 GP-направленных)">
       <span style="color:var(--text3);font-size:.6em">итер</span>
     </span>
+    <div class="mode-btn" id="mode_synthesis" onclick="switchToSynthesisMode()" title="🧬 SYNTHESIS — обратный инжинириг: автоматический синтез оптимальных стратегий через TPE, максимизируя GT-Score, Sortino, Sig%. Находит 1000-5000 стратегий из многомерного пространства параметров" style="border-color:rgba(100,255,100,.6);color:#7cff7c;font-weight:bold">🧬 Синтез</div>
   </div>
   <div class="sound-grp">
     🔔<input type="checkbox" id="snd_on" style="accent-color:var(--accent);width:12px;height:12px" title="Звук по завершении">
@@ -2376,6 +2377,83 @@ function toggleNotepad() {
   panel.style.display = open ? 'none' : 'flex';
   fab.classList.toggle('active', !open);
 }
+</script>
+
+<!-- SYNTHESIS MODAL -->
+<div class="tpl-overlay" id="synthesis-modal" onclick="if(event.target===this)closeSynthesisModal()" style="display:none">
+  <div class="tpl-modal" style="max-height:80vh;overflow-y:auto;width:500px">
+    <h3>🧬 Strategy Synthesis — Обратный инжинириг</h3>
+
+    <div style="font-size:.75em;color:var(--text2);margin-bottom:12px">
+      Автоматический синтез оптимальных торговых стратегий через TPE, максимизируя метрики качества (GT-Score, Sortino, Sig%).
+    </div>
+
+    <fieldset style="border:1px solid var(--border2);padding:8px;border-radius:4px;margin-bottom:10px">
+      <legend style="font-size:.7em;color:var(--text2)">Пространство поиска</legend>
+      <label style="font-size:.7em;display:flex;align-items:center;gap:6px;margin:4px 0"><input type="checkbox" id="c_synth_vary_entries" checked style="accent-color:var(--accent)"> Варьировать entry методы</label>
+      <label style="font-size:.7em;display:flex;align-items:center;gap:6px;margin:4px 0"><input type="checkbox" id="c_synth_vary_filters" checked style="accent-color:var(--accent)"> Варьировать фильтры (powerset)</label>
+      <label style="font-size:.7em;display:flex;align-items:center;gap:6px;margin:4px 0"><input type="checkbox" id="c_synth_vary_filter_params" checked style="accent-color:var(--accent)"> Варьировать параметры фильтров</label>
+      <label style="font-size:.7em;display:flex;align-items:center;gap:6px;margin:4px 0"><input type="checkbox" id="c_synth_vary_exits" checked style="accent-color:var(--accent)"> Варьировать exit механизмы</label>
+      <label style="font-size:.7em;display:flex;align-items:center;gap:6px;margin:4px 0"><input type="checkbox" id="c_synth_vary_sltp" checked style="accent-color:var(--accent)"> Варьировать SL/TP</label>
+      <label style="font-size:.7em;display:flex;align-items:center;gap:6px;margin:4px 0"><input type="checkbox" id="c_synth_vary_risk" checked style="accent-color:var(--accent)"> Варьировать risk parameters</label>
+    </fieldset>
+
+    <fieldset style="border:1px solid var(--border2);padding:8px;border-radius:4px;margin-bottom:10px">
+      <legend style="font-size:.7em;color:var(--text2)">Целевые метрики</legend>
+      <label style="font-size:.7em;display:flex;align-items:center;gap:6px;margin:4px 0"><input type="checkbox" id="c_synth_metric_gt" checked style="accent-color:var(--accent)"> GT-Score (anti-overfitting)</label>
+      <label style="font-size:.7em;display:flex;align-items:center;gap:6px;margin:4px 0"><input type="checkbox" id="c_synth_metric_sortino" checked style="accent-color:var(--accent)"> Sortino (стабильность)</label>
+      <label style="font-size:.7em;display:flex;align-items:center;gap:6px;margin:4px 0"><input type="checkbox" id="c_synth_metric_sig" checked style="accent-color:var(--accent)"> Sig% (значимость)</label>
+    </fieldset>
+
+    <fieldset style="border:1px solid var(--border2);padding:8px;border-radius:4px;margin-bottom:10px">
+      <legend style="font-size:.7em;color:var(--text2)">Ограничения (constraints)</legend>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:.7em">
+        <label>Min trades: <input type="number" id="c_synth_min_trades" value="10" min="1" style="width:60px;padding:2px 4px;border:1px solid var(--border)"></label>
+        <label>Max DD%: <input type="number" id="c_synth_max_dd" value="50" min="1" max="100" style="width:60px;padding:2px 4px;border:1px solid var(--border)"></label>
+        <label>Min WR%: <input type="number" id="c_synth_min_wr" value="0" min="0" max="100" step="0.1" style="width:60px;padding:2px 4px;border:1px solid var(--border)"></label>
+        <label>Min Sig%: <input type="number" id="c_synth_min_sig" value="0" min="0" max="100" style="width:60px;padding:2px 4px;border:1px solid var(--border)"></label>
+      </div>
+    </fieldset>
+
+    <fieldset style="border:1px solid var(--border2);padding:8px;border-radius:4px;margin-bottom:10px">
+      <legend style="font-size:.7em;color:var(--text2)">TPE параметры</legend>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:.7em">
+        <label>Target стратегий: <input type="number" id="c_synth_target_count" value="1000" min="100" style="width:70px;padding:2px 4px;border:1px solid var(--border)"></label>
+        <label>Max итераций: <input type="number" id="c_synth_max_iter" value="50000" min="1000" style="width:70px;padding:2px 4px;border:1px solid var(--border)"></label>
+      </div>
+      <div style="margin-top:8px">
+        <label style="font-size:.7em;display:flex;align-items:center;gap:6px">
+          Exploration (γ): <input type="range" id="c_synth_gamma" min="0.1" max="0.9" step="0.05" value="0.25" style="flex:1;cursor:pointer"> <span id="c_synth_gamma_val">0.25</span>
+        </label>
+      </div>
+    </fieldset>
+
+    <fieldset style="border:1px solid var(--border2);padding:8px;border-radius:4px;margin-bottom:10px">
+      <legend style="font-size:.7em;color:var(--text2)">Веса метрик для ranking</legend>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:.7em">
+        <label>GT w: <input type="number" id="c_synth_weight_gt" value="0.5" min="0" max="1" step="0.05" style="width:50px;padding:2px 4px;border:1px solid var(--border)"></label>
+        <label>Sort w: <input type="number" id="c_synth_weight_sortino" value="0.3" min="0" max="1" step="0.05" style="width:50px;padding:2px 4px;border:1px solid var(--border)"></label>
+        <label>Sig w: <input type="number" id="c_synth_weight_sig" value="0.2" min="0" max="1" step="0.05" style="width:50px;padding:2px 4px;border:1px solid var(--border)"></label>
+      </div>
+    </fieldset>
+
+    <fieldset style="border:1px solid var(--border2);padding:8px;border-radius:4px;margin-bottom:10px">
+      <legend style="font-size:.7em;color:var(--text2)">Опции</legend>
+      <label style="font-size:.7em;display:flex;align-items:center;gap:6px;margin:4px 0"><input type="checkbox" id="c_synth_save_history" checked style="accent-color:var(--accent)"> Сохранить сессию в истории</label>
+    </fieldset>
+
+    <div class="tpl-row" style="margin-top:12px">
+      <button class="tpl-btn2 ok" onclick="runSynthesis()" style="flex:1;background:rgba(100,255,100,.2);border-color:rgba(100,255,100,.6);color:#7cff7c">▶ Начать синтез</button>
+      <button class="tpl-btn2 cancel" onclick="closeSynthesisModal()" style="flex:1">Отмена</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// Synthesis mode slider value display
+document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
+  document.getElementById('c_synth_gamma_val').textContent = this.value;
+});
 </script>
 
 </body>
