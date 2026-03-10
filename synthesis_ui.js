@@ -66,10 +66,9 @@ function _showSynthProgressSection() {
 }
 
 function _hideSynthProgressSection() {
-  const section = document.getElementById('synth-progress-section');
+  // НЕ закрываем модал! Оставляем его открытым чтобы пользователь прочитал логи
   const runBtn = document.getElementById('synth-run-btn');
   const stopBtn = document.getElementById('synth-stop-btn');
-  if (section) section.style.display = 'none';
   if (runBtn) runBtn.style.display = 'inline-block';
   if (stopBtn) stopBtn.style.display = 'none';
 }
@@ -96,7 +95,7 @@ function stopSynthesis() {
   // Сигнал остановки (используется в runOpt через globalную переменную)
   if (typeof stopped !== 'undefined') stopped = true;
   _setSynthProgress(0, '⏹ Синтез остановлен пользователем');
-  setTimeout(() => _hideSynthProgressSection(), 1000);
+  _hideSynthProgressSection(); // только скрываем кнопку стопа, модал остаётся
 }
 
 function _setSynthesisDefaults(defaults) {

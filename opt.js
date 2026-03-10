@@ -2812,11 +2812,9 @@ async function runOpt() {
   if (_isSynthMode && typeof _setSynthProgress !== 'undefined') {
     const elapsed = Math.round((Date.now() - _t0) / 1000);
     _setSynthProgress(100, '✅ Синтез завершен! Найдено ' + results.length + ' стратегий за ' + elapsed + 'с');
-    setTimeout(() => {
-      if (typeof _hideSynthProgressSection !== 'undefined') {
-        _hideSynthProgressSection();
-      }
-    }, 3000);
+    if (typeof _hideSynthProgressSection !== 'undefined') {
+      _hideSynthProgressSection(); // модал остаётся открытым с логами
+    }
   }
 
   $('prog').textContent='✅ ' + fmtNum(results.length) + ' / ' + fmtNum(done) + ' прошли фильтр';
