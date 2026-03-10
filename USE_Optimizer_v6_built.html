@@ -4558,12 +4558,20 @@ async function _runSynthesisMainThread(opts) {
             // Log rejection summary every 5000 iterations
             if (iter > 0 && iter % 5000 === 0) {
               console.log(`[Synthesis iter=${iter}] Rejections: n=${stats.n}, dd=${stats.dd}, wr=${stats.wr}, sig=${stats.sig}, pnl=${stats.pnl}/${stats.total} (${(100*stats.n/stats.total).toFixed(1)}% by n, ${(100*stats.pnl/stats.total).toFixed(1)}% by pnl)`);
-              console.log(`  Space: minTrades=${space.minTrades}, maxDD=${space.maxDD}, minWR=${space.minWR}, minSig=${space.minSig}`);
-              console.log(`  Sample: n=${metrics.n}, dd=${metrics.dd.toFixed(1)}, wr=${metrics.wr.toFixed(1)}, sig=${metrics.sig}, pnl=${metrics.pnl.toFixed(1)}`);
+              console.log(`  Constraints: minTrades>=${space.minTrades}, maxDD<=${space.maxDD}, minWR>=${space.minWR}, minSig>=${space.minSig}, pnl>0`);
+              console.log(`  Sample metrics: n=${metrics.n}, dd=${metrics.dd.toFixed(1)}, wr=${metrics.wr.toFixed(1)}, sig=${metrics.sig}, pnl=${metrics.pnl.toFixed(1)}`);
+              const pctN = (100*stats.n/stats.total).toFixed(1);
+              const pctDD = (100*stats.dd/stats.total).toFixed(1);
+              const pctWR = (100*stats.wr/stats.total).toFixed(1);
+              const pctSig = (100*stats.sig/stats.total).toFixed(1);
+              const pctPnL = (100*stats.pnl/stats.total).toFixed(1);
+              _setSynthProgress(Math.min(99, 5 + (iter/opts.maxIter)*90),
+                `✓ ${foundResults.length} найдено | Отклонено: ${pctN}% n, ${pctDD}% dd, ${pctWR}% wr, ${pctSig}% sig, ${pctPnL}% pnl`);
             }
 
             if (metrics.n >= space.minTrades && metrics.dd <= space.maxDD &&
                 metrics.wr >= space.minWR && metrics.sig >= space.minSig && metrics.pnl > 0) {
+              // PASSED ALL FILTERS! ✅
               const pdd = result.dd > 0 ? result.pnl / result.dd : (result.pnl > 0 ? 50 : 0);
               const resultName = 'Synth_' + iter + '_' + foundResults.length;
               // Ensure cfg has all required fields for UI display
@@ -4587,7 +4595,20 @@ async function _runSynthesisMainThread(opts) {
               }
               foundResults.push(newResult);
               results.push(newResult);
+              console.log(`[Synthesis] ✅ Result #${foundResults.length} PASSED filters: pnl=${result.pnl.toFixed(1)}, wr=${result.wr.toFixed(1)}, n=${result.n}, dd=${result.dd.toFixed(1)}`);
               if (typeof renderResults === 'function') renderResults();
+            } else {
+              // FAILED at least one filter — log which one
+              const reason = [];
+              if (metrics.n < space.minTrades) reason.push(`n=${metrics.n}<${space.minTrades}`);
+              if (metrics.dd > space.maxDD) reason.push(`dd=${metrics.dd.toFixed(1)}>${space.maxDD}`);
+              if (metrics.wr < space.minWR) reason.push(`wr=${metrics.wr.toFixed(1)}<${space.minWR}`);
+              if (metrics.sig < space.minSig) reason.push(`sig=${metrics.sig}<${space.minSig}`);
+              if (metrics.pnl <= 0) reason.push(`pnl=${metrics.pnl.toFixed(1)}<=0`);
+              // Только логируем каждые 1000 отклонений
+              if (iter % 1000 === 0 && iter > 0) {
+                console.log(`[Synthesis] ❌ Rejected (iter=${iter}): ${reason.join(', ')}`);
+              }
             }
           } catch (e) {
             // skip bad config
