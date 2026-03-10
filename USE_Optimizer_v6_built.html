@@ -3455,6 +3455,8 @@ class StrategySpace {
       maP: [5, 200],
       adxThresh: [10, 50],
       atrP: [5, 50],
+      slMult: [0.5, 3.0],
+      tpMult: [1.0, 5.0],
     };
   }
 
@@ -3476,6 +3478,10 @@ class StrategySpace {
       v.push(cfg.useBE ? 1 : 0);
       v.push(cfg.useTrail ? 1 : 0);
       v.push(cfg.useRev ? 1 : 0);
+    }
+    if (this.varySLTP) {
+      v.push((cfg.slMult || 1.5) / 3.0);
+      v.push((cfg.tpMult || 2.0) / 5.0);
     }
     if (this.varyRisk) {
       v.push((cfg.atrP || 14) / 50);
@@ -3509,6 +3515,13 @@ class StrategySpace {
       cfg.useBE = vector[idx++] > 0.5;
       cfg.useTrail = vector[idx++] > 0.5;
       cfg.useRev = vector[idx++] > 0.5;
+    }
+
+    if (this.varySLTP) {
+      const [sl_min, sl_max] = this.paramRanges.slMult;
+      cfg.slMult = Math.round((sl_min + vector[idx++] * (sl_max - sl_min)) * 10) / 10;
+      const [tp_min, tp_max] = this.paramRanges.tpMult;
+      cfg.tpMult = Math.round((tp_min + vector[idx++] * (tp_max - tp_min)) * 10) / 10;
     }
 
     if (this.varyRisk) {
@@ -7489,10 +7502,19 @@ async function runOpt() {
   const trDists=useTrail?parseRange('x_trd'):[0.5];  // Default 0.5 when Trail disabled
   const timeBarsArr=useTime?parseRange('x_timeb'):[0];  // Default 0 when TimeExit disabled
 
-  // SL configs
+  // ── SYNTHESIS MODE: расширенный перебор SL/TP ──────────────────────
+  // При synthesis режиме игнорируем UI чекбоксы и используем широкий диапазон
   let slCfgs=[];
-  if ($c('s_atr')) parseRange('s_atrv').forEach(v=>slCfgs.push({type:'atr',m:v}));
-  if ($c('s_pct')) parseRange('s_pctv').forEach(v=>slCfgs.push({type:'pct',m:v}));
+  if (_isSynthMode) {
+    // Synthesis: автоматически перебираем разные SL мультипликаторы
+    [0.8, 1.0, 1.2, 1.5, 2.0, 2.5, 3.0].forEach(m => slCfgs.push({type:'atr',m}));
+    if (_isSynthMode && typeof _setSynthProgress !== 'undefined') {
+      _setSynthProgress(18, '📋 SL параметры (synthesis): ' + slCfgs.map(s => s.m).join(', '));
+    }
+  } else {
+    if ($c('s_atr')) parseRange('s_atrv').forEach(v=>slCfgs.push({type:'atr',m:v}));
+    if ($c('s_pct')) parseRange('s_pctv').forEach(v=>slCfgs.push({type:'pct',m:v}));
+  }
   // Combinations AND/OR: generate pairs if both enabled
   let slPairs=[];
   const slATRs=slCfgs.filter(s=>s.type==='atr');
@@ -7513,9 +7535,17 @@ async function runOpt() {
 
   // TP configs — same approach
   let tpCfgs=[];
-  if ($c('t_rr')) parseRange('t_rrv').forEach(v=>tpCfgs.push({type:'rr',m:v}));
-  if ($c('t_atr')) parseRange('t_atrv').forEach(v=>tpCfgs.push({type:'atr',m:v}));
-  if ($c('t_pct')) parseRange('t_pctv').forEach(v=>tpCfgs.push({type:'pct',m:v}));
+  if (_isSynthMode) {
+    // Synthesis: автоматически перебираем разные TP мультипликаторы
+    [1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0].forEach(m => tpCfgs.push({type:'rr',m}));
+    if (_isSynthMode && typeof _setSynthProgress !== 'undefined') {
+      _setSynthProgress(19, '📋 TP параметры (synthesis): ' + tpCfgs.map(t => t.m).join(', '));
+    }
+  } else {
+    if ($c('t_rr')) parseRange('t_rrv').forEach(v=>tpCfgs.push({type:'rr',m:v}));
+    if ($c('t_atr')) parseRange('t_atrv').forEach(v=>tpCfgs.push({type:'atr',m:v}));
+    if ($c('t_pct')) parseRange('t_pctv').forEach(v=>tpCfgs.push({type:'pct',m:v}));
+  }
   let tpPairs=[];
   const tpTypes=['rr','atr','pct'];
   const tpByType={rr:tpCfgs.filter(t=>t.type==='rr'),atr:tpCfgs.filter(t=>t.type==='atr'),pct:tpCfgs.filter(t=>t.type==='pct')};
