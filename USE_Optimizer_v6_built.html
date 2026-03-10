@@ -4538,18 +4538,28 @@ async function _runSynthesisMainThread(opts) {
             const metrics = { pnl: result.pnl, wr: result.wr, n: result.n, dd: result.dd, gt, sig, sortino: 0, dwr: result.dwr || 0 };
             tpe.addObservation(cfg, metrics);
 
-            // Debug: log why results are rejected
+            // Debug: track rejection reasons
             const passN = metrics.n >= space.minTrades;
             const passDD = metrics.dd <= space.maxDD;
             const passWR = metrics.wr >= space.minWR;
             const passSig = metrics.sig >= space.minSig;
             const passPnL = metrics.pnl > 0;
 
-            if (!passN || !passDD || !passWR || !passSig || !passPnL) {
-              if (iter % 500 === 0) { // Log every 500 iterations to avoid spam
-                console.log(`[Synthesis] Rejected: n=${metrics.n}(${passN}), dd=${metrics.dd.toFixed(1)}(${passDD}), wr=${metrics.wr.toFixed(1)}(${passWR}), sig=${metrics.sig}(${passSig}), pnl=${metrics.pnl.toFixed(1)}(${passPnL})`);
-                console.log(`  space: minTrades=${space.minTrades}, maxDD=${space.maxDD}, minWR=${space.minWR}, minSig=${space.minSig}`);
-              }
+            // Count rejections by reason
+            if (!window._synthRejectStats) window._synthRejectStats = { n: 0, dd: 0, wr: 0, sig: 0, pnl: 0, total: 0 };
+            const stats = window._synthRejectStats;
+            stats.total++;
+            if (!passN) stats.n++;
+            if (!passDD) stats.dd++;
+            if (!passWR) stats.wr++;
+            if (!passSig) stats.sig++;
+            if (!passPnL) stats.pnl++;
+
+            // Log rejection summary every 5000 iterations
+            if (iter > 0 && iter % 5000 === 0) {
+              console.log(`[Synthesis iter=${iter}] Rejections: n=${stats.n}, dd=${stats.dd}, wr=${stats.wr}, sig=${stats.sig}, pnl=${stats.pnl}/${stats.total} (${(100*stats.n/stats.total).toFixed(1)}% by n, ${(100*stats.pnl/stats.total).toFixed(1)}% by pnl)`);
+              console.log(`  Space: minTrades=${space.minTrades}, maxDD=${space.maxDD}, minWR=${space.minWR}, minSig=${space.minSig}`);
+              console.log(`  Sample: n=${metrics.n}, dd=${metrics.dd.toFixed(1)}, wr=${metrics.wr.toFixed(1)}, sig=${metrics.sig}, pnl=${metrics.pnl.toFixed(1)}`);
             }
 
             if (metrics.n >= space.minTrades && metrics.dd <= space.maxDD &&
@@ -4593,6 +4603,22 @@ async function _runSynthesisMainThread(opts) {
           // Yield to prevent blocking
           await new Promise(r => setTimeout(r, 10));
         }
+      }
+
+      // Final statistics
+      if (window._synthRejectStats) {
+        const stats = window._synthRejectStats;
+        console.log('[Synthesis FINAL]', {
+          totalTested: stats.total,
+          rejectedByN: stats.n,
+          rejectedByDD: stats.dd,
+          rejectedByWR: stats.wr,
+          rejectedBySig: stats.sig,
+          rejectedByPnL: stats.pnl,
+          accepted: foundResults.length,
+          pctByN: (100*stats.n/stats.total).toFixed(1) + '%',
+          pctByPnL: (100*stats.pnl/stats.total).toFixed(1) + '%'
+        });
       }
 
       _setSynthProgress(100, `✅ Синтез завершён! Найдено ${foundResults.length} стратегий`);
