@@ -350,12 +350,15 @@ async function _runSynthesisMainThread(opts) {
             const z = (result.wr - 50) / Math.sqrt(2500 / Math.max(result.n, 1));
             const sigMult = 1 + Math.min(Math.max(z, 0), 3) * 0.3;
             const consistMult = 0.5 + Math.min(Math.max(1 - (result.dwr || 0) / 100, 0), 1) * 0.5;
-            const gt = pdd > 0 ? pdd * sigMult * consistMult : (pdd <= 0 ? -2 : 0);
+            const gtRaw = pdd > 0 ? pdd * sigMult * consistMult : (pdd <= 0 ? -2 : 0);
             const t = 1 / (1 + 0.2316419 * z);
             const p = (1/Math.sqrt(2*Math.PI)) * Math.exp(-z*z/2) * t*(0.319382+t*(-0.356564+t*(1.781478+t*(-1.821256+t*1.330274))));
             const sig = Math.min(99, Math.max(0, Math.round((1 - p) * 100)));
 
-            const metrics = { pnl: result.pnl, wr: result.wr, n: result.n, dd: result.dd, gt, sig, sortino: 0, dwr: result.dwr || 0 };
+            // GT for TPE optimization (scaled 0-1)
+            const gtForTPE = Math.min(gtRaw / 10, 1);
+            // Metrics for TPE observation
+            const metrics = { pnl: result.pnl, wr: result.wr, n: result.n, dd: result.dd, gt: gtForTPE, sig, sortino: 0, dwr: result.dwr || 0 };
             tpe.addObservation(cfg, metrics);
 
             // Debug: track rejection reasons
@@ -392,16 +395,21 @@ async function _runSynthesisMainThread(opts) {
             if (metrics.n >= space.minTrades && metrics.dd <= space.maxDD &&
                 metrics.wr >= space.minWR && metrics.sig >= space.minSig && metrics.pnl > 0) {
               // PASSED ALL FILTERS! ✅
-              const pdd = result.dd > 0 ? result.pnl / result.dd : (result.pnl > 0 ? 50 : 0);
               const resultName = 'Synth_' + iter + '_' + foundResults.length;
               // Ensure cfg has all required fields for UI display
               cfg.atrPeriod = cfg.atrP; // UI uses atrPeriod, synthesis uses atrP
               cfg.commission = opts.commission;
+              // Calculate additional metrics from equity curve
+              const sortino = result.eq && result.eq.length >= 10 ? _calcSortino(result.eq) : null;
+              const kRatio = result.eq && result.eq.length >= 20 ? _calcKRatio(result.eq) : null;
+              const cvr = result.eq ? _calcCVR(result.eq) : null;
+              const upi = result.eq ? _calcUlcerIdx(result.eq) : null;
+
               const newResult = {
                 name: resultName,
                 cfg, pnl: result.pnl, wr: result.wr, n: result.n, dd: result.dd, pdd, avg: result.avg || 0,
-                sig, gt, sortino: 0, kRatio: null, sqn: null,
-                cvr: null, upi: null, omega: null, pain: null, burke: null, serenity: null, ir: null,
+                sig, gt: gtRaw, sortino, kRatio, sqn: null,
+                cvr, upi, omega: null, pain: null, burke: null, serenity: null, ir: null,
                 p1: result.p1 || 0, p2: result.p2 || 0, dwr: result.dwr || 0,
                 c1: result.c1 || 0, c2: result.c2 || 0,
                 nL: result.nL || 0, pL: result.pL || 0, wrL: result.wrL || 0,
