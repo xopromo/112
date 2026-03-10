@@ -7558,6 +7558,7 @@ function calcTotal() {
   let slCfgs=[];
   if($c('s_atr')) parseRange('s_atrv').forEach(v=>slCfgs.push({type:'atr',m:v}));
   if($c('s_pct')) parseRange('s_pctv').forEach(v=>slCfgs.push({type:'pct',m:v}));
+  if(slCfgs.length===0) slCfgs=[{type:'atr',m:1.5}];  // Default SL if none selected
   const slA=slCfgs.filter(s=>s.type==='atr'),slP=slCfgs.filter(s=>s.type==='pct');
   let slCount=slA.length&&slP.length ? slA.length*slP.length+slA.length+slP.length : slCfgs.length||1;
   let tpCfgs=[];
@@ -7568,6 +7569,7 @@ function calcTotal() {
   let tpCount=activeTp.length>=2 ?
     tpCfgs.filter(t=>t.type===activeTp[0]).length*tpCfgs.filter(t=>t.type===activeTp[1]).length+tpCfgs.length :
     tpCfgs.length||1;
+  if(tpCfgs.length===0) tpCfgs=[{type:'rr',m:2}];  // Default TP if none selected
   const _ctAdxL=$c('f_adx')?parseRange('f_adxl'):[$n('f_adxl')||14];
   const _ctAdxHtf=$c('f_adx')?parseRange('f_adx_htf'):[1];
   const _ctAtrExpMs=$c('f_atrexp')?parseRange('f_atrexpm'):[0];
