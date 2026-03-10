@@ -1103,17 +1103,17 @@ function showDetail(r) {
 
   // 1. ENTRY PATTERNS
   let ent = '';
-  ent += row('Pivot Points',        c.usePivot  ? `ВКЛ · Left=${c.pvL} баров, Right=${c.pvR} баров` : 'ВЫКЛ', c.usePivot?'on':'off');
+  ent += row('Pivot Points',        c.usePivot  ? `ВКЛ · Left=${c.pvL??0} баров, Right=${c.pvR??0} баров` : 'ВЫКЛ', c.usePivot?'on':'off');
   ent += row('Поглощение Engulfing',c.useEngulf ? 'ВКЛ' : 'ВЫКЛ',                                              c.useEngulf?'on':'off');
-  ent += row('Pin Bar',             c.usePinBar ? `ВКЛ · тень/тело ≥ ${c.pinRatio}` : 'ВЫКЛ',                  c.usePinBar?'on':'off');
-  ent += row('Пробой Боллинджера',  c.useBoll   ? `ВКЛ · период=${c.bbLen}, σ=${c.bbMult}` : 'ВЫКЛ',           c.useBoll?'on':'off');
-  ent += row('Пробой Дончиана',     c.useDonch  ? `ВКЛ · период=${c.donLen} баров` : 'ВЫКЛ',                   c.useDonch?'on':'off');
-  ent += row('ATR-канал пробой',    c.useAtrBo  ? `ВКЛ · EMA ${c.atrBoLen} баров, множитель=${c.atrBoMult}` : 'ВЫКЛ', c.useAtrBo?'on':'off');
-  ent += row('Касание MA',          c.useMaTouch? `ВКЛ · ${c.matType} ${c.matPeriod}, зона=${c.matZone}%` : 'ВЫКЛ', c.useMaTouch?'on':'off');
-  ent += row('Squeeze (BB+Keltner)',c.useSqueeze? `ВКЛ · BB ${c.sqzBBLen}, KC mult=${c.sqzKCMult}, мин ${c.sqzMinBars} баров в сжатии` : 'ВЫКЛ', c.useSqueeze?'on':'off');
-  ent += row('Касание трендовой линии', c.useTLTouch ? `ВКЛ · пивот ${c.tlPvL}/${c.tlPvR}, зона ±${c.tlZonePct}%` : 'ВЫКЛ', c.useTLTouch?'on':'off');
-  ent += row('Пробой трендовой линии',  c.useTLBreak ? `ВКЛ · пивот ${c.tlPvL}/${c.tlPvR}, зона ±${c.tlZonePct}%` : 'ВЫКЛ', c.useTLBreak?'on':'off');
-  ent += row('Флаг (Flag)',             c.useFlag    ? `ВКЛ · импульс ≥${c.flagImpMin}×ATR, макс ${c.flagMaxBars} баров, откат ≤${c.flagRetrace}` : 'ВЫКЛ', c.useFlag?'on':'off');
+  ent += row('Pin Bar',             c.usePinBar ? `ВКЛ · тень/тело ≥ ${c.pinRatio??0}` : 'ВЫКЛ',                  c.usePinBar?'on':'off');
+  ent += row('Пробой Боллинджера',  c.useBoll   ? `ВКЛ · период=${c.bbLen??0}, σ=${c.bbMult??0}` : 'ВЫКЛ',           c.useBoll?'on':'off');
+  ent += row('Пробой Дончиана',     c.useDonch  ? `ВКЛ · период=${c.donLen??0} баров` : 'ВЫКЛ',                   c.useDonch?'on':'off');
+  ent += row('ATR-канал пробой',    c.useAtrBo  ? `ВКЛ · EMA ${c.atrBoLen??0} баров, множитель=${c.atrBoMult??0}` : 'ВЫКЛ', c.useAtrBo?'on':'off');
+  ent += row('Касание MA',          c.useMaTouch? `ВКЛ · ${c.matType||'EMA'} ${c.matPeriod??0}, зона=${c.matZone??0}%` : 'ВЫКЛ', c.useMaTouch?'on':'off');
+  ent += row('Squeeze (BB+Keltner)',c.useSqueeze? `ВКЛ · BB ${c.sqzBBLen??0}, KC mult=${c.sqzKCMult??0}, мин ${c.sqzMinBars??0} баров в сжатии` : 'ВЫКЛ', c.useSqueeze?'on':'off');
+  ent += row('Касание трендовой линии', c.useTLTouch ? `ВКЛ · пивот ${c.tlPvL??0}/${c.tlPvR??0}, зона ±${c.tlZonePct??0}%` : 'ВЫКЛ', c.useTLTouch?'on':'off');
+  ent += row('Пробой трендовой линии',  c.useTLBreak ? `ВКЛ · пивот ${c.tlPvL??0}/${c.tlPvR??0}, зона ±${c.tlZonePct??0}%` : 'ВЫКЛ', c.useTLBreak?'on':'off');
+  ent += row('Флаг (Flag)',             c.useFlag    ? `ВКЛ · импульс ≥${c.flagImpMin??0}×ATR, макс ${c.flagMaxBars??0} баров, откат ≤${c.flagRetrace??0}` : 'ВЫКЛ', c.useFlag?'on':'off');
   ent += row('Треугольник (Triangle)',  c.useTri     ? 'ВКЛ · симм./восх./нисх., пробой' : 'ВЫКЛ', c.useTri?'on':'off');
   ent += row('RSI выход из зоны',   c.useRsiExit  ? `ВКЛ · период=${c.rsiExitPeriod||14}, OS=${c.rsiExitOS||30} / OB=${c.rsiExitOB||70}` : 'ВЫКЛ', c.useRsiExit?'on':'off');
   ent += row('МА кросс-овер',       c.useMaCross  ? `ВКЛ · ${c.maCrossType||'EMA'} период=${c.maCrossP||20}` : 'ВЫКЛ', c.useMaCross?'on':'off');
@@ -1138,49 +1138,49 @@ function showDetail(r) {
 
   // 3. EXIT MECHANICS
   let ex = '';
-  ex += row('Безубыток (BE)',       c.useBE      ? `ВКЛ · триггер ${c.beTrig}×ATR от входа, оффсет SL=${c.beOff}×ATR (≈0=точный BE)` : 'ВЫКЛ', c.useBE?'on':'off');
-  ex += row('Trailing Stop',        c.useTrail   ? `ВКЛ · триггер ${c.trTrig}×ATR, дистанция ${c.trDist}×ATR` : 'ВЫКЛ', c.useTrail?'on':'off');
+  ex += row('Безубыток (BE)',       c.useBE      ? `ВКЛ · триггер ${c.beTrig??0}×ATR от входа, оффсет SL=${c.beOff??0}×ATR (≈0=точный BE)` : 'ВЫКЛ', c.useBE?'on':'off');
+  ex += row('Trailing Stop',        c.useTrail   ? `ВКЛ · триггер ${c.trTrig??0}×ATR, дистанция ${c.trDist??0}×ATR` : 'ВЫКЛ', c.useTrail?'on':'off');
   ex += row('Обратный сигнал', c.useRev ? [
-    `ВКЛ · мин баров в сделке: <b>${c.revBars}</b>`,
+    `ВКЛ · мин баров в сделке: <b>${c.revBars??0}</b>`,
     `Пропустить N сигналов (skip): <b>${c.revSkip||0}</b>`,
     `Кулдаун после сигнала (cooldown): <b>${c.revCooldown||0}</b> баров`,
     `Режим (mode): <b>${c.revMode||'any'}</b>`,
     `Действие (act): <b>${c.revAct||'exit'}</b>`,
     `Источник (src): <b>${c.revSrc||'same'}</b>`,
   ].join('<br>') : 'ВЫКЛ', c.useRev?'on':'off');
-  ex += row('Выход по времени',     c.useTime    ? `ВКЛ · максимум ${c.timeBars} баров` : 'ВЫКЛ',                c.useTime?'on':'off');
-  ex += row('Частичный TP1',        c.usePartial ? `ВКЛ · уровень SL×${c.partRR}, закрыть ${c.partPct}%${c.partBE?', затем BE':''}` : 'ВЫКЛ', c.usePartial?'on':'off');
-  ex += row('Выход на Climax',      c.useClimax  ? `ВКЛ · объём >${c.clxVolMult}×средн, тело >${c.clxBodyMult}×средн` : 'ВЫКЛ', c.useClimax?'on':'off');
+  ex += row('Выход по времени',     c.useTime    ? `ВКЛ · максимум ${c.timeBars??0} баров` : 'ВЫКЛ',                c.useTime?'on':'off');
+  ex += row('Частичный TP1',        c.usePartial ? `ВКЛ · уровень SL×${c.partRR??0}, закрыть ${c.partPct??0}%${c.partBE?', затем BE':''}` : 'ВЫКЛ', c.usePartial?'on':'off');
+  ex += row('Выход на Climax',      c.useClimax  ? `ВКЛ · объём >${c.clxVolMult??0}×средн, тело >${c.clxBodyMult??0}×средн` : 'ВЫКЛ', c.useClimax?'on':'off');
   html += section('🚪', 'МЕХАНИКИ ВЫХОДА', ex);
 
   // 4. TREND FILTERS
   let filt = '';
-  filt += row('MA фильтр тренда',   c.useMA      ? `ВКЛ · ${c.maType} период=${c.maP}${(c.htfRatio&&c.htfRatio>1)?' · HTF ×'+c.htfRatio+'tf':''}` : 'ВЫКЛ',               c.useMA?'on':'off');
-  filt += row('ADX (сила тренда)',  c.useADX ? `ВКЛ · ADX(${c.adxLen||14}) > ${c.adxThresh}${(c.adxHtfRatio&&c.adxHtfRatio>1)?' · HTF ×'+c.adxHtfRatio+'tf':''}${c.useAdxSlope?' · slope↑('+c.adxSlopeBars+'b)':''}` : 'ВЫКЛ', c.useADX?'on':'off');
-  filt += row('ATR расширяется',   c.useAtrExp  ? `ВКЛ · ATR > ${c.atrExpMult}× среднего (антифлет)` : 'ВЫКЛ',  c.useAtrExp?'on':'off');
-  filt += row('RSI перекуп/перепрод', c.useRSI   ? `ВКЛ · лонг если RSI < ${c.rsiOS}, шорт если RSI > ${c.rsiOB}` : 'ВЫКЛ', c.useRSI?'on':'off');
-  filt += row('Простой тренд MA',   c.useSTrend  ? `ВКЛ · окно ${c.sTrendWin} баров` : 'ВЫКЛ',                  c.useSTrend?'on':'off');
-  filt += row('Структура рынка HH/LL', c.useStruct ? `ВКЛ · lookback ${c.structLen} баров` : 'ВЫКЛ',            c.useStruct?'on':'off');
-  filt += row('Свежесть тренда',    c.useFresh   ? `ВКЛ · макс ${c.freshMax} баров от пересечения MA` : 'ВЫКЛ', c.useFresh?'on':'off');
-  filt += row('Волатильность ATR',  c.useVolF    ? `ВКЛ · ATR < ${c.volFMult}× среднего` : 'ВЫКЛ',              c.useVolF?'on':'off');
-  filt += row('Дистанция от MA',    c.useMaDist  ? `ВКЛ · не дальше ${c.maDistMax}×ATR от MA` : 'ВЫКЛ',         c.useMaDist?'on':'off');
-  filt += row('Размер свечи',       c.useCandleF ? `ВКЛ · от ${c.candleMin}×ATR до ${c.candleMax}×ATR` : 'ВЫКЛ', c.useCandleF?'on':'off');
-  filt += row('Серия одноцв. свечей', c.useConsec ? `ВКЛ · блок если ≥ ${c.consecMax} одноцветных подряд` : 'ВЫКЛ', c.useConsec?'on':'off');
-  filt += row('Подтв. МА (вторая)',  c.useConfirm ? `ВКЛ · ${c.confMatType||'EMA'} период=${c.confN}${(c.confHtfRatio&&c.confHtfRatio>1)?' · HTF ×'+c.confHtfRatio+'tf':''} · лонг только если цена > MA, шорт только если цена < MA` : 'ВЫКЛ', c.useConfirm?'on':'off');
+  filt += row('MA фильтр тренда',   c.useMA      ? `ВКЛ · ${c.maType||'EMA'} период=${c.maP??0}${(c.htfRatio&&c.htfRatio>1)?' · HTF ×'+c.htfRatio+'tf':''}` : 'ВЫКЛ',               c.useMA?'on':'off');
+  filt += row('ADX (сила тренда)',  c.useADX ? `ВКЛ · ADX(${c.adxLen||14}) > ${c.adxThresh??0}${(c.adxHtfRatio&&c.adxHtfRatio>1)?' · HTF ×'+c.adxHtfRatio+'tf':''}${c.useAdxSlope?' · slope↑('+(c.adxSlopeBars??0)+'b)':''}` : 'ВЫКЛ', c.useADX?'on':'off');
+  filt += row('ATR расширяется',   c.useAtrExp  ? `ВКЛ · ATR > ${c.atrExpMult??1}× среднего (антифлет)` : 'ВЫКЛ',  c.useAtrExp?'on':'off');
+  filt += row('RSI перекуп/перепрод', c.useRSI   ? `ВКЛ · лонг если RSI < ${c.rsiOS??0}, шорт если RSI > ${c.rsiOB??0}` : 'ВЫКЛ', c.useRSI?'on':'off');
+  filt += row('Простой тренд MA',   c.useSTrend  ? `ВКЛ · окно ${c.sTrendWin??0} баров` : 'ВЫКЛ',                  c.useSTrend?'on':'off');
+  filt += row('Структура рынка HH/LL', c.useStruct ? `ВКЛ · lookback ${c.structLen??0} баров` : 'ВЫКЛ',            c.useStruct?'on':'off');
+  filt += row('Свежесть тренда',    c.useFresh   ? `ВКЛ · макс ${c.freshMax??0} баров от пересечения MA` : 'ВЫКЛ', c.useFresh?'on':'off');
+  filt += row('Волатильность ATR',  c.useVolF    ? `ВКЛ · ATR < ${c.volFMult??0}× среднего` : 'ВЫКЛ',              c.useVolF?'on':'off');
+  filt += row('Дистанция от MA',    c.useMaDist  ? `ВКЛ · не дальше ${c.maDistMax??0}×ATR от MA` : 'ВЫКЛ',         c.useMaDist?'on':'off');
+  filt += row('Размер свечи',       c.useCandleF ? `ВКЛ · от ${c.candleMin??0}×ATR до ${c.candleMax??0}×ATR` : 'ВЫКЛ', c.useCandleF?'on':'off');
+  filt += row('Серия одноцв. свечей', c.useConsec ? `ВКЛ · блок если ≥ ${c.consecMax??0} одноцветных подряд` : 'ВЫКЛ', c.useConsec?'on':'off');
+  filt += row('Подтв. МА (вторая)',  c.useConfirm ? `ВКЛ · ${c.confMatType||'EMA'} период=${c.confN??0}${(c.confHtfRatio&&c.confHtfRatio>1)?' · HTF ×'+c.confHtfRatio+'tf':''} · лонг только если цена > MA, шорт только если цена < MA` : 'ВЫКЛ', c.useConfirm?'on':'off');
   html += section('📊', 'ФИЛЬТРЫ — ТРЕНД И ЦЕНА', filt);
 
   // 5. VOLUME FILTERS
   let vol = '';
-  vol += row('Объём ≥ среднего',    c.useVSA     ? `ВКЛ · объём > ${c.vsaMult}× среднего за ${c.vsaPeriod} баров` : 'ВЫКЛ', c.useVSA?'on':'off');
-  vol += row('Ликвидность (мин)',   c.useLiq     ? `ВКЛ · объём > ${c.liqMin}× среднего` : 'ВЫКЛ',              c.useLiq?'on':'off');
-  vol += row('Направление объёма',  c.useVolDir  ? `ВКЛ · окно ${c.volDirPeriod} баров` : 'ВЫКЛ',               c.useVolDir?'on':'off');
-  vol += row('Взвешенный тренд',    c.useWT      ? `ВКЛ · порог score=${c.wtThresh}, глубина N=${c.wtN}, вес объёма=${c.wtVolW}, вес тела=${c.wtBodyW}${c.wtUseDist?', + дист. от MA':''}` : 'ВЫКЛ', c.useWT?'on':'off');
-  vol += row('Усталость тренда',    c.useFat     ? `ВКЛ · ${c.fatConsec} свечей подряд + объём падает до ${c.fatVolDrop}× среднего` : 'ВЫКЛ', c.useFat?'on':'off');
+  vol += row('Объём ≥ среднего',    c.useVSA     ? `ВКЛ · объём > ${c.vsaMult??0}× среднего за ${c.vsaPeriod??0} баров` : 'ВЫКЛ', c.useVSA?'on':'off');
+  vol += row('Ликвидность (мин)',   c.useLiq     ? `ВКЛ · объём > ${c.liqMin??0}× среднего` : 'ВЫКЛ',              c.useLiq?'on':'off');
+  vol += row('Направление объёма',  c.useVolDir  ? `ВКЛ · окно ${c.volDirPeriod??0} баров` : 'ВЫКЛ',               c.useVolDir?'on':'off');
+  vol += row('Взвешенный тренд',    c.useWT      ? `ВКЛ · порог score=${c.wtThresh??0}, глубина N=${c.wtN??0}, вес объёма=${c.wtVolW??0}, вес тела=${c.wtBodyW??0}${c.wtUseDist?', + дист. от MA':''}` : 'ВЫКЛ', c.useWT?'on':'off');
+  vol += row('Усталость тренда',    c.useFat     ? `ВКЛ · ${c.fatConsec??0} свечей подряд + объём падает до ${c.fatVolDrop??0}× среднего` : 'ВЫКЛ', c.useFat?'on':'off');
   html += section('📦', 'ОБЪЁМНЫЕ ФИЛЬТРЫ', vol);
 
   // 6. GENERAL
   let gen = '';
-  gen += row('ATR период',      `${c.atrPeriod} баров`, 'hi');
+  gen += row('ATR период',      `${c.atrPeriod??0} баров`, 'hi');
   const _baseC = (c.baseComm !== undefined ? c.baseComm : c.commission) ?? 0;
   const _spr   = (c.spreadVal !== undefined ? c.spreadVal : 0) ?? 0;
   gen += row('Комиссия (1 сторона)', `${_baseC.toFixed(3)}%  (туда+обратно = ${(_baseC*2).toFixed(3)}%)`, '');
