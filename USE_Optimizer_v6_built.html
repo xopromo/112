@@ -10613,8 +10613,8 @@ function renderVisibleResults() {
         const rateRatio = isRate > 0 ? oosRate / isRate * 100
                         : (oosGain > 0 ? 200 : (oosGain < 0 ? -100 : 0));
         // DD и P/DD сравниваем между полным TV бэктестом и IS-only бэктестом
-        const isDd  = r.dd,  tvDd  = f.dd;
-        const isPdd = r.pdd, tvPdd = f.pdd ?? 0;
+        const isDd  = r.dd??0,  tvDd  = f.dd??0;
+        const isPdd = r.pdd??0, tvPdd = f.pdd ?? 0;
         const dDd   = tvDd - isDd;
         const mulDd = isDd > 0 ? tvDd / isDd : (tvDd > 0 ? 99 : 1);
         const dPdd  = tvPdd - isPdd;
@@ -10915,8 +10915,8 @@ function showDetail(r) {
   // 6. GENERAL
   let gen = '';
   gen += row('ATR период',      `${c.atrPeriod} баров`, 'hi');
-  const _baseC = c.baseComm !== undefined ? c.baseComm : c.commission;
-  const _spr   = c.spreadVal !== undefined ? c.spreadVal : 0;
+  const _baseC = (c.baseComm !== undefined ? c.baseComm : c.commission) ?? 0;
+  const _spr   = (c.spreadVal !== undefined ? c.spreadVal : 0) ?? 0;
   gen += row('Комиссия (1 сторона)', `${_baseC.toFixed(3)}%  (туда+обратно = ${(_baseC*2).toFixed(3)}%)`, '');
   if (_spr > 0) {
     gen += row('Спред (round-trip)', `${_spr.toFixed(3)}%  (${(_spr/2).toFixed(3)}% за сторону)`, '');
