@@ -1020,15 +1020,15 @@ function showDetail(r) {
     const irC     = v.ir!=null ? (v.ir>=1?'pos':v.ir>=0?'warn':'neg') : 'muted'; // ##IR
     const irV     = v.ir!=null ? v.ir.toFixed(1) : '—'; // ##IR
     let h =
-      `<div class="dp-stat"><div class="v ${v.pnl>=0?'pos':'neg'}">${v.pnl.toFixed(1)}%</div><div class="l">PnL</div></div>`+
-      `<div class="dp-stat"><div class="v">${v.wr.toFixed(1)}%</div><div class="l">WinRate</div></div>`+
-      `<div class="dp-stat"><div class="v muted">${v.n}</div><div class="l">Сделок</div></div>`+
-      `<div class="dp-stat"><div class="v neg">${v.dd.toFixed(1)}%</div><div class="l">MaxDD</div></div>`+
-      `<div class="dp-stat"><div class="v ${pddC}">${v.pdd.toFixed(1)}</div><div class="l">P/DD</div></div>`+
-      `<div class="dp-stat"><div class="v ${dwrC}">${v.dwr.toFixed(1)}%</div><div class="l">ΔWR сплит</div></div>`+
-      `<div class="dp-stat"><div class="v ${v.p1>=0?'pos':'neg'}">${v.p1.toFixed(1)}%</div><div class="l">1п (${v.c1}сд)</div></div>`+
-      `<div class="dp-stat"><div class="v ${v.p2>=0?'pos':'neg'}">${v.p2.toFixed(1)}%</div><div class="l">2п (${v.c2}сд)</div></div>`+
-      `<div class="dp-stat"><div class="v">${v.avg.toFixed(2)}%</div><div class="l">Avg/сд</div></div>`+
+      `<div class="dp-stat"><div class="v ${(v.pnl??0)>=0?'pos':'neg'}">${(v.pnl??0).toFixed(1)}%</div><div class="l">PnL</div></div>`+
+      `<div class="dp-stat"><div class="v">${(v.wr??0).toFixed(1)}%</div><div class="l">WinRate</div></div>`+
+      `<div class="dp-stat"><div class="v muted">${v.n??0}</div><div class="l">Сделок</div></div>`+
+      `<div class="dp-stat"><div class="v neg">${(v.dd??0).toFixed(1)}%</div><div class="l">MaxDD</div></div>`+
+      `<div class="dp-stat"><div class="v ${(v.pdd??0)>=10?'pos':(v.pdd??0)>=5?'warn':'neg'}">${(v.pdd??0).toFixed(1)}</div><div class="l">P/DD</div></div>`+
+      `<div class="dp-stat"><div class="v ${(v.dwr??0)<10?'ok':(v.dwr??0)<20?'warn':'bad'}">${(v.dwr??0).toFixed(1)}%</div><div class="l">ΔWR сплит</div></div>`+
+      `<div class="dp-stat"><div class="v ${(v.p1??0)>=0?'pos':'neg'}">${(v.p1??0).toFixed(1)}%</div><div class="l">1п (${v.c1??0}сд)</div></div>`+
+      `<div class="dp-stat"><div class="v ${(v.p2??0)>=0?'pos':'neg'}">${(v.p2??0).toFixed(1)}%</div><div class="l">2п (${v.c2??0}сд)</div></div>`+
+      `<div class="dp-stat"><div class="v">${(v.avg??0).toFixed(2)}%</div><div class="l">Avg/сд</div></div>`+
       `<div class="dp-stat"><div class="v ${cvrC}">${cvrV}</div><div class="l">CVR%</div></div>`+
       `<div class="dp-stat" title="Ulcer Performance Index = PnL / sqrt(mean(просадка²))\nЛучше Calmar: учитывает длительность и частоту просадок.\n≥5 = устойчива ✅ | 2–5 = умеренно | &lt;2 = нестабильна"><div class="v ${upiC}">${upiV}</div><div class="l">UPI</div></div>`+
       `<div class="dp-stat" title="Sortino Ratio = PnL / downside_dev\ndownside_dev = sqrt(mean(min(Δeq,0)²)) — только отриц. движения.\n≥3 = отлично ✅ | ≥2 = хорошо | &lt;1 = нестабильно"><div class="v ${sorC}">${sorV}</div><div class="l">Sortino</div></div>`+ // ##SOR
