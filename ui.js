@@ -1481,7 +1481,7 @@ function copyDetail() {
 // --- State ---
 let paused = false;
 let pauseResolve = null;
-let optMode = 'full'; // full | prune | mc
+let optMode = 'full'; // full | prune | mc | tpe | bo
 let revMode   = 'any';  // any | plus | minus
 let revAct    = 'exit'; // exit | rev | skip
 let timeMode  = 'any';  // any | plus
