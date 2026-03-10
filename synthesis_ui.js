@@ -342,10 +342,22 @@ async function _runSynthesisMainThread(opts) {
 
             if (metrics.n >= space.minTrades && metrics.dd <= space.maxDD &&
                 metrics.wr >= space.minWR && metrics.sig >= space.minSig && metrics.pnl > 0) {
-              const newResult = { name: 'Synth_' + iter + '_' + foundResults.length, cfg, ...metrics };
+              const pdd = result.dd > 0 ? result.pnl / result.dd : (result.pnl > 0 ? 50 : 0);
+              const newResult = {
+                name: 'Synth_' + iter + '_' + foundResults.length,
+                cfg, pnl: result.pnl, wr: result.wr, n: result.n, dd: result.dd, pdd, avg: result.avg || 0,
+                sig, gt, sortino: 0, kRatio: null, sqn: null,
+                cvr: null, upi: null, omega: null, pain: null, burke: null, serenity: null, ir: null,
+                p1: result.p1 || 0, p2: result.p2 || 0, dwr: result.dwr || 0,
+                c1: result.c1 || 0, c2: result.c2 || 0,
+                nL: result.nL || 0, pL: result.pL || 0, wrL: result.wrL || 0,
+                nS: result.nS || 0, pS: result.pS || 0, wrS: result.wrS || 0,
+                dwrLS: result.dwrLS || null,
+                eq: result.eq || []
+              };
               foundResults.push(newResult);
               results.push(newResult);
-              updatePreview();
+              if (typeof renderResults === 'function') renderResults();
             }
           } catch (e) {
             // skip bad config
