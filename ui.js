@@ -108,7 +108,7 @@ let _rawDATA = null;    // полные загруженные данные до
 let _rawDataInfo = '';  // описание источника для finfo ("✅ filename" и т.п.)
 let NEW_DATA = null;  // Новые данные для OOS-проверки избранных
 let HAS_VOLUME = false;
-let results = [];
+var results = []; // var (not let) so window.results = x works from other scripts
 let equities = {};
 let stopped = false;
 let slLogic = 'or'; // or | and

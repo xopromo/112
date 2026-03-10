@@ -800,7 +800,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
 .tbl-tpl-item:last-child { border-bottom: none; }
 .tbl-tpl-name { flex: 1; font-size: .7em; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tbl-tpl-date { font-size: .58em; color: var(--text3); }
-.panels-toolbar .tpl-ibtn { font-size: .63em; padding: 3px 8px; }
+.panels-toolbar .tpl-ibtn { font-size: .85em; padding: 5px 12px; }
 
 </style>
 </head>
@@ -4716,7 +4716,7 @@ let _rawDATA = null;    // полные загруженные данные до
 let _rawDataInfo = '';  // описание источника для finfo ("✅ filename" и т.п.)
 let NEW_DATA = null;  // Новые данные для OOS-проверки избранных
 let HAS_VOLUME = false;
-let results = [];
+var results = []; // var (not let) so window.results = x works from other scripts
 let equities = {};
 let stopped = false;
 let slLogic = 'or'; // or | and
