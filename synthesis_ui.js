@@ -226,12 +226,13 @@ async function runSynthesis() {
 async function _runSynthesisWorker(opts) {
   return new Promise((resolve, reject) => {
     try {
-      // Create worker from inline script or file
+      // Create worker - synthesis_worker.js is bundled inline in HTML
+      // For bundled version, we use blob; for dev/separate files use synthesis_worker.js
       let worker;
       try {
         worker = new Worker('synthesis_worker.js');
       } catch {
-        // Fallback: create blob worker from inline synthesis code
+        // Fallback: create inline worker with bundled code
         const workerScript = `
 ${typeof StrategySpace !== 'undefined' ? '' : 'importScripts("synthesis.js")'}
 ${typeof backtest !== 'undefined' ? '' : 'importScripts("core.js")'}
