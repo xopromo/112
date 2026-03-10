@@ -4425,18 +4425,14 @@ async function _runSynthesisInWorker(payload) {
       throw new Error('Нет данных для синтеза');
     }
 
-    // Store globals
-    self.DATA = data;
-    self.window = { _ipDef: ipDef };
-    if (typeof DATA === 'undefined') self.DATA = data;
-    if (typeof window === 'undefined') self.window = { _ipDef: ipDef };
+    // Initialize globals properly
+    const DATA = data;
+    const HAS_VOLUME = data.length > 0 && data[0].v !== undefined;
+    const window_obj = { _ipDef: ipDef };
 
-    if (typeof HAS_VOLUME === 'undefined') self.HAS_VOLUME = data.length > 0 && data[0].v !== undefined;
-    if (typeof results === 'undefined') self.results = [];
-    if (typeof favourites === 'undefined') self.favourites = {};
-    if (typeof equities === 'undefined') self.equities = {};
-    if (typeof stopped === 'undefined') self.stopped = false;
-    if (typeof paused === 'undefined') self.paused = false;
+    // Make available to backtest functions
+    self.DATA = DATA;
+    self.HAS_VOLUME = HAS_VOLUME;
 
     _synthWorkerStartTime = Date.now();
     self.postMessage({ type: 'LOG', payload: '🔍 Инициализация параметров синтеза...' });
