@@ -404,12 +404,17 @@ async function _runSynthesisMainThread(opts) {
               const kRatio = result.eq && result.eq.length >= 20 ? _calcKRatio(result.eq) : null;
               const cvr = result.eq ? _calcCVR(result.eq) : null;
               const upi = result.eq ? _calcUlcerIdx(result.eq) : null;
+              const omega = result.eq && result.eq.length >= 10 ? _calcOmega(result.eq) : null;
+              const pain = result.eq && result.eq.length >= 20 ? _calcPainRatio(result.eq) : null;
+              const burke = result.eq && result.eq.length >= 20 ? _calcBurke(result.eq) : null;
+              const serenity = result.eq && result.eq.length >= 20 ? _calcSerenity(result.eq) : null;
+              const ir = result.eq && result.eq.length >= 20 ? _calcInfoRatio(result.eq) : null;
 
               const newResult = {
                 name: resultName,
                 cfg, pnl: result.pnl, wr: result.wr, n: result.n, dd: result.dd, pdd, avg: result.avg || 0,
                 sig, gt: gtRaw, sortino, kRatio, sqn: null,
-                cvr, upi, omega: null, pain: null, burke: null, serenity: null, ir: null,
+                cvr, upi, omega, pain, burke, serenity, ir,
                 p1: result.p1 || 0, p2: result.p2 || 0, dwr: result.dwr || 0,
                 c1: result.c1 || 0, c2: result.c2 || 0,
                 nL: result.nL || 0, pL: result.pL || 0, wrL: result.wrL || 0,
