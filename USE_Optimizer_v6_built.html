@@ -8890,9 +8890,15 @@ async function runOpt() {
     return; // выходим из runOpt — основной цикл не нужен
   }
 
-  // ── TPE РЕЖИМ ──────────────────────────────────────────────────────────────
+  // ── TPE РЕЖИМ и инициализация для BO ────────────────────────────────────────
   // Синтез использует TPE вместо MC для полноценной оптимизации
-  if (optMode === 'tpe' || optMode === 'synthesis') {
+  // BO тоже использует _tpeRunPoint, поэтому нужна инициализация переменных
+  // Но основной цикл TPE запускается только для 'tpe' и 'synthesis'
+  const _needTPEVars = (optMode === 'tpe' || optMode === 'synthesis' || optMode === 'bo');
+  // Объявляем переменные чтобы они были доступны для BO режима (всех возможных режимов)
+  let _tpeTarget, _tpeMaxIter, _nCandidates, _exploreN, _tpeHistory, _dims, _dsz, _tpeRsiArr, _tpeWtCache, _tpeSeen, nDims;
+
+  if (_needTPEVars) {
     // ОТЛАДКА: логируем что мы вошли в TPE блок
     console.log('[TPE] Запущен TPE режим:', {optMode, _isSynthMode, _mcDims_len: _mcDims?.length, _mcDimSizes_len: _mcDimSizes?.length});
     if (_isSynthMode && typeof _setSynthProgress !== 'undefined') {
@@ -8901,25 +8907,25 @@ async function runOpt() {
 
     // tpe_target = целевое кол-во результатов (TPE останавливается когда найдено)
     // tpe_n      = жёсткий лимит итераций (защита от бесконечного цикла)
-    const tpeTarget  = Math.max(10, parseInt($v('tpe_target')||'1000') || 1000);
-    const tpeMaxIter = Math.max(100, parseInt($v('tpe_n')||'50000') || 50000);
-    const _nCandidates = 32;
-    const _exploreN = Math.max(20, Math.min(500, Math.floor(tpeMaxIter * 0.10))); // разведка = 10% бюджета, макс 500
+    _tpeTarget  = Math.max(10, parseInt($v('tpe_target')||'1000') || 1000);
+    _tpeMaxIter = Math.max(100, parseInt($v('tpe_n')||'50000') || 50000);
+    _nCandidates = 32;
+    _exploreN = Math.max(20, Math.min(500, Math.floor(__tpeMaxIter * 0.10))); // разведка = 10% бюджета, макс 500
 
     // История: для каждой размерности храним нормализованные индексы и метрику
-    const _tpeHistory = []; // [{dimIndices: [...], score}]
-    const _dims = _mcDims;
-    const _dsz  = _mcDimSizes;
-    const nDims = _dims.length;
+    _tpeHistory = []; // [{dimIndices: [...], score}]
+    _dims = _mcDims;
+    _dsz  = _mcDimSizes;
+    nDims = _dims.length;
     // Дедупликация: Set уже виденных комбинаций
-    const _tpeSeen = new Set();
+    _tpeSeen = new Set();
 
     setMcPhase('🔮 TPE разведка ' + _exploreN + ' точек…');
 
     // Предвычисляем RSI(14) один раз — не зависит от параметров оптимизации
-    const _tpeRsiArr = useRsi ? calcRSI(14) : null;
+    _tpeRsiArr = useRsi ? calcRSI(14) : null;
     // Кэш calcWeightedTrend по ключу (atrP+'_'+maP) — каждая комбинация вычисляется 1 раз
-    const _tpeWtCache = {};
+    _tpeWtCache = {};
 
     // Вспомогательная функция: прогнать одну точку через backtest и сохранить результат
     async function _tpeRunPoint(dimIndices) {
@@ -9239,17 +9245,17 @@ async function runOpt() {
         if (ei < 3) console.log(`[TPE-Phase1] Индекс ${ei}: score=${score}, results.length=${results.length}`);
       }
       if (ei % 5 === 0) {
-        setMcPhase(`🔮 TPE разведка ${ei+1}/${_exploreN} | Находки: ${results.length}/${tpeTarget}`);
-        updateETA(done, tpeMaxIter, results.length);
+        setMcPhase(`🔮 TPE разведка ${ei+1}/${_exploreN} | Находки: ${results.length}/${_tpeTarget}`);
+        updateETA(done, _tpeMaxIter, results.length);
         await yieldToUI();
         await checkPause();
       }
     }
     console.log('[TPE-Phase1] Разведка завершена:', {results_length: results.length, history_length: _tpeHistory.length});
 
-    // ── Фаза 2: TPE эксплуатация — работаем пока не найдено tpeTarget результатов
-    //   или не исчерпан бюджет tpeMaxIter итераций
-    setMcPhase(`🎯 TPE эксплуатация | Цель: ${tpeTarget} результатов | Макс: ${tpeMaxIter} итераций…`);
+    // ── Фаза 2: TPE эксплуатация — работаем пока не найдено _tpeTarget результатов
+    //   или не исчерпан бюджет _tpeMaxIter итераций
+    setMcPhase(`🎯 TPE эксплуатация | Цель: ${_tpeTarget} результатов | Макс: ${_tpeMaxIter} итераций…`);
 
     let _tpeSortedCache = null;
     let _tpeBestScore = 0;
@@ -9258,13 +9264,13 @@ async function runOpt() {
     let _goodMat = null, _badMat = null, _lastGoodLen = -1, _lastBadLen = -1;
 
     let _tiSinceLastDone = 0, _donePrev = 0;
-    for (let ti = 0; results.length < tpeTarget && done < tpeMaxIter && !stopped; ti++) {
+    for (let ti = 0; results.length < _tpeTarget && done < _tpeMaxIter && !stopped; ti++) {
       // Антизамерзание: если 500 внешних итераций без нового done → пространство исчерпано
       // Сбрасываем _tpeSeen чтобы разрешить повторное исследование
       if (done === _donePrev) { _tiSinceLastDone++; } else { _tiSinceLastDone = 0; _donePrev = done; }
       if (_tiSinceLastDone >= 500) { _tpeSeen.clear(); _tiSinceLastDone = 0; }
 
-      const progress = Math.min(1, done / Math.max(tpeMaxIter - 1, 1));
+      const progress = Math.min(1, done / Math.max(_tpeMaxIter - 1, 1));
       const gamma = 0.25 - 0.10 * progress;
 
       // Пересортируем раз в 50 итераций
@@ -9342,9 +9348,9 @@ async function runOpt() {
       }
 
       if (done % 50 === 0) {
-        const pct = Math.round(Math.min(results.length / tpeTarget, done / tpeMaxIter) * 100);
-        setMcPhase(`🎯 TPE итер:${done} | γ=${gamma.toFixed(2)} | P/DD: ${_tpeBestScore.toFixed(2)} | ${results.length}/${tpeTarget} (${pct}%)`);
-        updateETA(done, tpeMaxIter, results.length);
+        const pct = Math.round(Math.min(results.length / _tpeTarget, done / _tpeMaxIter) * 100);
+        setMcPhase(`🎯 TPE итер:${done} | γ=${gamma.toFixed(2)} | P/DD: ${_tpeBestScore.toFixed(2)} | ${results.length}/${_tpeTarget} (${pct}%)`);
+        updateETA(done, _tpeMaxIter, results.length);
       }
       // Time-based yield: отдаём UI каждые ~12мс независимо от кол-ва итераций
       const _now = performance.now();
@@ -9387,13 +9393,14 @@ async function runOpt() {
     await _batchCPCV(results, 200);
     if (typeof setMcPhase==='function') setMcPhase(null);
     _curPage=0;
-    renderVisibleResults(); showBestStats(); updateETA(done, tpeMaxIter, results.length);
-    const _tpeStopReason = results.length >= tpeTarget ? `✅ цель ${tpeTarget} достигнута` : `✅ бюджет ${tpeMaxIter} итераций исчерпан`;
+    renderVisibleResults(); showBestStats(); updateETA(done, _tpeMaxIter, results.length);
+    const _tpeStopReason = results.length >= _tpeTarget ? `✅ цель ${_tpeTarget} достигнута` : `✅ бюджет ${_tpeMaxIter} итераций исчерпан`;
     $('prog').textContent=`${_tpeStopReason} | ${fmtNum(results.length)} / ${fmtNum(done)} прошли фильтр`;
     $('pbtn').style.display='none'; $('sbtn').style.display='none';
     $('rbtn').style.display=''; $('rbtn').disabled=false;
     playDone();
-    return;
+    // Только для TPE/Synthesis режимов — BO продолжит работу ниже
+    if (optMode !== 'bo') return;
   }
 
   // ── Bayesian Optimisation (GP) — Tier 3 ─────────────────────────────────
@@ -9405,6 +9412,7 @@ async function runOpt() {
     const boN    = Math.max(20, parseInt($v('bo_n') || '100') || 100);
     const nDims  = _mcDims.length;
     const _dsz   = _mcDimSizes;
+    // _tpeRunPoint и связанные переменные уже инициализированы в TPE блоке выше
     const _boSeen = new Set();
     // GP data storage
     const Xobs = []; // array of Float64Array (normalised [0,1]^d)
@@ -11483,7 +11491,7 @@ function copyDetail() {
 // --- State ---
 let paused = false;
 let pauseResolve = null;
-let optMode = 'full'; // full | prune | mc
+let optMode = 'full'; // full | prune | mc | tpe | bo
 let revMode   = 'any';  // any | plus | minus
 let revAct    = 'exit'; // exit | rev | skip
 let timeMode  = 'any';  // any | plus
