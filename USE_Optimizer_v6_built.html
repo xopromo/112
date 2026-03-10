@@ -3894,63 +3894,73 @@ function closeSynthesisModal() {
 }
 
 function _setSynthesisDefaults(defaults) {
-  document.getElementById('c_synth_vary_entries').checked = defaults.varyEntries;
-  document.getElementById('c_synth_vary_filters').checked = defaults.varyFilters;
-  document.getElementById('c_synth_vary_filter_params').checked = defaults.varyFilterParams;
-  document.getElementById('c_synth_vary_exits').checked = defaults.varyExits;
-  document.getElementById('c_synth_vary_sltp').checked = defaults.varySLTP;
-  document.getElementById('c_synth_vary_risk').checked = defaults.varyRisk;
+  const el = (id) => document.getElementById(id);
 
-  document.getElementById('c_synth_metric_gt').checked = defaults.metricsGT;
-  document.getElementById('c_synth_metric_sortino').checked = defaults.metricsSortino;
-  document.getElementById('c_synth_metric_sig').checked = defaults.metricsSig;
+  // Vary options
+  if (el('c_synth_vary_entries')) el('c_synth_vary_entries').checked = defaults.varyEntries;
+  if (el('c_synth_vary_filters')) el('c_synth_vary_filters').checked = defaults.varyFilters;
+  if (el('c_synth_vary_filter_params')) el('c_synth_vary_filter_params').checked = defaults.varyFilterParams;
+  if (el('c_synth_vary_exits')) el('c_synth_vary_exits').checked = defaults.varyExits;
+  if (el('c_synth_vary_sltp')) el('c_synth_vary_sltp').checked = defaults.varySLTP;
+  if (el('c_synth_vary_risk')) el('c_synth_vary_risk').checked = defaults.varyRisk;
 
-  document.getElementById('c_synth_min_trades').value = defaults.minTrades;
-  document.getElementById('c_synth_max_dd').value = defaults.maxDD;
-  document.getElementById('c_synth_min_wr').value = defaults.minWR;
-  document.getElementById('c_synth_min_sig').value = defaults.minSig;
+  // Metrics
+  if (el('c_synth_metric_gt')) el('c_synth_metric_gt').checked = defaults.metricsGT;
+  if (el('c_synth_metric_sortino')) el('c_synth_metric_sortino').checked = defaults.metricsSortino;
+  if (el('c_synth_metric_sig')) el('c_synth_metric_sig').checked = defaults.metricsSig;
 
-  document.getElementById('c_synth_target_count').value = defaults.targetCount;
-  document.getElementById('c_synth_max_iter').value = defaults.maxIter;
-  document.getElementById('c_synth_gamma').value = defaults.gamma;
-  document.getElementById('c_synth_gamma_val').textContent = defaults.gamma;
+  // Constraints
+  if (el('c_synth_min_trades')) el('c_synth_min_trades').value = defaults.minTrades;
+  if (el('c_synth_max_dd')) el('c_synth_max_dd').value = defaults.maxDD;
+  if (el('c_synth_min_wr')) el('c_synth_min_wr').value = defaults.minWR;
+  if (el('c_synth_min_sig')) el('c_synth_min_sig').value = defaults.minSig;
 
-  document.getElementById('c_synth_weight_gt').value = defaults.weightGT;
-  document.getElementById('c_synth_weight_sortino').value = defaults.weightSortino;
-  document.getElementById('c_synth_weight_sig').value = defaults.weightSig;
+  // TPE params
+  if (el('c_synth_target_count')) el('c_synth_target_count').value = defaults.targetCount;
+  if (el('c_synth_max_iter')) el('c_synth_max_iter').value = defaults.maxIter;
+  if (el('c_synth_gamma')) el('c_synth_gamma').value = defaults.gamma;
+  if (el('c_synth_gamma_val')) el('c_synth_gamma_val').textContent = defaults.gamma;
 
-  document.getElementById('c_synth_start_mode').value = defaults.startMode;
-  document.getElementById('c_synth_save_history').checked = defaults.saveHistory;
+  // Weights
+  if (el('c_synth_weight_gt')) el('c_synth_weight_gt').value = defaults.weightGT;
+  if (el('c_synth_weight_sortino')) el('c_synth_weight_sortino').value = defaults.weightSortino;
+  if (el('c_synth_weight_sig')) el('c_synth_weight_sig').value = defaults.weightSig;
+
+  // Options
+  if (el('c_synth_start_mode')) el('c_synth_start_mode').value = defaults.startMode;
+  if (el('c_synth_save_history')) el('c_synth_save_history').checked = defaults.saveHistory;
 }
 
 async function runSynthesis() {
+  const el = (id) => document.getElementById(id);
+
   const opts = {
-    varyEntries: document.getElementById('c_synth_vary_entries').checked,
-    varyFilters: document.getElementById('c_synth_vary_filters').checked,
-    varyFilterParams: document.getElementById('c_synth_vary_filter_params').checked,
-    varyExits: document.getElementById('c_synth_vary_exits').checked,
-    varySLTP: document.getElementById('c_synth_vary_sltp').checked,
-    varyRisk: document.getElementById('c_synth_vary_risk').checked,
+    varyEntries: el('c_synth_vary_entries')?.checked || true,
+    varyFilters: el('c_synth_vary_filters')?.checked || true,
+    varyFilterParams: el('c_synth_vary_filter_params')?.checked || true,
+    varyExits: el('c_synth_vary_exits')?.checked || true,
+    varySLTP: el('c_synth_vary_sltp')?.checked || true,
+    varyRisk: el('c_synth_vary_risk')?.checked || true,
     metrics: [],
-    minTrades: parseInt(document.getElementById('c_synth_min_trades').value) || 10,
-    maxDD: parseInt(document.getElementById('c_synth_max_dd').value) || 100,
-    minWR: parseFloat(document.getElementById('c_synth_min_wr').value) || 0,
-    minSig: parseFloat(document.getElementById('c_synth_min_sig').value) || 0,
-    targetCount: parseInt(document.getElementById('c_synth_target_count').value) || 1000,
-    maxIter: parseInt(document.getElementById('c_synth_max_iter').value) || 50000,
-    gamma: parseFloat(document.getElementById('c_synth_gamma').value) || 0.25,
+    minTrades: parseInt(el('c_synth_min_trades')?.value) || 10,
+    maxDD: parseInt(el('c_synth_max_dd')?.value) || 100,
+    minWR: parseFloat(el('c_synth_min_wr')?.value) || 0,
+    minSig: parseFloat(el('c_synth_min_sig')?.value) || 0,
+    targetCount: parseInt(el('c_synth_target_count')?.value) || 1000,
+    maxIter: parseInt(el('c_synth_max_iter')?.value) || 50000,
+    gamma: parseFloat(el('c_synth_gamma')?.value) || 0.25,
     weights: {
-      gt: parseFloat(document.getElementById('c_synth_weight_gt').value) || 0.5,
-      sortino: parseFloat(document.getElementById('c_synth_weight_sortino').value) || 0.3,
-      sig: parseFloat(document.getElementById('c_synth_weight_sig').value) || 0.2,
+      gt: parseFloat(el('c_synth_weight_gt')?.value) || 0.5,
+      sortino: parseFloat(el('c_synth_weight_sortino')?.value) || 0.3,
+      sig: parseFloat(el('c_synth_weight_sig')?.value) || 0.2,
     },
-    startMode: document.getElementById('c_synth_start_mode').value || 'zero',
-    saveHistory: document.getElementById('c_synth_save_history').checked,
+    startMode: el('c_synth_start_mode')?.value || 'zero',
+    saveHistory: el('c_synth_save_history')?.checked || true,
   };
 
-  if (document.getElementById('c_synth_metric_gt').checked) opts.metrics.push('gt');
-  if (document.getElementById('c_synth_metric_sortino').checked) opts.metrics.push('sortino');
-  if (document.getElementById('c_synth_metric_sig').checked) opts.metrics.push('sig');
+  if (el('c_synth_metric_gt')?.checked) opts.metrics.push('gt');
+  if (el('c_synth_metric_sortino')?.checked) opts.metrics.push('sortino');
+  if (el('c_synth_metric_sig')?.checked) opts.metrics.push('sig');
 
   if (opts.metrics.length === 0) {
     alert('Выбери хотя бы одну целевую метрику');
