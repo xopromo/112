@@ -226,8 +226,17 @@ async function runSynthesis() {
 async function _runSynthesisWorker(opts) {
   return new Promise((resolve, reject) => {
     try {
-      // Use synthesis_worker.js - must be available in same directory or bundled
-      const worker = new Worker('synthesis_worker.js');
+      // Try to use Web Worker first
+      let worker;
+      try {
+        worker = new Worker('synthesis_worker.js');
+      } catch (e) {
+        // Worker not available - fallback to main thread
+        _setSynthProgress(null, '⚠️ Worker недоступен, используется main thread (медленнее)');
+        _runSynthesisMainThread(opts).then(resolve).catch(reject);
+        return;
+      }
+
       _synthWorker = worker;
 
       worker.onmessage = (event) => {
@@ -240,11 +249,10 @@ async function _runSynthesisWorker(opts) {
           worker.terminate();
           _synthWorker = null;
           if (payload.status === 'success') {
-            // Convert worker results to main table format
             results = (payload.results || []).map((r, idx) => ({
               ...r,
               name: r.name || 'Synth_' + idx,
-              dwr: 0,  // фиксировать если нужно
+              dwr: 0,
             }));
             updatePreview();
             resolve();
@@ -260,9 +268,99 @@ async function _runSynthesisWorker(opts) {
         reject(err);
       };
 
-      // Start synthesis with data snapshot
       const ipDef = window._ipDef || {};
       worker.postMessage({ type: 'START_SYNTHESIS', payload: { data: DATA, ipDef, opts } });
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+async function _runSynthesisMainThread(opts) {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const startTime = Date.now();
+      _setSynthProgress(5, '🔍 Инициализация синтеза (main thread)...');
+
+      if (typeof StrategySpace === 'undefined' || typeof TPEOptimizer === 'undefined') {
+        throw new Error('StrategySpace или TPEOptimizer не найдены');
+      }
+
+      const space = new StrategySpace({
+        varyEntries: opts.varyEntries, varyFilters: opts.varyFilters,
+        varyFilterParams: opts.varyFilterParams, varyExits: opts.varyExits,
+        varySLTP: opts.varySLTP, varyRisk: opts.varyRisk,
+        minTrades: opts.minTrades, maxDD: opts.maxDD,
+        minWR: opts.minWR, minSig: opts.minSig,
+      });
+
+      const tpe = new TPEOptimizer(space, {
+        maxIter: opts.maxIter, batchSize: 100, gamma: opts.gamma,
+      });
+
+      tpe._computeScore = function(m) {
+        if (space.minWR > 0 && m.wr < space.minWR) return -1000;
+        if (space.minSig > 0 && m.sig < space.minSig) return -1000;
+        if (space.minTrades > 0 && m.n < space.minTrades) return -1000;
+        if (space.maxDD < 100 && m.dd > space.maxDD) return -1000;
+        const gt = Math.min((m.gt || 0) / 10, 1);
+        const s = Math.min((m.sortino || 0) / 5, 1);
+        const sig = Math.min((m.sig || 0) / 100, 1);
+        return gt * opts.weights.gt + s * opts.weights.sortino + sig * opts.weights.sig;
+      };
+
+      const foundResults = [];
+      let lastReportTime = Date.now();
+
+      for (let iter = 0; iter < opts.maxIter && foundResults.length < opts.targetCount; iter++) {
+        const batch = tpe.getNextBatch(100);
+
+        for (const cfg of batch) {
+          try {
+            const ind = _calcIndicators(cfg);
+            const btc = buildBtCfg(cfg, ind);
+            const result = backtest(ind.pvLo, ind.pvHi, ind.atrArr, btc);
+
+            if (!result) {
+              tpe.addObservation(cfg, { pnl: 0, wr: 0, n: 0, dd: 100, gt: 0, sig: 0 });
+              continue;
+            }
+
+            const pdd = result.dd > 0 ? result.pnl / result.dd : (result.pnl > 0 ? 50 : 0);
+            const z = (result.wr - 50) / Math.sqrt(2500 / Math.max(result.n, 1));
+            const sigMult = 1 + Math.min(Math.max(z, 0), 3) * 0.3;
+            const gt = pdd > 0 ? pdd * sigMult * 0.75 : 0;
+            const t = 1 / (1 + 0.2316419 * z);
+            const p = (1/Math.sqrt(2*Math.PI)) * Math.exp(-z*z/2) * t*(0.319382+t*(-0.356564+t*(1.781478+t*(-1.821256+t*1.330274))));
+            const sig = Math.min(99, Math.max(0, Math.round((1 - p) * 100)));
+
+            const metrics = { pnl: result.pnl, wr: result.wr, n: result.n, dd: result.dd, gt, sig, sortino: 0 };
+            tpe.addObservation(cfg, metrics);
+
+            if (metrics.n >= space.minTrades && metrics.dd <= space.maxDD &&
+                metrics.wr >= space.minWR && metrics.sig >= space.minSig && metrics.pnl > 0) {
+              foundResults.push({ name: 'Synth_' + iter + '_' + foundResults.length, cfg, ...metrics });
+            }
+          } catch (e) {
+            // skip bad config
+          }
+        }
+
+        if (Date.now() - lastReportTime > 500) {
+          const pct = Math.min(100, Math.round((iter / opts.maxIter) * 100));
+          const rate = iter / ((Date.now() - startTime) / 1000);
+          _setSynthProgress(pct, `📊 Итерация ${iter}/${opts.maxIter} | Найдено ${foundResults.length}`, rate);
+          lastReportTime = Date.now();
+
+          // Yield to prevent blocking
+          await new Promise(r => setTimeout(r, 10));
+        }
+      }
+
+      results = foundResults;
+      updatePreview();
+      _setSynthProgress(100, `✅ Синтез завершён! Найдено ${foundResults.length} стратегий`);
+      resolve();
     } catch (err) {
       reject(err);
     }
