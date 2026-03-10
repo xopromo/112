@@ -26,6 +26,7 @@ ui       = open(os.path.join(base, 'ui.js'),         encoding='utf-8').read()
 pine     = open(os.path.join(base, 'pine_export.js'), encoding='utf-8').read()
 projects = open(os.path.join(base, 'projects.js'),   encoding='utf-8').read()
 synthesis = open(os.path.join(base, 'synthesis.js'),   encoding='utf-8').read()
+synthesis_worker = open(os.path.join(base, 'synthesis_worker.js'), encoding='utf-8').read()
 pareto   = open(os.path.join(base, 'pareto_front.js'), encoding='utf-8').read()
 synthesis_ui = open(os.path.join(base, 'synthesis_ui.js'), encoding='utf-8').read()
 
@@ -82,6 +83,9 @@ shell = shell.replace('/* ##PINE## */', pine, 1)
 
 assert '/* ##SYNTHESIS## */' in shell, "Placeholder ##SYNTHESIS## not found in shell.html"
 shell = shell.replace('/* ##SYNTHESIS## */', synthesis, 1)
+
+assert '/* ##SYNTHESIS_WORKER## */' in shell, "Placeholder ##SYNTHESIS_WORKER## not found in shell.html"
+shell = shell.replace('/* ##SYNTHESIS_WORKER## */', synthesis_worker, 1)
 
 assert '/* ##PARETO## */' in shell, "Placeholder ##PARETO## not found in shell.html"
 shell = shell.replace('/* ##PARETO## */', pareto, 1)
