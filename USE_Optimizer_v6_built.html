@@ -8677,6 +8677,12 @@ async function runOpt() {
   // ── TPE РЕЖИМ ──────────────────────────────────────────────────────────────
   // Синтез использует TPE вместо MC для полноценной оптимизации
   if (optMode === 'tpe' || optMode === 'synthesis') {
+    // ОТЛАДКА: логируем что мы вошли в TPE блок
+    console.log('[TPE] Запущен TPE режим:', {optMode, _isSynthMode, _mcDims_len: _mcDims?.length, _mcDimSizes_len: _mcDimSizes?.length});
+    if (_isSynthMode && typeof _setSynthProgress !== 'undefined') {
+      _setSynthProgress(20, '🔮 TPE инициализация (phase 1: LHS разведка)');
+    }
+
     // tpe_target = целевое кол-во результатов (TPE останавливается когда найдено)
     // tpe_n      = жёсткий лимит итераций (защита от бесконечного цикла)
     const tpeTarget  = Math.max(10, parseInt($v('tpe_target')||'1000') || 1000);
@@ -8706,6 +8712,8 @@ async function runOpt() {
       for (let i = 0; i < dimIndices.length; i++) _hash = (_hash * 131 + dimIndices[i]) >>> 0;
       if (_tpeSeen.has(_hash)) return null;
       _tpeSeen.add(_hash);
+
+      if (done === 0) console.log('[TPE] Первый вызов _tpeRunPoint:', {dimIndices_len: dimIndices.length, done, results_len: results.length});
       let _d = 0;
       const pvL      = _dims[_d][dimIndices[_d++]];
       const pvR      = _dims[_d][dimIndices[_d++]];
@@ -8906,6 +8914,20 @@ async function runOpt() {
       const sig = _calcStatSig(r);
       const gt = _calcGTScore(r);
 
+      // ОТЛАДКА: логируем причину отклонения результата
+      if (r) {
+        const checks = {
+          n_ok: r.n >= minTrades,
+          dd_ok: r.dd <= maxDD,
+          wr_ok: r.wr >= minWR,
+          sig_ok: sig >= minSig
+        };
+        const passed = checks.n_ok && checks.dd_ok && checks.wr_ok && checks.sig_ok;
+        if (!passed && done < 5) {
+          console.log('[TPE] Отклонен результат:', {done, r_n: r.n, r_dd: r.dd, r_wr: r.wr, sig, minTrades, maxDD, minWR, minSig, checks});
+        }
+      }
+
       // Проверяем все ограничения: минимум трейдов, максимум DD, минимум WR, минимум Sig%
       if (r && r.n >= minTrades && r.dd <= maxDD && r.wr >= minWR && sig >= minSig) {
         let slDesc = slPair.combo ? `SL(ATR×${slPair.a.m}${slLogic==='or'?'|OR|':'|AND|'}${slPair.p.m}%)` : slPair.a ? `SL×${slPair.a.m}ATR` : `SL${slPair.p.m}%`;
@@ -8972,6 +8994,7 @@ async function runOpt() {
     const _lhsIndices = [];
     {
       const realTotal2 = _mcDimSizes.reduce((a,b)=>a*b,1);
+      console.log('[TPE-Phase1] LHS инициализация:', {realTotal2, _exploreN, nDims, _dsz_sum: _dsz?.reduce((a,b)=>a+b,0)});
       if (realTotal2 <= _exploreN) {
         for (let i = 0; i < realTotal2; i++) _lhsIndices.push(i);
       } else {
@@ -8988,12 +9011,17 @@ async function runOpt() {
       }
     }
 
+    console.log('[TPE-Phase1] LHS индексов:', _lhsIndices.length, 'первые 5:', _lhsIndices.slice(0,5));
+
     for (let ei = 0; ei < _lhsIndices.length && !stopped; ei++) {
       let _idx = _lhsIndices[ei];
       const _di = new Array(nDims);
       for (let d = nDims-1; d >= 0; d--) { _di[d]=_idx%_dsz[d]; _idx=Math.floor(_idx/_dsz[d]); }
       const score = await _tpeRunPoint(_di);
-      if (score !== null) _tpeHistory.push({dimIndices:[..._di], score});
+      if (score !== null) {
+        _tpeHistory.push({dimIndices:[..._di], score});
+        if (ei < 3) console.log(`[TPE-Phase1] Индекс ${ei}: score=${score}, results.length=${results.length}`);
+      }
       if (ei % 5 === 0) {
         setMcPhase(`🔮 TPE разведка ${ei+1}/${_exploreN} | Находки: ${results.length}/${tpeTarget}`);
         updateETA(done, tpeMaxIter, results.length);
@@ -9001,6 +9029,7 @@ async function runOpt() {
         await checkPause();
       }
     }
+    console.log('[TPE-Phase1] Разведка завершена:', {results_length: results.length, history_length: _tpeHistory.length});
 
     // ── Фаза 2: TPE эксплуатация — работаем пока не найдено tpeTarget результатов
     //   или не исчерпан бюджет tpeMaxIter итераций
