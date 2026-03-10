@@ -673,7 +673,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
 .tpl-item.def { border-color:var(--accent2); background:rgba(0,212,255,.04); }
 .tpl-item-name { flex:1; font-size:.71em; color:var(--text); }
 .tpl-item-date { font-size:.58em; color:var(--text3); }
-.tpl-ibtn { padding:2px 7px; border:1px solid var(--border2); border-radius:3px; background:var(--bg3); color:var(--text2); font-size:.62em; cursor:pointer; transition:all .1s; }
+.tpl-ibtn { padding:5px 12px; border:1px solid var(--border2); border-radius:3px; background:var(--bg3); color:var(--text2); font-size:.85em; cursor:pointer; transition:all .1s; }
 .tpl-ibtn:hover { border-color:var(--accent); color:var(--accent); }
 .tpl-ibtn.del:hover { border-color:var(--red); color:var(--red); }
 .tpl-input { width:100%; background:var(--bg); border:1px solid var(--border2); border-radius:5px; padding:6px 10px; color:var(--text); font-family:var(--font-mono); font-size:.73em; }
@@ -4184,7 +4184,9 @@ function _startSynthesisWorkerMode(opts) {
             // Store in global window.results for main UI
             if (typeof window !== 'undefined') {
               window.results = enrichedResults;
-              console.log('[SYNTHESIS] Worker stored', enrichedResults.length, 'results in window.results');
+              // Also assign to global scope so renderResults() can access it
+              try { results = enrichedResults; } catch(e) { console.warn('[SYNTHESIS] Worker could not set global results:', e); }
+              console.log('[SYNTHESIS] Worker stored', enrichedResults.length, 'results');
 
               setTimeout(() => {
                 // Close synthesis modal
@@ -4428,9 +4430,11 @@ async function _startSynthesisMainThread(opts) {
       console.log('[SYNTHESIS] Enriched sample:', enrichedResults[0]);
 
       if (typeof window !== 'undefined') {
-        // Store results in global window.results for main UI
+        // Store results in both window.results and global results variable
         window.results = enrichedResults;
-        console.log('[SYNTHESIS] Stored', enrichedResults.length, 'results in window.results');
+        // Also assign to global scope so renderResults() can access it
+        try { results = enrichedResults; } catch(e) { console.warn('[SYNTHESIS] Could not set global results:', e); }
+        console.log('[SYNTHESIS] Stored', enrichedResults.length, 'results');
 
         setTimeout(() => {
           // Close synthesis modal

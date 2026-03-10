@@ -318,7 +318,9 @@ function _startSynthesisWorkerMode(opts) {
             // Store in global window.results for main UI
             if (typeof window !== 'undefined') {
               window.results = enrichedResults;
-              console.log('[SYNTHESIS] Worker stored', enrichedResults.length, 'results in window.results');
+              // Also assign to global scope so renderResults() can access it
+              try { results = enrichedResults; } catch(e) { console.warn('[SYNTHESIS] Worker could not set global results:', e); }
+              console.log('[SYNTHESIS] Worker stored', enrichedResults.length, 'results');
 
               setTimeout(() => {
                 // Close synthesis modal
@@ -562,9 +564,11 @@ async function _startSynthesisMainThread(opts) {
       console.log('[SYNTHESIS] Enriched sample:', enrichedResults[0]);
 
       if (typeof window !== 'undefined') {
-        // Store results in global window.results for main UI
+        // Store results in both window.results and global results variable
         window.results = enrichedResults;
-        console.log('[SYNTHESIS] Stored', enrichedResults.length, 'results in window.results');
+        // Also assign to global scope so renderResults() can access it
+        try { results = enrichedResults; } catch(e) { console.warn('[SYNTHESIS] Could not set global results:', e); }
+        console.log('[SYNTHESIS] Stored', enrichedResults.length, 'results');
 
         setTimeout(() => {
           // Close synthesis modal
