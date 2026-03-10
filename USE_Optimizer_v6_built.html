@@ -8910,7 +8910,7 @@ async function runOpt() {
     _tpeTarget  = Math.max(10, parseInt($v('tpe_target')||'1000') || 1000);
     _tpeMaxIter = Math.max(100, parseInt($v('tpe_n')||'50000') || 50000);
     _nCandidates = 32;
-    _exploreN = Math.max(20, Math.min(500, Math.floor(__tpeMaxIter * 0.10))); // разведка = 10% бюджета, макс 500
+    _exploreN = Math.max(20, Math.min(500, Math.floor(_tpeMaxIter * 0.10))); // разведка = 10% бюджета, макс 500
 
     // История: для каждой размерности храним нормализованные индексы и метрику
     _tpeHistory = []; // [{dimIndices: [...], score}]
@@ -9279,13 +9279,13 @@ async function runOpt() {
       }
       const sorted = _tpeSortedCache;
       const nGood = Math.max(3, Math.floor(sorted.length * gamma));
-      const goodEnd = Math.min(nGood, 150);
+      const goodEnd = Math.min(nGood, sorted.length, 150);
       const badEnd  = Math.min(nGood + 300, sorted.length);
 
       // Пересчитываем матрицы только когда изменились размеры срезов
       if (goodEnd !== _lastGoodLen || badEnd - nGood !== _lastBadLen) {
         _goodMat = new Float32Array(nDims * goodEnd);
-        _badMat  = new Float32Array(nDims * (badEnd - nGood));
+        _badMat  = new Float32Array(nDims * Math.max(0, badEnd - nGood));
         for (let d = 0; d < nDims; d++) {
           const inv = 1 / Math.max(_dsz[d]-1, 1);
           for (let i = 0; i < goodEnd; i++)
