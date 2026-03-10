@@ -7840,7 +7840,7 @@ async function runOpt() {
     const _allIp = [
       ['adxL',        (Array.isArray(_adxLArr) && _adxLArr.length > 0) ? _adxLArr : [14]],
       ['sTrendWin',   (Array.isArray(_sTrendArr) && _sTrendArr.length > 0) ? _sTrendArr : [12]],
-      ['confN',       confNArr.length ? confNArr : [2]],
+      ['confN',       (Array.isArray(confNArr) && confNArr.length) ? confNArr : [2]],
       ['revBars',     (Array.isArray(revBarsArr) && revBarsArr.length > 0) ? revBarsArr : [5]],
       ['revSkip',     (Array.isArray(revSkipArr) && revSkipArr.length > 0) ? revSkipArr : [2]],
       ['revCooldown', (Array.isArray(revCooldownArr) && revCooldownArr.length > 0) ? revCooldownArr : [0]],
