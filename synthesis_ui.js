@@ -327,16 +327,18 @@ function _startSynthesisWorkerMode(opts) {
                   console.log('[SYNTHESIS] Worker closed synthesis modal');
                 }
 
-                // Switch to results mode and display
+                // Trigger renderResults to populate _visibleResults from global results
+                if (typeof renderResults === 'function') {
+                  console.log('[SYNTHESIS] Worker calling renderResults');
+                  renderResults();
+                }
+
+                // Switch to results mode
                 if (typeof switchTableMode === 'function') {
                   switchTableMode('results');
                   console.log('[SYNTHESIS] Worker switched to results mode');
                 }
 
-                if (typeof applyFilters === 'function') {
-                  console.log('[SYNTHESIS] Worker calling applyFilters');
-                  applyFilters();
-                }
                 _setSynthProgress(null, '✅ Готово к просмотру!');
               }, 500);
             }
@@ -569,16 +571,18 @@ async function _startSynthesisMainThread(opts) {
           closeSynthesisModal();
           console.log('[SYNTHESIS] Closed synthesis modal');
 
-          // Switch to results mode and display
+          // Trigger renderResults to populate _visibleResults from global results
+          if (typeof renderResults === 'function') {
+            console.log('[SYNTHESIS] Calling renderResults');
+            renderResults();
+          }
+
+          // Switch to results mode
           if (typeof switchTableMode === 'function') {
             switchTableMode('results');
             console.log('[SYNTHESIS] Switched to results mode');
           }
 
-          if (typeof applyFilters === 'function') {
-            console.log('[SYNTHESIS] Calling applyFilters');
-            applyFilters();
-          }
           _setSynthProgress(null, '✅ Готово к просмотру!');
         }, 500);
       }
