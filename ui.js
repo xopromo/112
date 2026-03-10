@@ -915,6 +915,13 @@ function renderVisibleResults() {
       '<td></td></tr>';
   }
 
+  // ОТЛАДКА: первая строка HTML
+  const firstTrMatch = html.match(/<tr[^>]*>.*?<\/tr>/);
+  if (firstTrMatch) {
+    const preview = firstTrMatch[0].replace(/>/g, '>\n  ').substring(0, 500);
+    console.log('[RENDER] Первая строка HTML:\n' + preview);
+  }
+
   const tbody = $('tb');
   console.log(`[RENDER] tbody element: exists=${!!tbody}, html_length=${html.length}`);
 
