@@ -281,10 +281,40 @@ function _startSynthesisWorkerMode(opts) {
             // Sort by score
             payload.results.sort((a, b) => (b.score || 0) - (a.score || 0));
 
+            // Enrich synthesis results with missing fields expected by table renderer
+            const enrichedResults = payload.results.map(r => ({
+              ...r,
+              pdd: r.dd > 0 ? r.pnl / r.dd : 0,
+              avg: r.pnl / Math.max(r.n, 1),
+              dwr: 0,
+              p1: r.wr,
+              p2: r.wr,
+              c1: Math.round(r.n / 2),
+              c2: Math.round(r.n / 2),
+              cvr: 0,
+              eq: [],
+              nL: Math.round(r.n / 2),
+              pL: Math.round(r.pnl / 2),
+              wrL: r.wr,
+              nS: Math.round(r.n / 2),
+              pS: Math.round(r.pnl / 2),
+              wrS: r.wr,
+              dwrLS: 0,
+              sortino: 0,
+              kRatio: 0,
+              sqn: 0,
+              upi: 0,
+              omega: 0,
+              pain: 0,
+              burke: 0,
+              serenity: 0,
+              ir: 0,
+            }));
+
             // Store in global results
             if (typeof renderSynthesisResults === 'function') {
               setTimeout(() => {
-                renderSynthesisResults(payload.results);
+                renderSynthesisResults(enrichedResults);
                 _setSynthProgress(null, '✅ Готово к просмотру!');
               }, 500);
             }
@@ -457,9 +487,39 @@ async function _startSynthesisMainThread(opts) {
 
       results.sort((a, b) => (b.score || 0) - (a.score || 0));
 
+      // Enrich synthesis results with missing fields expected by table renderer
+      const enrichedResults = results.map(r => ({
+        ...r,
+        pdd: r.dd > 0 ? r.pnl / r.dd : 0,
+        avg: r.pnl / Math.max(r.n, 1),
+        dwr: 0,
+        p1: r.wr,
+        p2: r.wr,
+        c1: Math.round(r.n / 2),
+        c2: Math.round(r.n / 2),
+        cvr: 0,
+        eq: [],
+        nL: Math.round(r.n / 2),
+        pL: Math.round(r.pnl / 2),
+        wrL: r.wr,
+        nS: Math.round(r.n / 2),
+        pS: Math.round(r.pnl / 2),
+        wrS: r.wr,
+        dwrLS: 0,
+        sortino: 0,
+        kRatio: 0,
+        sqn: 0,
+        upi: 0,
+        omega: 0,
+        pain: 0,
+        burke: 0,
+        serenity: 0,
+        ir: 0,
+      }));
+
       if (typeof renderSynthesisResults === 'function') {
         setTimeout(() => {
-          renderSynthesisResults(results);
+          renderSynthesisResults(enrichedResults);
           _setSynthProgress(null, '✅ Готово к просмотру!');
         }, 500);
       }
