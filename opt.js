@@ -1858,7 +1858,7 @@ async function runOpt() {
         useMacdFilter:_fCombo.useMacdFilter??useMacdFilter,
         useER:_fCombo.useER??useER,erArr,erPeriod:erPeriod||10,erThresh,
         useKalmanMA:_fCombo.useKalmanMA??useKalmanMA,kalmanArr,kalmanLen, // ##KALMAN_MA##
-        start:Math.max(maP||0,50)+2,
+        start:Math.max((maP||0)*(htfRatio||1),(confN||0)*(_confHtf||1),50)+2,
         pruning:false, maxDDLimit:maxDD
       };
 
@@ -2174,7 +2174,7 @@ async function runOpt() {
         useMacdFilter:_fCombo.useMacdFilter??useMacdFilter,
         useER:_fCombo.useER??useER,erArr,erPeriod:erPeriod||10,erThresh,
         useKalmanMA:_fCombo.useKalmanMA??useKalmanMA,kalmanLen, // ##KALMAN_MA##
-        start:Math.max(maP||0,50)+2,pruning:false,maxDDLimit:maxDD
+        start:Math.max((maP||0)*(htfRatio||1),(confN||0)*(_confHtf||1),50)+2,pruning:false,maxDDLimit:maxDD
       };
 
       if (_useOOS) DATA = _isData;
@@ -2768,7 +2768,7 @@ async function runOpt() {
                                       useFat,fatConsec,fatVolDrop,
                                       useKalmanMA,kalmanLen, // ##KALMAN_MA##
                                       bodyAvg:bodyAvgArr,
-                                      start:Math.max(maP||0,50)+2,
+                                      start:Math.max((maP||0)*(htfRatio||1),(confN||0)*(_confHtf||1),50)+2,
                                       // Pruning
                                       pruning:optMode==='prune',maxDDLimit:maxDD
                                     };
@@ -3504,7 +3504,7 @@ function buildBtCfg(cfg, ind) {
     kalmanArr:   ind.kalmanArr,
     kalmanLen:   cfg.kalmanLen   || 20,
 
-    start: Math.max(maP || 0, 50) + 2,
+    start: Math.max((maP || 0) * (cfg.htfRatio || 1), (cfg.confN || 0) * (cfg.confHtfRatio || 1), 50) + 2,
     pruning: false,
     maxDDLimit: 300,
   };
