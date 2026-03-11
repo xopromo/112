@@ -7916,10 +7916,10 @@ async function runOpt() {
   // Получаем ограничения из synthesis режима если доступны
   const minWR = _isSynthMode && typeof synthesisModeOptions !== 'undefined'
     ? (synthesisModeOptions.minWR || 0)
-    : ($n('c_minwr') || 0);
+    : (parseFloat($('c_minwr')?.value) || 0);
   const minSig = _isSynthMode && typeof synthesisModeOptions !== 'undefined'
     ? (synthesisModeOptions.minSig || 0)
-    : ($n('c_minsig') || 0);
+    : (parseFloat($('c_minsig')?.value) || 0);
   const _useGT = $c('c_use_gt');
 
   // Entry flags
