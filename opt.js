@@ -859,6 +859,7 @@ async function runOpt() {
     return;
   }
   stopped=false; paused=false; results=[]; equities={};
+  try { // ── глобальный try/catch: любая ошибка отображается в UI ──────────────
   resultCache.clear();
   const _resultNames = new Set(); // П.1: дедупликация
   $('tb').innerHTML=''; $('bst').style.display='none'; $('eqc').style.display='none';
@@ -1538,6 +1539,7 @@ async function runOpt() {
   }
 
   let done=0;
+  console.log('[runOpt] Режим:', optMode, '| total:', total, '| pvLs:', pvLs.length, 'atrPs:', atrPs.length, 'rsiPairs:', rsiPairs.length, 'slPairs:', slPairs.length);
   updateETA(0, total, 0);
 
   // ── _ipCombos: flat enumeration of new iterable inner params ─────────────
@@ -2949,6 +2951,14 @@ async function runOpt() {
   $('rbtn').style.display='';
   $('rbtn').disabled=false;
   playDone();
+  } catch(_runOptErr) { // ── конец глобального try/catch ──────────────────────
+    console.error('[runOpt] Критическая ошибка:', _runOptErr);
+    try {
+      $('prog').textContent = '❌ Ошибка: ' + (_runOptErr?.message || String(_runOptErr));
+      $('pbtn').style.display='none'; $('sbtn').style.display='none';
+      $('rbtn').style.display=''; $('rbtn').disabled=false;
+    } catch(_) {}
+  }
 }
 
 // ============================================================
