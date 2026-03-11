@@ -8891,8 +8891,7 @@ async function runOpt() {
     results.sort((a,b) => b.pdd-a.pdd);
     await _batchCPCV(results, 200);
     if (typeof setMcPhase === 'function') setMcPhase(null);
-    _curPage = 0;
-    renderVisibleResults(); showBestStats(); updateETA(done, mcTotal, results.length);
+    renderResults(); showBestStats(); updateETA(done, mcTotal, results.length);
     $('prog').textContent = '✅ ' + fmtNum(results.length) + ' / ' + fmtNum(done) + ' прошли фильтр';
     $('pbtn').style.display='none'; $('sbtn').style.display='none';
     $('rbtn').style.display=''; $('rbtn').disabled=false;
@@ -9408,8 +9407,7 @@ async function runOpt() {
     results.sort((a,b)=>b.pdd-a.pdd);
     await _batchCPCV(results, 200);
     if (typeof setMcPhase==='function') setMcPhase(null);
-    _curPage=0;
-    renderVisibleResults(); showBestStats(); updateETA(done, _tpeMaxIter, results.length);
+    renderResults(); showBestStats(); updateETA(done, _tpeMaxIter, results.length);
     const _tpeStopReason = results.length >= _tpeTarget ? `✅ цель ${_tpeTarget} достигнута` : `✅ бюджет ${_tpeMaxIter} итераций исчерпан`;
     $('prog').textContent=`${_tpeStopReason} | ${fmtNum(results.length)} / ${fmtNum(done)} прошли фильтр`;
     $('pbtn').style.display='none'; $('sbtn').style.display='none';
@@ -9513,8 +9511,7 @@ async function runOpt() {
         if (oi % 50 === 0) { await yieldToUI(); }
       }
     }
-    _curPage = 0;
-    renderVisibleResults(); showBestStats();
+    renderResults(); showBestStats();
     updateETA(boN, boN, results.length);
     $('prog').textContent = `✅ BO завершён ${boN} итераций | ${fmtNum(results.length)} прошли фильтр`;
     $('pbtn').style.display = 'none'; $('sbtn').style.display = 'none';
