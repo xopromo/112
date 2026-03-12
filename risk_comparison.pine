@@ -62,13 +62,19 @@ var float exit_px = na
 exit_px := na
 if _in
     if _dir == 1
-        if low  <= _sl    => exit_px := _sl
-        if high >= _tp    => exit_px := _tp
-        if raw_sig_s      => exit_px := close  // обратный сигнал
+        if low  <= _sl
+            exit_px := _sl
+        if high >= _tp
+            exit_px := _tp
+        if raw_sig_s
+            exit_px := close  // обратный сигнал
     else
-        if high >= _sl    => exit_px := _sl
-        if low  <= _tp    => exit_px := _tp
-        if raw_sig_l      => exit_px := close
+        if high >= _sl
+            exit_px := _sl
+        if low  <= _tp
+            exit_px := _tp
+        if raw_sig_l
+            exit_px := close
 
 // Закрываем сделку
 if not na(exit_px)
