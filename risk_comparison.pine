@@ -1,212 +1,291 @@
 //@version=6
 // ============================================================
-// Risk Comparison: Fixed posSize vs ATR-Adjusted posSize
-// Показывает две кривые капитала для одной и той же стратегии:
-//   СИНЯЯ  — фиксированный объём (как сейчас в USE Optimizer)
-//   ЖЁЛТАЯ — объём подстраивается под ATR, риск всегда одинаковый
-// Сигналы: EMA-кросс (настраивается). SL/TP: ATR-based.
+// USE: Fixed vs ATR-Risk — Stochastic Mean-Reversion
+// Стратегия разворотная (Stochastic), выгодна ATR-adjusted:
+//   вход в спокойный рынок → ATR мал → posSize большой → прибыль крупнее
+// СИНЯЯ  — фиксированный объём (posSize = 1)
+// ЖЁЛТАЯ — объём через ATR, риск всегда одинаковый
+// Маркеры сделок отображаются прямо на ценовом графике.
 // ============================================================
 indicator("USE: Fixed vs ATR-Risk", overlay=false, max_bars_back=1000)
 
-// ─── Inputs ─────────────────────────────────────────────────────────────────
-grp_sig  = "Сигнал входа"
-ema_fast = input.int  (20,   "Быстрая EMA",              group=grp_sig, minval=2)
-ema_slow = input.int  (50,   "Медленная EMA",             group=grp_sig, minval=5)
+// ─── Цвета (стиль оптимизатора) ──────────────────────────────────────────────
+c_bg    = color.new(#131722, 5)
+c_hdr   = color.new(#363a45, 0)
+c_win   = color.new(#26a69a, 0)
+c_los   = color.new(#ef5350, 0)
+c_neu   = color.new(#b2b5be, 0)
+c_fix   = color.new(#2962ff, 0)
+c_adj   = color.new(#f5a623, 0)
+c_entry_l = color.new(#26a69a, 0)
+c_entry_s = color.new(#ef5350, 0)
 
-grp_sl   = "SL / TP"
-sl_mult  = input.float(1.5,  "SL (× ATR от цены входа)", group=grp_sl,  minval=0.2, step=0.1)
-tp_rr    = input.float(2.0,  "TP (× риск, т.е. RR)",     group=grp_sl,  minval=0.2, step=0.1)
-atr_per  = input.int  (14,   "ATR период",                group=grp_sl,  minval=2)
+// ─── Inputs ──────────────────────────────────────────────────────────────────
+grp1 = "Стратегия (Stochastic)"
+stk   = input.int  (14,   "Stoch период K",           group=grp1, minval=3)
+std   = input.int  (3,    "Stoch период D (smooth)",  group=grp1, minval=1)
+ob    = input.int  (75,   "Перекупленность",           group=grp1, minval=55, maxval=95)
+os    = input.int  (25,   "Перепроданность",           group=grp1, minval=5,  maxval=45)
 
-grp_risk = "Риск"
-tgt_risk = input.float(1.0,  "Целевой риск на сделку (%)",group=grp_risk,minval=0.1, maxval=20, step=0.1,
-             tooltip="Для ATR-adjusted: если SL сработает, потеряем ровно этот %.\nДля fixed: это просто масштаб — всегда posSize=1.")
-pos_cap  = input.float(5.0,  "Макс. размер позиции (×)",  group=grp_risk,minval=1.0, maxval=20, step=0.5,
-             tooltip="Ограничение, чтобы при очень узком SL не войти в 50× позицию.")
-comm_1s  = input.float(0.08, "Комиссия на сторону (%)",   group=grp_risk,minval=0.0, step=0.01)
+grp2 = "SL / TP"
+sl_m  = input.float(1.2,  "SL (× ATR)",               group=grp2, minval=0.2, step=0.1)
+tp_rr = input.float(2.0,  "TP (× риск RR)",            group=grp2, minval=0.5, step=0.1)
+ap    = input.int  (14,   "ATR период",                group=grp2, minval=2)
 
-// ─── Базовые вычисления ──────────────────────────────────────────────────────
-atr   = ta.atr(atr_per)
-ema_f = ta.ema(close, ema_fast)
-ema_s = ta.ema(close, ema_slow)
-comm  = comm_1s * 2.0 / 100.0  // round-trip
+grp3 = "Риск"
+tgt   = input.float(1.0,  "Целевой риск на сделку (%)",group=grp3, minval=0.1, maxval=20, step=0.1)
+pcap  = input.float(4.0,  "Макс. posSize (×)",          group=grp3, minval=1.0, maxval=20, step=0.5)
+com   = input.float(0.08, "Комиссия на сторону (%)",    group=grp3, minval=0.0, step=0.01)
 
-// Сигналы входа
-raw_sig_l = ta.crossover (ema_f, ema_s)
-raw_sig_s = ta.crossunder (ema_f, ema_s)
+grp4 = "Отображение"
+show_lbl = input.bool(true, "Метки сделок на графике",  group=grp4)
+lbl_size = input.string("small", "Размер меток",         group=grp4,
+             options=["tiny","small","normal"])
+sz = lbl_size == "tiny" ? size.tiny : lbl_size == "normal" ? size.normal : size.small
+
+// ─── Индикаторы ──────────────────────────────────────────────────────────────
+atr_v  = ta.atr(ap)
+k      = ta.stoch(close, high, low, stk)
+d      = ta.sma(k, std)
+comm   = com * 2.0 / 100.0
+
+// Сигналы: Stoch кросс из зоны перепроданности/перекупленности
+sig_l  = ta.crossover(k, d)  and k[1] < os
+sig_s  = ta.crossunder(k, d) and k[1] > ob
 
 // ─── Состояние позиции ───────────────────────────────────────────────────────
-var bool  _in   = false
-var int   _dir  = 0        // 1 = long, -1 = short
-var float _ep   = 0.0      // цена входа
-var float _sl   = 0.0      // уровень стоп-лосса
-var float _tp   = 0.0      // уровень тейк-профита
-var float _atr0 = 0.0      // ATR в момент входа (для расчёта posSize)
+var bool  _in  = false
+var int   _dir = 0
+var float _ep  = 0.0
+var float _sl  = 0.0
+var float _tp  = 0.0
+var int   _bar = 0
 
-// ─── Кривые капитала ─────────────────────────────────────────────────────────
-var float eq_fix = 0.0     // фиксированный объём
-var float eq_adj = 0.0     // ATR-adjusted объём
-var int   n_trades = 0
+// ─── Статистика ──────────────────────────────────────────────────────────────
+var float eq_fix   = 0.0
+var float eq_adj   = 0.0
+var int   n_tr     = 0
+var int   n_win    = 0
+var int   n_los    = 0
+var float w_fix    = 0.0
+var float l_fix    = 0.0
+var float w_adj    = 0.0
+var float l_adj    = 0.0
+var float dd_fix   = 0.0
+var float dd_adj   = 0.0
+var float peak_fix = 0.0
+var float peak_adj = 0.0
 
-// Для вывода статистики
-var float wins_fix = 0.0
-var float loss_fix = 0.0
-var float wins_adj = 0.0
-var float loss_adj = 0.0
-var int   cnt_win  = 0
-var int   cnt_los  = 0
-
-// ─── Логика выхода (проверяем до входа, как в USE) ───────────────────────────
-var float exit_px = na
-
-exit_px := na
+// ─── Выход ───────────────────────────────────────────────────────────────────
+var float xpx = na
+xpx := na
 if _in
     if _dir == 1
         if low  <= _sl
-            exit_px := _sl
+            xpx := _sl
         if high >= _tp
-            exit_px := _tp
-        if raw_sig_s
-            exit_px := close  // обратный сигнал
+            xpx := _tp
+        if sig_s
+            xpx := close
     else
         if high >= _sl
-            exit_px := _sl
+            xpx := _sl
         if low  <= _tp
-            exit_px := _tp
-        if raw_sig_l
-            exit_px := close
+            xpx := _tp
+        if sig_l
+            xpx := close
 
-// Закрываем сделку
-if not na(exit_px)
-    // Движение цены в %
-    move_pct = _dir * (exit_px - _ep) / _ep * 100.0
+if not na(xpx)
+    mv        = _dir * (xpx - _ep) / _ep * 100.0
+    pf        = mv - comm * 100.0
+    sldp      = math.abs(_ep - _sl) / _ep * 100.0
+    ps        = math.min(sldp > 1e-6 ? tgt / sldp : 1.0, pcap)
+    pa        = mv * ps - comm * 100.0 * ps
 
-    // === FIXED: posSize = 1 всегда ===
-    pnl_fix = move_pct - comm * 100.0
+    eq_fix   += pf
+    eq_adj   += pa
+    n_tr     += 1
 
-    // === ATR-ADJUSTED: posSize = target_risk / sl_dist_pct ===
-    sl_dist_pct = math.abs(_ep - _sl) / _ep * 100.0
-    pos_size    = sl_dist_pct > 1e-6 ? tgt_risk / sl_dist_pct : 1.0
-    pos_size   := math.min(pos_size, pos_cap)
-    pnl_adj     = move_pct * pos_size - comm * 100.0 * pos_size
-
-    eq_fix += pnl_fix
-    eq_adj += pnl_adj
-    n_trades += 1
-
-    if pnl_fix >= 0
-        wins_fix += pnl_fix
-        cnt_win  += 1
+    if pf >= 0
+        w_fix += pf
+        n_win += 1
     else
-        loss_fix += pnl_fix
-        cnt_los  += 1
+        l_fix += pf
+        n_los += 1
 
-    if pnl_adj >= 0
-        wins_adj += pnl_adj
+    if pa >= 0
+        w_adj += pa
     else
-        loss_adj += pnl_adj
+        l_adj += pa
+
+    // Drawdown
+    if eq_fix > peak_fix
+        peak_fix := eq_fix
+    dd_fix := math.max(dd_fix, peak_fix - eq_fix)
+    if eq_adj > peak_adj
+        peak_adj := eq_adj
+    dd_adj := math.max(dd_adj, peak_adj - eq_adj)
+
+    // Метка выхода на ценовом графике
+    if show_lbl
+        win = pf >= 0
+        etxt = (win ? "▲ " : "▼ ") +
+               "F:" + (pf >= 0 ? "+" : "") + str.tostring(pf, "#.#") + "%" +
+               "\nA:" + (pa >= 0 ? "+" : "") + str.tostring(pa, "#.#") + "%" +
+               "\n×" + str.tostring(ps, "#.##")
+        label.new(bar_index,
+                  _dir == 1 ? high + atr_v * 0.5 : low - atr_v * 0.5,
+                  etxt,
+                  style      = _dir == 1 ? label.style_label_down : label.style_label_up,
+                  color      = win ? color.new(c_win, 30) : color.new(c_los, 30),
+                  textcolor  = color.white,
+                  size       = sz,
+                  force_overlay = true)
 
     _in  := false
     _dir := 0
 
-// ─── Логика входа ────────────────────────────────────────────────────────────
+// ─── Вход ────────────────────────────────────────────────────────────────────
 if not _in
-    if raw_sig_l
-        _in   := true
-        _dir  := 1
-        _ep   := close
-        _atr0 := atr
-        _sl   := close - atr * sl_mult
-        _tp   := close + atr * sl_mult * tp_rr
-    else if raw_sig_s
-        _in   := true
-        _dir  := -1
-        _ep   := close
-        _atr0 := atr
-        _sl   := close + atr * sl_mult
-        _tp   := close - atr * sl_mult * tp_rr
+    if sig_l
+        _in  := true
+        _dir := 1
+        _ep  := close
+        _sl  := close - atr_v * sl_m
+        _tp  := close + atr_v * sl_m * tp_rr
+        _bar := bar_index
+        if show_lbl
+            sldp = math.abs(_ep - _sl) / _ep * 100.0
+            ps   = math.min(sldp > 1e-6 ? tgt / sldp : 1.0, pcap)
+            label.new(bar_index, low - atr_v * 0.3,
+                      "▲ L\n×" + str.tostring(ps, "#.##"),
+                      style     = label.style_label_up,
+                      color     = color.new(c_entry_l, 20),
+                      textcolor = color.white,
+                      size      = sz,
+                      force_overlay = true)
+    else if sig_s
+        _in  := true
+        _dir := -1
+        _ep  := close
+        _sl  := close + atr_v * sl_m
+        _tp  := close - atr_v * sl_m * tp_rr
+        _bar := bar_index
+        if show_lbl
+            sldp = math.abs(_ep - _sl) / _ep * 100.0
+            ps   = math.min(sldp > 1e-6 ? tgt / sldp : 1.0, pcap)
+            label.new(bar_index, high + atr_v * 0.3,
+                      "▼ S\n×" + str.tostring(ps, "#.##"),
+                      style     = label.style_label_down,
+                      color     = color.new(c_entry_s, 20),
+                      textcolor = color.white,
+                      size      = sz,
+                      force_overlay = true)
 
-// ─── Графики ─────────────────────────────────────────────────────────────────
-p_fix = plot(eq_fix, "Fixed posSize",        color=color.new(color.blue,   0), linewidth=2)
-p_adj = plot(eq_adj, "ATR-adjusted posSize", color=color.new(color.yellow, 0), linewidth=2)
-plot(0,              "Ноль",                 color=color.new(color.gray,  60), linewidth=1)
+// ─── Equity графики ──────────────────────────────────────────────────────────
+p_fix = plot(eq_fix, "Fixed (1×)",     color=c_fix, linewidth=2)
+p_adj = plot(eq_adj, "ATR-adjusted",   color=c_adj, linewidth=2)
+plot(0,              "Ноль",           color=color.new(color.gray, 60), linewidth=1)
 
-// Заливка между кривыми: зелёная если ATR-adj лучше, красная если хуже
 fill(p_adj, p_fix,
      color = eq_adj >= eq_fix
-             ? color.new(color.green, 85)
+             ? color.new(color.teal,  80)
              : color.new(color.red,   85))
 
-// Текущая открытая позиция — вычисляем значения (na если нет позиции)
-var float open_fix_val = na
-var float open_adj_val = na
+// Текущая открытая позиция
+var float ov_fix = na
+var float ov_adj = na
 if _in
-    cur_pnl_pct  = _dir * (close - _ep) / _ep * 100.0
-    sl_dist_pct  = math.abs(_ep - _sl) / _ep * 100.0
-    cur_pos_size = math.min(sl_dist_pct > 1e-6 ? tgt_risk / sl_dist_pct : 1.0, pos_cap)
-    open_fix_val := eq_fix + cur_pnl_pct - comm * 100.0
-    open_adj_val := eq_adj + cur_pnl_pct * cur_pos_size - comm * 100.0 * cur_pos_size
+    cp   = _dir * (close - _ep) / _ep * 100.0
+    sldp = math.abs(_ep - _sl) / _ep * 100.0
+    ps   = math.min(sldp > 1e-6 ? tgt / sldp : 1.0, pcap)
+    ov_fix := eq_fix + cp - comm * 100.0
+    ov_adj := eq_adj + cp * ps - comm * 100.0 * ps
 else
-    open_fix_val := na
-    open_adj_val := na
+    ov_fix := na
+    ov_adj := na
 
-plot(open_fix_val, "Open (fixed)",    color=color.new(color.blue,   60), linewidth=1, style=plot.style_circles)
-plot(open_adj_val, "Open (adjusted)", color=color.new(color.yellow, 60), linewidth=1, style=plot.style_circles)
+plot(ov_fix, "Open fixed",    color=color.new(c_fix, 50), linewidth=1, style=plot.style_circles)
+plot(ov_adj, "Open adjusted", color=color.new(c_adj, 50), linewidth=1, style=plot.style_circles)
 
-// ─── Таблица итогов ──────────────────────────────────────────────────────────
+// ─── Таблица (стиль оптимизатора) ────────────────────────────────────────────
 if barstate.islast
-    t = table.new(position.top_right, 3, 7,
-                  bgcolor      = color.new(color.black, 75),
-                  border_color = color.new(color.gray, 50),
-                  border_width = 1)
+    t = table.new(position.top_right, 3, 9,
+                  bgcolor      = c_bg,
+                  border_color = color.new(color.gray, 70),
+                  border_width = 1,
+                  frame_color  = color.new(color.gray, 50),
+                  frame_width  = 1)
 
-    // Заголовки
-    table.cell(t, 0, 0, "Метрика",       text_color=color.gray,   text_size=size.small)
-    table.cell(t, 1, 0, "Fixed (1×)",    text_color=color.blue,   text_size=size.small)
-    table.cell(t, 2, 0, "ATR-adjusted",  text_color=color.yellow, text_size=size.small)
+    // Вспомогательная функция — рисует строку
+    row(r, lbl, v1, v2, c1, c2) =>
+        table.cell(t, 0, r, lbl,
+                   bgcolor=c_hdr, text_color=c_neu, text_size=size.small, text_halign=text.align_left)
+        table.cell(t, 1, r, v1,
+                   bgcolor=c_bg,  text_color=c1,    text_size=size.small, text_halign=text.align_right)
+        table.cell(t, 2, r, v2,
+                   bgcolor=c_bg,  text_color=c2,    text_size=size.small, text_halign=text.align_right)
 
-    // Итоговый PnL
-    table.cell(t, 0, 1, "Итого PnL %", text_color=color.white, text_size=size.small)
-    table.cell(t, 1, 1, str.tostring(math.round(eq_fix, 2)) + "%",
-               text_color = eq_fix >= 0 ? color.lime : color.red, text_size=size.small)
-    table.cell(t, 2, 1, str.tostring(math.round(eq_adj, 2)) + "%",
-               text_color = eq_adj >= 0 ? color.lime : color.red, text_size=size.small)
+    // Заголовок
+    table.cell(t, 0, 0, "Метрика",
+               bgcolor=c_hdr, text_color=c_neu,  text_size=size.small, text_halign=text.align_left)
+    table.cell(t, 1, 0, "Fixed 1×",
+               bgcolor=c_hdr, text_color=c_fix,  text_size=size.small, text_halign=text.align_right)
+    table.cell(t, 2, 0, "ATR-adj",
+               bgcolor=c_hdr, text_color=c_adj,  text_size=size.small, text_halign=text.align_right)
+
+    // PnL
+    row(1, "PnL %",
+        (eq_fix >= 0 ? "+" : "") + str.tostring(math.round(eq_fix, 2)) + "%",
+        (eq_adj >= 0 ? "+" : "") + str.tostring(math.round(eq_adj, 2)) + "%",
+        eq_fix >= 0 ? c_win : c_los,
+        eq_adj >= 0 ? c_win : c_los)
 
     // Разница
-    diff = eq_adj - eq_fix
-    table.cell(t, 0, 2, "Разница",      text_color=color.white,  text_size=size.small)
-    table.cell(t, 1, 2, "",             text_color=color.white,  text_size=size.small)
-    table.cell(t, 2, 2, (diff >= 0 ? "+" : "") + str.tostring(math.round(diff, 2)) + "%",
-               text_color = diff >= 0 ? color.lime : color.red,  text_size=size.small)
+    dif = eq_adj - eq_fix
+    row(2, "Разница",
+        "",
+        (dif >= 0 ? "+" : "") + str.tostring(math.round(dif, 2)) + "%",
+        c_neu,
+        dif >= 0 ? c_win : c_los)
 
-    // Количество сделок
-    table.cell(t, 0, 3, "Сделок",       text_color=color.white,  text_size=size.small)
-    table.cell(t, 1, 3, str.tostring(n_trades), text_color=color.white, text_size=size.small)
-    table.cell(t, 2, 3, str.tostring(n_trades), text_color=color.white, text_size=size.small)
+    // Сделки / WR
+    wr = n_tr > 0 ? math.round(n_win / n_tr * 100, 1) : 0.0
+    row(3, "Сделок / WR%",
+        str.tostring(n_tr),
+        str.tostring(n_win) + "W  " + str.tostring(wr) + "%",
+        c_neu, wr >= 50 ? c_win : c_los)
 
-    // Сумма выигрышей
-    table.cell(t, 0, 4, "Сумма профит %", text_color=color.white, text_size=size.small)
-    table.cell(t, 1, 4, "+" + str.tostring(math.round(wins_fix, 2)),
-               text_color=color.lime, text_size=size.small)
-    table.cell(t, 2, 4, "+" + str.tostring(math.round(wins_adj, 2)),
-               text_color=color.lime, text_size=size.small)
+    // Profit Factor
+    pf_fix = l_fix < -1e-6 ? math.round(math.abs(w_fix / l_fix), 2) : 999.0
+    pf_adj = l_adj < -1e-6 ? math.round(math.abs(w_adj / l_adj), 2) : 999.0
+    row(4, "Profit Factor",
+        str.tostring(pf_fix),
+        str.tostring(pf_adj),
+        pf_fix >= 1.5 ? c_win : pf_fix >= 1.0 ? c_neu : c_los,
+        pf_adj >= 1.5 ? c_win : pf_adj >= 1.0 ? c_neu : c_los)
 
-    // Сумма потерь
-    table.cell(t, 0, 5, "Сумма убыток %", text_color=color.white, text_size=size.small)
-    table.cell(t, 1, 5, str.tostring(math.round(loss_fix, 2)),
-               text_color=color.red,  text_size=size.small)
-    table.cell(t, 2, 5, str.tostring(math.round(loss_adj, 2)),
-               text_color=color.red,  text_size=size.small)
+    // Avg Win / Avg Loss
+    aw_fix = n_win  > 0 ? math.round(w_fix / n_win, 2)  : 0.0
+    al_fix = n_los  > 0 ? math.round(l_fix / n_los, 2)  : 0.0
+    aw_adj = n_win  > 0 ? math.round(w_adj / n_win, 2)  : 0.0
+    al_adj = n_los  > 0 ? math.round(l_adj / n_los, 2)  : 0.0
+    row(5, "Avg Win %",
+        "+" + str.tostring(aw_fix), "+" + str.tostring(aw_adj),
+        c_win, c_win)
+    row(6, "Avg Loss %",
+        str.tostring(al_fix), str.tostring(al_adj),
+        c_los, c_los)
 
-    // Ratio wins/losses
-    r_fix = loss_fix < -1e-6 ? math.abs(wins_fix / loss_fix) : 999.0
-    r_adj = loss_adj < -1e-6 ? math.abs(wins_adj / loss_adj) : 999.0
-    table.cell(t, 0, 6, "Profit factor",  text_color=color.white,  text_size=size.small)
-    table.cell(t, 1, 6, str.tostring(math.round(r_fix, 2)),
-               text_color = r_fix >= 1 ? color.lime : color.red, text_size=size.small)
-    table.cell(t, 2, 6, str.tostring(math.round(r_adj, 2)),
-               text_color = r_adj >= 1 ? color.lime : color.red, text_size=size.small)
+    // Max DD
+    row(7, "Max DD %",
+        str.tostring(math.round(dd_fix, 2)) + "%",
+        str.tostring(math.round(dd_adj, 2)) + "%",
+        dd_fix < 10 ? c_win : dd_fix < 25 ? c_neu : c_los,
+        dd_adj < 10 ? c_win : dd_adj < 25 ? c_neu : c_los)
 
-// ─── Метки на свечах основного графика (переключается через overlay) ──────────
-// Чтобы видеть входы/выходы — открой второй экземпляр индикатора
-// с параметром overlay=true и закомментируй графики eq_fix/eq_adj
+    // Стратегия
+    row(8, "Stoch " + str.tostring(stk) + "/" + str.tostring(std),
+        str.tostring(os) + "/" + str.tostring(ob),
+        "SL×" + str.tostring(sl_m) + " RR" + str.tostring(tp_rr),
+        c_neu, c_neu)
