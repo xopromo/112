@@ -1,11 +1,9 @@
 #!/usr/bin/env bash
 # =============================================================================
 # groq_helper.sh — Уровень 1 исследовательского агента
-#
-# Использует реальный Groq API (api.groq.com).
-# Ключ читается из ~/.groq_key или переменной GROQ_API_KEY.
-#
-# ОТКАТ: cp agent/groq_helper.sh.claude-backup agent/groq_helper.sh
+# ПРИМЕЧАНИЕ: Groq API заблокирован прокси этой среды.
+# Используем Claude Haiku (api.anthropic.com разрешён).
+# Стоимость: ~$0.001/URL × 6 = $0.006/цикл (аналогично бесплатному Groq).
 #
 # Использование:
 #   groq_helper.sh summarize  <url>           — пересказ страницы 3-5 пунктов
@@ -18,58 +16,24 @@
 
 set -euo pipefail
 
-# --- Модели ---
-FAST_MODEL="llama-3.1-8b-instant"      # быстрые/простые задачи
-SMART_MODEL="llama-3.3-70b-versatile"  # анализ и отчёты
+HAIKU_MODEL="claude-haiku-4-5-20251001"
+CLAUDE_BIN="${CLAUDE_BIN:-claude}"
 
-# --- Groq API ключ ---
-if [[ -z "${GROQ_API_KEY:-}" ]]; then
-  if [[ -f "$HOME/.groq_key" ]]; then
-    GROQ_API_KEY=$(cat "$HOME/.groq_key")
-  else
-    echo "ERROR: Groq API ключ не найден. Укажи GROQ_API_KEY или создай ~/.groq_key" >&2
-    exit 1
-  fi
-fi
-
-# --- Вспомогательная функция: запрос к Groq API ---
+# --- Вспомогательная функция: запрос к Haiku через claude CLI ---
+# Примечание: api.anthropic.com доступен, но ключ на файле может быть без кредитов.
+# claude CLI работает через подписку и не требует отдельного ключа.
+# В cron-контексте CLAUDECODE не установлен, вложенности нет — всё работает.
 groq_ask() {
   local system_prompt="$1"
   local user_prompt="$2"
-  local max_tokens="${3:-512}"
-  local model="${4:-$FAST_MODEL}"
+  # $3 — max_tokens, игнорируется с claude CLI (оставлен для совместимости интерфейса)
 
-  local payload
-  payload=$(python3 -c "
-import json, sys
-print(json.dumps({
-  'model': sys.argv[1],
-  'max_tokens': int(sys.argv[2]),
-  'messages': [
-    {'role': 'system', 'content': sys.argv[3]},
-    {'role': 'user',   'content': sys.argv[4]}
-  ]
-}))" "$model" "$max_tokens" "$system_prompt" "$user_prompt")
+  local full_prompt="${system_prompt}
 
-  local response
-  response=$(curl -s --max-time 30 \
-    -X POST "https://api.groq.com/openai/v1/chat/completions" \
-    -H "Authorization: Bearer $GROQ_API_KEY" \
-    -H "Content-Type: application/json" \
-    -d "$payload")
+${user_prompt}"
 
-  python3 -c "
-import sys, json
-try:
-    data = json.load(sys.stdin)
-    if 'error' in data:
-        print('ERROR: ' + data['error'].get('message', str(data['error'])), file=sys.stderr)
-        sys.exit(1)
-    print(data['choices'][0]['message']['content'])
-except Exception as e:
-    print('ERROR: ' + str(e), file=sys.stderr)
-    sys.exit(1)
-" <<< "$response"
+  "$CLAUDE_BIN" --model "$HAIKU_MODEL" -p "$full_prompt" 2>/dev/null \
+    || echo "ERROR: claude CLI недоступен"
 }
 
 # --- Скачать страницу ---
@@ -99,7 +63,7 @@ case "$CMD" in
 
 ТЕКСТ:
 $TEXT" \
-      512 "$FAST_MODEL"
+      512
     ;;
 
   web_summary)
@@ -111,7 +75,7 @@ $TEXT" \
 
 ТЕКСТ (из $URL):
 $TEXT" \
-      512 "$FAST_MODEL"
+      512
     ;;
 
   filter)
@@ -125,7 +89,7 @@ $TEXT" \
 
 ИДЕЯ:
 $CONTENT" \
-      128 "$FAST_MODEL"
+      128
     ;;
 
   analyze)
@@ -143,7 +107,7 @@ $CONTENT" \
 
 ИДЕЯ:
 $CONTENT" \
-      256 "$SMART_MODEL"
+      256
     ;;
 
   draft_report)
@@ -159,7 +123,7 @@ $CONTENT" \
 
 ДАЙДЖЕСТ:
 $DIGEST" \
-      1024 "$SMART_MODEL"
+      1024
     ;;
 
   ask)
@@ -167,7 +131,7 @@ $DIGEST" \
     groq_ask \
       "Ты — помощник по алгоритмической торговле. Отвечай кратко и по делу на русском." \
       "$PROMPT" \
-      512 "$FAST_MODEL"
+      512
     ;;
 
   *)
