@@ -137,16 +137,21 @@ fill(p_adj, p_fix,
              ? color.new(color.green, 85)
              : color.new(color.red,   85))
 
-// Текущая открытая позиция — показываем незакрытый PnL
+// Текущая открытая позиция — вычисляем значения (na если нет позиции)
+var float open_fix_val = na
+var float open_adj_val = na
 if _in
-    cur_pnl_pct = _dir * (close - _ep) / _ep * 100.0
+    cur_pnl_pct  = _dir * (close - _ep) / _ep * 100.0
     sl_dist_pct  = math.abs(_ep - _sl) / _ep * 100.0
-    cur_pos_size = sl_dist_pct > 1e-6 ? tgt_risk / sl_dist_pct : 1.0
-    cur_pos_size := math.min(cur_pos_size, pos_cap)
-    plot(eq_fix + cur_pnl_pct - comm * 100.0,
-         "Open (fixed)",    color=color.new(color.blue,   60), linewidth=1, style=plot.style_circles)
-    plot(eq_adj + cur_pnl_pct * cur_pos_size - comm * 100.0 * cur_pos_size,
-         "Open (adjusted)", color=color.new(color.yellow, 60), linewidth=1, style=plot.style_circles)
+    cur_pos_size = math.min(sl_dist_pct > 1e-6 ? tgt_risk / sl_dist_pct : 1.0, pos_cap)
+    open_fix_val := eq_fix + cur_pnl_pct - comm * 100.0
+    open_adj_val := eq_adj + cur_pnl_pct * cur_pos_size - comm * 100.0 * cur_pos_size
+else
+    open_fix_val := na
+    open_adj_val := na
+
+plot(open_fix_val, "Open (fixed)",    color=color.new(color.blue,   60), linewidth=1, style=plot.style_circles)
+plot(open_adj_val, "Open (adjusted)", color=color.new(color.yellow, 60), linewidth=1, style=plot.style_circles)
 
 // ─── Таблица итогов ──────────────────────────────────────────────────────────
 if barstate.islast
