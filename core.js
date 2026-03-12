@@ -143,6 +143,7 @@ function calcMA(data, period, type) {
   if (type === 'WMA') return calcWMA(data, period);
   if (type === 'DEMA') return calcDEMA(data, period);
   if (type === 'TEMA') return calcTEMA(data, period);
+  if (type === 'Kalman') return _buildKalmanMA(data, period); // ##KALMAN_TYPE##
   return calcEMA(data, period);
 }
 // HTF MA: строит MA на барах старшего ТФ (ratio=4 → 4x текущего).

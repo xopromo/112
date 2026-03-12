@@ -137,18 +137,37 @@ function _calcSortino(eq) {
 // OLS: eq[i] ~ a + b·i. Высокий K = equity растёт равномерно.
 // K ≥ 2 = отлично, ≥ 1 = хорошо, < 0.5 = нестабильно.
 // Вычисляется лениво в showDetail (НЕ в горячем цикле).
+// Kalman smoothing: перед OLS сглаживаем equity фильтром Калмана (Q=0.01, R=1).
+// Снижает влияние шумовых просадок на оценку slope → K-Ratio становится стабильнее.
 // Откат: удалить эту функцию + блок ##KR_SQN## в showDetail (ui.js)
+function _kalmanSmoothEq(eq) {
+  // Скалярный фильтр Калмана: Q=шум процесса, R=шум измерения
+  // Малый Q/R → больше сглаживания (доверяем модели, не измерениям)
+  const N = eq.length;
+  const out = new Array(N);
+  let x = eq[0], P = 1.0;
+  const Q = 0.01, R = 1.0;
+  for (let i = 0; i < N; i++) {
+    P += Q;
+    const K = P / (P + R);
+    x += K * (eq[i] - x);
+    P *= (1 - K);
+    out[i] = x;
+  }
+  return out;
+}
 function _calcKRatio(eq) {
   if (!eq || eq.length < 20) return null;
-  const N = eq.length;
+  const smoothed = _kalmanSmoothEq(eq); // ##KALMAN_KRATIO##
+  const N = smoothed.length;
   let sx = 0, sy = 0, sxy = 0, sx2 = 0;
-  for (let i = 0; i < N; i++) { sx += i; sy += eq[i]; sxy += i * eq[i]; sx2 += i * i; }
+  for (let i = 0; i < N; i++) { sx += i; sy += smoothed[i]; sxy += i * smoothed[i]; sx2 += i * i; }
   const den = N * sx2 - sx * sx;
   if (Math.abs(den) < 1e-10) return null;
   const b = (N * sxy - sx * sy) / den;
   const a = (sy - b * sx) / N;
   let ssr = 0;
-  for (let i = 0; i < N; i++) { const e = eq[i] - (a + b * i); ssr += e * e; }
+  for (let i = 0; i < N; i++) { const e = smoothed[i] - (a + b * i); ssr += e * e; }
   const se = Math.sqrt(ssr / Math.max(N - 2, 1) / (sx2 - sx * sx / N));
   if (se < 1e-10) return b > 0 ? 99.9 : b < 0 ? -99.9 : null; // ровный тренд → макс. K-Ratio
   return Math.round(b / se * 10) / 10;
@@ -996,6 +1015,7 @@ async function runOpt() {
 
   // New entry flags
   const useRsiExit  = $c('e_rsix');
+  const useKalmanCross = $c('e_kalcr'); // ##KALMAN_CROSS##
   const useMaCross    = $c('e_macr');
   const useFreeEntry  = $c('e_free');
   const useMacd       = $c('e_macd');
@@ -1338,6 +1358,7 @@ async function runOpt() {
   const rsiExitPers  = useRsiExit    ? parseRange('e_rsix_p')  : [$n('e_rsix_p') ||14];
   const rsiExitOSA   = useRsiExit    ? parseRange('e_rsix_os') : [$n('e_rsix_os')||30];
   const rsiExitOBA   = useRsiExit    ? parseRange('e_rsix_ob') : [$n('e_rsix_ob')||70];
+  const kalmanCrossLenArr = useKalmanCross ? parseRange('e_kalcrl') : [$n('e_kalcrl') || 20]; // ##KALMAN_CROSS##
   const maCrossPArr  = useMaCross    ? parseRange('e_macr_p')  : [$n('e_macr_p') ||20];
   const macdFastArr  = (useMacd||useMacdFilter) ? parseRange('e_macd_f')  : [$n('e_macd_f') ||12];
   const macdSlowArr  = (useMacd||useMacdFilter) ? parseRange('e_macd_s')  : [$n('e_macd_s') ||26];
@@ -1359,6 +1380,7 @@ async function runOpt() {
   const waitCancelAtr   = useWaitEntry ? ($n('e_wait_catr') || 0) : 0;
   // ── Per-iteration indicator caches ─────────────────────────────────
   const rsiExitCache = {}, maCrossNewCache = {}, macdNewCache = {}, stochNewCache = {}, stDirCache = {};
+  const kalmanCrossCache = {}; // ##KALMAN_CROSS##
 
   // ── Trendline Figures Precompute ─────────────────────────────
   // Все четыре паттерна вычисляются один раз перед основным циклом.
@@ -1579,6 +1601,7 @@ async function runOpt() {
       ['waitRetrace', (Array.isArray(waitRetraceArr) && waitRetraceArr.length > 0) ? waitRetraceArr : [0.618]],
       ['eisPeriod',   (Array.isArray(eisPArr) && eisPArr.length > 0) ? eisPArr : [20]],
       ['erPeriod',    (Array.isArray(erPArr) && erPArr.length > 0) ? erPArr : [10]],
+      ['kalmanCrossLen', (Array.isArray(kalmanCrossLenArr) && kalmanCrossLenArr.length > 0) ? kalmanCrossLenArr : [20]], // ##KALMAN_CROSS##
     ];
     // Defaults for all params (first element of each array)
     window._ipDef = Object.fromEntries(_allIp.map(([n,a])=>[n,a[0]]));
@@ -1599,7 +1622,8 @@ async function runOpt() {
       slPivOff: 0, slPivMax: 50, slPivL: 5, slPivR: 3, rsiExitPer: 14, rsiExitOS: 30,
       rsiExitOB: 70, maCrossP: 50, macdFast: 12, macdSlow: 26, macdSigP: 9,
       stochKP: 14, stochDP: 3, stochOS: 20, stochOB: 80, volMoveMult: 1.5, nReversalN: 3,
-      stAtrP: 10, stMult: 3.0, waitBars: 0, waitRetrace: 0.618, eisPeriod: 20, erPeriod: 10
+      stAtrP: 10, stMult: 3.0, waitBars: 0, waitRetrace: 0.618, eisPeriod: 20, erPeriod: 10,
+      kalmanCrossLen: 20 // ##KALMAN_CROSS##
     };
     window._ipCombos = [{}];
     if (_isSynthMode && typeof _setSynthProgress !== 'undefined') {
@@ -1764,8 +1788,10 @@ async function runOpt() {
       const waitRetrace = _ip.waitRetrace ?? window._ipDef.waitRetrace;
       const eisPeriod   = _ip.eisPeriod   ?? window._ipDef.eisPeriod;
       const erPeriod    = _ip.erPeriod    ?? window._ipDef.erPeriod;
+      const kalmanCrossLen = _ip.kalmanCrossLen ?? window._ipDef.kalmanCrossLen; // ##KALMAN_CROSS##
       const {lo:pivSLLo, hi:pivSLHi} = useSLPiv ? _getPivSL(slPivL, slPivR) : {lo:null, hi:null};
       const rsiExitArr = useRsiExit   ? (rsiExitCache[rsiExitPer]||(rsiExitCache[rsiExitPer]=calcRSI(rsiExitPer))) : null;
+      const kalmanCrossArr = useKalmanCross ? (()=>{const k=kalmanCrossLen;return kalmanCrossCache[k]||(kalmanCrossCache[k]=_buildKalmanMA(closes,k));})() : null; // ##KALMAN_CROSS##
       const maCrossArr = useMaCross   ? (()=>{const k=_mCrossType+'_'+maCrossP;return maCrossNewCache[k]||(maCrossNewCache[k]=calcMA(closes,maCrossP,_mCrossType));})() : null;
       const stDir      = (useSupertrend||useStExit) ? (()=>{const k=stAtrP+'_'+stMult;return stDirCache[k]||(stDirCache[k]=calcSupertrend(stAtrP,stMult));})() : null;
       let macdLine=null,macdSignal=null;
@@ -1815,6 +1841,7 @@ async function runOpt() {
         useSqueeze:useSqz,sqzOn,sqzCount,sqzMinBars,
         useTLTouch,useTLBreak,useFlag,useTri,tfSigL,tfSigS,tlPvL,tlPvR,
         useRsiExit,rsiExitArr,rsiExitPeriod:rsiExitPer,rsiExitOS,rsiExitOB,
+        useKalmanCross,kalmanCrossArr,kalmanCrossLen, // ##KALMAN_CROSS##
         useMaCross,maCrossArr,maCrossP,maCrossType:_mCrossType,
         useFreeEntry,
         useMacd,macdLine,macdSignal,macdFast,macdSlow,macdSignalP:macdSigP,
@@ -1887,6 +1914,7 @@ async function runOpt() {
               tlPvL,tlPvR,tlZonePct:$n('e_tl_zone')||0.3,
               flagImpMin:$n('e_flag_imp')||2.0,flagMaxBars:$n('e_flag_bars')||20,flagRetrace:$n('e_flag_ret')||0.618,
               useRsiExit,rsiExitPeriod:rsiExitPer,rsiExitOS,rsiExitOB,
+              useKalmanCross,kalmanCrossLen, // ##KALMAN_CROSS##
               useMaCross,maCrossP,maCrossType,
               useFreeEntry,
               useMacd,macdFast,macdSlow,macdSignalP:macdSigP,
@@ -2083,8 +2111,10 @@ async function runOpt() {
       const waitRetrace = _ip.waitRetrace ?? window._ipDef.waitRetrace;
       const eisPeriod   = _ip.eisPeriod   ?? window._ipDef.eisPeriod;
       const erPeriod    = _ip.erPeriod    ?? window._ipDef.erPeriod;
+      const kalmanCrossLen = _ip.kalmanCrossLen ?? window._ipDef.kalmanCrossLen; // ##KALMAN_CROSS##
       const {lo:pivSLLo, hi:pivSLHi} = useSLPiv ? _getPivSL(slPivL, slPivR) : {lo:null, hi:null};
       const rsiExitArr = useRsiExit   ? (rsiExitCache[rsiExitPer]||(rsiExitCache[rsiExitPer]=calcRSI(rsiExitPer))) : null;
+      const kalmanCrossArr = useKalmanCross ? (()=>{const k=kalmanCrossLen;return kalmanCrossCache[k]||(kalmanCrossCache[k]=_buildKalmanMA(closes,k));})() : null; // ##KALMAN_CROSS##
       const maCrossArr = useMaCross   ? (()=>{const k=_mCrossType+'_'+maCrossP;return maCrossNewCache[k]||(maCrossNewCache[k]=calcMA(closes,maCrossP,_mCrossType));})() : null;
       const stDir      = (useSupertrend||useStExit) ? (()=>{const k=stAtrP+'_'+stMult;return stDirCache[k]||(stDirCache[k]=calcSupertrend(stAtrP,stMult));})() : null;
       let macdLine=null,macdSignal=null;
@@ -2137,6 +2167,7 @@ async function runOpt() {
         useSqueeze:useSqz,sqzOn,sqzCount,sqzMinBars,
         useTLTouch,useTLBreak,useFlag,useTri,tfSigL,tfSigS,tlPvL,tlPvR,
         useRsiExit,rsiExitArr,rsiExitPeriod:rsiExitPer,rsiExitOS,rsiExitOB,
+        useKalmanCross,kalmanCrossArr,kalmanCrossLen, // ##KALMAN_CROSS##
         useMaCross,maCrossArr,maCrossP,maCrossType:_mCrossType,
         useFreeEntry,
         useMacd,macdLine,macdSignal,macdFast,macdSlow,macdSignalP:macdSigP,
@@ -2238,6 +2269,7 @@ async function runOpt() {
               tlPvL,tlPvR,tlZonePct:$n('e_tl_zone')||0.3,
               flagImpMin:$n('e_flag_imp')||2.0,flagMaxBars:$n('e_flag_bars')||20,flagRetrace:$n('e_flag_ret')||0.618,
               useRsiExit,rsiExitPeriod:rsiExitPer,rsiExitOS,rsiExitOB,
+              useKalmanCross,kalmanCrossLen, // ##KALMAN_CROSS##
               useMaCross,maCrossP,maCrossType:_mCrossType,
               useFreeEntry,
               useMacd,macdFast,macdSlow,macdSignalP:macdSigP,
@@ -2677,7 +2709,9 @@ async function runOpt() {
                                     const stMult      = _ip.stMult      ?? window._ipDef.stMult;
                                     const waitBars    = _ip.waitBars    ?? window._ipDef.waitBars;
                                     const waitRetrace = _ip.waitRetrace ?? window._ipDef.waitRetrace;
+                                    const kalmanCrossLen = _ip.kalmanCrossLen ?? window._ipDef.kalmanCrossLen; // ##KALMAN_CROSS##
                                     const rsiExitArr = useRsiExit   ? (rsiExitCache[rsiExitPer]||(rsiExitCache[rsiExitPer]=calcRSI(rsiExitPer))) : null;
+                                    const kalmanCrossArr = useKalmanCross ? (()=>{const k=kalmanCrossLen;return kalmanCrossCache[k]||(kalmanCrossCache[k]=_buildKalmanMA(closes,k));})() : null; // ##KALMAN_CROSS##
                                     const _mCrossType0 = maCrossTypeArr[0]||maCrossType;
                                     const maCrossArr = useMaCross   ? (()=>{const k=_mCrossType0+'_'+maCrossP;return maCrossNewCache[k]||(maCrossNewCache[k]=calcMA(closes,maCrossP,_mCrossType0));})() : null;
                                     const stDir      = (useSupertrend||useStExit) ? (()=>{const k=stAtrP+'_'+stMult;return stDirCache[k]||(stDirCache[k]=calcSupertrend(stAtrP,stMult));})() : null;
@@ -2714,6 +2748,7 @@ async function runOpt() {
                                       useTLTouch,useTLBreak,useFlag,useTri,
                                       tfSigL,tfSigS,
                                       useRsiExit,rsiExitArr,rsiExitPeriod:rsiExitPer,rsiExitOS,rsiExitOB,
+                                      useKalmanCross,kalmanCrossArr,kalmanCrossLen, // ##KALMAN_CROSS##
                                       useMaCross,maCrossArr,maCrossP,maCrossType:_mCrossTyp,
                                       useFreeEntry,
                                       useMacd,macdLine,macdSignal,macdFast,macdSlow,macdSignalP:macdSigP,
@@ -2820,6 +2855,7 @@ async function runOpt() {
                                           tlPvL:$n('e_tl_pvl')||5, tlPvR:$n('e_tl_pvr')||3, tlZonePct:$n('e_tl_zone')||0.3,
                                           flagImpMin:$n('e_flag_imp')||2.0, flagMaxBars:$n('e_flag_bars')||20, flagRetrace:$n('e_flag_ret')||0.618,
                                           useRsiExit,rsiExitPeriod:rsiExitPer,rsiExitOS,rsiExitOB,
+                                          useKalmanCross,kalmanCrossLen, // ##KALMAN_CROSS##
                                           useMaCross,maCrossP,maCrossType:_mCrossTyp,
                                           useFreeEntry,
                                           useMacd,macdFast,macdSlow,macdSignalP:macdSigP,
@@ -2998,6 +3034,11 @@ function _calcIndicators(cfg) {
   // ##KALMAN_MA## — Откат: удалить 2 строки + kalmanArr из return + buildBtCfg + filter_registry.js
   const kalmanLen = cfg.kalmanLen || 20;
   const kalmanArr = cfg.useKalmanMA ? _buildKalmanMA(closes, kalmanLen) : null;
+
+  // ── Kalman Crossover ─────────────────────────────────────────
+  // ##KALMAN_CROSS## — Откат: удалить 2 строки + kalmanCrossArr из return + buildBtCfg + entry_registry.js
+  const kalmanCrossLenInd = cfg.kalmanCrossLen || 20;
+  const kalmanCrossArr = cfg.useKalmanCross ? _buildKalmanMA(closes, kalmanCrossLenInd) : null;
 
   // ── Confirm MA ────────────────────────────────────────────
   const confN = cfg.confN || 0;
@@ -3298,6 +3339,7 @@ function _calcIndicators(cfg) {
     eisEMAArr, eisHistArr,
     erArr,
     kalmanArr, // ##KALMAN_MA##
+    kalmanCrossArr, // ##KALMAN_CROSS##
   };
 }
 
@@ -3503,6 +3545,10 @@ function buildBtCfg(cfg, ind) {
     useKalmanMA: cfg.useKalmanMA || false, // ##KALMAN_MA##
     kalmanArr:   ind.kalmanArr,
     kalmanLen:   cfg.kalmanLen   || 20,
+
+    useKalmanCross: cfg.useKalmanCross || false, // ##KALMAN_CROSS##
+    kalmanCrossArr: ind.kalmanCrossArr,
+    kalmanCrossLen: cfg.kalmanCrossLen || 20,
 
     start: Math.max((maP || 0) * (cfg.htfRatio || 1), (cfg.confN || 0) * (cfg.confHtfRatio || 1), 50) + 2,
     pruning: false,

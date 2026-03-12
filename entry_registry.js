@@ -316,6 +316,34 @@ const ENTRY_REGISTRY = [
     ],
   },
 
+  // ── Kalman Crossover ─────────────────────────────────────
+  // Вход по пересечению цены с адаптивной Kalman MA.
+  // Лонг: close[i-1] > Kalman[i-1] AND close[i-2] <= Kalman[i-2].
+  // Отличие от MA Crossover: Kalman адаптирует скорость к волатильности —
+  // быстрее при высокой, медленнее при низкой → меньше ложных пробоев.
+  // FIX: kalmanCrossArr[i-1] <= 0 → не прогрелся → не торговать.
+  // Откат: удалить этот объект + kalmanCrossArr в opt.js + #e_kalcr в shell.html
+  {
+    id:        'kalmancross',
+    flag:      'useKalmanCross',
+    htmlId:    'e_kalcr',
+    shortName: c => `KalmanX(${c.kalmanCrossLen || 20})`,
+    detectL: (cfg, i) => {
+      if (!cfg.kalmanCrossArr || i < 2) return false;
+      const k1 = cfg.kalmanCrossArr[i-1], k2 = cfg.kalmanCrossArr[i-2];
+      return k1 > 0 && k2 > 0 && DATA[i-1].c > k1 && DATA[i-2].c <= k2;
+    },
+    detectS: (cfg, i) => {
+      if (!cfg.kalmanCrossArr || i < 2) return false;
+      const k1 = cfg.kalmanCrossArr[i-1], k2 = cfg.kalmanCrossArr[i-2];
+      return k1 > 0 && k2 > 0 && DATA[i-1].c < k1 && DATA[i-2].c >= k2;
+    },
+    pineLines: (c, b) => [
+      `use_kalman_cross = input.bool(${b(c.useKalmanCross)}, "Kalman кросс", group=grp_entry)`,
+      `kalman_cross_len = input.int(${c.kalmanCrossLen || 20}, "  Kalman период", minval=5, maxval=500, group=grp_entry)`,
+    ],
+  },
+
   // ── Свободный вход (Free Entry) ───────────────────────────
   // Вход разрешён всегда. Ограничивают только фильтры (AND-логика).
   // Полезно: тест чистой системы фильтров без сигнала входа.

@@ -995,7 +995,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
   <div class="cb"><input type="checkbox" id="e_macr"><label data-tip="Пересечение MA: цена пересекает скользящую среднюю (закрытие выше после закрытия ниже = лонг). В отличие от MA Touch — без требования касания зоны">MA Crossover</label></div>
   <div class="g2">
     <div class="field"><label>Период MA</label><input id="e_macr_p" value="20" data-tip="Период скользящей средней для пересечения"></div>
-    <div class="field"><label>Тип MA</label><select id="e_macr_t"><option value="EMA">EMA</option><option value="SMA">SMA</option><option value="WMA">WMA</option><option value="RMA">RMA</option><option value="DEMA">DEMA</option><option value="TEMA">TEMA</option></select></div>
+    <div class="field"><label>Тип MA</label><select id="e_macr_t"><option value="EMA">EMA</option><option value="SMA">SMA</option><option value="WMA">WMA</option><option value="RMA">RMA</option><option value="DEMA">DEMA</option><option value="TEMA">TEMA</option><option value="Kalman">Kalman</option></select></div>
   </div>
   <div class="field"><label data-tip="Перебирать все типы MA (EMA, SMA, WMA) для MA Crossover входа"><input type="checkbox" id="e_macr_sweep_types"> Все типы MA</label></div>
 
@@ -1033,6 +1033,9 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
     <div class="field"><label>ATR период</label><input id="e_st_atrp" value="10" data-tip="Период ATR для расчёта Supertrend. Больше = медленнее реагирует, меньше сигналов"></div>
     <div class="field"><label>Множитель</label><input id="e_st_mult" value="3.0" data-tip="Множитель ATR для ширины полос Supertrend. Больше = реже смены тренда"></div>
   </div>
+
+  <div class="cb"><input type="checkbox" id="e_kalcr"><label data-tip="Kalman Crossover: цена пересекает адаптивную Kalman MA. Лонг: close пересёк Kalman снизу вверх. Kalman адаптирует скорость к волатильности — быстрее при высоком ATR, медленнее при низком → меньше ложных пробоев чем EMA">Kalman Crossover</label></div>
+  <div class="field"><label>Kalman период</label><input id="e_kalcrl" value="20" data-tip="Базовый период Kalman MA. Можно задать диапазон для оптимизации: 10,20,30. Фактическая скорость адаптируется к волатильности"></div>
 </div>
 
 <!-- Отложенный вход -->
@@ -1164,7 +1167,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
 
   <div class="cb"><input type="checkbox" id="f_ma" checked><label data-tip="Разрешает лонги только когда цена выше MA, шорты — только ниже MA. Основной трендовый фильтр">MA фильтр тренда</label></div>
   <div class="g2">
-    <div class="field"><label>Тип MA</label><select id="f_mat"><option>EMA</option><option>SMA</option><option>WMA</option><option>DEMA</option><option>TEMA</option></select></div>
+    <div class="field"><label>Тип MA</label><select id="f_mat"><option>EMA</option><option>SMA</option><option>WMA</option><option>DEMA</option><option>TEMA</option><option>Kalman</option></select></div>
     <div class="field"><label>Период</label><input id="f_map" value="50,100,200" data-tip="Период MA. Можно задать несколько через запятую для оптимизации: 50,100,200"></div>
   </div>
   <div class="g2">
@@ -1195,7 +1198,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
   <div class="cb"><input type="checkbox" id="f_confirm"><label data-tip="Вторая MA как дополнительный фильтр (аналог MTF MA в USE). Лонг: close > вторая MA. Шорт: close &lt; вторая MA. Позволяет задать более медленную MA для фильтрации направления">Вторая MA (доп. фильтр)</label></div>
   <div class="confirm-hint">Лонг: close &gt; вторая MA. Шорт: close &lt; вторая MA.</div>
   <div class="g2">
-    <div class="field"><label>Тип MA</label><select id="f_conf_mat"><option>EMA</option><option>SMA</option><option>WMA</option><option>HMA</option><option>DEMA</option><option>TEMA</option></select></div>
+    <div class="field"><label>Тип MA</label><select id="f_conf_mat"><option>EMA</option><option>SMA</option><option>WMA</option><option>HMA</option><option>DEMA</option><option>TEMA</option><option>Kalman</option></select></div>
     <div class="field"><label>Период</label><input id="f_confn" value="50,100,200" data-tip="Период второй MA. Например 200 для трендового фильтра, 50 для среднесрочного"></div>
   </div>
   <div class="g2">
