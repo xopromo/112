@@ -32,7 +32,7 @@ if [[ -z "${GROQ_API_KEY:-}" ]]; then
   fi
 fi
 
-# --- Вспомогательная функция: запрос к Groq API ---
+# --- Вспомогательная функция: запрос к Groq API с автоматическим retry при rate limit ---
 groq_ask() {
   local system_prompt="$1"
   local user_prompt="$2"
@@ -51,25 +51,51 @@ print(json.dumps({
   ]
 }))" "$model" "$max_tokens" "$system_prompt" "$user_prompt")
 
-  local response
-  response=$(curl -s --max-time 30 \
-    -X POST "https://api.groq.com/openai/v1/chat/completions" \
-    -H "Authorization: Bearer $GROQ_API_KEY" \
-    -H "Content-Type: application/json" \
-    -d "$payload")
+  while true; do
+    local response
+    response=$(curl -s --max-time 30 \
+      -X POST "https://api.groq.com/openai/v1/chat/completions" \
+      -H "Authorization: Bearer $GROQ_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d "$payload")
 
-  python3 -c "
-import sys, json
+    # Парсим ответ: если rate limit — ждём retry-after и повторяем
+    local result
+    result=$(python3 -c "
+import sys, json, re
 try:
     data = json.load(sys.stdin)
     if 'error' in data:
-        print('ERROR: ' + data['error'].get('message', str(data['error'])), file=sys.stderr)
-        sys.exit(1)
-    print(data['choices'][0]['message']['content'])
+        msg = data['error'].get('message', '')
+        # Определяем тип ошибки
+        if 'rate_limit' in data['error'].get('type','') or 'Rate limit' in msg:
+            # Ищем число секунд: 'try again in 2.72s' или 'in 2s'
+            m = re.search(r'in ([\d.]+)s', msg)
+            wait = float(m.group(1)) if m else 20.0
+            # Округляем вверх до целого + 1 секунда запаса
+            import math
+            wait = math.ceil(wait) + 1
+            print('RATE_LIMIT:' + str(wait))
+        else:
+            print('ERROR: ' + msg, file=sys.stderr)
+            sys.exit(1)
+    else:
+        print(data['choices'][0]['message']['content'])
 except Exception as e:
     print('ERROR: ' + str(e), file=sys.stderr)
     sys.exit(1)
-" <<< "$response"
+" <<< "$response")
+
+    if [[ "$result" == RATE_LIMIT:* ]]; then
+      local wait="${result#RATE_LIMIT:}"
+      echo "[groq] rate limit — жду ${wait}s..." >&2
+      sleep "$wait"
+      # повторяем запрос
+    else
+      echo "$result"
+      return 0
+    fi
+  done
 }
 
 # --- Скачать страницу ---
