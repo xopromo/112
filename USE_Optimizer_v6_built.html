@@ -252,20 +252,6 @@ header .sub {
 #ccnt { color: var(--orange); font-size: .72em; margin-left: 8px; }
 
 /* BEST STATS BAR */
-.best-bar {
-  display: none;
-  background: var(--bg3);
-  border: 1px solid var(--border2);
-  border-radius: 8px;
-  padding: 8px 14px;
-  margin: 6px 0;
-  flex-wrap: wrap;
-  gap: 16px;
-  /* НЕ sticky — не перекрывает график при прокрутке */
-}
-.bstat { text-align: center; }
-.bstat .val { font-size: 1.1em; font-weight: 700; }
-.bstat .lbl { font-size: .58em; color: var(--text2); margin-top: 1px; }
 
 /* EQUITY CHART */
 #eq-wrap {
@@ -1433,7 +1419,6 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
   </div>
 </div>
 
-<div class="best-bar" id="bst"></div>
 <div id="eq-wrap">
   <canvas id="eqc"></canvas>
   <canvas id="eq-crosshair"></canvas>
@@ -12960,17 +12945,7 @@ function applyParsedText() {
   showParseToast(changes);
 }
 
-function showBestStats() {
-  const b=results[0];
-  const el=$('bst'); el.style.display='flex';
-  el.innerHTML=
-    `<div class="bstat"><div class="val ${b.pnl>=0?'pos':'neg'}">${b.pnl.toFixed(1)}%</div><div class="lbl">PnL</div></div>`+
-    `<div class="bstat"><div class="val">${b.wr.toFixed(1)}%</div><div class="lbl">WinRate</div></div>`+
-    `<div class="bstat"><div class="val muted">${b.n}</div><div class="lbl">Сделок</div></div>`+
-    `<div class="bstat"><div class="val neg">${b.dd.toFixed(1)}%</div><div class="lbl">MaxDD</div></div>`+
-    `<div class="bstat"><div class="val pos">${b.pdd.toFixed(1)}</div><div class="lbl">P/DD</div></div>`+
-    `<div class="bstat"><div class="val" style="font-size:.6em;color:var(--accent);max-width:200px;overflow:hidden;text-overflow:ellipsis" title="${b.name}">${b.name}</div><div class="lbl">🏆 Лучшая</div></div>`;
-}
+function showBestStats() { /* removed */ }
 
 // Параметры последнего нарисованного графика — для crosshair
 let _eqChartParams = null;
@@ -17253,7 +17228,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1773421971085;
+window._BUILD_TS = 1773422103501;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;

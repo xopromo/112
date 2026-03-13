@@ -2821,17 +2821,7 @@ function applyParsedText() {
   showParseToast(changes);
 }
 
-function showBestStats() {
-  const b=results[0];
-  const el=$('bst'); el.style.display='flex';
-  el.innerHTML=
-    `<div class="bstat"><div class="val ${b.pnl>=0?'pos':'neg'}">${b.pnl.toFixed(1)}%</div><div class="lbl">PnL</div></div>`+
-    `<div class="bstat"><div class="val">${b.wr.toFixed(1)}%</div><div class="lbl">WinRate</div></div>`+
-    `<div class="bstat"><div class="val muted">${b.n}</div><div class="lbl">Сделок</div></div>`+
-    `<div class="bstat"><div class="val neg">${b.dd.toFixed(1)}%</div><div class="lbl">MaxDD</div></div>`+
-    `<div class="bstat"><div class="val pos">${b.pdd.toFixed(1)}</div><div class="lbl">P/DD</div></div>`+
-    `<div class="bstat"><div class="val" style="font-size:.6em;color:var(--accent);max-width:200px;overflow:hidden;text-overflow:ellipsis" title="${b.name}">${b.name}</div><div class="lbl">🏆 Лучшая</div></div>`;
-}
+function showBestStats() { /* removed */ }
 
 // Параметры последнего нарисованного графика — для crosshair
 let _eqChartParams = null;

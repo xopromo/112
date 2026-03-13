@@ -252,20 +252,6 @@ header .sub {
 #ccnt { color: var(--orange); font-size: .72em; margin-left: 8px; }
 
 /* BEST STATS BAR */
-.best-bar {
-  display: none;
-  background: var(--bg3);
-  border: 1px solid var(--border2);
-  border-radius: 8px;
-  padding: 8px 14px;
-  margin: 6px 0;
-  flex-wrap: wrap;
-  gap: 16px;
-  /* НЕ sticky — не перекрывает график при прокрутке */
-}
-.bstat { text-align: center; }
-.bstat .val { font-size: 1.1em; font-weight: 700; }
-.bstat .lbl { font-size: .58em; color: var(--text2); margin-top: 1px; }
 
 /* EQUITY CHART */
 #eq-wrap {
@@ -1433,7 +1419,6 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
   </div>
 </div>
 
-<div class="best-bar" id="bst"></div>
 <div id="eq-wrap">
   <canvas id="eqc"></canvas>
   <canvas id="eq-crosshair"></canvas>
