@@ -77,6 +77,24 @@ header .sub {
   margin-left: 8px;
   vertical-align: middle;
 }
+#build-age-wrap {
+  margin-top: 6px;
+  font-size: .6em;
+  color: var(--text3);
+  letter-spacing: 0.04em;
+}
+#build-age-wrap .build-age-dot {
+  display: inline-block;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--green2);
+  margin-right: 5px;
+  vertical-align: middle;
+  position: relative;
+  top: -1px;
+}
+#build-age-wrap.age-old .build-age-dot { background: var(--orange); }
+#build-age-wrap.age-stale .build-age-dot { background: var(--text3); }
 
 /* PANELS */
 .panels-toolbar {
@@ -455,6 +473,8 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
   letter-spacing: .06em;
   flex: 1;
   line-height: 1.4;
+  user-select: text;
+  cursor: text;
 }
 .dp-close {
   width: 28px; height: 28px;
@@ -810,6 +830,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
 <header>
   <h1>⚡ USE OPTIMIZER <span class="version-badge">v5</span></h1>
   <div class="sub">OHLCV · Полная реплика логики USE · SL/TP И/ИЛИ · Volume-фильтры · Подробные названия</div>
+  <div id="build-age-wrap" title="Время с момента последнего обновления кода"></div>
 </header>
 
 <!-- TOP TOOLBAR (one row: project + tools) -->
@@ -1494,8 +1515,8 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
           <th class="col-pnl" data-sort="1" style="min-width:52px;resize:horizontal;overflow:auto;cursor:pointer">PnL% ↕</th>
           <th class="col-wr" data-sort="2" style="min-width:48px;resize:horizontal;overflow:auto;cursor:pointer">WR% ↕</th>
           <th class="col-n" data-sort="3" style="min-width:36px;resize:horizontal;overflow:auto;cursor:pointer"># ↕</th>
-          <th class="col-dd" data-sort="4" style="min-width:48px;resize:horizontal;overflow:auto;cursor:pointer">DD% ↕</th>
-          <th class="col-pdd" data-sort="5" style="min-width:48px;resize:horizontal;overflow:auto;cursor:pointer">P/DD ↕</th>
+          <th class="col-dd" data-sort="4" title="Максимальная просадка (DrawDown): наибольшее падение от пика equity до дна. Меньше — лучше." style="min-width:48px;resize:horizontal;overflow:auto;cursor:pointer">DD% ↕</th>
+          <th class="col-pdd" data-sort="5" title="PnL / MaxDD: сколько прибыли приходится на единицу максимального риска. Выше — лучше. ≥3 = хорошо, ≥5 = отлично." style="min-width:48px;resize:horizontal;overflow:auto;cursor:pointer">P/DD ↕</th>
           <th class="col-sig" data-sort="19" title="Статистическая значимость: z-тест WR>50%. ≥90% = значима." style="min-width:48px;resize:horizontal;overflow:auto;cursor:pointer;color:var(--accent)">Sig% ↕</th>
           <th class="col-gt" data-sort="20" title="GT-Score: (P/DD) × sig_mult × consistency_mult. Антиовефиттинг метрика." style="min-width:52px;resize:horizontal;overflow:auto;cursor:pointer;color:var(--accent)">GT ↕</th>
           <th class="col-cvr" data-sort="21" title="CVR% — Temporal Cross-Validation Robustness: % из 6 временных окон, где стратегия прибыльна. ≥80% = устойчива." style="min-width:48px;resize:horizontal;overflow:auto;cursor:pointer;color:var(--accent)">CVR% ↕</th>
@@ -1508,22 +1529,22 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
           <th class="col-srnty" data-sort="33" title="Serenity Index = PnL / (UlcerIdx × TailFactor). TailFactor = CVaR(5%) / mean(убытков). Штраф за хвостовые риски. ≥5 = отлично, ≥3 = хорошо." style="min-width:56px;resize:horizontal;overflow:auto;cursor:pointer;color:var(--accent)">Serenity ↕</th>
           <th class="col-ir" data-sort="34" title="Information Ratio = mean(active_returns) / std(active_returns) × √252. active_return = стратегия − buy&hold. IR > 1 = хорошо, > 0.5 = добавляет ценность, < 0 = хуже buy&hold." style="min-width:44px;resize:horizontal;overflow:auto;cursor:pointer;color:var(--accent)">IR ↕</th>
           <th class="col-cpcv" data-sort="29" title="CPCV% — блочная валидация. Заполняется после открытия детали (lazy). ≥80% = устойчива." style="min-width:52px;resize:horizontal;overflow:auto;cursor:pointer;color:var(--accent)">CPCV% ↕</th>
-          <th class="col-avg" data-sort="6" style="min-width:44px;resize:horizontal;overflow:auto;cursor:pointer">Avg% ↕</th>
-          <th class="col-p1" data-sort="7" style="min-width:52px;resize:horizontal;overflow:auto;cursor:pointer">1п PnL ↕</th>
-          <th class="col-p2" data-sort="8" style="min-width:52px;resize:horizontal;overflow:auto;cursor:pointer">2п PnL ↕</th>
-          <th class="col-dwr" data-sort="9" style="min-width:44px;resize:horizontal;overflow:auto;cursor:pointer">ΔWR ↕</th>
-          <th class="col-split" data-sort="10" style="min-width:44px;resize:horizontal;overflow:auto;cursor:pointer">Split ↕</th>
+          <th class="col-avg" data-sort="6" title="Средний % прибыли/убытка на одну сделку. Показывает насколько «жирные» средние сделки." style="min-width:44px;resize:horizontal;overflow:auto;cursor:pointer">Avg% ↕</th>
+          <th class="col-p1" data-sort="7" title="PnL за первую половину данных (IS). Показывает, как стратегия работала на обучающей части." style="min-width:52px;resize:horizontal;overflow:auto;cursor:pointer">1п PnL ↕</th>
+          <th class="col-p2" data-sort="8" title="PnL за вторую половину данных (OOS). Показывает, как стратегия работала на проверочной части. Близко к 1п = стабильно." style="min-width:52px;resize:horizontal;overflow:auto;cursor:pointer">2п PnL ↕</th>
+          <th class="col-dwr" data-sort="9" title="ΔWinRate: разница WR между первой и второй половиной данных. Близко к 0% = стабильное качество сигналов. ≥20% — признак подгонки." style="min-width:44px;resize:horizontal;overflow:auto;cursor:pointer">ΔWR ↕</th>
+          <th class="col-split" data-sort="10" title="Оценка стабильности: сравнивает PnL и ΔWR между двумя половинами данных. ✅ = обе половины прибыльны и ΔWR мал, ⚠️ = умеренное расхождение, ❌ = одна из половин убыточна или большой дрейф." style="min-width:44px;resize:horizontal;overflow:auto;cursor:pointer">Split ↕</th>
           <th class="col-ls" data-sort="17" title="Разница WinRate лонг vs шорт" style="min-width:44px;resize:horizontal;overflow:auto;cursor:pointer">L/S ↕</th>
           <th class="col-tv-score" data-sort="22" title="OOS прибылен + скорость роста ≥50% от IS + DD не взорвался" style="min-width:32px;resize:horizontal;overflow:auto;color:#f90;cursor:pointer">TV ↕</th>
           <th class="col-tv-dpnl" data-sort="23" title="OOS PnL — прибыль только за OOS-период (последние 30%). Показывает, зарабатывает ли стратегия на НОВЫХ данных" style="min-width:64px;resize:horizontal;overflow:auto;color:#f90;cursor:pointer">OOS PnL ↕</th>
           <th class="col-tv-ddd" data-sort="24" title="Во сколько раз TV MaxDD больше IS MaxDD. ≤1.5 = хорошо" style="min-width:56px;resize:horizontal;overflow:auto;color:#f90;cursor:pointer">ΔDD TV ↕</th>
           <th class="col-tv-dpdd" data-sort="25" title="TV P/DD vs IS P/DD: % удержания. ≥70% = хорошо" style="min-width:56px;resize:horizontal;overflow:auto;color:#f90;cursor:pointer">ΔP/DD TV ↕</th>
-          <th class="col-rob" data-sort="11" title="Всего тестов пройдено" style="min-width:44px;resize:horizontal;overflow:auto;cursor:pointer">Rob ↕</th>
-          <th class="col-rob-oos" data-sort="12" title="OOS: 3 участка" style="min-width:36px;resize:horizontal;overflow:auto;color:var(--accent);cursor:pointer">OOS</th>
-          <th class="col-rob-walk" data-sort="13" title="Walk-Forward" style="min-width:36px;resize:horizontal;overflow:auto;color:var(--accent);cursor:pointer">WF</th>
-          <th class="col-rob-param" data-sort="14" title="Параметрическая чувствительность" style="min-width:40px;resize:horizontal;overflow:auto;color:var(--accent);cursor:pointer">Param</th>
-          <th class="col-rob-noise" data-sort="15" title="Шум: 60%+ прогонов прибыльны" style="min-width:40px;resize:horizontal;overflow:auto;color:var(--accent);cursor:pointer">Noise</th>
-          <th class="col-rob-mc" data-sort="16" title="Monte Carlo: p95 DD < PnL" style="min-width:32px;resize:horizontal;overflow:auto;color:var(--accent);cursor:pointer">MC</th>
+          <th class="col-rob" data-sort="11" title="Robustness Score: итоговый % пройденных тестов устойчивости из 5 видов (OOS, WF, Param, Noise, MC). 100% = прошла все тесты." style="min-width:44px;resize:horizontal;overflow:auto;cursor:pointer">Rob ↕</th>
+          <th class="col-rob-oos" data-sort="12" title="Out-Of-Sample: стратегия проверяется на 3 непересекающихся отрезках данных. ✅ = прибыльна на всех 3 участках." style="min-width:36px;resize:horizontal;overflow:auto;color:var(--accent);cursor:pointer">OOS</th>
+          <th class="col-rob-walk" data-sort="13" title="Walk-Forward: оптимизация на первых 70%, тест на следующих 30%, сдвиг, повтор. ✅ = стабильна при движущемся окне." style="min-width:36px;resize:horizontal;overflow:auto;color:var(--accent);cursor:pointer">WF</th>
+          <th class="col-rob-param" data-sort="14" title="Параметрическая чувствительность: ±10% изменение каждого параметра. ✅ = соседние параметры дают похожие результаты (нет острых пиков)." style="min-width:40px;resize:horizontal;overflow:auto;color:var(--accent);cursor:pointer">Param</th>
+          <th class="col-rob-noise" data-sort="15" title="Noise Test: добавляется случайный шум к ценам (±0.1%). ✅ = ≥60% прогонов остаются прибыльными." style="min-width:40px;resize:horizontal;overflow:auto;color:var(--accent);cursor:pointer">Noise</th>
+          <th class="col-rob-mc" data-sort="16" title="Monte Carlo: случайное перемешивание сделок. ✅ = p95 просадка меньше общего PnL (стратегия выдерживает худшие сценарии)." style="min-width:32px;resize:horizontal;overflow:auto;color:var(--accent);cursor:pointer">MC</th>
           <th id="col-settings-btn" title="Настройки столбиков" style="cursor:pointer;width:20px;padding:2px 4px">⚙</th>
         </tr>
         <tr class="tbl-filter-row" id="filter-row">
@@ -2472,6 +2493,32 @@ function toggleNotepad() {
 document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
   document.getElementById('c_synth_gamma_val').textContent = this.value;
 });
+</script>
+
+<script>
+// Build age timer — показывает сколько времени прошло с последнего обновления кода
+window._BUILD_TS = /* ##BUILD_TS## */ 0;
+(function() {
+  const wrap = document.getElementById('build-age-wrap');
+  if (!wrap || !window._BUILD_TS) return;
+  function fmt(ms) {
+    const m = Math.floor(ms / 60000);
+    if (m < 1)  return 'только что';
+    if (m < 60) return `${m} мин назад`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h} ч ${m % 60} мин назад`;
+    const d = Math.floor(h / 24);
+    return `${d} д ${h % 24} ч назад`;
+  }
+  function update() {
+    const age = Date.now() - window._BUILD_TS;
+    const h = age / 3600000;
+    wrap.className = h < 2 ? '' : h < 24 ? 'age-old' : 'age-stale';
+    wrap.innerHTML = `<span class="build-age-dot"></span>обновлено ${fmt(age)}`;
+  }
+  update();
+  setInterval(update, 60000);
+})();
 </script>
 
 </body>
