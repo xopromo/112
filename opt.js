@@ -2572,12 +2572,10 @@ async function runOpt() {
         }
       }
 
-      if (iter % 10 === 0 || iter === boN - 1) {
-        updateETA(iter + 1, boN, results.length);
-        setMcPhase(`🔬 BO итерация ${iter + 1}/${boN} · найдено ${results.length} · лучший score ${yBest.toFixed(3)}`);
-        await yieldToUI();
-        await checkPause();
-      }
+      updateETA(iter + 1, boN, results.length);
+      setMcPhase(`🔬 BO итерация ${iter + 1}/${boN} · найдено ${results.length} · лучший score ${yBest.toFixed(3)}`);
+      await yieldToUI();
+      await checkPause();
     }
 
     // Batch metrics for BO results (same as TPE)

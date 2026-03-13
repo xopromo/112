@@ -574,7 +574,14 @@ async function openTableTplPopover(forceReopen) {
     : '<div style="font-size:.65em;color:var(--text3);padding:4px 0">Нет сохранённых шаблонов</div>';
 
   pop.innerHTML = saveRow + toggleHelp + items;
-  btn.parentElement.appendChild(pop);
+
+  // Append to body to escape overflow:hidden on .tbl-mode-bar
+  document.body.appendChild(pop);
+  const rect = btn.getBoundingClientRect();
+  pop.style.position = 'fixed';
+  pop.style.top  = (rect.bottom + 3) + 'px';
+  pop.style.right = (window.innerWidth - rect.right) + 'px';
+  pop.style.left  = 'auto';
 
   // close on outside click
   setTimeout(() => {
