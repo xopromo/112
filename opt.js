@@ -1381,6 +1381,7 @@ async function runOpt() {
   // ── Per-iteration indicator caches ─────────────────────────────────
   const rsiExitCache = {}, maCrossNewCache = {}, macdNewCache = {}, stochNewCache = {}, stDirCache = {};
   const kalmanCrossCache = {}; // ##KALMAN_CROSS##
+  const kalmanMACache = {}; // ##KALMAN_MA##
 
   // ── Trendline Figures Precompute ─────────────────────────────
   // Все четыре паттерна вычисляются один раз перед основным циклом.
@@ -1792,6 +1793,7 @@ async function runOpt() {
       const {lo:pivSLLo, hi:pivSLHi} = useSLPiv ? _getPivSL(slPivL, slPivR) : {lo:null, hi:null};
       const rsiExitArr = useRsiExit   ? (rsiExitCache[rsiExitPer]||(rsiExitCache[rsiExitPer]=calcRSI(rsiExitPer))) : null;
       const kalmanCrossArr = useKalmanCross ? (()=>{const k=kalmanCrossLen;return kalmanCrossCache[k]||(kalmanCrossCache[k]=_buildKalmanMA(closes,k));})() : null; // ##KALMAN_CROSS##
+      const kalmanArr = useKalmanMA ? (()=>{return kalmanMACache[kalmanLen]||(kalmanMACache[kalmanLen]=_buildKalmanMA(closes,kalmanLen));})() : null; // ##KALMAN_MA##
       const maCrossArr = useMaCross   ? (()=>{const k=_mCrossType+'_'+maCrossP;return maCrossNewCache[k]||(maCrossNewCache[k]=calcMA(closes,maCrossP,_mCrossType));})() : null;
       const stDir      = (useSupertrend||useStExit) ? (()=>{const k=stAtrP+'_'+stMult;return stDirCache[k]||(stDirCache[k]=calcSupertrend(stAtrP,stMult));})() : null;
       let macdLine=null,macdSignal=null;
@@ -2115,6 +2117,7 @@ async function runOpt() {
       const {lo:pivSLLo, hi:pivSLHi} = useSLPiv ? _getPivSL(slPivL, slPivR) : {lo:null, hi:null};
       const rsiExitArr = useRsiExit   ? (rsiExitCache[rsiExitPer]||(rsiExitCache[rsiExitPer]=calcRSI(rsiExitPer))) : null;
       const kalmanCrossArr = useKalmanCross ? (()=>{const k=kalmanCrossLen;return kalmanCrossCache[k]||(kalmanCrossCache[k]=_buildKalmanMA(closes,k));})() : null; // ##KALMAN_CROSS##
+      const kalmanArr = useKalmanMA ? (()=>{return kalmanMACache[kalmanLen]||(kalmanMACache[kalmanLen]=_buildKalmanMA(closes,kalmanLen));})() : null; // ##KALMAN_MA##
       const maCrossArr = useMaCross   ? (()=>{const k=_mCrossType+'_'+maCrossP;return maCrossNewCache[k]||(maCrossNewCache[k]=calcMA(closes,maCrossP,_mCrossType));})() : null;
       const stDir      = (useSupertrend||useStExit) ? (()=>{const k=stAtrP+'_'+stMult;return stDirCache[k]||(stDirCache[k]=calcSupertrend(stAtrP,stMult));})() : null;
       let macdLine=null,macdSignal=null;
@@ -2204,7 +2207,7 @@ async function runOpt() {
         useFat:_effUseFat,fatConsec,fatVolDrop,bodyAvg:bodyAvgArr,
         useMacdFilter:_fCombo.useMacdFilter??useMacdFilter,
         useER:_fCombo.useER??useER,erArr,erPeriod:erPeriod||10,erThresh,
-        useKalmanMA:_fCombo.useKalmanMA??useKalmanMA,kalmanLen, // ##KALMAN_MA##
+        useKalmanMA:_fCombo.useKalmanMA??useKalmanMA,kalmanArr,kalmanLen, // ##KALMAN_MA##
         start:Math.max((maP||0)*(htfRatio||1),(confN||0)*(_confHtf||1),50)+2,pruning:false,maxDDLimit:maxDD
       };
 
@@ -2712,6 +2715,7 @@ async function runOpt() {
                                     const kalmanCrossLen = _ip.kalmanCrossLen ?? window._ipDef.kalmanCrossLen; // ##KALMAN_CROSS##
                                     const rsiExitArr = useRsiExit   ? (rsiExitCache[rsiExitPer]||(rsiExitCache[rsiExitPer]=calcRSI(rsiExitPer))) : null;
                                     const kalmanCrossArr = useKalmanCross ? (()=>{const k=kalmanCrossLen;return kalmanCrossCache[k]||(kalmanCrossCache[k]=_buildKalmanMA(closes,k));})() : null; // ##KALMAN_CROSS##
+                                    const kalmanArr = useKalmanMA ? (()=>{return kalmanMACache[kalmanLen]||(kalmanMACache[kalmanLen]=_buildKalmanMA(closes,kalmanLen));})() : null; // ##KALMAN_MA##
                                     const _mCrossType0 = maCrossTypeArr[0]||maCrossType;
                                     const maCrossArr = useMaCross   ? (()=>{const k=_mCrossType0+'_'+maCrossP;return maCrossNewCache[k]||(maCrossNewCache[k]=calcMA(closes,maCrossP,_mCrossType0));})() : null;
                                     const stDir      = (useSupertrend||useStExit) ? (()=>{const k=stAtrP+'_'+stMult;return stDirCache[k]||(stDirCache[k]=calcSupertrend(stAtrP,stMult));})() : null;
@@ -2801,7 +2805,7 @@ async function runOpt() {
                                       useVolDir,volDirPeriod:volDirP,
                                       useWT:useWT&&wtT>0,wtScores,wtThresh:wtT,
                                       useFat,fatConsec,fatVolDrop,
-                                      useKalmanMA,kalmanLen, // ##KALMAN_MA##
+                                      useKalmanMA,kalmanArr,kalmanLen, // ##KALMAN_MA##
                                       bodyAvg:bodyAvgArr,
                                       start:Math.max((maP||0)*(htfRatio||1),(confN||0)*(_confHtf||1),50)+2,
                                       // Pruning

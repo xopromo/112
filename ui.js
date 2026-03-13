@@ -540,10 +540,11 @@ function _applyTableFilters(f, visibleOnly) {
   applyFilters();
 }
 
-async function openTableTplPopover() {
-  // close if already open
+async function openTableTplPopover(forceReopen) {
+  // close if already open (toggle); if forceReopen — just close old and rebuild
   const existing = document.getElementById('tbl-tpl-popover');
-  if (existing) { existing.remove(); return; }
+  if (existing && !forceReopen) { existing.remove(); return; }
+  if (existing) existing.remove();
 
   const tpls = (await storeLoad(_TBL_TPL_KEY)) || [];
   const btn  = $('btn-tbl-tpl');
@@ -593,7 +594,7 @@ async function saveTableTpl() {
   if (!name?.trim()) return;
   tpls.push({ name: name.trim(), filters: _gatherTableFilters(), ts: Date.now() });
   await storeSave(_TBL_TPL_KEY, tpls);
-  openTableTplPopover(); // refresh
+  openTableTplPopover(true); // force reopen with updated list
 }
 
 async function applyTableTpl(i, visibleOnly) {
@@ -608,7 +609,7 @@ async function deleteTableTpl(i) {
   const tpls = (await storeLoad(_TBL_TPL_KEY)) || [];
   tpls.splice(i, 1);
   await storeSave(_TBL_TPL_KEY, tpls);
-  openTableTplPopover();
+  openTableTplPopover(true); // force reopen with updated list
 }
 
 function resetAllFilters() {
@@ -845,7 +846,7 @@ function renderVisibleResults() {
     const fav = isFav(r.name) ? '⭐' : '☆';
     html +=
       `<tr data-i="${rii}" style="cursor:pointer">` +
-      `<td class="accent" style="font-size:.66em;max-width:380px;overflow:hidden;text-overflow:ellipsis">${r.name}</td>` +
+      `<td class="accent" style="font-size:.66em;max-width:380px;overflow:hidden;text-overflow:ellipsis;user-select:text;cursor:text" title="${r.name}">${r.name}</td>` +
       `<td class="col-fav" style="cursor:pointer;font-size:.85em" data-fav="${rii}">${fav}</td>` +
       `<td class="col-pnl ${pnlCls}">${r.pnl.toFixed(1)}</td>` +
       `<td class="col-wr">${r.wr.toFixed(1)}</td>` +
