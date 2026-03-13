@@ -2537,7 +2537,7 @@ async function runOpt() {
     setMcPhase(`🔬 BO разведка (${Math.min(20, boN)} случайных точек)…`);
     updateETA(0, boN, 0); await yieldToUI(); // показать начальное состояние BO до цикла
 
-    for (let iter = 0; iter < boN && !_mcDone; iter++) {
+    for (let iter = 0; iter < boN && !_mcDone && !stopped; iter++) {
       let dimIndices;
       if (iter < Math.min(20, Math.floor(boN * 0.2)) || gpModel === null) {
         // Exploration: random LHS

@@ -607,6 +607,9 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
 .tbl-mode-btn.active { background:rgba(0,212,255,.12); border-color:var(--accent); color:var(--accent); font-weight:600; }
 .tbl-mode-btn.hc-mode { border-color:var(--green); color:var(--green); }
 .tbl-mode-btn.hc-mode.active { background:rgba(0,230,118,.12); }
+.tbl-mode-btn.tbl-qf-btn { border-color:var(--accent2); color:var(--text2); font-size:.62em; }
+.tbl-mode-btn.tbl-qf-btn:hover { background:rgba(255,255,255,.06); color:var(--text1); }
+.tbl-mode-btn.tbl-qf-default { border-color:var(--accent2); color:var(--accent2); }
 .tbl-mode-label { font-size:.6em; color:var(--text3); }
 
 /* ===== Пагинация ===== */
@@ -1487,6 +1490,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
     <button class="tbl-mode-btn" id="tbl-btn-fav" onclick="switchTableMode('fav')">Избранные <span id="tbl-cnt-fav">0</span></button>
     <button class="tbl-mode-btn oos-mode" id="tbl-btn-oos" onclick="switchTableMode('oos')" style="display:none">OOS <span id="tbl-cnt-oos">0</span></button>
     <button class="tbl-mode-btn" id="btn-reset-filters" onclick="resetAllFilters()" title="Сбросить все фильтры и сортировку" style="margin-left:auto">✕ Сброс</button>
+    <span id="tbl-quick-filters"></span>
     <div style="position:relative">
       <button class="tbl-mode-btn" id="btn-tbl-tpl" onclick="openTableTplPopover()" title="Шаблоны фильтров — сохранить текущие фильтры / быстро применить сохранённый набор" style="border-color:var(--accent2);color:var(--accent)">💾 Наборы фильтров ▾</button>
     </div>

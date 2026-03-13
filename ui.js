@@ -540,6 +540,21 @@ function _applyTableFilters(f, visibleOnly) {
   applyFilters();
 }
 
+function _renderQuickFilterBtns(tpls) {
+  const container = document.getElementById('tbl-quick-filters');
+  if (!container) return;
+  const pinned = (tpls || []).filter(t => t.pinned).slice(0, 5);
+  container.innerHTML = pinned.map((t, _) => {
+    const i = tpls.indexOf(t);
+    const isDefault = t.isDefault;
+    return `<button class="tbl-mode-btn tbl-qf-btn${isDefault ? ' tbl-qf-default' : ''}"
+      onclick="applyTableTpl(${i},false)"
+      title="${t.name}${isDefault ? ' · применяется по умолчанию' : ''}"
+      style="max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+      >${isDefault ? '🏠 ' : ''}${t.name}</button>`;
+  }).join('');
+}
+
 async function openTableTplPopover(forceReopen) {
   // close if already open (toggle); if forceReopen — just close old and rebuild
   const existing = document.getElementById('tbl-tpl-popover');
@@ -557,11 +572,17 @@ async function openTableTplPopover(forceReopen) {
   </div>`;
 
   const toggleHelp = `<div style="font-size:.6em;color:var(--text3);margin-bottom:6px">
-    Клик = применить ко всем (вкл. скрытые колонки) &nbsp;·&nbsp; Shift+Клик = только видимые колонки
+    ▶ применить · 👁▶ только видимые · 🏠 по умолчанию · 📌 на панель (до 5)
   </div>`;
 
+  const pinnedCount = tpls.filter(t => t.pinned).length;
+
   const items = tpls.length
-    ? tpls.map((t, i) => `
+    ? tpls.map((t, i) => {
+        const pinActive  = t.pinned;
+        const defActive  = t.isDefault;
+        const canPin     = pinActive || pinnedCount < 5;
+        return `
       <div class="tbl-tpl-item">
         <div style="flex:1;min-width:0">
           <div class="tbl-tpl-name">${t.name}</div>
@@ -569,8 +590,11 @@ async function openTableTplPopover(forceReopen) {
         </div>
         <button class="tpl-ibtn" style="font-size:.62em;padding:2px 6px" onclick="applyTableTpl(${i},false)" title="Применить ко всем колонкам">▶</button>
         <button class="tpl-ibtn" style="font-size:.62em;padding:2px 6px;border-color:var(--accent2);color:var(--accent2)" onclick="applyTableTpl(${i},true)" title="Применить только к видимым колонкам">👁▶</button>
+        <button class="tpl-ibtn" style="font-size:.62em;padding:2px 5px;opacity:${canPin?1:.35};${defActive?'border-color:var(--accent2);color:var(--accent2)':''}" onclick="setDefaultTpl(${i})" title="${defActive ? 'Убрать из «по умолчанию»' : 'Применять по умолчанию при загрузке'}">🏠</button>
+        <button class="tpl-ibtn" style="font-size:.62em;padding:2px 5px;${pinActive?'border-color:var(--accent);color:var(--accent)':'opacity:.5'}${canPin?'':';opacity:.3;cursor:default'}" onclick="${canPin?`togglePinTpl(${i})`:'void 0'}" title="${pinActive ? 'Убрать с панели' : (canPin ? 'Добавить на панель быстрого доступа' : 'Панель заполнена (5/5)')}">📌</button>
         <button class="tpl-ibtn del" style="font-size:.62em;padding:2px 5px" onclick="deleteTableTpl(${i})" title="Удалить">✕</button>
-      </div>`).join('')
+      </div>`;
+      }).join('')
     : '<div style="font-size:.65em;color:var(--text3);padding:4px 0">Нет сохранённых шаблонов</div>';
 
   pop.innerHTML = saveRow + toggleHelp + items;
@@ -601,6 +625,7 @@ async function saveTableTpl() {
   if (!name?.trim()) return;
   tpls.push({ name: name.trim(), filters: _gatherTableFilters(), ts: Date.now() });
   await storeSave(_TBL_TPL_KEY, tpls);
+  _renderQuickFilterBtns(tpls);
   openTableTplPopover(true); // force reopen with updated list
 }
 
@@ -616,7 +641,30 @@ async function deleteTableTpl(i) {
   const tpls = (await storeLoad(_TBL_TPL_KEY)) || [];
   tpls.splice(i, 1);
   await storeSave(_TBL_TPL_KEY, tpls);
+  _renderQuickFilterBtns(tpls);
   openTableTplPopover(true); // force reopen with updated list
+}
+
+async function setDefaultTpl(i) {
+  const tpls = (await storeLoad(_TBL_TPL_KEY)) || [];
+  if (!tpls[i]) return;
+  const wasDefault = tpls[i].isDefault;
+  tpls.forEach(t => delete t.isDefault);
+  if (!wasDefault) tpls[i].isDefault = true; // toggle off if already default
+  await storeSave(_TBL_TPL_KEY, tpls);
+  _renderQuickFilterBtns(tpls);
+  openTableTplPopover(true);
+}
+
+async function togglePinTpl(i) {
+  const tpls = (await storeLoad(_TBL_TPL_KEY)) || [];
+  if (!tpls[i]) return;
+  const pinnedCount = tpls.filter(t => t.pinned).length;
+  if (!tpls[i].pinned && pinnedCount >= 5) return; // cap at 5
+  tpls[i].pinned = !tpls[i].pinned;
+  await storeSave(_TBL_TPL_KEY, tpls);
+  _renderQuickFilterBtns(tpls);
+  openTableTplPopover(true);
 }
 
 function resetAllFilters() {
@@ -1520,6 +1568,12 @@ window.addEventListener('load', async () => {
   templates = (await storeLoad('use6_tpl')) || [];
   const def = templates.find(t => t.isDefault);
   if (def) applySettings(def.settings);
+
+  // Наборы фильтров: рендерим кнопки быстрого доступа и применяем дефолтный
+  const filterTpls = (await storeLoad(_TBL_TPL_KEY)) || [];
+  _renderQuickFilterBtns(filterTpls);
+  const defFilterTpl = filterTpls.find(t => t.isDefault);
+  if (defFilterTpl) _applyTableFilters(defFilterTpl.filters, false);
   renderTplList();
   updateClxExitVisibility();
 
