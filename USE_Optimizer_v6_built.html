@@ -2359,9 +2359,10 @@ function generatePineScript(r) {
   lines.push(`bool ma_dist_ok = not use_ma_dist or not use_int_ma or ma_dist <= ma_dist_max`);
   lines.push(``);
   lines.push(`// Volume`);
-  lines.push(`float vol_avg2   = ta.sma(volume, vol_len)`);
-  lines.push(`bool is_whale    = volume[1] > vol_avg2[1] * vol_mult`);
-  lines.push(`bool is_climax_v = volume[1] > vol_avg2[1] * 3 and math.abs(close[1] - open[1]) > ta.sma(math.abs(close - open), 20)[1] * 1.5`);
+  lines.push(`float vol_avg2      = ta.sma(volume, vol_len)`);
+  lines.push(`float body_sma20    = ta.sma(math.abs(close - open), 20)`);
+  lines.push(`bool is_whale       = volume[1] > vol_avg2[1] * vol_mult`);
+  lines.push(`bool is_climax_v    = volume[1] > vol_avg2[1] * 3 and math.abs(close[1] - open[1]) > body_sma20[1] * 1.5`);
   lines.push(`bool liq_ok      = not use_liq_f or volume[1] >= vol_avg2[1] * liq_min_mult`);
     lines.push(`float bull_vol = 0.0`);
     lines.push(`float bear_vol = 0.0`);
@@ -17233,7 +17234,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1773423916399;
+window._BUILD_TS = 1773424047454;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
