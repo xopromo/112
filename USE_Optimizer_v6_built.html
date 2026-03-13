@@ -77,6 +77,24 @@ header .sub {
   margin-left: 8px;
   vertical-align: middle;
 }
+#build-age-wrap {
+  margin-top: 6px;
+  font-size: .6em;
+  color: var(--text3);
+  letter-spacing: 0.04em;
+}
+#build-age-wrap .build-age-dot {
+  display: inline-block;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--green2);
+  margin-right: 5px;
+  vertical-align: middle;
+  position: relative;
+  top: -1px;
+}
+#build-age-wrap.age-old .build-age-dot { background: var(--orange); }
+#build-age-wrap.age-stale .build-age-dot { background: var(--text3); }
 
 /* PANELS */
 .panels-toolbar {
@@ -812,6 +830,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
 <header>
   <h1>⚡ USE OPTIMIZER <span class="version-badge">v5</span></h1>
   <div class="sub">OHLCV · Полная реплика логики USE · SL/TP И/ИЛИ · Volume-фильтры · Подробные названия</div>
+  <div id="build-age-wrap" title="Время с момента последнего обновления кода"></div>
 </header>
 
 <!-- TOP TOOLBAR (one row: project + tools) -->
@@ -17224,6 +17243,32 @@ function toggleNotepad() {
 document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
   document.getElementById('c_synth_gamma_val').textContent = this.value;
 });
+</script>
+
+<script>
+// Build age timer — показывает сколько времени прошло с последнего обновления кода
+window._BUILD_TS = 1773419920631;
+(function() {
+  const wrap = document.getElementById('build-age-wrap');
+  if (!wrap || !window._BUILD_TS) return;
+  function fmt(ms) {
+    const m = Math.floor(ms / 60000);
+    if (m < 1)  return 'только что';
+    if (m < 60) return `${m} мин назад`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h} ч ${m % 60} мин назад`;
+    const d = Math.floor(h / 24);
+    return `${d} д ${h % 24} ч назад`;
+  }
+  function update() {
+    const age = Date.now() - window._BUILD_TS;
+    const h = age / 3600000;
+    wrap.className = h < 2 ? '' : h < 24 ? 'age-old' : 'age-stale';
+    wrap.innerHTML = `<span class="build-age-dot"></span>обновлено ${fmt(age)}`;
+  }
+  update();
+  setInterval(update, 60000);
+})();
 </script>
 
 </body>
