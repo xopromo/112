@@ -798,7 +798,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
 
 /* TABLE FILTER TEMPLATE popover */
 #tbl-tpl-popover {
-  position: absolute; top: 100%; right: 0; z-index: 5000; margin-top: 3px;
+  position: fixed; z-index: 5000;
   background: var(--bg2); border: 1px solid var(--border2); border-radius: 8px;
   padding: 10px; min-width: 260px; max-height: 400px; overflow-y: auto;
   box-shadow: 0 6px 24px rgba(0,0,0,.7);
@@ -9554,12 +9554,10 @@ async function runOpt() {
         }
       }
 
-      if (iter % 10 === 0 || iter === boN - 1) {
-        updateETA(iter + 1, boN, results.length);
-        setMcPhase(`🔬 BO итерация ${iter + 1}/${boN} · найдено ${results.length} · лучший score ${yBest.toFixed(3)}`);
-        await yieldToUI();
-        await checkPause();
-      }
+      updateETA(iter + 1, boN, results.length);
+      setMcPhase(`🔬 BO итерация ${iter + 1}/${boN} · найдено ${results.length} · лучший score ${yBest.toFixed(3)}`);
+      await yieldToUI();
+      await checkPause();
     }
 
     // Batch metrics for BO results (same as TPE)
@@ -10698,7 +10696,14 @@ async function openTableTplPopover(forceReopen) {
     : '<div style="font-size:.65em;color:var(--text3);padding:4px 0">Нет сохранённых шаблонов</div>';
 
   pop.innerHTML = saveRow + toggleHelp + items;
-  btn.parentElement.appendChild(pop);
+
+  // Append to body to escape overflow:hidden on .tbl-mode-bar
+  document.body.appendChild(pop);
+  const rect = btn.getBoundingClientRect();
+  pop.style.position = 'fixed';
+  pop.style.top  = (rect.bottom + 3) + 'px';
+  pop.style.right = (window.innerWidth - rect.right) + 'px';
+  pop.style.left  = 'auto';
 
   // close on outside click
   setTimeout(() => {
@@ -17228,7 +17233,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1773423356671;
+window._BUILD_TS = 1773423916399;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
