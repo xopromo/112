@@ -1018,8 +1018,8 @@ function showDetail(r) {
   // Stats bar — unified IS + TV rows via CSS grid
   const _fwd = r.cfg && r.cfg._oos && r.cfg._oos.forward;
   const _hasLS = r.wrL != null;
-  // Column count: 9 base + Avg + CVR + UPI + Sortino + (1 ΔWR L/S if applicable)
-  const _ncols = 17 + (_hasLS ? 1 : 0); // ##SOR +1 ##OMG +1 ##PAIN +1 ##BURKE +1 ##SRNTY +1
+  // Column count: PnL WinRate Сделок MaxDD P/DD UPI Sortino Omega Pain Burke Serenity = 11
+  const _ncols = 11;
 
   // Build one row of dp-stat cells (same structure for both IS and TV)
   function _statsRow(v) {
@@ -1041,28 +1041,18 @@ function showDetail(r) {
     const srntyV  = v.serenity!=null ? v.serenity.toFixed(1) : '—'; // ##SRNTY
     const irC     = v.ir!=null ? (v.ir>=1?'pos':v.ir>=0?'warn':'neg') : 'muted'; // ##IR
     const irV     = v.ir!=null ? v.ir.toFixed(1) : '—'; // ##IR
-    let h =
+    const h =
       `<div class="dp-stat"><div class="v ${(v.pnl??0)>=0?'pos':'neg'}">${(v.pnl??0).toFixed(1)}%</div><div class="l">PnL</div></div>`+
       `<div class="dp-stat"><div class="v">${(v.wr??0).toFixed(1)}%</div><div class="l">WinRate</div></div>`+
       `<div class="dp-stat"><div class="v muted">${v.n??0}</div><div class="l">Сделок</div></div>`+
       `<div class="dp-stat"><div class="v neg">${(v.dd??0).toFixed(1)}%</div><div class="l">MaxDD</div></div>`+
       `<div class="dp-stat"><div class="v ${(v.pdd??0)>=10?'pos':(v.pdd??0)>=5?'warn':'neg'}">${(v.pdd??0).toFixed(1)}</div><div class="l">P/DD</div></div>`+
-      `<div class="dp-stat"><div class="v ${(v.dwr??0)<10?'ok':(v.dwr??0)<20?'warn':'bad'}">${(v.dwr??0).toFixed(1)}%</div><div class="l">ΔWR сплит</div></div>`+
-      `<div class="dp-stat"><div class="v ${(v.p1??0)>=0?'pos':'neg'}">${(v.p1??0).toFixed(1)}%</div><div class="l">1п (${v.c1??0}сд)</div></div>`+
-      `<div class="dp-stat"><div class="v ${(v.p2??0)>=0?'pos':'neg'}">${(v.p2??0).toFixed(1)}%</div><div class="l">2п (${v.c2??0}сд)</div></div>`+
-      `<div class="dp-stat"><div class="v">${(v.avg??0).toFixed(2)}%</div><div class="l">Avg/сд</div></div>`+
-      `<div class="dp-stat"><div class="v ${cvrC}">${cvrV}</div><div class="l">CVR%</div></div>`+
       `<div class="dp-stat" title="Ulcer Performance Index = PnL / sqrt(mean(просадка²))\nЛучше Calmar: учитывает длительность и частоту просадок.\n≥5 = устойчива ✅ | 2–5 = умеренно | &lt;2 = нестабильна"><div class="v ${upiC}">${upiV}</div><div class="l">UPI</div></div>`+
-      `<div class="dp-stat" title="Sortino Ratio = PnL / downside_dev\ndownside_dev = sqrt(mean(min(Δeq,0)²)) — только отриц. движения.\n≥3 = отлично ✅ | ≥2 = хорошо | &lt;1 = нестабильно"><div class="v ${sorC}">${sorV}</div><div class="l">Sortino</div></div>`+ // ##SOR
-      `<div class="dp-stat" title="Omega Ratio = Σприросты / Σпадения (уровень баров)\nProfit factor без предположения о нормальности. ≥3 = отлично ✅ | ≥2 = хорошо."><div class="v ${omgC}">${omgV}</div><div class="l">Omega</div></div>`+ // ##OMG
-      `<div class="dp-stat" title="Pain Ratio = PnL / Pain Index\nPain Index = mean(просадка от пика). Штрафует за длительность любых просадок.\n≥5 = отлично ✅ | ≥3 = хорошо | &lt;1 = плохо"><div class="v ${painC}">${painV}</div><div class="l">Pain</div></div>`+ // ##PAIN
-      `<div class="dp-stat" title="Burke Ratio = PnL / √(Σ просадок²)\nУчитывает ВСЕ события просадок, не только максимальную.\n≥3 = отлично ✅ | ≥2 = хорошо | &lt;0.5 = плохо"><div class="v ${burkeC}">${burkeV}</div><div class="l">Burke</div></div>`+ // ##BURKE
-      `<div class="dp-stat" title="Serenity = PnL / (UlcerIdx × TailFactor)\nTailFactor = CVaR(5%) / mean(убытков). Штраф за хвостовые риски.\n≥5 = отлично ✅ | ≥3 = хорошо | &lt;1 = плохо"><div class="v ${srntyC}">${srntyV}</div><div class="l">Serenity</div></div>` + // ##SRNTY
-      `<div class="dp-stat" title="Information Ratio = mean(active) / std(active) × √252\nactive = стратегия − buy&amp;hold. ≥1 = хорошо ✅ | ≥0.5 = ценность | &lt;0 = хуже рынка"><div class="v ${irC}">${irV}</div><div class="l">IR</div></div>`; // ##IR
-    if (_hasLS) {
-      const lsC = v.dwrLS!=null ? (v.dwrLS<10?'ok':v.dwrLS<25?'warn':'bad') : 'muted';
-      h += `<div class="dp-stat" title="Разница WR лонгов и шортов. L:${v.nL||0}сд WR${v.wrL!=null?v.wrL.toFixed(0):'?'}% · S:${v.nS||0}сд WR${v.wrS!=null?v.wrS.toFixed(0):'?'}%"><div class="v ${lsC}">${v.dwrLS!=null?v.dwrLS.toFixed(0)+'%':'—'}</div><div class="l">ΔWR L/S</div></div>`;
-    }
+      `<div class="dp-stat" title="Sortino Ratio = PnL / downside_dev\ndownside_dev = sqrt(mean(min(Δeq,0)²)) — только отриц. движения.\n≥3 = отлично ✅ | ≥2 = хорошо | &lt;1 = нестабильно"><div class="v ${sorC}">${sorV}</div><div class="l">Sortino</div></div>`+
+      `<div class="dp-stat" title="Omega Ratio = Σприросты / Σпадения (уровень баров)\nProfit factor без предположения о нормальности. ≥3 = отлично ✅ | ≥2 = хорошо."><div class="v ${omgC}">${omgV}</div><div class="l">Omega</div></div>`+
+      `<div class="dp-stat" title="Pain Ratio = PnL / Pain Index\nPain Index = mean(просадка от пика). Штрафует за длительность любых просадок.\n≥5 = отлично ✅ | ≥3 = хорошо | &lt;1 = плохо"><div class="v ${painC}">${painV}</div><div class="l">Pain</div></div>`+
+      `<div class="dp-stat" title="Burke Ratio = PnL / √(Σ просадок²)\nУчитывает ВСЕ события просадок, не только максимальную.\n≥3 = отлично ✅ | ≥2 = хорошо | &lt;0.5 = плохо"><div class="v ${burkeC}">${burkeV}</div><div class="l">Burke</div></div>`+
+      `<div class="dp-stat" title="Serenity = PnL / (UlcerIdx × TailFactor)\nTailFactor = CVaR(5%) / mean(убытков). Штраф за хвостовые риски.\n≥5 = отлично ✅ | ≥3 = хорошо | &lt;1 = плохо"><div class="v ${srntyC}">${srntyV}</div><div class="l">Serenity</div></div>`;
     return h;
   }
 
@@ -2831,17 +2821,7 @@ function applyParsedText() {
   showParseToast(changes);
 }
 
-function showBestStats() {
-  const b=results[0];
-  const el=$('bst'); el.style.display='flex';
-  el.innerHTML=
-    `<div class="bstat"><div class="val ${b.pnl>=0?'pos':'neg'}">${b.pnl.toFixed(1)}%</div><div class="lbl">PnL</div></div>`+
-    `<div class="bstat"><div class="val">${b.wr.toFixed(1)}%</div><div class="lbl">WinRate</div></div>`+
-    `<div class="bstat"><div class="val muted">${b.n}</div><div class="lbl">Сделок</div></div>`+
-    `<div class="bstat"><div class="val neg">${b.dd.toFixed(1)}%</div><div class="lbl">MaxDD</div></div>`+
-    `<div class="bstat"><div class="val pos">${b.pdd.toFixed(1)}</div><div class="lbl">P/DD</div></div>`+
-    `<div class="bstat"><div class="val" style="font-size:.6em;color:var(--accent);max-width:200px;overflow:hidden;text-overflow:ellipsis" title="${b.name}">${b.name}</div><div class="lbl">🏆 Лучшая</div></div>`;
-}
+function showBestStats() { /* removed */ }
 
 // Параметры последнего нарисованного графика — для crosshair
 let _eqChartParams = null;

@@ -78,10 +78,11 @@ header .sub {
   vertical-align: middle;
 }
 #build-age-wrap {
-  margin-top: 6px;
-  font-size: .6em;
-  color: var(--text3);
-  letter-spacing: 0.04em;
+  font-size: .75em;
+  color: var(--text2);
+  letter-spacing: 0.03em;
+  background: var(--bg3);
+  border: 1px solid var(--border);
 }
 #build-age-wrap .build-age-dot {
   display: inline-block;
@@ -147,7 +148,7 @@ header .sub {
 
 /* FIELDS */
 .field { display: flex; flex-direction: column; gap: 2px; margin-bottom: 4px; }
-.field label { font-size: .62em; color: var(--text2); letter-spacing: 0.03em; }
+.field label { font-size: .62em; color: var(--text2); letter-spacing: 0.03em; user-select: text; cursor: text; }
 .field input, .field select {
   background: var(--bg);
   border: 1px solid var(--border2);
@@ -174,6 +175,7 @@ header .sub {
   font-size: .73em; margin: 3px 0; cursor: pointer;
   user-select: none;
 }
+.cb label { user-select: text; cursor: text; }
 .cb input[type=checkbox] {
   appearance: none;
   width: 14px; height: 14px;
@@ -250,20 +252,6 @@ header .sub {
 #ccnt { color: var(--orange); font-size: .72em; margin-left: 8px; }
 
 /* BEST STATS BAR */
-.best-bar {
-  display: none;
-  background: var(--bg3);
-  border: 1px solid var(--border2);
-  border-radius: 8px;
-  padding: 8px 14px;
-  margin: 6px 0;
-  flex-wrap: wrap;
-  gap: 16px;
-  /* НЕ sticky — не перекрывает график при прокрутке */
-}
-.bstat { text-align: center; }
-.bstat .val { font-size: 1.1em; font-weight: 700; }
-.bstat .lbl { font-size: .58em; color: var(--text2); margin-top: 1px; }
 
 /* EQUITY CHART */
 #eq-wrap {
@@ -555,6 +543,8 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
   font-size: .68em;
   flex-shrink: 0;
   max-width: 55%;
+  user-select: text;
+  cursor: text;
 }
 .dp-val {
   font-size: .72em;
@@ -830,7 +820,6 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
 <header>
   <h1>⚡ USE OPTIMIZER <span class="version-badge">v5</span></h1>
   <div class="sub">OHLCV · Полная реплика логики USE · SL/TP И/ИЛИ · Volume-фильтры · Подробные названия</div>
-  <div id="build-age-wrap" title="Время с момента последнего обновления кода"></div>
 </header>
 
 <!-- TOP TOOLBAR (one row: project + tools) -->
@@ -850,12 +839,13 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
   <!-- Divider -->
   <span style="color:var(--border2);margin:0 1px;font-size:1.3em;line-height:1">│</span>
   <!-- Collapse/Expand -->
-  <button class="tpl-ibtn" onclick="collapseInactivePanels()" title="Свернуть неактивные группы и панели">↗ Свернуть</button>
-  <button class="tpl-ibtn" onclick="expandAllPanels()" title="Развернуть все панели и группы">↙ Развернуть</button>
+  <button class="tpl-ibtn" id="btn-toggle-panels" onclick="togglePanels()" title="Свернуть неактивные / Развернуть все">↗ Свернуть</button>
   <!-- Notes -->
   <button class="tpl-ibtn" id="notepad-fab" onclick="toggleNotepad()" title="Записная книжка (глобальная)">📝</button>
   <!-- Spacer -->
   <span style="flex:1"></span>
+  <!-- Build age timer -->
+  <div id="build-age-wrap" title="Время с момента последнего обновления кода" style="font-size:.8em;padding:2px 8px;border-radius:4px;white-space:nowrap"></div>
   <!-- Perf widget toggle (moved from bottom) -->
   <button class="tpl-ibtn" id="btn-perf-toggle" onclick="(function(){var w=document.getElementById('perf-widget');w.style.display=w.style.display==='none'?'flex':'none';})()" title="Показать/скрыть виджет нагрузки (FPS, CPU)" style="color:var(--text3);border-color:var(--border)">⚡</button>
   <div id="perf-widget" style="display:none;align-items:center;gap:6px">
@@ -1429,7 +1419,6 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
   </div>
 </div>
 
-<div class="best-bar" id="bst"></div>
 <div id="eq-wrap">
   <canvas id="eqc"></canvas>
   <canvas id="eq-crosshair"></canvas>
@@ -1451,14 +1440,14 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
       <input type="checkbox" id="mrb_param" checked style="accent-color:var(--accent)"> Param
     </label>
     <label style="display:flex;align-items:center;gap:4px;color:var(--text2);margin-left:8px" title="Разброс SL/TP для теста Param (±%). Строже = меньше процент, мягче = больше">
-      Param разброс ±<input type="number" id="param_spread" value="30" min="5" max="50" step="5"
+      Param разброс ±<input type="number" id="param_spread" value="20" min="5" max="50" step="5"
         style="width:42px;background:var(--bg2);color:var(--text1);border:1px solid var(--border);border-radius:3px;padding:1px 4px;font-size:.8em">%
     </label>
     <label style="display:flex;align-items:center;gap:3px;color:var(--text2)">
-      <input type="checkbox" id="mrb_mc" style="accent-color:var(--accent)"> MC
+      <input type="checkbox" id="mrb_mc" checked style="accent-color:var(--accent)"> MC
     </label>
     <label style="display:flex;align-items:center;gap:3px;color:var(--text2)">
-      <input type="checkbox" id="mrb_noise" style="accent-color:var(--accent)"> Шум
+      <input type="checkbox" id="mrb_noise" checked style="accent-color:var(--accent)"> Шум
     </label>
     <label style="display:flex;align-items:center;gap:4px;color:var(--text2)" title="Кол-во прогонов Noise (меньше = быстрее). Рек: 10-20">
       Noise прогонов: <input type="number" id="noise_runs" value="10" min="5" max="100" step="5"
@@ -1499,7 +1488,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
     <button class="tbl-mode-btn oos-mode" id="tbl-btn-oos" onclick="switchTableMode('oos')" style="display:none">OOS <span id="tbl-cnt-oos">0</span></button>
     <button class="tbl-mode-btn" id="btn-reset-filters" onclick="resetAllFilters()" title="Сбросить все фильтры и сортировку" style="margin-left:auto">✕ Сброс</button>
     <div style="position:relative">
-      <button class="tbl-mode-btn" id="btn-tbl-tpl" onclick="openTableTplPopover()" title="Шаблоны фильтров — быстро применить сохранённый набор фильтров в 1 клик">🗂 Фильтры ▾</button>
+      <button class="tbl-mode-btn" id="btn-tbl-tpl" onclick="openTableTplPopover()" title="Шаблоны фильтров — сохранить текущие фильтры / быстро применить сохранённый набор" style="border-color:var(--accent2);color:var(--accent)">💾 Наборы фильтров ▾</button>
     </div>
     <button class="tbl-mode-btn" onclick="_downloadSources()" title="Скачать исходные файлы: core.js, opt.js, ui.js, shell.html, build.py, README.md">⬇ Исходники</button>
   </div>
@@ -2300,6 +2289,18 @@ function expandAllPanels() {
     p.classList.remove('panel-collapsed');
     p.querySelectorAll('.grp-hidden').forEach(el => el.classList.remove('grp-hidden'));
   });
+}
+
+function togglePanels() {
+  const anyCollapsed = document.querySelectorAll('.panels .panel.panel-collapsed').length > 0;
+  const btn = document.getElementById('btn-toggle-panels');
+  if (anyCollapsed) {
+    expandAllPanels();
+    if (btn) { btn.textContent = '↗ Свернуть'; btn.title = 'Свернуть неактивные группы и панели'; }
+  } else {
+    collapseInactivePanels();
+    if (btn) { btn.textContent = '↙ Развернуть'; btn.title = 'Развернуть все панели и группы'; }
+  }
 }
 
 // ── Panel drag-and-drop (reorder) ─────────────────────────────

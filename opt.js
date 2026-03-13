@@ -1995,7 +1995,7 @@ async function runOpt() {
   // Но основной цикл TPE запускается только для 'tpe' и 'synthesis'
   const _needTPEVars = (optMode === 'tpe' || optMode === 'synthesis' || optMode === 'bo');
   // Объявляем переменные чтобы они были доступны для BO режима (всех возможных режимов)
-  let _tpeTarget, _tpeMaxIter, _nCandidates, _exploreN, _tpeHistory, _dims, _dsz, _tpeRsiArr, _tpeWtCache, _tpeSeen, nDims;
+  let _tpeTarget, _tpeMaxIter, _nCandidates, _exploreN, _tpeHistory, _dims, _dsz, _tpeRsiArr, _tpeWtCache, _tpeSeen, nDims, _tpeRunPoint;
 
   if (_needTPEVars) {
     // ОТЛАДКА: логируем что мы вошли в TPE блок
@@ -2027,7 +2027,7 @@ async function runOpt() {
     _tpeWtCache = {};
 
     // Вспомогательная функция: прогнать одну точку через backtest и сохранить результат
-    async function _tpeRunPoint(dimIndices) {
+    _tpeRunPoint = async function(dimIndices) {
       // Дедупликация: быстрый числовой хеш вместо медленного join(',')
       let _hash = 0;
       for (let i = 0; i < dimIndices.length; i++) _hash = (_hash * 131 + dimIndices[i]) >>> 0;
@@ -3729,7 +3729,7 @@ async function runRobustScoreFor(r, tests, _fastMode) {
     const mut=(pair,m)=>{if(!pair)return pair;const np=JSON.parse(JSON.stringify(pair));if(np.a&&np.a.m)np.a.m=+(np.a.m*m).toFixed(2);if(np.p&&np.p.m)np.p.m=+(np.p.m*m).toFixed(2);return np;};
     const variants=[];
     // Разброс читается из UI (по умолчанию 30%)
-    const _pSpread = Math.max(5, Math.min(50, parseInt(document.getElementById('param_spread')?.value) || 30)) / 100;
+    const _pSpread = Math.max(5, Math.min(50, parseInt(document.getElementById('param_spread')?.value) || 20)) / 100;
     const _pLo = +(1 - _pSpread).toFixed(2), _pHi = +(1 + _pSpread).toFixed(2);
     for(const sm of[_pLo,_pHi])for(const tm of[_pLo,_pHi]){cfg.slPair=mut(savedSl,sm);cfg.tpPair=mut(savedTp,tm);const rv=runOnSlice(fullDATA);if(rv&&rv.n>=5)variants.push(rv.pnl);}
     cfg.slPair=savedSl; cfg.tpPair=savedTp;
