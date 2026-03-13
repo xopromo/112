@@ -881,7 +881,7 @@ async function runOpt() {
   try { // ── глобальный try/catch: любая ошибка отображается в UI ──────────────
   resultCache.clear();
   const _resultNames = new Set(); // П.1: дедупликация
-  $('tb').innerHTML=''; $('bst').style.display='none'; $('eqc').style.display='none';
+  $('tb').innerHTML=''; $('eqc').style.display='none';
   // Show pause/stop, hide run
   $('rbtn').style.display='none';
   $('pbtn').style.display='inline-block'; $('pbtn').textContent='⏸ Пауза';

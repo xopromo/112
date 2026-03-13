@@ -222,14 +222,43 @@ bash /home/user/112/agent/gh_search.sh <query> <mode> <max_urls>
 
 ---
 
-## Сборка проекта
+## Сборка и деплой — ОБЯЗАТЕЛЬНЫЙ ФИНАЛЬНЫЙ ШАГ
 
-<!-- НЕ ВЫПОЛНЯТЬ АВТОМАТИЧЕСКИ — только по явной просьбе пользователя
+> ⚠️ **ВСЕГДА выполнять после любых изменений в коде, без исключений.**
+
+### Что делать после каждого изменения:
 ```bash
-cd /home/user/112
-python build.py   # → USE_Optimizer_v6_built.html
+# 1. Подтянуть main (ОБЯЗАТЕЛЬНО — иначе конфликт в PR!)
+git fetch origin main && git merge origin/main --no-edit || true
+
+# 2. Пересобрать (решает конфликт в USE_Optimizer_v6_built.html)
+python build.py
+
+# 3. Коммит и пуш
+git add -A && git commit -m "..."
+git push -u origin <claude/ветка>
 ```
--->
+
+> ⚠️ `USE_Optimizer_v6_built.html` всегда конфликтует если не подтянуть main перед пушем.
+> Причина: GitHub Actions создаёт новый коммит в main после каждого мержа.
+> Решение: всегда `git fetch origin main && git merge origin/main` → `python build.py` → пуш.
+
+### Деплой на GitHub Pages (xopromo.github.io/112)
+- GitHub Pages деплоится только из ветки `main`
+- Push в `main` заблокирован прокси (только `claude/...` ветки разрешены)
+- **Поэтому:** после пуша всегда создавать PR и давать пользователю прямую ссылку
+
+**Шаблон ссылки на PR:**
+```
+https://github.com/xopromo/112/compare/main...<ветка>
+```
+
+**Пользователю нужен 1 клик** — нажать Merge pull request.
+После мержа Actions автоматически деплоит (~1 мин).
+
+### Всегда давать пользователю:
+1. **Ссылку на PR** (создать/смержить): `https://github.com/xopromo/112/compare/main...<ветка>`
+2. **Прямую ссылку на сайт** после деплоя: `https://xopromo.github.io/112/USE_Optimizer_v6_built.html`
 
 ---
 
