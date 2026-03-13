@@ -7863,7 +7863,7 @@ async function runOpt() {
   try { // ── глобальный try/catch: любая ошибка отображается в UI ──────────────
   resultCache.clear();
   const _resultNames = new Set(); // П.1: дедупликация
-  $('tb').innerHTML=''; $('bst').style.display='none'; $('eqc').style.display='none';
+  $('tb').innerHTML=''; $('eqc').style.display='none';
   // Show pause/stop, hide run
   $('rbtn').style.display='none';
   $('pbtn').style.display='inline-block'; $('pbtn').textContent='⏸ Пауза';
@@ -17228,7 +17228,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1773422673067;
+window._BUILD_TS = 1773423036179;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
