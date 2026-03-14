@@ -8101,6 +8101,7 @@ async function runOpt() {
     if (typeof setMcPhase === 'function') setMcPhase(`⏳ OOS для ${pending.length} результатов…`);
     for (let oi = 0; oi < pending.length; oi++) {
       _attachOOS(pending[oi].cfg, pending[oi].name, pending[oi].n);
+      if (equities[pending[oi].name]) pending[oi].eq = equities[pending[oi].name];
       if (oi % 20 === 0) await yieldToUI();
     }
     if (typeof setMcPhase === 'function') setMcPhase(null);
@@ -9074,7 +9075,7 @@ async function runOpt() {
             p1:r.p1,p2:r.p2,dwr:r.dwr,c1:r.c1,c2:r.c2,nL:r.nL||0,pL:r.pL||0,wrL:r.wrL,nS:r.nS||0,pS:r.pS||0,wrS:r.wrS,dwrLS:r.dwrLS,
             cvr:_calcCVR(r.eq),upi:_calcUlcerIdx(r.eq),sortino:_calcSortino(r.eq),kRatio:_calcKRatio(r.eq),sqn:r.sqn??null,
             omega:_calcOmega(r.eq),pain:_calcPainRatio(r.eq),
-            burke:_calcBurke(r.eq),serenity:_calcSerenity(r.eq),ir:_calcInfoRatio(r.eq),cfg:_cfg}); // ##OMG ##PAIN ##BURKE ##SRNTY ##IR
+            burke:_calcBurke(r.eq),serenity:_calcSerenity(r.eq),ir:_calcInfoRatio(r.eq),eq:r.eq,cfg:_cfg}); // ##OMG ##PAIN ##BURKE ##SRNTY ##IR
           equities[name] = r.eq;
         }
       }
@@ -9095,6 +9096,7 @@ async function runOpt() {
       setMcPhase(`⏳ OOS проверка ${results.length} результатов…`);
       for (let oi = 0; oi < results.length; oi++) {
         _attachOOS(results[oi].cfg, results[oi].name, results[oi].n);
+        if (equities[results[oi].name]) results[oi].eq = equities[results[oi].name];
         if (oi % 50 === 0) { await yieldToUI(); }
       }
     }
@@ -9432,7 +9434,7 @@ async function runOpt() {
           results.push({name,pnl:r.pnl,wr:r.wr,n:r.n,dd:r.dd,pdd,avg:r.avg,sig,gt,
             p1:r.p1,p2:r.p2,dwr:r.dwr,c1:r.c1,c2:r.c2,nL:r.nL||0,pL:r.pL||0,wrL:r.wrL,nS:r.nS||0,pS:r.pS||0,wrS:r.wrS,dwrLS:r.dwrLS,
             cvr:null,upi:null,sortino:null,kRatio:null,sqn:r.sqn??null,
-            omega:null,pain:null,burke:null,serenity:null,ir:null,cfg:_cfg_tpe}); // ##OMG ##PAIN ##BURKE ##SRNTY ##IR (null — батч)
+            omega:null,pain:null,burke:null,serenity:null,ir:null,eq:r.eq,cfg:_cfg_tpe}); // ##OMG ##PAIN ##BURKE ##SRNTY ##IR (null — батч)
           equities[name] = r.eq;
         }
       }
@@ -9600,6 +9602,7 @@ async function runOpt() {
       for (let oi = 0; oi < results.length; oi++) {
         const _eq = equities[results[oi].name];
         if (_eq) {
+          results[oi].eq      = _eq;
           results[oi].cvr     = _calcCVR(_eq);
           results[oi].upi     = _calcUlcerIdx(_eq);
           results[oi].sortino = _calcSortino(_eq);
@@ -9723,6 +9726,7 @@ async function runOpt() {
       setMcPhase(`⏳ OOS проверка ${results.length} результатов…`);
       for (let oi = 0; oi < results.length; oi++) {
         _attachOOS(results[oi].cfg, results[oi].name, results[oi].n);
+        if (equities[results[oi].name]) results[oi].eq = equities[results[oi].name];
         if (oi % 50 === 0) { await yieldToUI(); }
       }
     }
@@ -10026,7 +10030,7 @@ async function runOpt() {
                                         p1:r.p1,p2:r.p2,dwr:r.dwr,c1:r.c1,c2:r.c2,nL:r.nL||0,pL:r.pL||0,wrL:r.wrL,nS:r.nS||0,pS:r.pS||0,wrS:r.wrS,dwrLS:r.dwrLS,
                                         cvr:_calcCVR(r.eq),upi:_calcUlcerIdx(r.eq),sortino:_calcSortino(r.eq),kRatio:_calcKRatio(r.eq),sqn:r.sqn??null,
                                         omega:_calcOmega(r.eq),pain:_calcPainRatio(r.eq),
-                                        burke:_calcBurke(r.eq),serenity:_calcSerenity(r.eq),ir:_calcInfoRatio(r.eq),cfg:_cfg_ex}); // ##OMG ##PAIN ##BURKE ##SRNTY ##IR
+                                        burke:_calcBurke(r.eq),serenity:_calcSerenity(r.eq),ir:_calcInfoRatio(r.eq),eq:r.eq,cfg:_cfg_ex}); // ##OMG ##PAIN ##BURKE ##SRNTY ##IR
                                       equities[name]=r.eq;
                                       } // end else (не дубль)
                                     } // end if(r passed filter)
@@ -10077,6 +10081,7 @@ async function runOpt() {
     if (!_isSynthMode) {
       for (let oi = 0; oi < results.length; oi++) {
         _attachOOS(results[oi].cfg, results[oi].name, results[oi].n);
+        if (equities[results[oi].name]) results[oi].eq = equities[results[oi].name];
         if (oi % 50 === 0) { await yieldToUI(); }
       }
     } else {
@@ -17828,7 +17833,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1773526817274;
+window._BUILD_TS = 1773528400368;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
