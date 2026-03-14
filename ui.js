@@ -1068,6 +1068,7 @@ function onoff(v, onLabel='', offLabel='ВЫКЛ') {
 function showDetail(r) {
   if (!r.cfg) return;
   _robustResult = r;  // запоминаем для теста устойчивости
+  _tvCmpCurrentResult = r; // для loadTVcsv
   const c = r.cfg;
 
   $('dp-title').textContent = r.name;
@@ -1426,6 +1427,18 @@ function showDetail(r) {
     html = section('🌊', 'HMM РЕЖИМЫ + ПРОИЗВОДИТЕЛЬНОСТЬ', _hmmHtml) + html;
   }
   // ##HMM_END##
+
+  // ##TVCOMPARE_START##
+  {
+    const _tvSec = `<div style="font-size:.78em;color:var(--text3);margin-bottom:6px">Загрузи CSV из TradingView (индикатор USE_EXP → Table Mode → ⬇). Сравниваем <b>Equity%</b> с JS-бэктестом построчно.</div>`+
+      `<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">`+
+      `<input type="file" id="fi-tv-csv" accept=".csv,.tsv" style="display:none" onchange="loadTVcsv(event)">`+
+      `<button class="tpl-btn2" style="padding:3px 10px;font-size:.85em" onclick="document.getElementById('fi-tv-csv').click()">📂 TV CSV</button>`+
+      `<span id="tv-cmp-status" style="font-size:.78em;color:var(--text3)">файл не загружен</span>`+
+      `</div><div id="tv-cmp-results" style="margin-top:6px"></div>`;
+    html = section('📡', 'СРАВНЕНИЕ С TRADINGVIEW (E2E)', _tvSec) + html;
+  }
+  // ##TVCOMPARE_END##
 
   $('dp-body').innerHTML = html;
 
@@ -3008,6 +3021,298 @@ function drawEquityForResult(r) {
   }
 }
 
+
+// ── TV COMPARE ────────────────────────────────────────────────
+
+let _tvCmpCurrentResult = null;
+let _tvCmpDiag = null; // хранит данные для copyTVdiag()
+
+function _normTime(t) {
+  if (!t) return '';
+  return String(t).trim()
+    .replace(/ UTC$/i, '').replace(/ GMT$/i, '')
+    .replace('T', ' ')
+    .replace(/:\d\d$/, '')
+    .replace(/\.\d+$/, '')
+    .substring(0, 16);
+}
+
+function _parseTVcsv(text) {
+  const lines = text.trim().split(/\r?\n/).filter(l => l.trim());
+  if (lines.length < 2) return null;
+  const sep = lines[0].includes('\t') ? '\t' : ',';
+  const hdrs = lines[0].split(sep).map(h => h.trim().replace(/"/g, '').toLowerCase());
+
+  const tIdx  = hdrs.findIndex(h => h.includes('time') || h.includes('date')) >= 0
+                ? hdrs.findIndex(h => h.includes('time') || h.includes('date')) : 0;
+  const eqIdx = hdrs.findIndex(h => h.includes('equity'));
+  const elIdx = hdrs.indexOf('el');
+  const esIdx = hdrs.indexOf('es');
+  const xlIdx = hdrs.indexOf('xl');
+  const xsIdx = hdrs.indexOf('xs');
+
+  if (eqIdx < 0) return null;
+
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cols = lines[i].split(sep).map(c => c.trim().replace(/"/g, ''));
+    if (cols.length <= eqIdx) continue;
+    const t  = _normTime(cols[tIdx]);
+    const eq = parseFloat(cols[eqIdx]);
+    if (!t || isNaN(eq)) continue;
+    rows.push({
+      t, eq,
+      el: elIdx >= 0 ? (parseFloat(cols[elIdx]) || 0) : null,
+      es: esIdx >= 0 ? (parseFloat(cols[esIdx]) || 0) : null,
+      xl: xlIdx >= 0 ? (parseFloat(cols[xlIdx]) || 0) : null,
+      xs: xsIdx >= 0 ? (parseFloat(cols[xsIdx]) || 0) : null,
+    });
+  }
+  return rows.length >= 2 ? rows : null;
+}
+
+function loadTVcsv(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const statusEl = document.getElementById('tv-cmp-status');
+  const resultsEl = document.getElementById('tv-cmp-results');
+  if (statusEl) statusEl.textContent = '⏳ Читаю файл...';
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const tvRows = _parseTVcsv(e.target.result);
+    if (!tvRows) {
+      if (statusEl) statusEl.textContent = '❌ Не удалось прочитать. Нужна колонка «Equity %» из TV Table Mode';
+      return;
+    }
+    if (statusEl) statusEl.textContent = `✅ ${file.name} · ${tvRows.length} строк`;
+    _runTVcompare(tvRows, resultsEl);
+  };
+  reader.readAsText(file);
+}
+
+function _runTVcompare(tvRows, resultsEl) {
+  const r = _tvCmpCurrentResult;
+  if (!r || !r.eq || !r.eq.length) {
+    resultsEl.innerHTML = '<span style="color:var(--neg);font-size:.8em">❌ Нет equity для текущего результата.</span>';
+    return;
+  }
+
+  // Build time→row map
+  const tvMap = Object.create(null);
+  for (const row of tvRows) tvMap[row.t] = row;
+
+  // Align with DATA[]
+  const pairs = [];
+  for (let i = 0; i < DATA.length; i++) {
+    const nt = _normTime(DATA[i]?.t || '');
+    const tv = tvMap[nt];
+    if (tv && r.eq[i] !== undefined) pairs.push({ i, jsEq: r.eq[i], tvEq: tv.eq, tvRow: tv });
+  }
+
+  if (pairs.length < 5) {
+    const tvSample = tvRows[0]?.t || '?';
+    const jsSample = _normTime(DATA[0]?.t || '');
+    resultsEl.innerHTML = `<span style="color:var(--neg);font-size:.8em">❌ Совпало ${pairs.length} баров.<br>TV время: «${tvSample}» · JS время: «${jsSample}»<br>Проверь тикер/ТФ — должны совпадать с загруженными данными.</span>`;
+    return;
+  }
+
+  const jsArr = pairs.map(p => p.jsEq);
+  const tvArr = pairs.map(p => p.tvEq);
+
+  // Correlation
+  const jsMean = jsArr.reduce((s, v) => s + v, 0) / jsArr.length;
+  const tvMean = tvArr.reduce((s, v) => s + v, 0) / tvArr.length;
+  let num = 0, denJ = 0, denT = 0;
+  for (let k = 0; k < jsArr.length; k++) {
+    const dj = jsArr[k] - jsMean, dt = tvArr[k] - tvMean;
+    num += dj * dt; denJ += dj * dj; denT += dt * dt;
+  }
+  const corr = (denJ > 0 && denT > 0) ? num / Math.sqrt(denJ * denT) : 0;
+
+  // RMSE
+  const rmse = Math.sqrt(pairs.reduce((s, p) => s + Math.pow(p.jsEq - p.tvEq, 2), 0) / pairs.length);
+
+  // Max divergence
+  let maxDiff = 0, maxDiffBar = 0, maxDiffTime = '';
+  for (const p of pairs) {
+    const d = Math.abs(p.jsEq - p.tvEq);
+    if (d > maxDiff) { maxDiff = d; maxDiffBar = p.i; maxDiffTime = DATA[p.i]?.t || ''; }
+  }
+
+  // First divergence > 0.5%
+  let firstDivBar = -1, firstDivTime = '';
+  for (const p of pairs) {
+    if (Math.abs(p.jsEq - p.tvEq) > 0.5) { firstDivBar = p.i; firstDivTime = DATA[p.i]?.t || ''; break; }
+  }
+
+  const jsLast = jsArr[jsArr.length - 1];
+  const tvLast = tvArr[tvArr.length - 1];
+  const finalDiff = jsLast - tvLast;
+
+  // Signal stats
+  const hasSigs = pairs[0]?.tvRow.el !== null;
+  let tvSigCount = 0;
+  if (hasSigs) for (const p of pairs) {
+    if (p.tvRow.el === 1 || p.tvRow.es === 1 || p.tvRow.xl === 1 || p.tvRow.xs === 1) tvSigCount++;
+  }
+
+  const corrC = corr >= 0.99 ? 'pos' : corr >= 0.95 ? 'warn' : 'neg';
+  const rmseC = rmse < 1 ? 'pos' : rmse < 5 ? 'warn' : 'neg';
+  const fdC   = Math.abs(finalDiff) < 1 ? 'pos' : Math.abs(finalDiff) < 5 ? 'warn' : 'neg';
+
+  // Сохраняем диагностику для copyTVdiag()
+  _tvCmpDiag = { r, pairs, corr, rmse, finalDiff, jsLast, tvLast, firstDivBar, firstDivTime, maxDiff, maxDiffBar, maxDiffTime, hasSigs, tvSigCount };
+
+  let html = '';
+  html += row('Совпало баров', `${pairs.length} / ${tvRows.length} TV · ${DATA.length} JS`, 'muted');
+  html += row('Корреляция equity', `<span class="${corrC}">${(corr * 100).toFixed(2)}%</span>${corr >= 0.99 ? ' ✅' : corr < 0.95 ? ' ⚠️' : ''}`, '');
+  html += row('RMSE equity', `<span class="${rmseC}">${rmse.toFixed(2)}%</span>`, '');
+  html += row('JS итог / TV итог', `<span class="${fdC}">JS ${jsLast.toFixed(1)}% · TV ${tvLast.toFixed(1)}% · Δ${finalDiff >= 0 ? '+' : ''}${finalDiff.toFixed(1)}%</span>`, '');
+  if (firstDivBar >= 0) {
+    html += row('Первое расхождение >0.5%', `<span class="warn">бар #${firstDivBar} · ${firstDivTime}</span>`, '');
+    html += `<button class="tpl-btn2" style="margin-top:6px;padding:4px 12px;font-size:.82em;border-color:#c792ea;color:#c792ea;width:100%" onclick="copyTVdiag()">📋 Скопировать диагностику для Claude</button>`;
+  } else {
+    html += row('Расхождение >0.5%', '<span class="pos">не обнаружено ✅</span>', '');
+  }
+  html += row('Макс. расхождение', `${maxDiff.toFixed(2)}% · бар #${maxDiffBar} · ${maxDiffTime}`, 'muted');
+  if (hasSigs) html += row('TV сигналов (EL/ES/XL/XS)', `${tvSigCount} из ${pairs.length} совпавших баров`, 'muted');
+
+  resultsEl.innerHTML = html;
+
+  // Draw TV equity overlay on existing canvas
+  _tvDrawOverlay(pairs, r.eq);
+}
+
+function _tvDrawOverlay(pairs, jsEq) {
+  const canvas = document.getElementById('eqc');
+  if (!canvas || !_eqChartParams) return;
+  const ctx = canvas.getContext('2d');
+  const { mn, range, pad, W, H } = _eqChartParams;
+  if (!range) return;
+
+  // Build dense array: tvAtBar[jsBarIndex] = tvEquity (NaN where no match)
+  const tvAtBar = new Float64Array(jsEq.length).fill(NaN);
+  for (const p of pairs) { if (p.i < tvAtBar.length) tvAtBar[p.i] = p.tvEq; }
+
+  const nPx  = W - 2 * pad;
+  const nLast = Math.max(jsEq.length - 1, 1);
+
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255,200,60,0.9)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([3, 2]);
+  ctx.beginPath();
+  let started = false;
+  for (let px = 0; px < nPx; px++) {
+    const i = Math.round(px * nLast / (nPx - 1));
+    const v = tvAtBar[i];
+    if (isNaN(v)) { started = false; continue; }
+    const x = pad + px;
+    const y = H - pad - ((v - mn) / range * (H - 2 * pad));
+    if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Legend label
+  ctx.fillStyle = 'rgba(255,200,60,0.85)';
+  ctx.font = '8px JetBrains Mono,monospace';
+  ctx.fillText('TV', W - 24, 9);
+  ctx.restore();
+}
+
+function copyTVdiag() {
+  const d = _tvCmpDiag;
+  if (!d) { alert('Нет данных диагностики — сначала загрузи TV CSV'); return; }
+  const { r, pairs, corr, rmse, finalDiff, jsLast, tvLast,
+          firstDivBar, firstDivTime, maxDiff, maxDiffBar, maxDiffTime, hasSigs } = d;
+  const c = r.cfg;
+
+  const lines = [];
+  lines.push('=== TV vs JS ДИАГНОСТИКА РАСХОЖДЕНИЯ ===');
+  lines.push(`Результат: ${r.name}`);
+  lines.push(`Совпало баров: ${pairs.length} | Корреляция: ${(corr*100).toFixed(2)}% | RMSE: ${rmse.toFixed(2)}%`);
+  lines.push(`JS итог: ${jsLast.toFixed(2)}%  TV итог: ${tvLast.toFixed(2)}%  Δ: ${finalDiff>=0?'+':''}${finalDiff.toFixed(2)}%`);
+  lines.push(`Первое расхождение >0.5%: бар #${firstDivBar} (${firstDivTime})`);
+  lines.push(`Макс. расхождение: ${maxDiff.toFixed(2)}% на баре #${maxDiffBar} (${maxDiffTime})`);
+  lines.push('');
+
+  // Config summary
+  lines.push('=== КОНФИГ СТРАТЕГИИ ===');
+  const slName = c.slPair ? JSON.stringify(c.slPair) : '—';
+  const tpName = c.tpPair ? JSON.stringify(c.tpPair) : '—';
+  lines.push(`SL: ${slName}`);
+  lines.push(`TP: ${tpName}`);
+  lines.push(`ATR период: ${c.atrPeriod||14}`);
+  lines.push(`Комиссия: ${c.baseComm??c.commission??0.08}%  Спред: ${c.spreadVal||0}%`);
+  lines.push(`useMA: ${!!c.useMA}  maType: ${c.maType||'EMA'}  maP: ${c.maP||200}`);
+  lines.push(`useConfirm: ${!!c.useConfirm}  confN: ${c.confN||100}`);
+  lines.push(`useSTrend: ${!!c.useSTrend}  sTrendWin: ${c.sTrendWin||10}`);
+  lines.push(`useBE: ${!!c.useBE}  beTrig: ${c.beTrig||0}  beOff: ${c.beOff||0}`);
+  lines.push(`useTrail: ${!!c.useTrail}  trTrig: ${c.trTrig||0}  trDist: ${c.trDist||0}`);
+  lines.push(`usePartial: ${!!c.usePartial}  partRR: ${c.partRR||0}  partPct: ${c.partPct||0}`);
+  lines.push(`useTime: ${!!c.useTime}  timeBars: ${c.timeBars||0}`);
+  lines.push(`usePivot: ${!!c.usePivot}  pvL: ${c.pvL||5}  pvR: ${c.pvR||2}`);
+  lines.push(`useEngulf: ${!!c.useEngulf}  usePinBar: ${!!c.usePinBar}  useBoll: ${!!c.useBoll}`);
+  lines.push(`useDonch: ${!!c.useDonch}  useAtrBo: ${!!c.useAtrBo}  useSqueeze: ${!!c.useSqueeze}`);
+  lines.push(`useMaTouch: ${!!c.useMaTouch}  useRev: ${!!c.useRev}  useClimax: ${!!c.useClimax}`);
+  lines.push(`longOnly: ${!!c.longOnly}  shortOnly: ${!!c.shortOnly}`);
+  lines.push(`entry_price_mode: ${c.entryMode||'close'}  confirmed: ${c.confirmed!==false}`);
+  lines.push('');
+
+  // Bars around first divergence: -15 to +5
+  const fromBar = Math.max(0, firstDivBar - 15);
+  const toBar   = Math.min(DATA.length - 1, firstDivBar + 5);
+  const pairMap = Object.create(null);
+  for (const p of pairs) pairMap[p.i] = p;
+
+  lines.push(`=== БАРЫ ВОКРУГ ПЕРВОГО РАСХОЖДЕНИЯ (бар #${firstDivBar}) ===`);
+  lines.push('Бар# | Дата              | Open     | High     | Low      | Close    | JS_eq%   | TV_eq%   | Δeq%  | TV:EL ES XL XS');
+  lines.push('-'.repeat(110));
+  for (let i = fromBar; i <= toBar; i++) {
+    const bar  = DATA[i] || {};
+    const p    = pairMap[i];
+    const jsEq = p ? p.jsEq.toFixed(3) : '—      ';
+    const tvEq = p ? p.tvEq.toFixed(3) : '—      ';
+    const diff = p ? (p.jsEq - p.tvEq).toFixed(3) : '—    ';
+    const sigs = p && hasSigs
+      ? `${p.tvRow.el||0} ${p.tvRow.es||0} ${p.tvRow.xl||0} ${p.tvRow.xs||0}`
+      : '— — — —';
+    const marker = i === firstDivBar ? ' ◄ ПЕРВОЕ' : i === maxDiffBar ? ' ◄ МАКС' : '';
+    const t = String(bar.t || '—').padEnd(18);
+    lines.push(
+      `${String(i).padStart(5)} | ${t} | ${(bar.o||0).toFixed(4).padStart(8)} | ${(bar.h||0).toFixed(4).padStart(8)} | ` +
+      `${(bar.l||0).toFixed(4).padStart(8)} | ${(bar.c||0).toFixed(4).padStart(8)} | ` +
+      `${String(jsEq).padStart(8)} | ${String(tvEq).padStart(8)} | ${String(diff).padStart(6)} | ${sigs}${marker}`
+    );
+  }
+  lines.push('');
+
+  // Also show 5 bars before first divergence where they still matched (last matching bars)
+  let lastMatchBar = -1;
+  for (const p of pairs) { if (p.i < firstDivBar && Math.abs(p.jsEq - p.tvEq) <= 0.5) lastMatchBar = p.i; }
+  if (lastMatchBar >= 0) {
+    lines.push(`Последний совпадающий бар (Δ≤0.5%): #${lastMatchBar} (${DATA[lastMatchBar]?.t||''})`);
+    const pm = pairMap[lastMatchBar];
+    if (pm) lines.push(`  JS_eq: ${pm.jsEq.toFixed(3)}%  TV_eq: ${pm.tvEq.toFixed(3)}%`);
+  }
+  lines.push('');
+  lines.push('=== ЧТО ПРОВЕРИТЬ ===');
+  lines.push('1. На баре первого расхождения — TV показывает вход/выход (EL/ES/XL/XS = 1)?');
+  lines.push('2. Если TV EL/ES=1 там где JS не открывал сделку — ищи различие в логике входа');
+  lines.push('3. Если TV XL/XS=1 там где JS не закрывал — ищи различие в логике SL/TP/BE/Trail');
+  lines.push('4. Если сигналы совпадают но equity расходится — ищи различие в расчёте PnL (цена входа, комиссия)');
+
+  const text = lines.join('\n');
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.querySelector('#tv-cmp-results button');
+    if (btn) { const orig = btn.textContent; btn.textContent = '✅ Скопировано!'; setTimeout(() => { btn.textContent = orig; }, 2000); }
+  }).catch(() => {
+    // fallback
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+  });
+}
 
 // ── CROSSHAIR ──────────────────────────────────────────────────
 (function() {
