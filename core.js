@@ -221,25 +221,25 @@ function calcRMA_ATR(period) {
   return rma;
 }
 function calcPivotLow(left, right) {
-  // Pine ta.pivotlow: center СТРОГО меньше всех left И right баров
+  // Pine ta.pivotlow: center <= всех left И right баров (ничья разрешена, как в Pine)
   const N = DATA.length, res = new Uint8Array(N);
   for (let i = left + right; i < N; i++) {
     const idx = i - right, v = DATA[idx].l;
     let ok = true;
-    for (let j = idx - left; j < idx; j++) { if (DATA[j].l <= v) { ok = false; break; } }
-    if (ok) for (let j = idx + 1; j <= Math.min(idx + right, N-1); j++) { if (DATA[j].l <= v) { ok = false; break; } }
+    for (let j = idx - left; j < idx; j++) { if (DATA[j].l < v) { ok = false; break; } }
+    if (ok) for (let j = idx + 1; j <= Math.min(idx + right, N-1); j++) { if (DATA[j].l < v) { ok = false; break; } }
     if (ok) res[i] = 1;
   }
   return res;
 }
 function calcPivotHigh(left, right) {
-  // Pine ta.pivothigh: center СТРОГО больше всех left И right баров
+  // Pine ta.pivothigh: center >= всех left И right баров (ничья разрешена, как в Pine)
   const N = DATA.length, res = new Uint8Array(N);
   for (let i = left + right; i < N; i++) {
     const idx = i - right, v = DATA[idx].h;
     let ok = true;
-    for (let j = idx - left; j < idx; j++) { if (DATA[j].h >= v) { ok = false; break; } }
-    if (ok) for (let j = idx + 1; j <= Math.min(idx + right, N-1); j++) { if (DATA[j].h >= v) { ok = false; break; } }
+    for (let j = idx - left; j < idx; j++) { if (DATA[j].h > v) { ok = false; break; } }
+    if (ok) for (let j = idx + 1; j <= Math.min(idx + right, N-1); j++) { if (DATA[j].h > v) { ok = false; break; } }
     if (ok) res[i] = 1;
   }
   return res;
