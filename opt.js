@@ -948,7 +948,10 @@ async function runOpt() {
     if (rFull && typeof isTradeN === 'number' && isTradeN > rFull.n) {
       console.warn('[_attachOOS] IS > TV trades:', isTradeN, '>', rFull.n, cfg);
     }
-    if (!rFull || !rFull.eq || rFull.eq.length < _isN + 5) return;
+    if (!rFull || !rFull.eq || rFull.eq.length < _isN + 5) {
+      if (!rFull) console.warn('[_attachOOS] rFull=null (exception in _runOOS). Name:', name, '| cfg keys:', Object.keys(cfg).filter(k=>cfg[k]).slice(0,8).join(','));
+      return;
+    }
     const eq       = rFull.eq;
     const N_eq     = eq.length;
     const splitIdx = Math.min(_isN - 1, N_eq - 2);
@@ -1948,6 +1951,8 @@ async function runOpt() {
               useWT:_effUseWT&&wtT>0,wtThresh:wtT,wtN,wtVolW,wtBodyW,wtUseDist,
               useFat:_effUseFat,fatConsec,fatVolDrop,
               useKalmanMA:_fCombo.useKalmanMA??useKalmanMA,kalmanLen, // ##KALMAN_MA##
+              useMacdFilter:_fCombo.useMacdFilter??useMacdFilter,
+              useER:_fCombo.useER??useER,erPeriod:erPeriod||10,erThresh,
               atrPeriod:atrP,commission:commTotal,baseComm:comm,spreadVal:spread*2,
               revSkip,revCooldown,revSrc};
           results.push({name,pnl:r.pnl,wr:r.wr,n:r.n,dd:r.dd,pdd,avg:r.avg,sig,gt,
@@ -2304,6 +2309,8 @@ async function runOpt() {
               useWT:_effUseWT&&wtT>0,wtThresh:wtT,wtN,wtVolW,wtBodyW,wtUseDist,
               useFat:_effUseFat,fatConsec,fatVolDrop,
               useKalmanMA:_fCombo.useKalmanMA??useKalmanMA,kalmanLen, // ##KALMAN_MA##
+              useMacdFilter:_fCombo.useMacdFilter??useMacdFilter,
+              useER:_fCombo.useER??useER,erPeriod:erPeriod||10,erThresh,
               atrPeriod:atrP,commission:commTotal,baseComm:comm,spreadVal:spread*2};
           // OOS и тяжёлые метрики НЕ вызываем здесь — это горячий цикл
           // CVR/UPI/Sortino/kRatio вычислятся батчем после завершения TPE
@@ -2718,9 +2725,11 @@ async function runOpt() {
                                     const maCrossArr = useMaCross   ? (()=>{const k=_mCrossType0+'_'+maCrossP;return maCrossNewCache[k]||(maCrossNewCache[k]=calcMA(closes,maCrossP,_mCrossType0));})() : null;
                                     const stDir      = (useSupertrend||useStExit) ? (()=>{const k=stAtrP+'_'+stMult;return stDirCache[k]||(stDirCache[k]=calcSupertrend(stAtrP,stMult));})() : null;
                                     let macdLine=null,macdSignal=null;
-                                    if(useMacd){const mk=macdFast+'_'+macdSlow+'_'+macdSigP;if(!macdNewCache[mk]){const m=calcMACD(macdFast,macdSlow,macdSigP);macdNewCache[mk]=m;}macdLine=macdNewCache[mk].line;macdSignal=macdNewCache[mk].signal;}
+                                    if(useMacd||useMacdFilter){const mk=macdFast+'_'+macdSlow+'_'+macdSigP;if(!macdNewCache[mk]){const m=calcMACD(macdFast,macdSlow,macdSigP);macdNewCache[mk]=m;}macdLine=macdNewCache[mk].line;macdSignal=macdNewCache[mk].signal;}
                                     let stochD=null;
                                     if(useStochExit){const sk=stochKP+'_'+stochDP;if(!stochNewCache[sk])stochNewCache[sk]=calcStochastic(stochKP,stochDP);stochD=stochNewCache[sk].dArr;}
+                                    let erArrEx=null;
+                                    if(useER){const ep=erPArr[0]||10;const ek='er_'+ep;if(!maCache[ek]){const ea=new Float64Array(N);for(let i=ep;i<N;i++){const net=Math.abs(closes[i]-closes[i-ep]);let sum=0;for(let j=i-ep+1;j<=i;j++)sum+=Math.abs(closes[j]-closes[j-1]);ea[i]=sum>0?net/sum:0;}maCache[ek]=ea;}erArrEx=maCache[ek];}
                                     if(stopped) break;
                                     for(const _confType of (confTypeArr.length?confTypeArr:['EMA'])) {
                                     for(const _confHtf of (confHtfArr.length?confHtfArr:[1])) {
@@ -2804,6 +2813,7 @@ async function runOpt() {
                                       useWT:useWT&&wtT>0,wtScores,wtThresh:wtT,
                                       useFat,fatConsec,fatVolDrop,
                                       useKalmanMA,kalmanArr,kalmanLen, // ##KALMAN_MA##
+                                      useMacdFilter,useER,erArr:erArrEx,erPeriod:erPArr[0]||10,erThresh,
                                       bodyAvg:bodyAvgArr,
                                       start:Math.max((maP||0)*(htfRatio||1),(confN||0)*(_confHtf||1),50)+2,
                                       // Pruning
@@ -2894,6 +2904,7 @@ async function runOpt() {
                                           useWT:useWT&&wtT>0, wtThresh:wtT, wtN, wtVolW, wtBodyW, wtUseDist,
                                           useFat, fatConsec, fatVolDrop,
                                           useKalmanMA, kalmanLen, // ##KALMAN_MA##
+                                          useMacdFilter, useER, erPeriod:erPArr[0]||10, erThresh,
                                           atrPeriod:atrP, commission:commTotal, baseComm:comm, spreadVal:spread*2
                                         };
                                       results.push({name,pnl:r.pnl,wr:r.wr,n:r.n,dd:r.dd,pdd,avg:r.avg,sig,gt,
