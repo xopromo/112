@@ -562,9 +562,9 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
             if (fn(cfg, i)) oppSig = true;
           }
         }
-        // Применяем те же фильтры входа для противоположного направления
-        // (rev_sig должен срабатывать только когда вход в другую сторону был бы разрешён)
-        if (oppSig) {
+        // Применяем фильтры входа для противоположного направления
+        // (только если cfg.revNoFilters !== true; иначе RevSig срабатывает на любой паттерн)
+        if (oppSig && !cfg.revNoFilters) {
           for (let _fi = 0; _fi < activeFilters.length && oppSig; _fi++) {
             const _f = activeFilters[_fi];
             if (dir === 1 && _f.blocksS(cfg, i, ac)) oppSig = false;
@@ -722,14 +722,14 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
         if (revNewDir !== 0) {
           dir = revNewDir; entry = bar.c;
           const ac2 = atrArr[i];
-          hasSL2 = hasSLA && hasSLB;
-          if (hasSLA) sl1 = entry - dir*ac2*cfg.slMult;
-          if (hasSLB) { const slB2 = entry*(1-dir*cfg.slPctMult/100); sl1 = hasSLA ? (dir===1?Math.max(sl1,slB2):Math.min(sl1,slB2)) : slB2; }
+          hasSL2 = cfg.hasSLA && cfg.hasSLB;
+          if (cfg.hasSLA) sl1 = entry - dir*ac2*cfg.slMult;
+          if (cfg.hasSLB) { const slB2 = entry*(1-dir*cfg.slPctMult/100); sl1 = cfg.hasSLA ? (dir===1?Math.max(sl1,slB2):Math.min(sl1,slB2)) : slB2; }
           if (hasSL2) sl2 = entry*(1-dir*cfg.slPctMult/100);
           const slDist2 = Math.abs(entry-sl1)||ac2;
-          hasTP2 = hasTPA && hasTPB;
-          if (hasTPA) tp1 = _calcTP(entry, dir, slDist2, ac2, cfg.tpMode,  cfg.tpMult);
-          if (hasTPB) tp2 = _calcTP(entry, dir, slDist2, ac2, cfg.tpModeB, cfg.tpMultB);
+          hasTP2 = cfg.hasTPA && cfg.hasTPB;
+          if (cfg.hasTPA) tp1 = _calcTP(entry, dir, slDist2, ac2, cfg.tpMode,  cfg.tpMult);
+          if (cfg.hasTPB) tp2 = _calcTP(entry, dir, slDist2, ac2, cfg.tpModeB, cfg.tpMultB);
           inTrade = true; entryBar = i; posSize = 1.0;
           beActive = false; trailActive = false; partialDone = false;
           eq[i] = pnl;

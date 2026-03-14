@@ -170,15 +170,28 @@ jobs:
           print(f"Search done: {len(all_results)} total, {len(new_results)} new, {len(old_results)} already seen")
 
           # ── STEP 2: Fetch full page content ────────────────────────────────
-          if mode != 'snippets_only' and results_to_process:
-              from bs4 import BeautifulSoup
-              print(f"\nFetching {len(results_to_process)} pages...")
+          FALLBACK_UAS = [
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+              'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15',
+              'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:123.0) Gecko/20100101 Firefox/123.0',
+          ]
 
-              for i, item in enumerate(results_to_process):
-                  url = item['url']
-                  print(f"  [{i+1}/{len(results_to_process)}] {url[:70]}...")
+          def fetch_page(url):
+              """Fetch page with retry on 403/429/5xx using different User-Agents."""
+              from bs4 import BeautifulSoup
+              last_err = None
+              for attempt, ua in enumerate([UA] + FALLBACK_UAS):
                   try:
-                      resp = requests.get(url, headers={'User-Agent': UA}, timeout=20)
+                      if attempt > 0:
+                          wait = 2 ** attempt  # 2, 4, 8 sec
+                          print(f"    Retry {attempt} (UA#{attempt}) after {wait}s...")
+                          time.sleep(wait)
+                      resp = requests.get(url, headers={'User-Agent': ua}, timeout=20)
+                      if resp.status_code == 429:
+                          retry_after = int(resp.headers.get('Retry-After', 5))
+                          print(f"    429 Rate limit, waiting {retry_after}s...")
+                          time.sleep(retry_after)
+                          continue
                       resp.raise_for_status()
                       soup = BeautifulSoup(resp.text, 'html.parser')
                       for tag in soup(['script', 'style', 'nav', 'footer',
@@ -186,13 +199,28 @@ jobs:
                           tag.decompose()
                       text  = soup.get_text(separator='\n')
                       lines = [l.strip() for l in text.splitlines() if l.strip()]
-                      text  = '\n'.join(lines)
-                      item['full_text'] = text[:15000]
-                      print(f"    {len(text)} chars fetched")
-                      time.sleep(1)
+                      return '\n'.join(lines)
                   except Exception as e:
-                      item['full_text'] = f"FETCH_ERROR: {e}"
-                      print(f"    ERROR: {e}", file=sys.stderr)
+                      last_err = e
+                      if '403' not in str(e) and '429' not in str(e) and '5' not in str(e)[:3]:
+                          break  # не ретраить если ошибка не связана с блокировкой
+              return None, last_err
+
+          if mode != 'snippets_only' and results_to_process:
+              print(f"\nFetching {len(results_to_process)} pages...")
+
+              for i, item in enumerate(results_to_process):
+                  url = item['url']
+                  print(f"  [{i+1}/{len(results_to_process)}] {url[:70]}...")
+                  result = fetch_page(url)
+                  if isinstance(result, tuple):
+                      _, err = result
+                      item['full_text'] = f"FETCH_ERROR: {err}"
+                      print(f"    ERROR (all retries failed): {err}", file=sys.stderr)
+                  else:
+                      item['full_text'] = result[:15000]
+                      print(f"    {len(result)} chars fetched")
+                  time.sleep(1)
 
           # ── STEP 3: Process with Groq ───────────────────────────────────────
           PROMPTS = {
@@ -221,39 +249,57 @@ jobs:
               if not groq_key or mode in ('snippets_only', 'full_text'):
                   return None
               prompt = PROMPTS.get(mode, PROMPTS['summarize'])
-              try:
-                  resp = requests.post(
-                      'https://api.groq.com/openai/v1/chat/completions',
-                      headers={
-                          'Authorization': f'Bearer {groq_key}',
-                          'Content-Type':  'application/json',
-                      },
-                      json={
-                          'model': 'llama-3.3-70b-versatile',
-                          'messages': [
-                              {
-                                  'role':    'system',
-                                  'content': (
-                                      'Ты исследователь алгоритмической торговли. '
-                                      'Отвечай кратко и по делу на русском.'
-                                  ),
-                              },
-                              {
-                                  'role':    'user',
-                                  'content': f'{prompt}\n\nТЕКСТ:\n{text[:8000]}',
-                              },
-                          ],
-                          'max_tokens':  1024,
-                          'temperature': 0.3,
-                      },
-                      timeout=30,
-                  )
-                  data = resp.json()
-                  if 'choices' in data:
-                      return data['choices'][0]['message']['content']
-                  return f"Groq error: {data.get('error', data)}"
-              except Exception as e:
-                  return f"Groq failed: {e}"
+              for attempt in range(4):  # max 4 попытки
+                  try:
+                      if attempt > 0:
+                          wait = 2 ** attempt  # 2, 4, 8 sec
+                          print(f"    Groq retry {attempt} after {wait}s...")
+                          time.sleep(wait)
+                      resp = requests.post(
+                          'https://api.groq.com/openai/v1/chat/completions',
+                          headers={
+                              'Authorization': f'Bearer {groq_key}',
+                              'Content-Type':  'application/json',
+                          },
+                          json={
+                              'model': 'llama-3.3-70b-versatile',
+                              'messages': [
+                                  {
+                                      'role':    'system',
+                                      'content': (
+                                          'Ты исследователь алгоритмической торговли. '
+                                          'Отвечай кратко и по делу на русском.'
+                                      ),
+                                  },
+                                  {
+                                      'role':    'user',
+                                      'content': f'{prompt}\n\nТЕКСТ:\n{text[:8000]}',
+                                  },
+                              ],
+                              'max_tokens':  1024,
+                              'temperature': 0.3,
+                          },
+                          timeout=30,
+                      )
+                      if resp.status_code == 429:
+                          retry_after = int(resp.headers.get('Retry-After', 2 ** attempt))
+                          print(f"    Groq 429 rate limit, waiting {retry_after}s...")
+                          time.sleep(retry_after)
+                          continue
+                      data = resp.json()
+                      if 'choices' in data:
+                          return data['choices'][0]['message']['content']
+                      err_msg = data.get('error', {})
+                      if isinstance(err_msg, dict) and err_msg.get('type') == 'tokens':
+                          print(f"    Groq token limit: {err_msg.get('message','')}")
+                          time.sleep(5)
+                          continue
+                      return f"Groq error: {err_msg}"
+                  except Exception as e:
+                      if attempt == 3:
+                          return f"Groq failed: {e}"
+                      print(f"    Groq exception: {e}, retrying...")
+              return "Groq failed: max retries exceeded"
 
           if mode not in ('snippets_only', 'full_text') and results_to_process:
               print(f"\nProcessing with Groq (mode={mode})...")
