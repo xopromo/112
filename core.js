@@ -147,35 +147,131 @@ function calcMA(data, period, type) {
   return calcEMA(data, period);
 }
 // HTF MA: строит MA на барах старшего ТФ (ratio=4 → 4x текущего).
-// Lookahead-free: на баре i видим только закрытые HTF-бары (до закрытия бара i).
-// HTF-бар k закрывается когда base-бар (k+1)*ratio-1 закрывается.
-// Поэтому aligned[i] = htfMA[floor((i+1)/ratio) - 1], или 0 если нет закрытых HTF-баров.
+// Lookahead-free + timestamp-aligned: HTF-бары группируются по реальным timestamp-периодам,
+// как это делает Pine request.security с lookahead_on + [1]:
+//   aligned[i] = MA HTF-бара ПРЕДШЕСТВУЮЩЕГО тому, в котором находится base-бар i.
+// Это исправляет смещение на 1 бар когда первый base-бар CSV не совпадает
+// с началом HTF-периода (например, CSV начинается на 15:25 вместо 15:20 для 20-мин HTF).
 function calcHTFMA(data, htfRatio, period, type) {
   const N = data.length;
-  const htfN = Math.ceil(N / htfRatio);
-  const htfCloses = new Float64Array(htfN);
-  for (let k = 0; k < htfN; k++) {
-    const endIdx = Math.min((k + 1) * htfRatio - 1, N - 1);
-    htfCloses[k] = data[endIdx].c;
+  if (N < 2) return new Float64Array(N);
+
+  // Определяем базовый интервал из timestamps (в секундах)
+  const baseInterval = Math.round(parseInt(data[1].t) - parseInt(data[0].t));
+  const htfPeriod = baseInterval * htfRatio;
+
+  // Если нет timestamps (тест без .t) — старый алгоритм как fallback
+  if (!baseInterval || !data[0].t) {
+    const htfN = Math.ceil(N / htfRatio);
+    const htfCloses = new Float64Array(htfN);
+    for (let k = 0; k < htfN; k++) {
+      htfCloses[k] = data[Math.min((k + 1) * htfRatio - 1, N - 1)].c;
+    }
+    const htfMA = calcMA(htfCloses, period, type);
+    const aligned = new Float64Array(N);
+    for (let i = 0; i < N; i++) {
+      const lastHTF = Math.floor((i + 1) / htfRatio) - 1;
+      aligned[i] = lastHTF >= 0 ? htfMA[lastHTF] : 0;
+    }
+    return aligned;
   }
-  const htfMA = calcMA(htfCloses, period, type);
-  const aligned = new Float64Array(N);
+
+  // Шаг 1: группируем base-бары по HTF-периодам через timestamp
+  // htfBars[k] = { close, lastBaseBar } — последний base-бар в периоде k
+  const htfBars = [];
+  let prevHtfId = -1;
   for (let i = 0; i < N; i++) {
-    const lastHTF = Math.floor((i + 1) / htfRatio) - 1;
-    aligned[i] = lastHTF >= 0 ? htfMA[lastHTF] : 0;
+    const htfId = Math.floor(parseInt(data[i].t) / htfPeriod);
+    if (htfId !== prevHtfId) {
+      htfBars.push({ close: data[i].c, lastBaseBar: i });
+      prevHtfId = htfId;
+    } else {
+      htfBars[htfBars.length - 1].close = data[i].c;
+      htfBars[htfBars.length - 1].lastBaseBar = i;
+    }
+  }
+
+  // Шаг 2: вычисляем MA на HTF-закрытиях
+  const htfCloses = new Float64Array(htfBars.length);
+  for (let k = 0; k < htfBars.length; k++) htfCloses[k] = htfBars[k].close;
+  const htfMA = calcMA(htfCloses, period, type);
+
+  // Шаг 3: выравниваем обратно к base-таймфрейму
+  // Pine: ma_val = request.security(..., calc_ma[1], lookahead_on)
+  // На base-баре i видим MA HTF-бара, предшествующего текущему HTF-бару (сдвиг [1])
+  const aligned = new Float64Array(N);
+  let ki = 0;
+  for (let i = 0; i < N; i++) {
+    // Продвигаем ki: ki = индекс HTF-бара, содержащего base-бар i
+    while (ki < htfBars.length - 1 && htfBars[ki].lastBaseBar < i) ki++;
+    // С сдвигом [1]: видим MA HTF-бара ki-1
+    const visibleHtf = ki - 1;
+    aligned[i] = visibleHtf >= 0 ? htfMA[visibleHtf] : 0;
   }
   return aligned;
 }
 function calcHTFADX(data, htfRatio, period) {
   const N = data.length;
-  const htfN = Math.ceil(N / htfRatio);
-  const htfH = new Float64Array(htfN), htfL = new Float64Array(htfN), htfC = new Float64Array(htfN);
-  for (let k = 0; k < htfN; k++) {
-    const s = k * htfRatio, e = Math.min((k+1)*htfRatio-1, N-1);
-    let h = -Infinity, l = Infinity;
-    for (let j = s; j <= e; j++) { h = Math.max(h, data[j].h); l = Math.min(l, data[j].l); }
-    htfH[k] = h; htfL[k] = l; htfC[k] = data[e].c;
+  if (N < 2) return new Float64Array(N);
+
+  // Timestamp-aligned HTF grouping (same logic as calcHTFMA)
+  const baseInterval = Math.round(parseInt(data[1].t) - parseInt(data[0].t));
+  const htfPeriod = baseInterval * htfRatio;
+
+  if (!baseInterval || !data[0].t) {
+    // Fallback: old algorithm without timestamp alignment
+    const htfN = Math.ceil(N / htfRatio);
+    const htfH = new Float64Array(htfN), htfL = new Float64Array(htfN), htfC = new Float64Array(htfN);
+    for (let k = 0; k < htfN; k++) {
+      const s = k * htfRatio, e = Math.min((k+1)*htfRatio-1, N-1);
+      let h = -Infinity, l = Infinity;
+      for (let j = s; j <= e; j++) { h = Math.max(h, data[j].h); l = Math.min(l, data[j].l); }
+      htfH[k] = h; htfL[k] = l; htfC[k] = data[e].c;
+    }
+    const pdm = new Float64Array(htfN), mdm = new Float64Array(htfN), tr = new Float64Array(htfN);
+    for (let i = 1; i < htfN; i++) {
+      const up = htfH[i]-htfH[i-1], dn = htfL[i-1]-htfL[i];
+      pdm[i] = (up > dn && up > 0) ? up : 0;
+      mdm[i] = (dn > up && dn > 0) ? dn : 0;
+      tr[i]  = Math.max(htfH[i]-htfL[i], Math.abs(htfH[i]-htfC[i-1]), Math.abs(htfL[i]-htfC[i-1]));
+    }
+    const atrR = calcRMA(Array.from(tr), period);
+    const pdmR = calcRMA(Array.from(pdm), period);
+    const mdmR = calcRMA(Array.from(mdm), period);
+    const dx = new Float64Array(htfN);
+    for (let i = period; i < htfN; i++) {
+      if (atrR[i] > 0) { const pi=pdmR[i]/atrR[i]*100, mi=mdmR[i]/atrR[i]*100, s=pi+mi; dx[i]=s>0?Math.abs(pi-mi)/s*100:0; }
+    }
+    const htfADX = calcRMA(Array.from(dx), period);
+    const aligned = new Float64Array(N);
+    for (let i = 0; i < N; i++) {
+      const last = Math.floor((i+1)/htfRatio)-1;
+      aligned[i] = last >= 0 ? htfADX[last] : 0;
+    }
+    return aligned;
   }
+
+  // Group bars into HTF periods by timestamp
+  const htfBars = []; // { H, L, C, lastBaseBar }
+  let prevHtfId = -1;
+  for (let i = 0; i < N; i++) {
+    const htfId = Math.floor(parseInt(data[i].t) / htfPeriod);
+    if (htfId !== prevHtfId) {
+      htfBars.push({ H: data[i].h, L: data[i].l, C: data[i].c, lastBaseBar: i });
+      prevHtfId = htfId;
+    } else {
+      const b = htfBars[htfBars.length - 1];
+      if (data[i].h > b.H) b.H = data[i].h;
+      if (data[i].l < b.L) b.L = data[i].l;
+      b.C = data[i].c;
+      b.lastBaseBar = i;
+    }
+  }
+
+  const htfN = htfBars.length;
+  const htfH = new Float64Array(htfN), htfL = new Float64Array(htfN), htfC = new Float64Array(htfN);
+  for (let k = 0; k < htfN; k++) { htfH[k]=htfBars[k].H; htfL[k]=htfBars[k].L; htfC[k]=htfBars[k].C; }
+
   const pdm = new Float64Array(htfN), mdm = new Float64Array(htfN), tr = new Float64Array(htfN);
   for (let i = 1; i < htfN; i++) {
     const up = htfH[i]-htfH[i-1], dn = htfL[i-1]-htfL[i];
@@ -191,10 +287,14 @@ function calcHTFADX(data, htfRatio, period) {
     if (atrR[i] > 0) { const pi=pdmR[i]/atrR[i]*100, mi=mdmR[i]/atrR[i]*100, s=pi+mi; dx[i]=s>0?Math.abs(pi-mi)/s*100:0; }
   }
   const htfADX = calcRMA(Array.from(dx), period);
+
+  // Align to base timeframe with lookahead-free [1] shift
   const aligned = new Float64Array(N);
+  let ki = 0;
   for (let i = 0; i < N; i++) {
-    const last = Math.floor((i+1)/htfRatio)-1;
-    aligned[i] = last >= 0 ? htfADX[last] : 0;
+    while (ki < htfBars.length - 1 && htfBars[ki].lastBaseBar < i) ki++;
+    const visibleHtf = ki - 1;
+    aligned[i] = visibleHtf >= 0 ? htfADX[visibleHtf] : 0;
   }
   return aligned;
 }
