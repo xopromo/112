@@ -185,8 +185,8 @@ const BTF = {
   // Pivot entry
   usePivot: true, pvLo, pvHi_: pvHi, pvL: 6, pvR: 5,
   // Rev signal
-  useRev: true, revBars: 1, revSkip: 1, revMode: 'any', revAct: 'exit',
-  revSrc: 'same', revCooldown: 0,
+  useRev: true, revBars: 1, revSkip: 1, revMode: 'plus', revAct: 'exit',
+  revSrc: 'same', revCooldown: 0, revNoFilters: true,
   // Other flags off
   useEngulf: false, usePinBar: false, useBoll: false, useDonch: false,
   useAtrBo: false, useSqueeze: false, useMaTouch: false, useClimax: false,
