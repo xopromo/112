@@ -3267,11 +3267,19 @@ function copyTVdiag() {
   for (const p of pairs) pairMap[p.i] = p;
 
   lines.push(`=== БАРЫ ВОКРУГ ПЕРВОГО РАСХОЖДЕНИЯ (бар #${firstDivBar}) ===`);
-  // JS внутренние значения: pvLo, pvHi_, maArr, atrArr
-  const pvLo   = c.pvLo   || null;
-  const pvHi_  = c.pvHi_  || null;
-  const maArr  = c.maArr  || null;
-  const atrArr = c.atrArr || null;
+  // Пересчитываем btCfg — r.cfg хранит только скаляры, массивы не сохраняются в результат
+  let pvLo = null, pvHi_ = null, maArr = null, atrArr = null;
+  try {
+    const _ind   = typeof _calcIndicators === 'function' ? _calcIndicators(c) : null;
+    const _btCfg = (_ind && typeof buildBtCfg === 'function') ? buildBtCfg(c, _ind) : null;
+    if (_btCfg) {
+      pvLo   = _btCfg.pvLo  || null;
+      pvHi_  = _btCfg.pvHi_ || null;
+      maArr  = _btCfg.maArr || null;
+      atrArr = _ind.atrArr  || null;
+    }
+    lines.push(`btCfg пересчитан: pvLo=${pvLo?'✅':'❌'} maArr=${maArr?'✅':'❌'}`);
+  } catch(e) { lines.push(`⚠️ Не удалось пересчитать btCfg: ${e.message}`); }
   lines.push('Бар# | Дата              | Open     | High     | Low      | Close    | JS_eq%   | TV_eq%   | Δeq%  | TV:EL ES XL XS | pvLo pvHi | MA(i-1)   | MA_block?');
   lines.push('-'.repeat(150));
   for (let i = fromBar; i <= toBar; i++) {
@@ -3316,34 +3324,69 @@ function copyTVdiag() {
   lines.push('');
   // Автоматический анализ первичной причины
   lines.push('=== АВТО-ДИАГНОЗ ===');
-  const fp = pairMap[firstDivBar];
-  if (fp) {
-    const tvEl = fp.tvRow.el, tvEs = fp.tvRow.es, tvXl = fp.tvRow.xl, tvXs = fp.tvRow.xs;
-    const tvEntry = tvEl===1||tvEs===1, tvExit = tvXl===1||tvXs===1;
-    if (tvEntry) {
-      // TV открыл сделку. Проверяем pvLo/pvHi и MA filter
-      const signalBar = firstDivBar - 1; // bar where EL appeared in TV
-      if (pvLo && pvHi_) {
-        const pvAtSignal = tvEl===1 ? pvLo[firstDivBar-1] : pvHi_[firstDivBar-1];
-        lines.push(`TV открыл ${tvEl===1?'LONG':'SHORT'} на баре #${firstDivBar-1} (EL/ES=1 на ${firstDivBar}).`);
-        lines.push(`JS pvLo[${firstDivBar-1}]=${pvLo[firstDivBar-1]}  pvHi_[${firstDivBar-1}]=${pvHi_[firstDivBar-1]}`);
-        if (pvAtSignal !== 1) lines.push(`⚠️  JS НЕ видит pivot на баре #${firstDivBar-1} → вероятная причина расхождения: разная логика pivot detection`);
-        else lines.push(`✅ JS тоже видит pivot на баре #${firstDivBar-1}`);
-      }
-    } else if (tvExit) {
-      lines.push(`TV закрыл сделку (XL/XS=1) на баре #${firstDivBar}. JS вероятно закрыл позже или по другой цене.`);
-    } else {
-      lines.push(`TV не показывает явного сигнала на баре расхождения — возможна разница в цене входа/комиссии.`);
-    }
-    // Check MA block at first divergence bar
-    if (maArr) {
-      const fi = firstDivBar;
-      const prevC = DATA[fi-1]?.c || 0;
-      const ma = maArr[fi-1] || 0;
-      if (ma > 0) {
-        lines.push(`MA(${c.maP}) на баре #${fi-1}: ${ma.toFixed(6)}  close[${fi-1}]: ${prevC.toFixed(6)}  → ${prevC<=ma?'⚠️ MA_FILTER БЛОКИРУЕТ LONG':'✅ MA filter не блокирует'}`);
+  // Ищем TV EL/ES сигнал в окне [firstDivBar-6 .. firstDivBar] — он мог быть чуть раньше
+  let entrySignalBar = -1, entryDir = 0;
+  for (let _si = Math.max(0, firstDivBar - 6); _si <= firstDivBar; _si++) {
+    const _p = pairMap[_si];
+    if (!_p) continue;
+    if (_p.tvRow.el === 1) { entrySignalBar = _si; entryDir = 1; break; }
+    if (_p.tvRow.es === 1) { entrySignalBar = _si; entryDir = -1; break; }
+  }
+  // Ищем TV XL/XS в том же окне
+  let exitSignalBar = -1;
+  for (let _si = Math.max(0, firstDivBar - 6); _si <= firstDivBar; _si++) {
+    const _p = pairMap[_si];
+    if (!_p) continue;
+    if (_p.tvRow.xl === 1 || _p.tvRow.xs === 1) { exitSignalBar = _si; break; }
+  }
+
+  if (entrySignalBar >= 0) {
+    const dirStr = entryDir === 1 ? 'LONG' : 'SHORT';
+    lines.push(`TV открыл ${dirStr} на баре #${entrySignalBar}`);
+    if (pvLo && pvHi_) {
+      const pvAtSig = entryDir === 1 ? pvLo[entrySignalBar] : pvHi_[entrySignalBar];
+      lines.push(`JS pvLo[${entrySignalBar}]=${pvLo[entrySignalBar]}  pvHi_[${entrySignalBar}]=${pvHi_[entrySignalBar]}`);
+      if (pvAtSig !== 1) {
+        lines.push(`⚠️  ПРИЧИНА: JS НЕ видит pivot на баре #${entrySignalBar}`);
+        // показываем близкие бары где JS видит pivot
+        for (let _k = entrySignalBar - 3; _k <= entrySignalBar + 3; _k++) {
+          if (_k < 0 || _k >= DATA.length) continue;
+          if (pvLo[_k] === 1) lines.push(`   JS видит pvLo на баре #${_k} (≠${entrySignalBar})`);
+          if (pvHi_[_k] === 1) lines.push(`   JS видит pvHi на баре #${_k} (≠${entrySignalBar})`);
+        }
       } else {
-        lines.push(`MA(${c.maP}) на баре #${fi-1} = 0 (прогрев!) → MA_FILTER БЛОКИРУЕТ (warmup)`);
+        lines.push(`✅ JS тоже видит pivot на баре #${entrySignalBar} — причина не в pivot detection`);
+      }
+    }
+    // MA filter на баре сигнала
+    if (maArr && entrySignalBar > 0) {
+      const prevC = DATA[entrySignalBar - 1]?.c || 0;
+      const ma = maArr[entrySignalBar - 1] || 0;
+      if (ma > 0) {
+        const blocked = entryDir === 1 ? prevC <= ma : prevC >= ma;
+        lines.push(`MA(${c.maP}×${c.htfRatio||1}tf)[${entrySignalBar-1}] = ${ma.toFixed(6)}  close[${entrySignalBar-1}] = ${prevC.toFixed(6)}`);
+        lines.push(blocked
+          ? `⚠️  ПРИЧИНА: JS MA_FILTER БЛОКИРУЕТ ${dirStr} (close ${entryDir===1?'<=':'>='}  MA)`
+          : `✅ MA filter не блокирует ${dirStr}`);
+      } else {
+        lines.push(`⚠️  ПРИЧИНА: MA[${entrySignalBar-1}] = 0 (warmup) → JS MA_FILTER БЛОКИРУЕТ`);
+      }
+    }
+  } else if (exitSignalBar >= 0) {
+    lines.push(`TV закрыл сделку (XL/XS=1) на баре #${exitSignalBar}. JS вероятно закрыл позже или по другой цене.`);
+    if (maArr && exitSignalBar > 0) {
+      const ma = maArr[exitSignalBar - 1] || 0;
+      lines.push(`MA[${exitSignalBar-1}] = ${ma > 0 ? ma.toFixed(6) : '0 (warmup)'}`);
+    }
+  } else {
+    lines.push(`TV не показывает явного EL/ES/XL/XS в окне [${firstDivBar-6}..${firstDivBar}].`);
+    lines.push(`Возможна разница в цене входа/SL/TP расчёте.`);
+    // Dump MA values near first divergence
+    if (maArr) {
+      for (let _k = firstDivBar - 2; _k <= firstDivBar + 1; _k++) {
+        if (_k < 1 || _k >= DATA.length) continue;
+        const ma = maArr[_k-1], cl = DATA[_k-1]?.c || 0;
+        lines.push(`  MA[${_k-1}]=${ma>0?ma.toFixed(6):'warmup'}  close[${_k-1}]=${cl.toFixed(6)}`);
       }
     }
   }
