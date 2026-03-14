@@ -1,0 +1,33 @@
+{
+  "name": "Pivot + WMA75 × 4tf  (откалибровано 2026-03-14)",
+  "dataFile": "test_data/ohlcv.csv",
+  "tvFile":   "test_data/tv_equity.csv",
+  "sliceOffset": "auto10000",
+
+  "btf": {
+    "hasSLB":    true,
+    "slPctMult": 10,
+    "hasTPA":    true,
+    "tpMult":    2,
+    "tpMode":    "pct",
+    "comm":      0.05,
+
+    "useMA":    true,
+    "maSource": "tv",
+    "maType":   "WMA",
+    "maP":      75,
+    "htfRatio": 4,
+
+    "usePivot": true,
+    "pvL":      6,
+    "pvR":      5,
+
+    "useRev":      true,
+    "revBars":     1,
+    "revSkip":     1,
+    "revMode":     "plus",
+    "revNoFilters": true,
+
+    "atrPeriod": 10
+  }
+}
