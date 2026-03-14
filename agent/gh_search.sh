@@ -72,9 +72,9 @@ if [ -z "$RUN_ID" ]; then
 fi
 log "Run ID: $RUN_ID"
 
-# Wait for completion (max 2 min)
+# Wait for completion (max 5 min)
 STATUS=""
-for i in $(seq 1 24); do
+for i in $(seq 1 60); do
     sleep 5
     STATUS=$(curl -s -H "$AUTH_H" -H "$ACCEPT_H" \
         "$API/repos/$REPO/actions/runs/$RUN_ID" | \
