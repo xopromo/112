@@ -221,25 +221,30 @@ function calcRMA_ATR(period) {
   return rma;
 }
 function calcPivotLow(left, right) {
-  // Pine ta.pivotlow: center <= всех left И right баров (ничья разрешена, как в Pine)
+  // Pine ta.pivotlow:
+  //   LEFT  (нестрого): левый бар дисквалифицирует только если low СТРОГО меньше центра (ничья = ok)
+  //   RIGHT (строго):   правый бар дисквалифицирует если low меньше ИЛИ равен центру (ничья = fail)
+  // Следствие: при двух равных low подряд pivot — на БОЛЕЕ ПОЗДНЕМ баре (как в Pine)
   const N = DATA.length, res = new Uint8Array(N);
   for (let i = left + right; i < N; i++) {
     const idx = i - right, v = DATA[idx].l;
     let ok = true;
     for (let j = idx - left; j < idx; j++) { if (DATA[j].l < v) { ok = false; break; } }
-    if (ok) for (let j = idx + 1; j <= Math.min(idx + right, N-1); j++) { if (DATA[j].l < v) { ok = false; break; } }
+    if (ok) for (let j = idx + 1; j <= Math.min(idx + right, N-1); j++) { if (DATA[j].l <= v) { ok = false; break; } }
     if (ok) res[i] = 1;
   }
   return res;
 }
 function calcPivotHigh(left, right) {
-  // Pine ta.pivothigh: center >= всех left И right баров (ничья разрешена, как в Pine)
+  // Pine ta.pivothigh:
+  //   LEFT  (нестрого): левый бар дисквалифицирует только если high СТРОГО больше центра (ничья = ok)
+  //   RIGHT (строго):   правый бар дисквалифицирует если high больше ИЛИ равен центру (ничья = fail)
   const N = DATA.length, res = new Uint8Array(N);
   for (let i = left + right; i < N; i++) {
     const idx = i - right, v = DATA[idx].h;
     let ok = true;
     for (let j = idx - left; j < idx; j++) { if (DATA[j].h > v) { ok = false; break; } }
-    if (ok) for (let j = idx + 1; j <= Math.min(idx + right, N-1); j++) { if (DATA[j].h > v) { ok = false; break; } }
+    if (ok) for (let j = idx + 1; j <= Math.min(idx + right, N-1); j++) { if (DATA[j].h >= v) { ok = false; break; } }
     if (ok) res[i] = 1;
   }
   return res;
