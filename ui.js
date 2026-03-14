@@ -3267,8 +3267,13 @@ function copyTVdiag() {
   for (const p of pairs) pairMap[p.i] = p;
 
   lines.push(`=== БАРЫ ВОКРУГ ПЕРВОГО РАСХОЖДЕНИЯ (бар #${firstDivBar}) ===`);
-  lines.push('Бар# | Дата              | Open     | High     | Low      | Close    | JS_eq%   | TV_eq%   | Δeq%  | TV:EL ES XL XS');
-  lines.push('-'.repeat(110));
+  // JS внутренние значения: pvLo, pvHi_, maArr, atrArr
+  const pvLo   = c.pvLo   || null;
+  const pvHi_  = c.pvHi_  || null;
+  const maArr  = c.maArr  || null;
+  const atrArr = c.atrArr || null;
+  lines.push('Бар# | Дата              | Open     | High     | Low      | Close    | JS_eq%   | TV_eq%   | Δeq%  | TV:EL ES XL XS | pvLo pvHi | MA(i-1)   | MA_block?');
+  lines.push('-'.repeat(150));
   for (let i = fromBar; i <= toBar; i++) {
     const bar  = DATA[i] || {};
     const p    = pairMap[i];
@@ -3278,12 +3283,24 @@ function copyTVdiag() {
     const sigs = p && hasSigs
       ? `${p.tvRow.el||0} ${p.tvRow.es||0} ${p.tvRow.xl||0} ${p.tvRow.xs||0}`
       : '— — — —';
+    // JS внутреннее состояние
+    const pvLoVal = pvLo ? pvLo[i] : '?';
+    const pvHiVal = pvHi_ ? pvHi_[i] : '?';
+    const maVal   = (maArr && i > 0) ? maArr[i-1] : null;
+    const maStr   = maVal != null ? maVal.toFixed(6) : '—';
+    let maBlock = '—';
+    if (maArr && i > 0) {
+      const prevC = DATA[i-1]?.c || 0;
+      const ma = maArr[i-1];
+      maBlock = (ma <= 0) ? 'WARMUP' : (prevC <= ma ? 'BLK_L' : 'ok');
+    }
     const marker = i === firstDivBar ? ' ◄ ПЕРВОЕ' : i === maxDiffBar ? ' ◄ МАКС' : '';
     const t = String(bar.t || '—').padEnd(18);
     lines.push(
       `${String(i).padStart(5)} | ${t} | ${(bar.o||0).toFixed(4).padStart(8)} | ${(bar.h||0).toFixed(4).padStart(8)} | ` +
-      `${(bar.l||0).toFixed(4).padStart(8)} | ${(bar.c||0).toFixed(4).padStart(8)} | ` +
-      `${String(jsEq).padStart(8)} | ${String(tvEq).padStart(8)} | ${String(diff).padStart(6)} | ${sigs}${marker}`
+      `${(bar.l||0).toFixed(6).padStart(10)} | ${(bar.c||0).toFixed(6).padStart(10)} | ` +
+      `${String(jsEq).padStart(8)} | ${String(tvEq).padStart(8)} | ${String(diff).padStart(6)} | ${sigs.padEnd(14)} | ` +
+      `${String(pvLoVal).padStart(4)}  ${String(pvHiVal).padStart(4)} | ${maStr.padStart(10)} | ${maBlock}${marker}`
     );
   }
   lines.push('');
@@ -3297,11 +3314,39 @@ function copyTVdiag() {
     if (pm) lines.push(`  JS_eq: ${pm.jsEq.toFixed(3)}%  TV_eq: ${pm.tvEq.toFixed(3)}%`);
   }
   lines.push('');
-  lines.push('=== ЧТО ПРОВЕРИТЬ ===');
-  lines.push('1. На баре первого расхождения — TV показывает вход/выход (EL/ES/XL/XS = 1)?');
-  lines.push('2. Если TV EL/ES=1 там где JS не открывал сделку — ищи различие в логике входа');
-  lines.push('3. Если TV XL/XS=1 там где JS не закрывал — ищи различие в логике SL/TP/BE/Trail');
-  lines.push('4. Если сигналы совпадают но equity расходится — ищи различие в расчёте PnL (цена входа, комиссия)');
+  // Автоматический анализ первичной причины
+  lines.push('=== АВТО-ДИАГНОЗ ===');
+  const fp = pairMap[firstDivBar];
+  if (fp) {
+    const tvEl = fp.tvRow.el, tvEs = fp.tvRow.es, tvXl = fp.tvRow.xl, tvXs = fp.tvRow.xs;
+    const tvEntry = tvEl===1||tvEs===1, tvExit = tvXl===1||tvXs===1;
+    if (tvEntry) {
+      // TV открыл сделку. Проверяем pvLo/pvHi и MA filter
+      const signalBar = firstDivBar - 1; // bar where EL appeared in TV
+      if (pvLo && pvHi_) {
+        const pvAtSignal = tvEl===1 ? pvLo[firstDivBar-1] : pvHi_[firstDivBar-1];
+        lines.push(`TV открыл ${tvEl===1?'LONG':'SHORT'} на баре #${firstDivBar-1} (EL/ES=1 на ${firstDivBar}).`);
+        lines.push(`JS pvLo[${firstDivBar-1}]=${pvLo[firstDivBar-1]}  pvHi_[${firstDivBar-1}]=${pvHi_[firstDivBar-1]}`);
+        if (pvAtSignal !== 1) lines.push(`⚠️  JS НЕ видит pivot на баре #${firstDivBar-1} → вероятная причина расхождения: разная логика pivot detection`);
+        else lines.push(`✅ JS тоже видит pivot на баре #${firstDivBar-1}`);
+      }
+    } else if (tvExit) {
+      lines.push(`TV закрыл сделку (XL/XS=1) на баре #${firstDivBar}. JS вероятно закрыл позже или по другой цене.`);
+    } else {
+      lines.push(`TV не показывает явного сигнала на баре расхождения — возможна разница в цене входа/комиссии.`);
+    }
+    // Check MA block at first divergence bar
+    if (maArr) {
+      const fi = firstDivBar;
+      const prevC = DATA[fi-1]?.c || 0;
+      const ma = maArr[fi-1] || 0;
+      if (ma > 0) {
+        lines.push(`MA(${c.maP}) на баре #${fi-1}: ${ma.toFixed(6)}  close[${fi-1}]: ${prevC.toFixed(6)}  → ${prevC<=ma?'⚠️ MA_FILTER БЛОКИРУЕТ LONG':'✅ MA filter не блокирует'}`);
+      } else {
+        lines.push(`MA(${c.maP}) на баре #${fi-1} = 0 (прогрев!) → MA_FILTER БЛОКИРУЕТ (warmup)`);
+      }
+    }
+  }
 
   const text = lines.join('\n');
   navigator.clipboard.writeText(text).then(() => {
