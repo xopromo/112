@@ -720,7 +720,7 @@ function generatePineScript(r) {
     lines.push(`            bool htr = false`);
   lines.push(`            float xp = close`);
   lines.push(`            // Reverse signal exit`);
-  lines.push(`            bool rev_sig = use_sig_ex and ((_dir == 1 and pat_s) or (_dir == -1 and pat_l))`);
+  lines.push(`            bool rev_sig = use_sig_ex and ((_dir == 1 and sig_s) or (_dir == -1 and sig_l))`);
   lines.push(`            bool rev_bars_ok = (bar_index - _eb) >= sig_ex_min_bars`);
   lines.push(`            bool rev_mode_ok = sig_ex_mode == "any" or (sig_ex_mode == "plus" and cpnl > 0) or (sig_ex_mode == "minus" and cpnl < 0)`);
   lines.push(`            if use_sig_ex and rev_sig and rev_bars_ok`);
@@ -952,7 +952,7 @@ function generatePineScript(r) {
     lines.push(`        bool htr = false`);
     lines.push(`        float vxp = close`);
     lines.push(`        string vxt = ""`);
-  lines.push(`        bool rev_sig = use_sig_ex and ((v_dir == 1 and pat_s) or (v_dir == -1 and pat_l))`);
+  lines.push(`        bool rev_sig = use_sig_ex and ((v_dir == 1 and sig_s) or (v_dir == -1 and sig_l))`);
   lines.push(`        bool rev_bars_ok = (bar_index - v_eb) >= sig_ex_min_bars`);
   lines.push(`        bool rev_mode_ok = sig_ex_mode == "any" or (sig_ex_mode == "plus" and cpnl > 0) or (sig_ex_mode == "minus" and cpnl < 0)`);
   lines.push(`        if use_sig_ex and rev_sig and rev_bars_ok`);

@@ -462,6 +462,15 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
             if (fn(cfg, i)) oppSig = true;
           }
         }
+        // Применяем те же фильтры входа для противоположного направления
+        // (rev_sig должен срабатывать только когда вход в другую сторону был бы разрешён)
+        if (oppSig) {
+          for (let _fi = 0; _fi < activeFilters.length && oppSig; _fi++) {
+            const _f = activeFilters[_fi];
+            if (dir === 1 && _f.blocksS(cfg, i, ac)) oppSig = false;
+            if (dir === -1 && _f.blocksL(cfg, i, ac)) oppSig = false;
+          }
+        }
         if (oppSig) {
           if (cfg.revCooldown > 0) {
             if (revCooldownBar < 0) revCooldownBar = i;
