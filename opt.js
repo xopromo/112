@@ -3509,7 +3509,7 @@ function buildBtCfg(cfg, ind) {
     clxMode:     cfg.clxMode     || 'any',
 
     // ── Фильтры ───────────────────────────────────────────────
-    useMA:    maP > 0,
+    useMA:    !!(cfg.useMA) && maP > 0,
     maArr:    ind.maArr,
     maType:   cfg.maType   || 'EMA',
     maP:      maP,

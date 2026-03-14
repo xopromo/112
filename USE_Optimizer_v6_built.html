@@ -10610,7 +10610,7 @@ function buildBtCfg(cfg, ind) {
     clxMode:     cfg.clxMode     || 'any',
 
     // ── Фильтры ───────────────────────────────────────────────
-    useMA:    maP > 0,
+    useMA:    !!(cfg.useMA) && maP > 0,
     maArr:    ind.maArr,
     maType:   cfg.maType   || 'EMA',
     maP:      maP,
@@ -13582,8 +13582,8 @@ function copyTVdiag() {
     const pvHiVal = pvHi_ ? pvHi_[i] : '?';
     const maVal   = (maArr && i > 0) ? maArr[i-1] : null;
     const maStr   = maVal != null ? maVal.toFixed(6) : '—';
-    let maBlock = '—';
-    if (maArr && i > 0) {
+    let maBlock = c.useMA ? '—' : 'off';
+    if (c.useMA && maArr && i > 0) {
       const prevC = DATA[i-1]?.c || 0;
       const ma = maArr[i-1];
       maBlock = (ma <= 0) ? 'WARMUP' : (prevC <= ma ? 'BLK_L' : 'ok');
@@ -13670,12 +13670,14 @@ function copyTVdiag() {
         }
         // Анализ фильтров на СИГНАЛЬНОМ баре jsSigBar
         lines.push(`--- Фильтры на сигнальном баре JS #${jsSigBar} (bar.i-1=${jsSigBar-1}) ---`);
-        if (maArr && jsSigBar > 0) {
+        if (maArr && jsSigBar > 0 && c.useMA) {
           const prevC2 = DATA[jsSigBar-1]?.c || 0;
           const ma2 = maArr[jsSigBar-1] || 0;
           const blocked2 = ma2 > 0 && (entryDir===1 ? prevC2 <= ma2 : prevC2 >= ma2);
           lines.push(`MA(${c.maP}×${c.htfRatio||1}tf)[${jsSigBar-1}] = ${ma2>0?ma2.toFixed(6):'0(warmup)'}  close=${prevC2.toFixed(6)}`);
           lines.push(ma2 <= 0 ? `⚠️  MA warmup → блокирует` : blocked2 ? `⚠️  MA БЛОКИРУЕТ (close${entryDir===1?'<=':'>='}MA)` : `✅ MA ok`);
+        } else if (maArr && jsSigBar > 0 && !c.useMA) {
+          lines.push(`MA(${c.maP}×${c.htfRatio||1}tf) — отключён (useMA=false), не влияет`);
         }
         if (confArr && jsSigBar > 0) {
           const prevC3 = DATA[jsSigBar-1]?.c || 0;
@@ -13696,7 +13698,7 @@ function copyTVdiag() {
     }
     // MA и Confirm MA filter на БАРЕ ВХОДА (для справки)
     const checkBar = (jsSigBar >= 0 && waitB > 0) ? jsSigBar : entrySignalBar;
-    if (checkBar !== jsSigBar && maArr && entrySignalBar > 0) {
+    if (checkBar !== jsSigBar && c.useMA && maArr && entrySignalBar > 0) {
       // только если уже не показали выше
       const prevC = DATA[entrySignalBar - 1]?.c || 0;
       const ma = maArr[entrySignalBar - 1] || 0;
@@ -17900,7 +17902,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1773531229085;
+window._BUILD_TS = 1773532384011;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
