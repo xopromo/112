@@ -7977,6 +7977,20 @@ async function runOpt() {
     // с правильным split-маркером на IS/OOS границе, а не растянутую IS-кривую.
     if (name && typeof equities !== 'undefined') equities[name] = rFull.eq;
   }
+  // Экспортируем _attachOOS для вызова из pauseOpt (ui.js)
+  // При паузе пользователь видит результаты до завершения OOS-батча → TV колонки "—".
+  // _batchOOS вычисляет OOS для уже найденных результатов без OOS данных.
+  window._batchOOS = async function() {
+    if (!_useOOS || !results || results.length === 0) return;
+    const pending = results.filter(r => !r.cfg || r.cfg._oos === undefined);
+    if (pending.length === 0) return;
+    if (typeof setMcPhase === 'function') setMcPhase(`⏳ OOS для ${pending.length} результатов…`);
+    for (let oi = 0; oi < pending.length; oi++) {
+      _attachOOS(pending[oi].cfg, pending[oi].name, pending[oi].n);
+      if (oi % 20 === 0) await yieldToUI();
+    }
+    if (typeof setMcPhase === 'function') setMcPhase(null);
+  };
   const comm=$n('c_comm')||0.08;
   const spread=($n('c_spread')||0)/2; // спред делим на 2 стороны (как комиссия)
   const commTotal = comm + spread; // итоговая стоимость одной стороны сделки
@@ -11066,6 +11080,8 @@ function renderVisibleResults() {
       + `<td class="col-ls ${lsSc}" title="L:${r.nL||0}сд WR${r.wrL!=null?r.wrL.toFixed(0):'?'}% | S:${r.nS||0}сд WR${r.wrS!=null?r.wrS.toFixed(0):'?'}%">${lsIcon}${r.dwrLS!=null?' '+r.dwrLS.toFixed(0)+'%':''}</td>` +
       (()=>{
         const f = r.cfg && r.cfg._oos && r.cfg._oos.forward;
+        // _oos===undefined: OOS не считался (паузе/во время оптимизации) — показываем ⏳
+        if (r.cfg && r.cfg._oos === undefined) return '<td class="col-tv-score muted" title="OOS ещё не вычислен">⏳</td><td class="col-tv-dpnl muted">⏳</td><td class="col-tv-ddd muted">⏳</td><td class="col-tv-dpdd muted">⏳</td>';
         if (!f || f.pnlFull == null) return '<td class="col-tv-score muted">—</td><td class="col-tv-dpnl muted">—</td><td class="col-tv-ddd muted">—</td><td class="col-tv-dpdd muted">—</td>';
         // oosGain/isGain — из ОДНОГО полного бэктеста (корректное сравнение)
         const oosGain = f.pnl;           // прибыль только за OOS-период (последние 30%)
@@ -11759,6 +11775,8 @@ async function pauseOpt() {
     $('pbtn').style.background = 'rgba(0,230,118,.15)';
     $('pbtn').style.borderColor = 'var(--green)';
     $('pbtn').style.color = 'var(--green)';
+    // Вычисляем OOS для уже найденных результатов — иначе TV колонки показывают "—" при паузе
+    if (typeof window._batchOOS === 'function') await window._batchOOS();
     renderResults();
   } else {
     paused = false;
@@ -17303,7 +17321,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1773491325544;
+window._BUILD_TS = 1773491850187;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;

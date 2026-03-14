@@ -928,6 +928,8 @@ function renderVisibleResults() {
       + `<td class="col-ls ${lsSc}" title="L:${r.nL||0}сд WR${r.wrL!=null?r.wrL.toFixed(0):'?'}% | S:${r.nS||0}сд WR${r.wrS!=null?r.wrS.toFixed(0):'?'}%">${lsIcon}${r.dwrLS!=null?' '+r.dwrLS.toFixed(0)+'%':''}</td>` +
       (()=>{
         const f = r.cfg && r.cfg._oos && r.cfg._oos.forward;
+        // _oos===undefined: OOS не считался (паузе/во время оптимизации) — показываем ⏳
+        if (r.cfg && r.cfg._oos === undefined) return '<td class="col-tv-score muted" title="OOS ещё не вычислен">⏳</td><td class="col-tv-dpnl muted">⏳</td><td class="col-tv-ddd muted">⏳</td><td class="col-tv-dpdd muted">⏳</td>';
         if (!f || f.pnlFull == null) return '<td class="col-tv-score muted">—</td><td class="col-tv-dpnl muted">—</td><td class="col-tv-ddd muted">—</td><td class="col-tv-dpdd muted">—</td>';
         // oosGain/isGain — из ОДНОГО полного бэктеста (корректное сравнение)
         const oosGain = f.pnl;           // прибыль только за OOS-период (последние 30%)
@@ -1621,6 +1623,8 @@ async function pauseOpt() {
     $('pbtn').style.background = 'rgba(0,230,118,.15)';
     $('pbtn').style.borderColor = 'var(--green)';
     $('pbtn').style.color = 'var(--green)';
+    // Вычисляем OOS для уже найденных результатов — иначе TV колонки показывают "—" при паузе
+    if (typeof window._batchOOS === 'function') await window._batchOOS();
     renderResults();
   } else {
     paused = false;
