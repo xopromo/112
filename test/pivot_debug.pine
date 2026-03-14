@@ -1,0 +1,22 @@
+//@version=6
+// ============================================================
+// pivot_debug.pine — экспорт пивотов ta.pivothigh/pivotlow
+// ============================================================
+// Использование:
+//   1. Добавить как отдельный индикатор на тот же график
+//   2. Настроить pvL / pvR под нужную стратегию (по умолчанию 6/5)
+//   3. Экспортировать данные: Export chart data → CSV
+//      CSV будет содержать колонки "PV_HI" и "PV_LO" (0/1)
+//   4. Скопировать CSV в test_data/tv_equity.csv (добавить колонки)
+//      или передать как отдельный файл в tv_diag.js (--pvcsv)
+// ============================================================
+indicator("Pivot Debug Export", overlay=false, max_bars_back=500)
+
+pvL = input.int(6, "Left Bars",  minval=1, maxval=50)
+pvR = input.int(5, "Right Bars", minval=1, maxval=50)
+
+pv_hi = ta.pivothigh(high, pvL, pvR)
+pv_lo = ta.pivotlow (low,  pvL, pvR)
+
+plot(not na(pv_hi) ? 1 : 0, "PV_HI", color=color.red,   linewidth=1)
+plot(not na(pv_lo) ? 1 : 0, "PV_LO", color=color.green, linewidth=1)
