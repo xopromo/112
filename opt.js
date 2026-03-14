@@ -990,6 +990,20 @@ async function runOpt() {
     // с правильным split-маркером на IS/OOS границе, а не растянутую IS-кривую.
     if (name && typeof equities !== 'undefined') equities[name] = rFull.eq;
   }
+  // Экспортируем _attachOOS для вызова из pauseOpt (ui.js)
+  // При паузе пользователь видит результаты до завершения OOS-батча → TV колонки "—".
+  // _batchOOS вычисляет OOS для уже найденных результатов без OOS данных.
+  window._batchOOS = async function() {
+    if (!_useOOS || !results || results.length === 0) return;
+    const pending = results.filter(r => !r.cfg || r.cfg._oos === undefined);
+    if (pending.length === 0) return;
+    if (typeof setMcPhase === 'function') setMcPhase(`⏳ OOS для ${pending.length} результатов…`);
+    for (let oi = 0; oi < pending.length; oi++) {
+      _attachOOS(pending[oi].cfg, pending[oi].name, pending[oi].n);
+      if (oi % 20 === 0) await yieldToUI();
+    }
+    if (typeof setMcPhase === 'function') setMcPhase(null);
+  };
   const comm=$n('c_comm')||0.08;
   const spread=($n('c_spread')||0)/2; // спред делим на 2 стороны (как комиссия)
   const commTotal = comm + spread; // итоговая стоимость одной стороны сделки
