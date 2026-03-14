@@ -29,6 +29,11 @@ on:
         required: false
         type: string
         default: '5'
+      detail_top:
+        description: 'Deep-dive for top N results: full article ~500 words (0=off, 1-3)'
+        required: false
+        type: string
+        default: '0'
 
 permissions:
   contents: write
@@ -66,6 +71,7 @@ jobs:
           mode         = os.environ.get('MODE', 'summarize')
           custom_prompt= os.environ.get('CUSTOM_PROMPT', '')
           max_urls     = int(os.environ.get('MAX_URLS', '5'))
+          detail_top   = int(os.environ.get('DETAIL_TOP', '0'))
           groq_key     = os.environ.get('GROQ_KEY', '')
 
           UA = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
@@ -310,6 +316,61 @@ jobs:
                       item['processed'] = groq_process(ft, mode)
                       time.sleep(0.5)
 
+          # ── STEP 3b: Deep-dive for top N results ───────────────────────────
+          DETAIL_PROMPT = (
+              'Напиши полноценную новостную заметку на русском языке на основе этого текста.\n'
+              'Структура:\n'
+              '**Заголовок** (одна строка)\n\n'
+              '**Суть** (2-3 предложения — что произошло)\n\n'
+              '**Детали** (3-5 абзацев — кто, что, зачем, цифры, цитаты если есть)\n\n'
+              '**Значение** (1-2 предложения — почему это важно)\n\n'
+              'Пиши конкретно, без воды. Объём ~400-600 слов.'
+          )
+
+          if detail_top > 0 and groq_key and mode not in ('snippets_only', 'full_text'):
+              print(f"\nDeep-dive for top {detail_top} results...")
+              for i, item in enumerate(results_to_process[:detail_top]):
+                  ft = item.get('full_text', '')
+                  if ft and not ft.startswith('FETCH_ERROR'):
+                      print(f"  [{i+1}/{detail_top}] Deep Groq processing...")
+                      for attempt in range(4):
+                          try:
+                              if attempt > 0:
+                                  wait = 2 ** attempt
+                                  print(f"    Retry {attempt} after {wait}s...")
+                                  time.sleep(wait)
+                              resp = requests.post(
+                                  'https://api.groq.com/openai/v1/chat/completions',
+                                  headers={
+                                      'Authorization': f'Bearer {groq_key}',
+                                      'Content-Type':  'application/json',
+                                  },
+                                  json={
+                                      'model': 'llama-3.3-70b-versatile',
+                                      'messages': [
+                                          {'role': 'system', 'content': 'Ты журналист, специализирующийся на технологиях и ИИ. Пиши чётко и информативно на русском.'},
+                                          {'role': 'user',   'content': f'{DETAIL_PROMPT}\n\nТЕКСТ:\n{ft[:12000]}'},
+                                      ],
+                                      'max_tokens':  3000,
+                                      'temperature': 0.4,
+                                  },
+                                  timeout=60,
+                              )
+                              if resp.status_code == 429:
+                                  wait = int(resp.headers.get('Retry-After', 2 ** attempt))
+                                  print(f"    429 rate limit, waiting {wait}s...")
+                                  time.sleep(wait)
+                                  continue
+                              data = resp.json()
+                              if 'choices' in data:
+                                  item['detail'] = data['choices'][0]['message']['content']
+                                  print(f"    {len(item['detail'])} chars detail generated")
+                              break
+                          except Exception as e:
+                              if attempt == 3:
+                                  item['detail'] = f"Detail failed: {e}"
+                      time.sleep(1)
+
           # ── STEP 4: Update seen_urls ────────────────────────────────────────
           all_new_urls = [r['url'] for r in all_results if r['url']]
           updated_seen = list(seen_urls | set(all_new_urls))
@@ -335,15 +396,18 @@ jobs:
           with open('search_results.json', 'w', encoding='utf-8') as f:
               json.dump(output, f, ensure_ascii=False, indent=2)
 
-          groq_count = sum(1 for r in results_to_process if r.get('processed'))
+          groq_count   = sum(1 for r in results_to_process if r.get('processed'))
+          detail_count = sum(1 for r in results_to_process if r.get('detail'))
           print(f"\nDone: {len(all_results)} found ({len(new_results)} new), "
-                f"{len(results_to_process)} fetched, {groq_count} processed by Groq")
+                f"{len(results_to_process)} fetched, {groq_count} summarized, "
+                f"{detail_count} deep-dived")
           PYEOF
         env:
           SEARCH_QUERY:   ${{ inputs.query }}
           MODE:           ${{ inputs.mode }}
           CUSTOM_PROMPT:  ${{ inputs.custom_prompt }}
           MAX_URLS:       ${{ inputs.max_urls }}
+          DETAIL_TOP:     ${{ inputs.detail_top }}
           GROQ_KEY:       ${{ secrets.GROQ_KEY }}
 
       - name: Push results to search-results branch

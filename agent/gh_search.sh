@@ -1,6 +1,6 @@
 #!/bin/bash
 # Web search via GitHub Actions
-# Usage: bash agent/gh_search.sh "query"
+# Usage: bash agent/gh_search.sh "query" [mode] [max_urls] [detail_top]
 # Returns: JSON with search results to stdout
 # Requires: GITHUB_TOKEN env var OR /home/user/.github_token file
 
@@ -8,7 +8,7 @@ set -euo pipefail
 
 QUERY="${1:-}"
 if [ -z "$QUERY" ]; then
-    echo '{"error": "Usage: gh_search.sh <query>"}' >&2
+    echo '{"error": "Usage: gh_search.sh <query> [mode] [max_urls] [detail_top]"}' >&2
     exit 1
 fi
 
@@ -33,12 +33,21 @@ from datetime import datetime, timezone, timedelta
 print((datetime.now(timezone.utc) - timedelta(seconds=5)).strftime('%Y-%m-%dT%H:%M:%SZ'))
 ")
 
+MODE="${2:-summarize}"
+MAX_URLS="${3:-5}"
+DETAIL_TOP="${4:-0}"
+
 # Trigger workflow
-log "Triggering search for: $QUERY"
+log "Triggering search for: $QUERY (mode=$MODE, max_urls=$MAX_URLS, detail_top=$DETAIL_TOP)"
 HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
     -H "$AUTH_H" -H "$ACCEPT_H" -H "Content-Type: application/json" \
     "$API/repos/$REPO/actions/workflows/search.yml/dispatches" \
-    -d "{\"ref\":\"main\",\"inputs\":{\"query\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$QUERY")}}")
+    -d "{\"ref\":\"main\",\"inputs\":{
+        \"query\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$QUERY"),
+        \"mode\":\"$MODE\",
+        \"max_urls\":\"$MAX_URLS\",
+        \"detail_top\":\"$DETAIL_TOP\"
+    }}")
 
 if [ "$HTTP_STATUS" != "204" ]; then
     log "Failed to trigger workflow: HTTP $HTTP_STATUS"
@@ -84,7 +93,7 @@ for i in $(seq 1 60); do
 done
 
 if [ "$STATUS" != "completed" ]; then
-    echo '{"error": "Workflow did not complete in 2 minutes"}'
+    echo '{"error": "Workflow did not complete in 5 minutes"}'
     exit 1
 fi
 
