@@ -13301,22 +13301,14 @@ let _tvCmpDiag = null; // хранит данные для copyTVdiag()
 function _normTime(t) {
   if (!t && t !== 0) return '';
   const s = String(t).trim();
-  // Unix timestamp (9-10 digits, секунды): конвертируем в UTC ISO-строку
-  if (/^\d{9,10}$/.test(s)) {
-    const d = new Date(parseInt(s) * 1000);
-    return d.toISOString().substring(0, 16).replace('T', ' ');
-  }
-  // Unix timestamp в миллисекундах (13 цифр)
-  if (/^\d{13}$/.test(s)) {
-    const d = new Date(parseInt(s));
-    return d.toISOString().substring(0, 16).replace('T', ' ');
-  }
-  // ISO/date string нормализация
+  // Unix timestamp в секундах (9-10 цифр) или миллисекундах (13 цифр)
+  if (/^\d{9,10}$/.test(s)) return new Date(parseInt(s) * 1000).toISOString().substring(0, 16).replace('T', ' ');
+  if (/^\d{13}$/.test(s))   return new Date(parseInt(s)).toISOString().substring(0, 16).replace('T', ' ');
+  // ISO/date string: убираем зону, T→пробел, секунды+мс, берём 16 символов
   return s
-    .replace(/ UTC$/i, '').replace(/ GMT$/i, '')
+    .replace(/ UTC$/i, '').replace(/ GMT$/i, '').replace(/Z$/, '')
     .replace('T', ' ')
-    .replace(/:\d\d$/, '')
-    .replace(/\.\d+$/, '')
+    .replace(/(\d{2}:\d{2}):\d{2}(\.\d+)?$/, '$1')  // только секунды, не минуты
     .substring(0, 16);
 }
 
@@ -17853,7 +17845,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1773529166332;
+window._BUILD_TS = 1773529562773;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
