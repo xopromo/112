@@ -3028,8 +3028,20 @@ let _tvCmpCurrentResult = null;
 let _tvCmpDiag = null; // хранит данные для copyTVdiag()
 
 function _normTime(t) {
-  if (!t) return '';
-  return String(t).trim()
+  if (!t && t !== 0) return '';
+  const s = String(t).trim();
+  // Unix timestamp (9-10 digits, секунды): конвертируем в UTC ISO-строку
+  if (/^\d{9,10}$/.test(s)) {
+    const d = new Date(parseInt(s) * 1000);
+    return d.toISOString().substring(0, 16).replace('T', ' ');
+  }
+  // Unix timestamp в миллисекундах (13 цифр)
+  if (/^\d{13}$/.test(s)) {
+    const d = new Date(parseInt(s));
+    return d.toISOString().substring(0, 16).replace('T', ' ');
+  }
+  // ISO/date string нормализация
+  return s
     .replace(/ UTC$/i, '').replace(/ GMT$/i, '')
     .replace('T', ' ')
     .replace(/:\d\d$/, '')
@@ -3110,9 +3122,17 @@ function _runTVcompare(tvRows, resultsEl) {
   }
 
   if (pairs.length < 5) {
-    const tvSample = tvRows[0]?.t || '?';
-    const jsSample = _normTime(DATA[0]?.t || '');
-    resultsEl.innerHTML = `<span style="color:var(--neg);font-size:.8em">❌ Совпало ${pairs.length} баров.<br>TV время: «${tvSample}» · JS время: «${jsSample}»<br>Проверь тикер/ТФ — должны совпадать с загруженными данными.</span>`;
+    const tvFirst = tvRows[0]?.t || '?';
+    const tvLast  = tvRows[tvRows.length - 1]?.t || '?';
+    const jsFirst = _normTime(DATA[0]?.t || '');
+    const jsLast  = _normTime(DATA[DATA.length - 1]?.t || '');
+    const overlap = tvFirst <= jsLast && tvLast >= jsFirst;
+    resultsEl.innerHTML = `<span style="color:var(--neg);font-size:.8em">❌ Совпало ${pairs.length} баров.`
+      + `<br>TV диапазон: ${tvFirst} … ${tvLast}`
+      + `<br>JS диапазон: ${jsFirst} … ${jsLast}`
+      + (overlap ? '<br>⚠️ Диапазоны перекрываются — возможно несовпадение тикера или ТФ.'
+                 : '<br>⛔ Диапазоны НЕ пересекаются — загрузи CSV за тот же период что и JS данные.')
+      + `</span>`;
     return;
   }
 
