@@ -3264,6 +3264,7 @@ function copyTVdiag() {
   lines.push(`useTrail: ${!!c.useTrail}  trTrig: ${c.trTrig||0}  trDist: ${c.trDist||0}`);
   lines.push(`usePartial: ${!!c.usePartial}  partRR: ${c.partRR||0}  partPct: ${c.partPct||0}`);
   lines.push(`useTime: ${!!c.useTime}  timeBars: ${c.timeBars||0}`);
+  lines.push(`waitBars: ${c.waitBars||0}  waitRetrace: ${!!c.waitRetrace}  waitMaxBars: ${c.waitMaxBars||0}  waitCancelAtr: ${c.waitCancelAtr||0}`);
   lines.push(`usePivot: ${!!c.usePivot}  pvL: ${c.pvL||5}  pvR: ${c.pvR||2}`);
   lines.push(`useEngulf: ${!!c.useEngulf}  usePinBar: ${!!c.usePinBar}  useBoll: ${!!c.useBoll}`);
   lines.push(`useDonch: ${!!c.useDonch}  useAtrBo: ${!!c.useAtrBo}  useSqueeze: ${!!c.useSqueeze}`);
@@ -3280,20 +3281,23 @@ function copyTVdiag() {
 
   lines.push(`=== БАРЫ ВОКРУГ ПЕРВОГО РАСХОЖДЕНИЯ (бар #${firstDivBar}) ===`);
   // Пересчитываем btCfg — r.cfg хранит только скаляры, массивы не сохраняются в результат
-  let pvLo = null, pvHi_ = null, maArr = null, atrArr = null;
+  let pvLo = null, pvHi_ = null, maArr = null, confArr = null, atrArr = null, _btCfgRef = null;
   try {
     const _ind   = typeof _calcIndicators === 'function' ? _calcIndicators(c) : null;
     const _btCfg = (_ind && typeof buildBtCfg === 'function') ? buildBtCfg(c, _ind) : null;
+    _btCfgRef = _btCfg;
     if (_btCfg) {
-      pvLo   = _btCfg.pvLo  || null;
-      pvHi_  = _btCfg.pvHi_ || null;
-      maArr  = _btCfg.maArr || null;
-      atrArr = _ind.atrArr  || null;
+      pvLo    = _btCfg.pvLo          || null;
+      pvHi_   = _btCfg.pvHi_         || null;
+      maArr   = _btCfg.maArr         || null;
+      confArr = _btCfg.maArrConfirm  || null;
+      atrArr  = _ind.atrArr          || null;
     }
-    lines.push(`btCfg пересчитан: pvLo=${pvLo?'✅':'❌'} maArr=${maArr?'✅':'❌'}`);
+    lines.push(`btCfg пересчитан: pvLo=${pvLo?'✅':'❌'} maArr=${maArr?'✅':'❌'} confArr=${confArr?'✅':'—'}`);
   } catch(e) { lines.push(`⚠️ Не удалось пересчитать btCfg: ${e.message}`); }
-  lines.push('Бар# | Дата              | Open     | High     | Low      | Close    | JS_eq%   | TV_eq%   | Δeq%  | TV:EL ES XL XS | pvLo pvHi | MA(i-1)   | MA_block?');
-  lines.push('-'.repeat(150));
+  const confLabel = c.useConfirm ? `Conf(i-1)` : null;
+  lines.push('Бар# | Дата              | Open     | High     | Low      | Close    | JS_eq%   | TV_eq%   | Δeq%  | TV:EL ES XL XS | pvLo pvHi | MA(i-1)   | MA_blk  ' + (confLabel ? `| ${confLabel.padEnd(10)} | Cf_blk` : ''));
+  lines.push('-'.repeat(confLabel ? 175 : 150));
   for (let i = fromBar; i <= toBar; i++) {
     const bar  = DATA[i] || {};
     const p    = pairMap[i];
@@ -3303,7 +3307,6 @@ function copyTVdiag() {
     const sigs = p && hasSigs
       ? `${p.tvRow.el||0} ${p.tvRow.es||0} ${p.tvRow.xl||0} ${p.tvRow.xs||0}`
       : '— — — —';
-    // JS внутреннее состояние
     const pvLoVal = pvLo ? pvLo[i] : '?';
     const pvHiVal = pvHi_ ? pvHi_[i] : '?';
     const maVal   = (maArr && i > 0) ? maArr[i-1] : null;
@@ -3314,13 +3317,25 @@ function copyTVdiag() {
       const ma = maArr[i-1];
       maBlock = (ma <= 0) ? 'WARMUP' : (prevC <= ma ? 'BLK_L' : 'ok');
     }
+    let confPart = '';
+    if (confLabel) {
+      const cma = (confArr && i > 0) ? confArr[i-1] : null;
+      const cmaStr = cma != null ? cma.toFixed(6) : '—';
+      let cfBlock = '—';
+      if (confArr && i > 0) {
+        const prevC = DATA[i-1]?.c || 0;
+        const cmaV = confArr[i-1];
+        cfBlock = (cmaV <= 0) ? 'WARMUP' : (prevC <= cmaV ? 'BLK_L' : 'ok');
+      }
+      confPart = ` | ${cmaStr.padStart(10)} | ${cfBlock}`;
+    }
     const marker = i === firstDivBar ? ' ◄ ПЕРВОЕ' : i === maxDiffBar ? ' ◄ МАКС' : '';
     const t = String(bar.t || '—').padEnd(18);
     lines.push(
       `${String(i).padStart(5)} | ${t} | ${(bar.o||0).toFixed(4).padStart(8)} | ${(bar.h||0).toFixed(4).padStart(8)} | ` +
       `${(bar.l||0).toFixed(6).padStart(10)} | ${(bar.c||0).toFixed(6).padStart(10)} | ` +
       `${String(jsEq).padStart(8)} | ${String(tvEq).padStart(8)} | ${String(diff).padStart(6)} | ${sigs.padEnd(14)} | ` +
-      `${String(pvLoVal).padStart(4)}  ${String(pvHiVal).padStart(4)} | ${maStr.padStart(10)} | ${maBlock}${marker}`
+      `${String(pvLoVal).padStart(4)}  ${String(pvHiVal).padStart(4)} | ${maStr.padStart(10)} | ${maBlock.padEnd(7)}${confPart}${marker}`
     );
   }
   lines.push('');
@@ -3355,23 +3370,63 @@ function copyTVdiag() {
   if (entrySignalBar >= 0) {
     const dirStr = entryDir === 1 ? 'LONG' : 'SHORT';
     lines.push(`TV открыл ${dirStr} на баре #${entrySignalBar}`);
-    if (pvLo && pvHi_) {
-      const pvAtSig = entryDir === 1 ? pvLo[entrySignalBar] : pvHi_[entrySignalBar];
-      lines.push(`JS pvLo[${entrySignalBar}]=${pvLo[entrySignalBar]}  pvHi_[${entrySignalBar}]=${pvHi_[entrySignalBar]}`);
-      if (pvAtSig !== 1) {
-        lines.push(`⚠️  ПРИЧИНА: JS НЕ видит pivot на баре #${entrySignalBar}`);
-        // показываем близкие бары где JS видит pivot
-        for (let _k = entrySignalBar - 3; _k <= entrySignalBar + 3; _k++) {
-          if (_k < 0 || _k >= DATA.length) continue;
-          if (pvLo[_k] === 1) lines.push(`   JS видит pvLo на баре #${_k} (≠${entrySignalBar})`);
-          if (pvHi_[_k] === 1) lines.push(`   JS видит pvHi на баре #${_k} (≠${entrySignalBar})`);
-        }
-      } else {
-        lines.push(`✅ JS тоже видит pivot на баре #${entrySignalBar} — причина не в pivot detection`);
+    const waitB = c.waitBars || 0;
+
+    // Ищем реальный сигнальный бар JS с учётом waitBars
+    let jsSigBar = -1;
+    if (pvLo && pvHi_ && c.usePivot) {
+      // Сигнал должен быть на баре entrySignalBar - waitBars (± небольшое окно)
+      const searchFrom = Math.max(0, entrySignalBar - waitB - 3);
+      const searchTo   = Math.min(DATA.length - 1, entrySignalBar);
+      for (let _k = searchTo; _k >= searchFrom; _k--) {
+        const pv = entryDir === 1 ? pvLo[_k] : pvHi_[_k];
+        if (pv === 1) { jsSigBar = _k; break; }
       }
     }
-    // MA filter на баре сигнала
-    if (maArr && entrySignalBar > 0) {
+
+    if (pvLo && pvHi_) {
+      const pvAtEntry = entryDir === 1 ? pvLo[entrySignalBar] : pvHi_[entrySignalBar];
+      lines.push(`JS pvLo[${entrySignalBar}]=${pvLo[entrySignalBar]}  pvHi_[${entrySignalBar}]=${pvHi_[entrySignalBar]}`);
+      if (pvAtEntry === 1) {
+        lines.push(`✅ JS тоже видит pivot на баре #${entrySignalBar} — причина не в pivot detection`);
+      } else if (waitB > 0 && jsSigBar >= 0) {
+        const delay = entrySignalBar - jsSigBar;
+        lines.push(`ℹ️  waitBars=${waitB}: JS видит pvSig на баре #${jsSigBar}, вход должен быть на #${jsSigBar}+${waitB}=${jsSigBar+waitB}`);
+        if (jsSigBar + waitB === entrySignalBar) {
+          lines.push(`✅ Задержка совпадает с TV (сигнал #${jsSigBar} + ${waitB}б = #${entrySignalBar}) — проверить фильтры на баре #${jsSigBar}`);
+        } else {
+          lines.push(`⚠️  Задержка не совпадает: JS вошёл бы на #${jsSigBar+waitB}, TV на #${entrySignalBar} (разница ${entrySignalBar-(jsSigBar+waitB)} бара)`);
+        }
+        // Анализ фильтров на СИГНАЛЬНОМ баре jsSigBar
+        lines.push(`--- Фильтры на сигнальном баре JS #${jsSigBar} (bar.i-1=${jsSigBar-1}) ---`);
+        if (maArr && jsSigBar > 0) {
+          const prevC2 = DATA[jsSigBar-1]?.c || 0;
+          const ma2 = maArr[jsSigBar-1] || 0;
+          const blocked2 = ma2 > 0 && (entryDir===1 ? prevC2 <= ma2 : prevC2 >= ma2);
+          lines.push(`MA(${c.maP}×${c.htfRatio||1}tf)[${jsSigBar-1}] = ${ma2>0?ma2.toFixed(6):'0(warmup)'}  close=${prevC2.toFixed(6)}`);
+          lines.push(ma2 <= 0 ? `⚠️  MA warmup → блокирует` : blocked2 ? `⚠️  MA БЛОКИРУЕТ (close${entryDir===1?'<=':'>='}MA)` : `✅ MA ok`);
+        }
+        if (confArr && jsSigBar > 0) {
+          const prevC3 = DATA[jsSigBar-1]?.c || 0;
+          const cf3 = confArr[jsSigBar-1] || 0;
+          const cfBlocked = cf3 > 0 && (entryDir===1 ? prevC3 <= cf3 : prevC3 >= cf3);
+          lines.push(`ConfMA(${c.confN}×${c.confHtfRatio||1}tf)[${jsSigBar-1}] = ${cf3>0?cf3.toFixed(6):'0(warmup)'}  close=${prevC3.toFixed(6)}`);
+          lines.push(cf3 <= 0 ? `⚠️  ConfMA warmup → блокирует` : cfBlocked ? `⚠️  CONFIRM MA БЛОКИРУЕТ (close${entryDir===1?'<=':'>='}ConfMA)` : `✅ ConfMA ok`);
+        }
+      } else {
+        lines.push(`⚠️  ПРИЧИНА: JS НЕ видит pivot вблизи бара #${entrySignalBar} (waitBars=${waitB})`);
+        // показываем близкие бары где JS видит pivot
+        for (let _k = Math.max(0,entrySignalBar-waitB-3); _k <= entrySignalBar+3; _k++) {
+          if (_k >= DATA.length) break;
+          if (pvLo[_k] === 1) lines.push(`   JS видит pvLo на баре #${_k}`);
+          if (pvHi_[_k] === 1) lines.push(`   JS видит pvHi на баре #${_k}`);
+        }
+      }
+    }
+    // MA и Confirm MA filter на БАРЕ ВХОДА (для справки)
+    const checkBar = (jsSigBar >= 0 && waitB > 0) ? jsSigBar : entrySignalBar;
+    if (checkBar !== jsSigBar && maArr && entrySignalBar > 0) {
+      // только если уже не показали выше
       const prevC = DATA[entrySignalBar - 1]?.c || 0;
       const ma = maArr[entrySignalBar - 1] || 0;
       if (ma > 0) {
