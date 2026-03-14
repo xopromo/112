@@ -3021,6 +3021,7 @@ function drawEquityForResult(r) {
 // ── TV COMPARE ────────────────────────────────────────────────
 
 let _tvCmpCurrentResult = null;
+let _tvCmpDiag = null; // хранит данные для copyTVdiag()
 
 function _normTime(t) {
   if (!t) return '';
@@ -3155,6 +3156,9 @@ function _runTVcompare(tvRows, resultsEl) {
   const rmseC = rmse < 1 ? 'pos' : rmse < 5 ? 'warn' : 'neg';
   const fdC   = Math.abs(finalDiff) < 1 ? 'pos' : Math.abs(finalDiff) < 5 ? 'warn' : 'neg';
 
+  // Сохраняем диагностику для copyTVdiag()
+  _tvCmpDiag = { r, pairs, corr, rmse, finalDiff, jsLast, tvLast, firstDivBar, firstDivTime, maxDiff, maxDiffBar, maxDiffTime, hasSigs, tvSigCount };
+
   let html = '';
   html += row('Совпало баров', `${pairs.length} / ${tvRows.length} TV · ${DATA.length} JS`, 'muted');
   html += row('Корреляция equity', `<span class="${corrC}">${(corr * 100).toFixed(2)}%</span>${corr >= 0.99 ? ' ✅' : corr < 0.95 ? ' ⚠️' : ''}`, '');
@@ -3162,6 +3166,7 @@ function _runTVcompare(tvRows, resultsEl) {
   html += row('JS итог / TV итог', `<span class="${fdC}">JS ${jsLast.toFixed(1)}% · TV ${tvLast.toFixed(1)}% · Δ${finalDiff >= 0 ? '+' : ''}${finalDiff.toFixed(1)}%</span>`, '');
   if (firstDivBar >= 0) {
     html += row('Первое расхождение >0.5%', `<span class="warn">бар #${firstDivBar} · ${firstDivTime}</span>`, '');
+    html += `<button class="tpl-btn2" style="margin-top:6px;padding:4px 12px;font-size:.82em;border-color:#c792ea;color:#c792ea;width:100%" onclick="copyTVdiag()">📋 Скопировать диагностику для Claude</button>`;
   } else {
     html += row('Расхождение >0.5%', '<span class="pos">не обнаружено ✅</span>', '');
   }
@@ -3210,6 +3215,99 @@ function _tvDrawOverlay(pairs, jsEq) {
   ctx.font = '8px JetBrains Mono,monospace';
   ctx.fillText('TV', W - 24, 9);
   ctx.restore();
+}
+
+function copyTVdiag() {
+  const d = _tvCmpDiag;
+  if (!d) { alert('Нет данных диагностики — сначала загрузи TV CSV'); return; }
+  const { r, pairs, corr, rmse, finalDiff, jsLast, tvLast,
+          firstDivBar, firstDivTime, maxDiff, maxDiffBar, maxDiffTime, hasSigs } = d;
+  const c = r.cfg;
+
+  const lines = [];
+  lines.push('=== TV vs JS ДИАГНОСТИКА РАСХОЖДЕНИЯ ===');
+  lines.push(`Результат: ${r.name}`);
+  lines.push(`Совпало баров: ${pairs.length} | Корреляция: ${(corr*100).toFixed(2)}% | RMSE: ${rmse.toFixed(2)}%`);
+  lines.push(`JS итог: ${jsLast.toFixed(2)}%  TV итог: ${tvLast.toFixed(2)}%  Δ: ${finalDiff>=0?'+':''}${finalDiff.toFixed(2)}%`);
+  lines.push(`Первое расхождение >0.5%: бар #${firstDivBar} (${firstDivTime})`);
+  lines.push(`Макс. расхождение: ${maxDiff.toFixed(2)}% на баре #${maxDiffBar} (${maxDiffTime})`);
+  lines.push('');
+
+  // Config summary
+  lines.push('=== КОНФИГ СТРАТЕГИИ ===');
+  const slName = c.slPair ? JSON.stringify(c.slPair) : '—';
+  const tpName = c.tpPair ? JSON.stringify(c.tpPair) : '—';
+  lines.push(`SL: ${slName}`);
+  lines.push(`TP: ${tpName}`);
+  lines.push(`ATR период: ${c.atrPeriod||14}`);
+  lines.push(`Комиссия: ${c.baseComm??c.commission??0.08}%  Спред: ${c.spreadVal||0}%`);
+  lines.push(`useMA: ${!!c.useMA}  maType: ${c.maType||'EMA'}  maP: ${c.maP||200}`);
+  lines.push(`useConfirm: ${!!c.useConfirm}  confN: ${c.confN||100}`);
+  lines.push(`useSTrend: ${!!c.useSTrend}  sTrendWin: ${c.sTrendWin||10}`);
+  lines.push(`useBE: ${!!c.useBE}  beTrig: ${c.beTrig||0}  beOff: ${c.beOff||0}`);
+  lines.push(`useTrail: ${!!c.useTrail}  trTrig: ${c.trTrig||0}  trDist: ${c.trDist||0}`);
+  lines.push(`usePartial: ${!!c.usePartial}  partRR: ${c.partRR||0}  partPct: ${c.partPct||0}`);
+  lines.push(`useTime: ${!!c.useTime}  timeBars: ${c.timeBars||0}`);
+  lines.push(`usePivot: ${!!c.usePivot}  pvL: ${c.pvL||5}  pvR: ${c.pvR||2}`);
+  lines.push(`useEngulf: ${!!c.useEngulf}  usePinBar: ${!!c.usePinBar}  useBoll: ${!!c.useBoll}`);
+  lines.push(`useDonch: ${!!c.useDonch}  useAtrBo: ${!!c.useAtrBo}  useSqueeze: ${!!c.useSqueeze}`);
+  lines.push(`useMaTouch: ${!!c.useMaTouch}  useRev: ${!!c.useRev}  useClimax: ${!!c.useClimax}`);
+  lines.push(`longOnly: ${!!c.longOnly}  shortOnly: ${!!c.shortOnly}`);
+  lines.push(`entry_price_mode: ${c.entryMode||'close'}  confirmed: ${c.confirmed!==false}`);
+  lines.push('');
+
+  // Bars around first divergence: -15 to +5
+  const fromBar = Math.max(0, firstDivBar - 15);
+  const toBar   = Math.min(DATA.length - 1, firstDivBar + 5);
+  const pairMap = Object.create(null);
+  for (const p of pairs) pairMap[p.i] = p;
+
+  lines.push(`=== БАРЫ ВОКРУГ ПЕРВОГО РАСХОЖДЕНИЯ (бар #${firstDivBar}) ===`);
+  lines.push('Бар# | Дата              | Open     | High     | Low      | Close    | JS_eq%   | TV_eq%   | Δeq%  | TV:EL ES XL XS');
+  lines.push('-'.repeat(110));
+  for (let i = fromBar; i <= toBar; i++) {
+    const bar  = DATA[i] || {};
+    const p    = pairMap[i];
+    const jsEq = p ? p.jsEq.toFixed(3) : '—      ';
+    const tvEq = p ? p.tvEq.toFixed(3) : '—      ';
+    const diff = p ? (p.jsEq - p.tvEq).toFixed(3) : '—    ';
+    const sigs = p && hasSigs
+      ? `${p.tvRow.el||0} ${p.tvRow.es||0} ${p.tvRow.xl||0} ${p.tvRow.xs||0}`
+      : '— — — —';
+    const marker = i === firstDivBar ? ' ◄ ПЕРВОЕ' : i === maxDiffBar ? ' ◄ МАКС' : '';
+    const t = String(bar.t || '—').padEnd(18);
+    lines.push(
+      `${String(i).padStart(5)} | ${t} | ${(bar.o||0).toFixed(4).padStart(8)} | ${(bar.h||0).toFixed(4).padStart(8)} | ` +
+      `${(bar.l||0).toFixed(4).padStart(8)} | ${(bar.c||0).toFixed(4).padStart(8)} | ` +
+      `${String(jsEq).padStart(8)} | ${String(tvEq).padStart(8)} | ${String(diff).padStart(6)} | ${sigs}${marker}`
+    );
+  }
+  lines.push('');
+
+  // Also show 5 bars before first divergence where they still matched (last matching bars)
+  let lastMatchBar = -1;
+  for (const p of pairs) { if (p.i < firstDivBar && Math.abs(p.jsEq - p.tvEq) <= 0.5) lastMatchBar = p.i; }
+  if (lastMatchBar >= 0) {
+    lines.push(`Последний совпадающий бар (Δ≤0.5%): #${lastMatchBar} (${DATA[lastMatchBar]?.t||''})`);
+    const pm = pairMap[lastMatchBar];
+    if (pm) lines.push(`  JS_eq: ${pm.jsEq.toFixed(3)}%  TV_eq: ${pm.tvEq.toFixed(3)}%`);
+  }
+  lines.push('');
+  lines.push('=== ЧТО ПРОВЕРИТЬ ===');
+  lines.push('1. На баре первого расхождения — TV показывает вход/выход (EL/ES/XL/XS = 1)?');
+  lines.push('2. Если TV EL/ES=1 там где JS не открывал сделку — ищи различие в логике входа');
+  lines.push('3. Если TV XL/XS=1 там где JS не закрывал — ищи различие в логике SL/TP/BE/Trail');
+  lines.push('4. Если сигналы совпадают но equity расходится — ищи различие в расчёте PnL (цена входа, комиссия)');
+
+  const text = lines.join('\n');
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.querySelector('#tv-cmp-results button');
+    if (btn) { const orig = btn.textContent; btn.textContent = '✅ Скопировано!'; setTimeout(() => { btn.textContent = orig; }, 2000); }
+  }).catch(() => {
+    // fallback
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+  });
 }
 
 // ── CROSSHAIR ──────────────────────────────────────────────────
