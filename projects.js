@@ -158,6 +158,35 @@ const ProjectManager = (() => {
     } catch(e) { return null; }
   }
 
+  // Returns handle only if permission already granted (no requestPermission — safe in setInterval)
+  async function getHandleIfGranted(id) {
+    const handle = await _getHandle(id || _currentId);
+    if (!handle) return null;
+    try {
+      const perm = await handle.queryPermission({ mode: 'readwrite' });
+      return perm === 'granted' ? handle : null;
+    } catch(e) { return null; }
+  }
+
+  // Returns new CSV filenames without requesting permission (safe to call from setInterval)
+  // Returns null if permission not yet granted, [] if granted but no new files
+  async function checkNewFilesIfGranted(id) {
+    const proj = _projects.find(p => p.id === (id || _currentId));
+    if (!proj) return null;
+    const handle = await getHandleIfGranted(id || _currentId);
+    if (!handle) return null; // permission not granted — skip silently
+    const known = new Set(proj.knownFiles || []);
+    const files = [];
+    try {
+      for await (const [name, entry] of handle.entries()) {
+        if (entry.kind === 'file' && name.toLowerCase().endsWith('.csv')) {
+          files.push(name);
+        }
+      }
+    } catch(e) { return null; }
+    return files.filter(n => !known.has(n));
+  }
+
   // Returns sorted array: [{ name, size, lastModified }]
   async function listCSVFiles(id) {
     const handle = await getHandle(id || _currentId);
@@ -250,8 +279,8 @@ const ProjectManager = (() => {
     init,
     getAll, getCurrentId, getCurrent, getById,
     create, switchTo, duplicate, rename, remove,
-    getHandle, listCSVFiles, readCSVFile, saveToFolder,
-    checkNewFiles, markFilesKnown, updateLastFile,
+    getHandle, getHandleIfGranted, listCSVFiles, readCSVFile, saveToFolder,
+    checkNewFiles, checkNewFilesIfGranted, markFilesKnown, updateLastFile,
     saveState, loadState,
   };
 })();

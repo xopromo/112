@@ -193,6 +193,8 @@ function loadFile(file) {
     // Track last loaded file for the current project
     if (typeof ProjectManager !== 'undefined' && ProjectManager.getCurrentId()) {
       ProjectManager.updateLastFile(file.name);
+      // Cache CSV text for restore on page reload (no file permission needed)
+      try { localStorage.setItem(`use6_csv_${ProjectManager.getCurrentId()}`, e.target.result); } catch(_) {}
     }
   };
   reader.readAsText(file);
@@ -6361,22 +6363,47 @@ async function setProject(id) {
   _favNs = (state && state.favNs) ? state.favNs : '';
   localStorage.setItem('use6_fav_ns', _favNs);
 
+  // Clear stale data from previous project before loading new one
+  DATA = null; _rawDATA = null;
+  _rawDataInfo = '';
+  if ($('finfo')) $('finfo').textContent = 'Нет данных';
+  results = []; equities = {};
+  if ($('tb')) $('tb').innerHTML = '';
+  if ($('eqc')) $('eqc').style.display = 'none';
+  if ($('rbtn')) $('rbtn').disabled = true;
+
   // Update UI
   _updateProjBar(proj);
   renderFavBar();
   const nsEl = document.getElementById('fav-ns-label');
   if (nsEl) nsEl.textContent = _favNs ? _favNs : '';
 
+  // Helper: try to restore CSV from localStorage cache (no permission needed)
+  function _restoreFromCache(filename) {
+    const cached = localStorage.getItem(`use6_csv_${id}`);
+    if (!cached) return false;
+    parseCSV(cached);
+    _rawDATA = DATA;
+    _rawDataInfo = '✅ ' + (filename || 'данные') + ' (кэш)';
+    applyMaxBars();
+    if ($('rbtn')) $('rbtn').disabled = false;
+    updateVolStatus();
+    updatePreview();
+    return true;
+  }
+
   // Auto-load last CSV from project folder
   if (proj.lastFile) {
     const file = await ProjectManager.readCSVFile(id, proj.lastFile);
     if (file) loadFile(file);
+    else _restoreFromCache(proj.lastFile); // fallback: restore from cache on reload
   } else {
     // No lastFile — try to pick the most recent CSV
     const files = await ProjectManager.listCSVFiles(id);
     if (files.length > 0) {
       const file = await ProjectManager.readCSVFile(id, files[0].name);
       if (file) { loadFile(file); ProjectManager.updateLastFile(files[0].name); }
+      else _restoreFromCache(files[0].name);
       ProjectManager.markFilesKnown(id, files.map(f => f.name));
     }
   }
@@ -6513,9 +6540,11 @@ async function _pollNewFiles() {
   const id = ProjectManager.getCurrentId();
   if (!id) return;
   try {
-    const newFiles = await ProjectManager.checkNewFiles(id);
+    // Use IfGranted variant — doesn't call requestPermission (requires user gesture)
+    const newFiles = await ProjectManager.checkNewFilesIfGranted(id);
     const badge = document.getElementById('proj-new-badge');
-    if (badge) badge.style.display = newFiles.length > 0 ? 'inline' : 'none';
+    // null = permission not yet granted → don't hide badge (it may have been set earlier)
+    if (badge && newFiles !== null) badge.style.display = newFiles.length > 0 ? 'inline' : 'none';
   } catch(e) {}
 }
 
