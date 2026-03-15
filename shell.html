@@ -1011,7 +1011,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
     <div class="field"><label>Период MA</label><input id="e_macr_p" value="20" data-tip="Период скользящей средней для пересечения"></div>
     <div class="field"><label>Тип MA</label><select id="e_macr_t"><option value="EMA">EMA</option><option value="SMA">SMA</option><option value="WMA">WMA</option><option value="RMA">RMA</option><option value="DEMA">DEMA</option><option value="TEMA">TEMA</option><option value="Kalman">Kalman</option></select></div>
   </div>
-  <div class="field"><label data-tip="Перебирать все типы MA (EMA, SMA, WMA) для MA Crossover входа"><input type="checkbox" id="e_macr_sweep_types"> Все типы MA</label></div>
+  <div class="field"><label data-tip="Перебирать все типы MA (EMA, SMA, WMA, RMA, DEMA, TEMA, Kalman) для MA Crossover входа"><input type="checkbox" id="e_macr_sweep_types"> Все типы MA</label></div>
 
   <div class="cb"><input type="checkbox" id="e_free"><label data-tip="Свободный вход: вход разрешён после каждой закрытой свечи (если позволяют фильтры). Полезно для тестирования чистой работы фильтров">Свободный вход (Free)</label></div>
 
@@ -1185,7 +1185,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
     <div class="field"><label>Период</label><input id="f_map" value="50,100,200" data-tip="Период MA. Можно задать несколько через запятую для оптимизации: 50,100,200"></div>
   </div>
   <div class="g2">
-    <div class="field"><label data-tip="Перебирать все типы MA (EMA, SMA, WMA) вместо одного выбранного"><input type="checkbox" id="f_ma_sweep_types"> Все типы MA</label></div>
+    <div class="field"><label data-tip="Перебирать все типы MA (EMA, SMA, WMA, DEMA, TEMA, Kalman) вместо одного выбранного"><input type="checkbox" id="f_ma_sweep_types"> Все типы MA</label></div>
     <div class="field"><label>HTF ratio</label><input id="f_ma_htf" value="1" data-tip="Коэффициент старшего ТФ. 1=текущий ТФ, 4=4x (напр. 1H→4H), 24=24x. Несколько через запятую: 1,4,24"></div>
   </div>
 
@@ -1216,7 +1216,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
     <div class="field"><label>Период</label><input id="f_confn" value="50,100,200" data-tip="Период второй MA. Например 200 для трендового фильтра, 50 для среднесрочного"></div>
   </div>
   <div class="g2">
-    <div class="field"><label data-tip="Перебирать все типы MA (EMA, SMA, WMA) для второй MA"><input type="checkbox" id="f_conf_sweep_types"> Все типы</label></div>
+    <div class="field"><label data-tip="Перебирать все типы MA (EMA, SMA, WMA, HMA, DEMA, TEMA, Kalman) для второй MA"><input type="checkbox" id="f_conf_sweep_types"> Все типы</label></div>
     <div class="field"><label>HTF ratio</label><input id="f_conf_htf" value="1" data-tip="HTF коэффициент для второй MA. 1=текущий ТФ, 4=4x (1H→4H), 24=24x. Несколько через запятую: 1,4,24"></div>
   </div>
 
