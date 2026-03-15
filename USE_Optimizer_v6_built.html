@@ -9116,7 +9116,8 @@ async function runOpt() {
         if (oi % 50 === 0) { await yieldToUI(); }
       }
     }
-    await _batchCPCV(results, 200);
+    results.sort((a,b)=>b.pdd-a.pdd);
+    try { await _batchCPCV(results, 200); } catch(_cpcvErr) { console.error('[MC _batchCPCV]', _cpcvErr); }
     if (typeof setMcPhase === 'function') setMcPhase(null);
     renderResults(); showBestStats(); updateETA(done, mcTotal, results.length);
     $('prog').textContent = '✅ ' + fmtNum(results.length) + ' / ' + fmtNum(done) + ' прошли фильтр';
@@ -9650,7 +9651,7 @@ async function runOpt() {
       }
     }
     results.sort((a,b)=>b.pdd-a.pdd);
-    await _batchCPCV(results, 200);
+    try { await _batchCPCV(results, 200); } catch(_cpcvErr) { console.error('[TPE _batchCPCV]', _cpcvErr); }
     if (typeof setMcPhase==='function') setMcPhase(null);
     renderResults(); showBestStats(); updateETA(done, _tpeMaxIter, results.length);
     const _tpeStopReason = results.length >= _tpeTarget ? `✅ цель ${_tpeTarget} достигнута` : `✅ бюджет ${_tpeMaxIter} итераций исчерпан`;
@@ -10133,7 +10134,7 @@ async function runOpt() {
     }
   }
   results.sort((a,b)=>b.pdd-a.pdd);
-  await _batchCPCV(results, 200);
+  try { await _batchCPCV(results, 200); } catch(_cpcvErr) { console.error('[Exhaustive _batchCPCV]', _cpcvErr); }
   if (typeof setMcPhase === 'function') setMcPhase(null);
   _curPage = 0;
   renderResults();
@@ -11140,6 +11141,16 @@ function renderResults() {
   renderVisibleResults();
   $('mass-rob-bar').style.display = results.length > 0 ? 'flex' : 'none';
   $('mass-rob-info').textContent = `${results.length} результатов`;
+  // Safety net: если после рендера есть результаты без OOS — пересчитать в фоне
+  if (typeof window._batchOOS === 'function') {
+    const _pendingOOS = results.filter(r => r.cfg && r.cfg._oos === undefined);
+    if (_pendingOOS.length > 0) {
+      setTimeout(async () => {
+        await window._batchOOS();
+        applyFilters(); // перерисовать таблицу с заполненными TV колонками
+      }, 50);
+    }
+  }
 }
 
 // --- Пагинация ---
@@ -18001,7 +18012,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1773569752942;
+window._BUILD_TS = 1773572964394;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
