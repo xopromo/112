@@ -999,8 +999,13 @@ async function runOpt() {
     if (pending.length === 0) return;
     if (typeof setMcPhase === 'function') setMcPhase(`⏳ OOS для ${pending.length} результатов…`);
     for (let oi = 0; oi < pending.length; oi++) {
-      _attachOOS(pending[oi].cfg, pending[oi].name, pending[oi].n);
-      if (equities[pending[oi].name]) pending[oi].eq = equities[pending[oi].name];
+      try {
+        _attachOOS(pending[oi].cfg, pending[oi].name, pending[oi].n);
+        if (equities[pending[oi].name]) pending[oi].eq = equities[pending[oi].name];
+      } catch(_oosErr) {
+        console.error('[_batchOOS] oi='+oi, _oosErr);
+        if (!pending[oi].cfg._oos) pending[oi].cfg._oos = { forward: null, isPct: Math.round(_isN / N * 100) };
+      }
       if (oi % 20 === 0) await yieldToUI();
     }
     if (typeof setMcPhase === 'function') setMcPhase(null);
@@ -1997,12 +2002,16 @@ async function runOpt() {
     if (_useOOS && results.length > 0) {
       setMcPhase(`⏳ OOS проверка ${results.length} результатов…`);
       for (let oi = 0; oi < results.length; oi++) {
-        _attachOOS(results[oi].cfg, results[oi].name, results[oi].n);
-        if (equities[results[oi].name]) results[oi].eq = equities[results[oi].name];
+        try {
+          _attachOOS(results[oi].cfg, results[oi].name, results[oi].n);
+          if (equities[results[oi].name]) results[oi].eq = equities[results[oi].name];
+        } catch(_oosErr) {
+          console.error('[MC OOS батч] oi='+oi, _oosErr);
+          if (!results[oi].cfg._oos) results[oi].cfg._oos = { forward: null, isPct: Math.round(_isN / N * 100) };
+        }
         if (oi % 50 === 0) { await yieldToUI(); }
       }
     }
-    results.sort((a,b) => b.pdd-a.pdd);
     await _batchCPCV(results, 200);
     if (typeof setMcPhase === 'function') setMcPhase(null);
     renderResults(); showBestStats(); updateETA(done, mcTotal, results.length);
@@ -2525,7 +2534,13 @@ async function runOpt() {
     if (_useOOS && results.length > 0) {
       setMcPhase(`⏳ OOS проверка ${results.length} результатов…`);
       for (let oi = 0; oi < results.length; oi++) {
-        _attachOOS(results[oi].cfg, results[oi].name, results[oi].n);
+        try {
+          _attachOOS(results[oi].cfg, results[oi].name, results[oi].n);
+          if (equities[results[oi].name]) results[oi].eq = equities[results[oi].name];
+        } catch(_oosErr) {
+          console.error('[TPE OOS батч] oi='+oi, _oosErr);
+          if (!results[oi].cfg._oos) results[oi].cfg._oos = { forward: null, isPct: Math.round(_isN / N * 100) };
+        }
         if (oi % 50 === 0) { await yieldToUI(); }
       }
     }
@@ -2630,8 +2645,13 @@ async function runOpt() {
     if (_useOOS && results.length > 0) {
       setMcPhase(`⏳ OOS проверка ${results.length} результатов…`);
       for (let oi = 0; oi < results.length; oi++) {
-        _attachOOS(results[oi].cfg, results[oi].name, results[oi].n);
-        if (equities[results[oi].name]) results[oi].eq = equities[results[oi].name];
+        try {
+          _attachOOS(results[oi].cfg, results[oi].name, results[oi].n);
+          if (equities[results[oi].name]) results[oi].eq = equities[results[oi].name];
+        } catch(_oosErr) {
+          console.error('[BO OOS батч] oi='+oi, _oosErr);
+          if (!results[oi].cfg._oos) results[oi].cfg._oos = { forward: null, isPct: Math.round(_isN / N * 100) };
+        }
         if (oi % 50 === 0) { await yieldToUI(); }
       }
     }
@@ -2988,8 +3008,13 @@ async function runOpt() {
     // OOS вычисляется только если не synthesis режим (для synthesis отложено до detail modal)
     if (!_isSynthMode) {
       for (let oi = 0; oi < results.length; oi++) {
-        _attachOOS(results[oi].cfg, results[oi].name, results[oi].n);
-        if (equities[results[oi].name]) results[oi].eq = equities[results[oi].name];
+        try {
+          _attachOOS(results[oi].cfg, results[oi].name, results[oi].n);
+          if (equities[results[oi].name]) results[oi].eq = equities[results[oi].name];
+        } catch(_oosErr) {
+          console.error('[Exhaustive OOS батч] oi='+oi, _oosErr);
+          if (!results[oi].cfg._oos) results[oi].cfg._oos = { forward: null, isPct: Math.round(_isN / N * 100) };
+        }
         if (oi % 50 === 0) { await yieldToUI(); }
       }
     } else {
