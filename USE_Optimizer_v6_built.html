@@ -15935,6 +15935,15 @@ function _hcCluster(found, step, pvStep) {
     if (a.useTrail && b.useTrail) d += Math.abs((a.trTrig||1) - (b.trTrig||1)) / step;
     // MA
     d += Math.abs((a.maP||0) - (b.maP||0)) / 5;
+    // ATR Breakout multiplier — HC варьирует его, cfgDist должен это учитывать
+    if (a.useAtrBo && b.useAtrBo)
+      d += Math.abs((a.atrBoMult||2) - (b.atrBoMult||2)) / step;
+    // Confirm MA period — варьируется через vConf
+    if (a.useConfirm && b.useConfirm)
+      d += Math.abs((a.confN||14) - (b.confN||14)) / 10;
+    // ADX threshold
+    if (a.useADX && b.useADX)
+      d += Math.abs((a.adxThresh||20) - (b.adxThresh||20)) / 10;
     return d;
   }
 
@@ -18029,7 +18038,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1773593511619;
+window._BUILD_TS = 1773599873861;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
