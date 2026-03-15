@@ -1945,6 +1945,7 @@ async function runOpt() {
               useKalmanCross,kalmanCrossLen, // ##KALMAN_CROSS##
               useMaCross,maCrossP,maCrossType,
               useFreeEntry,
+              useEIS,eisPeriod:eisPeriod||13,useSoldiers,
               useMacd,macdFast,macdSlow,macdSignalP:macdSigP,
               useStochExit,stochKP,stochDP,stochOS,stochOB,
               useVolMove,volMoveMult,
@@ -2311,6 +2312,7 @@ async function runOpt() {
               useKalmanCross,kalmanCrossLen, // ##KALMAN_CROSS##
               useMaCross,maCrossP,maCrossType:_mCrossType,
               useFreeEntry,
+              useEIS,eisPeriod:eisPeriod||13,useSoldiers,
               useMacd,macdFast,macdSlow,macdSignalP:macdSigP,
               useStochExit,stochKP,stochDP,stochOS,stochOB,
               useVolMove,volMoveMult,
@@ -2917,6 +2919,7 @@ async function runOpt() {
                                           useKalmanCross,kalmanCrossLen, // ##KALMAN_CROSS##
                                           useMaCross,maCrossP,maCrossType:_mCrossTyp,
                                           useFreeEntry,
+                                          useEIS,eisPeriod:eisPeriod||13,useSoldiers,
                                           useMacd,macdFast,macdSlow,macdSignalP:macdSigP,
                                           useStochExit,stochKP,stochDP,stochOS,stochOB,
                                           useVolMove,volMoveMult,

@@ -9048,6 +9048,7 @@ async function runOpt() {
               useKalmanCross,kalmanCrossLen, // ##KALMAN_CROSS##
               useMaCross,maCrossP,maCrossType,
               useFreeEntry,
+              useEIS,eisPeriod:eisPeriod||13,useSoldiers,
               useMacd,macdFast,macdSlow,macdSignalP:macdSigP,
               useStochExit,stochKP,stochDP,stochOS,stochOB,
               useVolMove,volMoveMult,
@@ -9414,6 +9415,7 @@ async function runOpt() {
               useKalmanCross,kalmanCrossLen, // ##KALMAN_CROSS##
               useMaCross,maCrossP,maCrossType:_mCrossType,
               useFreeEntry,
+              useEIS,eisPeriod:eisPeriod||13,useSoldiers,
               useMacd,macdFast,macdSlow,macdSignalP:macdSigP,
               useStochExit,stochKP,stochDP,stochOS,stochOB,
               useVolMove,volMoveMult,
@@ -10020,6 +10022,7 @@ async function runOpt() {
                                           useKalmanCross,kalmanCrossLen, // ##KALMAN_CROSS##
                                           useMaCross,maCrossP,maCrossType:_mCrossTyp,
                                           useFreeEntry,
+                                          useEIS,eisPeriod:eisPeriod||13,useSoldiers,
                                           useMacd,macdFast,macdSlow,macdSignalP:macdSigP,
                                           useStochExit,stochKP,stochDP,stochOS,stochOB,
                                           useVolMove,volMoveMult,
@@ -17997,7 +18000,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1773565428808;
+window._BUILD_TS = 1773567851198;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
