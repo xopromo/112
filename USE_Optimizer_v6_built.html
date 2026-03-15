@@ -9006,7 +9006,10 @@ async function runOpt() {
         useMacdFilter:_fCombo.useMacdFilter??useMacdFilter,
         useER:_fCombo.useER??useER,erArr,erPeriod:erPeriod||10,erThresh,
         useKalmanMA:_fCombo.useKalmanMA??useKalmanMA,kalmanArr,kalmanLen, // ##KALMAN_MA##
-        start:Math.max((maP||0)*(htfRatio||1),(confN||0)*(_confHtf||1),50)+2,
+        start:Math.max(
+          (_effUseMa&&maP>0?(maP||0)*(htfRatio||1):0),
+          (_effUseConfirm&&confN>0?(confN||0)*(_confHtf||1):0),
+          50)+2,
         pruning:false, maxDDLimit:maxDD
       };
 
@@ -9330,7 +9333,10 @@ async function runOpt() {
         useMacdFilter:_fCombo.useMacdFilter??useMacdFilter,
         useER:_fCombo.useER??useER,erArr,erPeriod:erPeriod||10,erThresh,
         useKalmanMA:_fCombo.useKalmanMA??useKalmanMA,kalmanArr,kalmanLen, // ##KALMAN_MA##
-        start:Math.max((maP||0)*(htfRatio||1),(confN||0)*(_confHtf||1),50)+2,pruning:false,maxDDLimit:maxDD
+        start:Math.max(
+          (_effUseMa&&maP>0?(maP||0)*(htfRatio||1):0),
+          (_effUseConfirm&&confN>0?(confN||0)*(_confHtf||1):0),
+          50)+2,pruning:false,maxDDLimit:maxDD
       };
 
       if (_useOOS) DATA = _isData;
@@ -9913,7 +9919,7 @@ async function runOpt() {
                                       usePartial,partRR,partPct,partBE,
                                       useClimax:useClimaxExit&&HAS_VOLUME,clxVolMult,clxBodyMult,clxMode,
                                       // Filters
-                                      useMA:maP>0,maArr,maType:mType,maP,htfRatio,
+                                      useMA:useMa&&maP>0,maArr,maType:mType,maP,htfRatio,
                                       useADX:useAdx&&adxT>0,adxArr:adxCache[_adxCk],adxThresh:adxT,adxLen:adxL,adxHtfRatio,useAdxSlope,adxSlopeBars,
                                       useRSI:useRsi,rsiArr:useRsi?calcRSI(14):null,
                                       rsiOS:rsiPair.os,rsiOB:rsiPair.ob,
@@ -9934,7 +9940,10 @@ async function runOpt() {
                                       useKalmanMA,kalmanArr,kalmanLen, // ##KALMAN_MA##
                                       useMacdFilter,useER,erArr:erArrEx,erPeriod:erPArr[0]||10,erThresh,
                                       bodyAvg:bodyAvgArr,
-                                      start:Math.max((maP||0)*(htfRatio||1),(confN||0)*(_confHtf||1),50)+2,
+                                      start:Math.max(
+                                        (useMa&&maP>0?(maP||0)*(htfRatio||1):0),
+                                        (useConfirm&&confN>0?(confN||0)*(_confHtf||1):0),
+                                        50)+2,
                                       // Pruning
                                       pruning:optMode==='prune',maxDDLimit:maxDD
                                     };
@@ -10005,7 +10014,7 @@ async function runOpt() {
                                           useTime, timeBars, timeMode,
                                           usePartial, partRR, partPct, partBE,
                                           useClimax:useClimaxExit&&HAS_VOLUME, clxVolMult, clxBodyMult, clxMode,
-                                          useMA:maP>0, maType:mType, maP, htfRatio,
+                                          useMA:useMa&&maP>0, maType:mType, maP, htfRatio,
                                           useADX:useAdx&&adxT>0, adxThresh:adxT, adxLen:adxL, adxHtfRatio, useAdxSlope, adxSlopeBars,
                                           useRSI:useRsi, rsiOS:rsiPair.os, rsiOB:rsiPair.ob,
                                           useVolF:useVolF&&vfM>0, volFMult:vfM,
@@ -10610,7 +10619,7 @@ function buildBtCfg(cfg, ind) {
     clxMode:     cfg.clxMode     || 'any',
 
     // ── Фильтры ───────────────────────────────────────────────
-    useMA:    maP > 0,
+    useMA:    !!(cfg.useMA) && maP > 0,
     maArr:    ind.maArr,
     maType:   cfg.maType   || 'EMA',
     maP:      maP,
@@ -10683,7 +10692,10 @@ function buildBtCfg(cfg, ind) {
     kalmanCrossArr: ind.kalmanCrossArr,
     kalmanCrossLen: cfg.kalmanCrossLen || 20,
 
-    start: Math.max((maP || 0) * (cfg.htfRatio || 1), (cfg.confN || 0) * (cfg.confHtfRatio || 1), 50) + 2,
+    start: Math.max(
+      (cfg.useMA      ? (maP || 0)       * (cfg.htfRatio     || 1) : 0),
+      (cfg.useConfirm ? (cfg.confN || 0) * (cfg.confHtfRatio || 1) : 0),
+      50) + 2,
     pruning: false,
     maxDDLimit: 300,
   };
@@ -13582,8 +13594,8 @@ function copyTVdiag() {
     const pvHiVal = pvHi_ ? pvHi_[i] : '?';
     const maVal   = (maArr && i > 0) ? maArr[i-1] : null;
     const maStr   = maVal != null ? maVal.toFixed(6) : '—';
-    let maBlock = '—';
-    if (maArr && i > 0) {
+    let maBlock = c.useMA ? '—' : 'off';
+    if (c.useMA && maArr && i > 0) {
       const prevC = DATA[i-1]?.c || 0;
       const ma = maArr[i-1];
       maBlock = (ma <= 0) ? 'WARMUP' : (prevC <= ma ? 'BLK_L' : 'ok');
@@ -13670,12 +13682,14 @@ function copyTVdiag() {
         }
         // Анализ фильтров на СИГНАЛЬНОМ баре jsSigBar
         lines.push(`--- Фильтры на сигнальном баре JS #${jsSigBar} (bar.i-1=${jsSigBar-1}) ---`);
-        if (maArr && jsSigBar > 0) {
+        if (maArr && jsSigBar > 0 && c.useMA) {
           const prevC2 = DATA[jsSigBar-1]?.c || 0;
           const ma2 = maArr[jsSigBar-1] || 0;
           const blocked2 = ma2 > 0 && (entryDir===1 ? prevC2 <= ma2 : prevC2 >= ma2);
           lines.push(`MA(${c.maP}×${c.htfRatio||1}tf)[${jsSigBar-1}] = ${ma2>0?ma2.toFixed(6):'0(warmup)'}  close=${prevC2.toFixed(6)}`);
           lines.push(ma2 <= 0 ? `⚠️  MA warmup → блокирует` : blocked2 ? `⚠️  MA БЛОКИРУЕТ (close${entryDir===1?'<=':'>='}MA)` : `✅ MA ok`);
+        } else if (maArr && jsSigBar > 0 && !c.useMA) {
+          lines.push(`MA(${c.maP}×${c.htfRatio||1}tf) — отключён (useMA=false), не влияет`);
         }
         if (confArr && jsSigBar > 0) {
           const prevC3 = DATA[jsSigBar-1]?.c || 0;
@@ -13696,7 +13710,7 @@ function copyTVdiag() {
     }
     // MA и Confirm MA filter на БАРЕ ВХОДА (для справки)
     const checkBar = (jsSigBar >= 0 && waitB > 0) ? jsSigBar : entrySignalBar;
-    if (checkBar !== jsSigBar && maArr && entrySignalBar > 0) {
+    if (checkBar !== jsSigBar && c.useMA && maArr && entrySignalBar > 0) {
       // только если уже не показали выше
       const prevC = DATA[entrySignalBar - 1]?.c || 0;
       const ma = maArr[entrySignalBar - 1] || 0;
@@ -17900,7 +17914,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1773560276367;
+window._BUILD_TS = 1773561239514;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
