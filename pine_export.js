@@ -390,8 +390,8 @@ function generatePineScript(r) {
   lines.push(`safe_body   = math.max(body_cur, syminfo.mintick)`);
   lines.push(`bull_pin = (math.min(close,open) - low)  > safe_body * pin_ratio and (high - math.max(close,open)) < safe_body`);
   lines.push(`bear_pin = (high - math.max(close,open)) > safe_body * pin_ratio and (math.min(close,open) - low)  < safe_body`);
-  lines.push(`donch_hi = ta.highest(high, donch_len)[1]`);
-  lines.push(`donch_lo = ta.lowest(low,   donch_len)[1]`);
+  lines.push(`donch_hi = ta.highest(high, donch_len)[2]`);
+  lines.push(`donch_lo = ta.lowest(low,   donch_len)[2]`);
   lines.push(`bool donch_l = use_donch and high[1] > donch_hi`);
   lines.push(`bool donch_s = use_donch and low[1]  < donch_lo`);
   lines.push(`boll_basis = ta.sma(close, boll_len)`);
