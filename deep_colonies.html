@@ -1,0 +1,1343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DEEP COLONIES — Abyssal Throne</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: #001428;
+  color: #94d2bd;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  overflow: hidden;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+#header {
+  background: #002244;
+  border-bottom: 1px solid #0a9396;
+  padding: 4px 12px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-shrink: 0;
+}
+#header h1 { color: #94d2bd; font-size: 14px; letter-spacing: 3px; text-transform: uppercase; }
+#wave-info { color: #0a9396; font-size: 12px; }
+#main {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+#canvas-container {
+  position: relative;
+  flex-shrink: 0;
+}
+#gameCanvas {
+  display: block;
+  cursor: crosshair;
+}
+#wave-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0,0,0,0.8);
+  border: 2px solid #0a9396;
+  color: #94d2bd;
+  padding: 16px 32px;
+  font-size: 18px;
+  text-align: center;
+  pointer-events: none;
+  display: none;
+  z-index: 10;
+}
+#effect-overlay {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  background: rgba(200,50,50,0.7);
+  color: #fff;
+  padding: 3px 8px;
+  font-size: 11px;
+  pointer-events: none;
+  display: none;
+  z-index: 10;
+  border-radius: 3px;
+}
+#sidebar {
+  width: 320px;
+  background: #001e3c;
+  border-left: 1px solid #0a9396;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.sidebar-section {
+  border-bottom: 1px solid #0a9396;
+  padding: 8px;
+}
+.sidebar-section h3 {
+  color: #0a9396;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin-bottom: 6px;
+}
+#resources-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+}
+.res-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.res-label { color: #5a9; font-size: 10px; }
+.res-val { color: #94d2bd; font-size: 12px; font-weight: bold; }
+.res-bar { height: 4px; background: #001428; border-radius: 2px; overflow: hidden; }
+.res-bar-fill { height: 100%; border-radius: 2px; transition: width 0.3s; }
+.bar-o2 { background: #4dd; }
+.bar-energy { background: #fd0; }
+.bar-food { background: #8d8; }
+.bar-pop { background: #d8a; }
+#build-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+}
+.build-btn {
+  background: #002244;
+  border: 1px solid #0a9396;
+  color: #94d2bd;
+  padding: 5px 2px;
+  font-size: 10px;
+  cursor: pointer;
+  text-align: center;
+  border-radius: 3px;
+  transition: all 0.15s;
+  line-height: 1.3;
+}
+.build-btn:hover { background: #0a9396; color: #001428; }
+.build-btn.active { background: #0a9396; color: #001428; border-color: #94d2bd; }
+.build-btn.demolish { border-color: #c44; color: #f88; }
+.build-btn.demolish:hover { background: #c44; color: #fff; }
+.build-btn.demolish.active { background: #c44; color: #fff; }
+#tech-section {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+  border-bottom: 1px solid #0a9396;
+}
+#tech-section h3 { color: #0a9396; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 6px; }
+.tech-tier { margin-bottom: 6px; }
+.tech-tier-label { color: #567; font-size: 10px; margin-bottom: 3px; }
+.tech-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; }
+.tech-btn {
+  background: #001428;
+  border: 1px solid #345;
+  color: #678;
+  padding: 4px;
+  font-size: 9px;
+  cursor: pointer;
+  text-align: center;
+  border-radius: 2px;
+  transition: all 0.15s;
+  line-height: 1.2;
+}
+.tech-btn:hover:not(.locked):not(.done) { background: #024; border-color: #0a9396; color: #94d2bd; }
+.tech-btn.available { border-color: #0a9396; color: #94d2bd; }
+.tech-btn.done { background: #012820; border-color: #0a5; color: #0d0; }
+.tech-btn.locked { opacity: 0.4; cursor: not-allowed; }
+#log-section { height: 130px; padding: 6px; overflow-y: auto; flex-shrink: 0; }
+#log-section h3 { color: #0a9396; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 4px; }
+.log-entry { font-size: 10px; margin-bottom: 2px; padding: 1px 0; }
+.log-info { color: #678; }
+.log-warn { color: #ca0; }
+.log-danger { color: #f44; }
+.log-good { color: #4d4; }
+.log-wave { color: #0af; }
+#tooltip {
+  position: fixed;
+  background: rgba(0,20,40,0.95);
+  border: 1px solid #0a9396;
+  color: #94d2bd;
+  padding: 6px 10px;
+  font-size: 10px;
+  pointer-events: none;
+  z-index: 100;
+  max-width: 200px;
+  display: none;
+  line-height: 1.5;
+}
+#game-over, #game-win {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.88);
+  display: none; align-items: center; justify-content: center;
+  flex-direction: column; gap: 16px; z-index: 200;
+}
+#game-over h2 { color: #f44; font-size: 32px; letter-spacing: 4px; }
+#game-win h2 { color: #0f8; font-size: 32px; letter-spacing: 4px; }
+.restart-btn {
+  background: #0a9396; border: none; color: #001428;
+  padding: 10px 30px; font-size: 14px; cursor: pointer;
+  border-radius: 4px; font-family: inherit; font-weight: bold;
+}
+.restart-btn:hover { background: #94d2bd; }
+#selected-info {
+  padding: 6px 8px;
+  font-size: 10px;
+  color: #678;
+  min-height: 32px;
+  border-bottom: 1px solid #0a9396;
+  flex-shrink: 0;
+}
+#selected-info span { color: #94d2bd; }
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: #001428; }
+::-webkit-scrollbar-thumb { background: #0a9396; border-radius: 2px; }
+</style>
+</head>
+<body>
+<div id="header">
+  <h1>⚓ DEEP COLONIES — Abyssal Throne</h1>
+  <div id="wave-info">Wave: <span id="wave-num">0</span> | Next wave: <span id="wave-timer">120s</span></div>
+  <div id="wave-info" style="margin-left:auto;color:#567;">Click tiles to build • Right-click to cancel</div>
+</div>
+<div id="main">
+  <div id="canvas-container">
+    <canvas id="gameCanvas" width="720" height="504"></canvas>
+    <div id="wave-overlay"></div>
+    <div id="effect-overlay"></div>
+  </div>
+  <div id="sidebar">
+    <div class="sidebar-section" id="res-section">
+      <h3>Resources</h3>
+      <div id="resources-grid">
+        <div class="res-item">
+          <div class="res-label">💧 O2</div>
+          <div class="res-val" id="res-o2">500/1000</div>
+          <div class="res-bar"><div class="res-bar-fill bar-o2" id="bar-o2" style="width:50%"></div></div>
+        </div>
+        <div class="res-item">
+          <div class="res-label">⚡ Energy</div>
+          <div class="res-val" id="res-energy">200/600</div>
+          <div class="res-bar"><div class="res-bar-fill bar-energy" id="bar-energy" style="width:33%"></div></div>
+        </div>
+        <div class="res-item">
+          <div class="res-label">🪨 Minerals</div>
+          <div class="res-val" id="res-minerals">500</div>
+        </div>
+        <div class="res-item">
+          <div class="res-label">🐟 Food</div>
+          <div class="res-val" id="res-food">300/600</div>
+          <div class="res-bar"><div class="res-bar-fill bar-food" id="bar-food" style="width:50%"></div></div>
+        </div>
+        <div class="res-item">
+          <div class="res-label">🔬 Research</div>
+          <div class="res-val" id="res-research">0</div>
+        </div>
+        <div class="res-item">
+          <div class="res-label">👥 Population</div>
+          <div class="res-val" id="res-pop">12/20</div>
+          <div class="res-bar"><div class="res-bar-fill bar-pop" id="bar-pop" style="width:60%"></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="sidebar-section">
+      <h3>Build</h3>
+      <div id="build-grid">
+        <div class="build-btn" data-type="dome" title="Habitat Dome">🏠<br>Dome<br><span style="color:#567">100m+30e</span></div>
+        <div class="build-btn" data-type="reactor" title="Reactor">⚡<br>Reactor<br><span style="color:#567">150m</span></div>
+        <div class="build-btn" data-type="o2gen" title="O2 Generator">💧<br>O2 Gen<br><span style="color:#567">120m+20e</span></div>
+        <div class="build-btn" data-type="mine" title="Mining Drill">⛏<br>Mine<br><span style="color:#567">80m</span></div>
+        <div class="build-btn" data-type="farm" title="Bio-Farm">🌿<br>Farm<br><span style="color:#567">100m+20e</span></div>
+        <div class="build-btn" data-type="lab" title="Research Lab">🔬<br>Lab<br><span style="color:#567">200m+40e</span></div>
+        <div class="build-btn" data-type="turret" title="Defense Turret">🔫<br>Turret<br><span style="color:#567">150m+30e</span></div>
+        <div class="build-btn" data-type="sonar" title="Sonar Array">📡<br>Sonar<br><span style="color:#567">100m+20e</span></div>
+        <div class="build-btn demolish" data-type="demolish">🗑<br>Demo<br><span style="color:#c44">+50%</span></div>
+      </div>
+    </div>
+    <div id="selected-info">Click a tile to see info</div>
+    <div id="tech-section">
+      <h3>Technology</h3>
+      <div class="tech-tier">
+        <div class="tech-tier-label">— TIER 1 (25 research) —</div>
+        <div class="tech-grid" id="tech-tier1"></div>
+      </div>
+      <div class="tech-tier">
+        <div class="tech-tier-label">— TIER 2 (75 research, req 2×T1) —</div>
+        <div class="tech-grid" id="tech-tier2"></div>
+      </div>
+      <div class="tech-tier">
+        <div class="tech-tier-label">— TIER 3 (150 research, req 2×T2) —</div>
+        <div class="tech-grid" id="tech-tier3"></div>
+      </div>
+    </div>
+    <div class="sidebar-section" id="log-section">
+      <h3>Event Log</h3>
+      <div id="event-log"></div>
+    </div>
+  </div>
+</div>
+<div id="tooltip"></div>
+<div id="game-over" style="display:none">
+  <h2>⚠ COLONY LOST</h2>
+  <div id="go-reason" style="color:#f88;font-size:14px"></div>
+  <button class="restart-btn" onclick="initGame()">Restart Mission</button>
+</div>
+<div id="game-win" style="display:none">
+  <h2>✦ ASCENSION ACHIEVED</h2>
+  <div style="color:#0f8;font-size:14px">Your colony has transcended the abyss!</div>
+  <button class="restart-btn" onclick="initGame()">New Colony</button>
+</div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const COLS = 20, ROWS = 14, TS = 36;
+
+const TILE = { FLOOR:0, ROCK:1, MINERAL:2, VENT:3, SAND:4 };
+const TILE_COLORS = ['#1a2a4a','#3a3a4a','#1a4a3a','#4a2a0a','#3a3020'];
+const TILE_NAMES = ['Floor','Rock','Mineral Deposit','Hydrothermal Vent','Sand'];
+
+const BDEFS = {
+  hq:     { name:'HQ', icon:'⚓', hp:500, cost:{min:0,e:0}, prod:{e:8,o2:5}, cons:{e:0}, popMax:0, buildable:false },
+  dome:   { name:'Habitat Dome', icon:'🏠', hp:200, cost:{min:100,e:30}, prod:{}, cons:{e:1}, popMax:15 },
+  reactor:{ name:'Reactor', icon:'⚡', hp:150, cost:{min:150,e:0}, prod:{e:25}, cons:{e:0} },
+  o2gen:  { name:'O2 Generator', icon:'💧', hp:150, cost:{min:120,e:20}, prod:{o2:20}, cons:{e:4} },
+  mine:   { name:'Mining Drill', icon:'⛏', hp:120, cost:{min:80,e:0}, prod:{min:12}, cons:{e:3} },
+  farm:   { name:'Bio-Farm', icon:'🌿', hp:130, cost:{min:100,e:20}, prod:{food:18}, cons:{e:3} },
+  lab:    { name:'Research Lab', icon:'🔬', hp:100, cost:{min:200,e:40}, prod:{res:8}, cons:{e:5} },
+  turret: { name:'Defense Turret', icon:'🔫', hp:200, cost:{min:150,e:30}, prod:{}, cons:{e:2} },
+  sonar:  { name:'Sonar Array', icon:'📡', hp:80, cost:{min:100,e:20}, prod:{}, cons:{e:2} },
+};
+
+const TECHS = [
+  { id:'adv_mining', name:'Adv Mining', tier:1, cost:25, desc:'+60% mineral drills', req:[] },
+  { id:'pressure_filters', name:'Pressure Filters', tier:1, cost:25, desc:'+40% O2 gen', req:[] },
+  { id:'reinf_hulls', name:'Reinf. Hulls', tier:1, cost:25, desc:'+80% building HP', req:[] },
+  { id:'sonar_grid', name:'Sonar Grid', tier:1, cost:25, desc:'Turrets fire 0.3s faster', req:[] },
+  { id:'fusion_reactor', name:'Fusion Reactor', tier:2, cost:75, desc:'+80% reactor energy', req:['adv_mining','pressure_filters'] },
+  { id:'bioengineering', name:'Bio-Engineering', tier:2, cost:75, desc:'+60% food farms', req:['pressure_filters','reinf_hulls'] },
+  { id:'torpedo_sys', name:'Torpedo Systems', tier:2, cost:75, desc:'Turret dmg×2, range+1', req:['sonar_grid','reinf_hulls'] },
+  { id:'col_training', name:'Colonist Training', tier:2, cost:75, desc:'Pop grows 50% faster, +20 popMax', req:['adv_mining','sonar_grid'] },
+  { id:'pressure_shields', name:'Pressure Shields', tier:3, cost:150, desc:'Bldgs take 40% less dmg', req:['fusion_reactor','bioengineering'] },
+  { id:'nano_repair', name:'Nano-Repair Bots', tier:3, cost:150, desc:'Bldgs self-repair 1HP/5s', req:['fusion_reactor','torpedo_sys'] },
+  { id:'hydro_tap', name:'Hydrothermal Tap', tier:3, cost:150, desc:'+15e/tick per vent tile', req:['bioengineering','col_training'] },
+  { id:'ascension', name:'ASCENSION DRIVE', tier:3, cost:500, desc:'WIN — 60s to charge', req:['pressure_shields','nano_repair'] },
+];
+
+let state, gameRunning, logicInterval, animFrame;
+let buildMode = null;
+let selectedTile = null;
+let bubbles = [];
+let ambientFish = [];
+let waveOverlayTimer = 0;
+let effectOverlayMsg = '';
+let effectOverlayTimer = 0;
+let ascensionTimer = 0;
+let ascensionActive = false;
+
+function rnd(a,b){ return a + Math.floor(Math.random()*(b-a+1)); }
+function rndF(a,b){ return a + Math.random()*(b-a); }
+
+function initGame() {
+  document.getElementById('game-over').style.display = 'none';
+  document.getElementById('game-win').style.display = 'none';
+  if(logicInterval) clearInterval(logicInterval);
+  if(animFrame) cancelAnimationFrame(animFrame);
+  buildMode = null;
+  selectedTile = null;
+  ascensionActive = false;
+  ascensionTimer = 0;
+
+  const map = generateMap();
+  bubbles = Array.from({length:25}, () => createBubble());
+  ambientFish = Array.from({length:3}, () => createFish());
+
+  state = {
+    map,
+    buildings: [],
+    enemies: [],
+    bullets: [],
+    droppedMinerals: [],
+    tick: 0,
+    wave: 0,
+    waveTimer: 120*2,
+    waveActive: false,
+    enemiesInWave: 0,
+    enemiesKilled: 0,
+    o2: 500, o2Max: 1000,
+    energy: 200, energyMax: 600,
+    minerals: 600,
+    food: 450, foodMax: 600,
+    deltas: {o2:0, energy:0, minerals:0, food:0},
+    research: 0,
+    pop: 12, popMax: 20,
+    popGrowthTick: 0,
+    popDecayTick: 0,
+    o2ZeroTicks: 0,
+    techDone: new Set(),
+    disasterTimer: rnd(60,120)*2,
+    disasterActive: null,
+    disasterTicks: 0,
+    gameOver: false,
+    gameWin: false,
+    turretCooldowns: {},
+    nextEnemyId: 1,
+    nextBuildId: 1,
+  };
+
+  // Place HQ at center
+  placeBuilding('hq', 10, 7);
+  updateTechUI();
+  addLog('Colony established. Survive the abyss.', 'good');
+  setTimeout(()=>addLog('⚠ Build a Reactor + O2 Gen + Farm ASAP!', 'warn'), 800);
+  setTimeout(()=>addLog('Right-click canvas to cancel build mode.', 'info'), 1600);
+  gameRunning = true;
+
+  logicInterval = setInterval(gameTick, 500);
+  requestAnimationFrame(renderLoop);
+}
+
+function generateMap() {
+  const map = Array.from({length:ROWS}, () => new Array(COLS).fill(TILE.FLOOR));
+
+  // Add rock clusters
+  for(let c=0; c<18; c++){
+    const cx = rnd(1, COLS-2), cy = rnd(1, ROWS-2);
+    const sz = rnd(2,4);
+    for(let i=0; i<sz; i++){
+      const nx = cx + rnd(-1,1), ny = cy + rnd(-1,1);
+      if(nx>=0&&nx<COLS&&ny>=0&&ny<ROWS){
+        // Don't block center area around HQ
+        if(Math.abs(nx-10)>3 || Math.abs(ny-7)>3) map[ny][nx] = TILE.ROCK;
+      }
+    }
+  }
+
+  // Add mineral deposits
+  for(let i=0; i<7; i++){
+    const mx = rnd(1,COLS-2), my = rnd(1,ROWS-2);
+    if(map[my][mx] !== TILE.ROCK) map[my][mx] = TILE.MINERAL;
+  }
+
+  // Add vents
+  for(let i=0; i<3; i++){
+    const vx = rnd(1,COLS-2), vy = rnd(1,ROWS-2);
+    if(map[vy][vx] !== TILE.ROCK) map[vy][vx] = TILE.VENT;
+  }
+
+  // Sand patches
+  for(let i=0; i<8; i++){
+    const sx = rnd(0,COLS-1), sy = rnd(0,ROWS-1);
+    for(let dx=-1;dx<=1;dx++) for(let dy=-1;dy<=1;dy++){
+      const nx=sx+dx,ny=sy+dy;
+      if(nx>=0&&nx<COLS&&ny>=0&&ny<ROWS&&map[ny][nx]===TILE.FLOOR) map[ny][nx]=TILE.SAND;
+    }
+  }
+
+  // Ensure HQ area clear
+  for(let dx=-1;dx<=1;dx++) for(let dy=-1;dy<=1;dy++){
+    const nx=10+dx,ny=7+dy;
+    if(nx>=0&&nx<COLS&&ny>=0&&ny<ROWS) if(map[ny][nx]===TILE.ROCK) map[ny][nx]=TILE.FLOOR;
+  }
+
+  // Ensure edges have walkable tiles for enemy spawning
+  for(let x=0;x<COLS;x++){ map[0][x]=TILE.FLOOR; map[ROWS-1][x]=TILE.FLOOR; }
+  for(let y=0;y<ROWS;y++){ map[y][0]=TILE.FLOOR; map[y][COLS-1]=TILE.FLOOR; }
+
+  // Clear path check: BFS from edges to center, carve rocks if needed
+  const edgeTiles = [];
+  for(let x=0;x<COLS;x++){ edgeTiles.push([x,0]); edgeTiles.push([x,ROWS-1]); }
+  for(let y=1;y<ROWS-1;y++){ edgeTiles.push([0,y]); edgeTiles.push([COLS-1,y]); }
+  const path = bfs(map, edgeTiles[0][0], edgeTiles[0][1], 10, 7);
+  if(!path || path.length===0){
+    // Carve a diagonal path
+    for(let x=0;x<=10;x++) if(map[7][x]===TILE.ROCK) map[7][x]=TILE.FLOOR;
+  }
+
+  return map;
+}
+
+function bfs(map, sx, sy, tx, ty){
+  const visited = Array.from({length:ROWS}, ()=>new Array(COLS).fill(false));
+  const queue = [[sx,sy,[[sx,sy]]]];
+  visited[sy][sx] = true;
+  const dirs = [[0,1],[0,-1],[1,0],[-1,0]];
+  while(queue.length){
+    const [cx,cy,path] = queue.shift();
+    if(cx===tx&&cy===ty) return path;
+    for(const [dx,dy] of dirs){
+      const nx=cx+dx, ny=cy+dy;
+      if(nx>=0&&nx<COLS&&ny>=0&&ny<ROWS&&!visited[ny][nx]&&map[ny][nx]!==TILE.ROCK){
+        visited[ny][nx]=true;
+        queue.push([nx,ny,[...path,[nx,ny]]]);
+      }
+    }
+  }
+  return null;
+}
+
+function bfsEnemy(sx, sy, tx, ty){
+  // BFS ignoring buildings but avoiding rocks
+  return bfs(state.map, sx, sy, tx, ty);
+}
+
+function placeBuilding(type, col, row) {
+  const def = BDEFS[type];
+  const b = {
+    id: state.nextBuildId++,
+    type,
+    col, row,
+    hp: def.hp,
+    maxHp: def.hp,
+    glowPhase: Math.random()*Math.PI*2,
+  };
+  state.buildings.push(b);
+  if(def.popMax) state.popMax += def.popMax;
+  // Turret cooldown
+  if(type === 'turret') state.turretCooldowns[b.id] = 0;
+  return b;
+}
+
+function removeBuilding(id) {
+  const idx = state.buildings.findIndex(b=>b.id===id);
+  if(idx===-1) return;
+  const b = state.buildings[idx];
+  const def = BDEFS[b.type];
+  if(def.popMax) state.popMax = Math.max(state.pop, state.popMax - def.popMax);
+  if(b.type==='turret') delete state.turretCooldowns[b.id];
+  state.buildings.splice(idx,1);
+  // Recalc enemy paths
+  state.enemies.forEach(e => { e.path = null; e.pathIdx = 0; });
+}
+
+function getBuildingAt(col, row){ return state.buildings.find(b=>b.col===col&&b.row===row)||null; }
+function isTileBuildable(col, row){
+  const t = state.map[row][col];
+  return t !== TILE.ROCK && !getBuildingAt(col,row);
+}
+
+function hasTech(id){ return state.techDone.has(id); }
+
+function gameTick(){
+  if(!gameRunning||state.gameOver||state.gameWin) return;
+  state.tick++;
+  const t = state.tick;
+
+  // Disaster timer
+  state.disasterTimer--;
+  if(state.disasterTimer<=0){
+    triggerDisaster();
+    state.disasterTimer = rnd(60,120)*2;
+  }
+  if(state.disasterActive){
+    state.disasterTicks--;
+    if(state.disasterTicks<=0){ state.disasterActive=null; effectOverlayTimer=0; document.getElementById('effect-overlay').style.display='none'; }
+  }
+
+  // Energy available?
+  const totalEnergyCons = calcEnergyCons();
+  const totalEnergyProd = calcEnergyProd();
+  const energyOk = state.energy > 0 || totalEnergyProd >= totalEnergyCons;
+  const disasterToxic = state.disasterActive === 'toxic';
+  const disasterBio = state.disasterActive === 'biolumin';
+  const disasterThermal = state.disasterActive === 'thermal';
+
+  // Production
+  // dE starts as net energy (production already calculated, consumption subtracted)
+  let dE = totalEnergyProd - totalEnergyCons * (disasterThermal ? 1.8 : 1);
+  let dO2 = 0, dMin = 0, dFood = 0, dRes = 0;
+
+  state.buildings.forEach(b => {
+    if(!energyOk && b.type!=='hq' && b.type!=='reactor') return;
+    const p = BDEFS[b.type].prod||{};
+    if(b.type==='mine'){
+      let m = hasTech('adv_mining') ? 1.6 : 1;
+      if(state.map[b.row][b.col]===TILE.MINERAL) m*=2;
+      dMin += (p.min||0) * m;
+    }
+    if(b.type==='o2gen') dO2 += (p.o2||0) * (hasTech('pressure_filters')?1.4:1) * (disasterToxic?0.5:1);
+    if(b.type==='hq') dO2 += (p.o2||0); // energy already in dE via calcEnergyProd
+    // reactor energy already counted in dE
+    if(b.type==='farm') dFood += (p.food||0) * (hasTech('bioengineering')?1.6:1);
+    if(b.type==='lab') dRes += (p.res||0);
+  });
+
+  // Hydrothermal tap energy already in calcEnergyProd / dE, no double-add needed
+
+  // Pop consumption
+  dO2 -= state.pop * 0.5;
+  dFood -= state.pop * 0.3 * (disasterBio ? 2 : 1);
+
+  // Save deltas for UI display (smooth with previous)
+  state.deltas.o2 = dO2;
+  state.deltas.energy = dE;
+  state.deltas.minerals = dMin;
+  state.deltas.food = dFood;
+
+  // Apply
+  state.energy = Math.max(0, Math.min(state.energyMax, state.energy + dE));
+  state.o2 = Math.max(0, Math.min(state.o2Max, state.o2 + dO2));
+  state.minerals = Math.max(0, state.minerals + dMin);
+  state.food = Math.max(0, Math.min(state.foodMax, state.food + dFood));
+  state.research = Math.max(0, state.research + dRes);
+
+  // Nano repair
+  if(hasTech('nano_repair') && t % 10 === 0){
+    state.buildings.forEach(b => { if(b.hp < b.maxHp) b.hp = Math.min(b.maxHp, b.hp+1); });
+  }
+
+  // Population logic
+  const o2Pct = state.o2/state.o2Max;
+  const foodPct = state.food/state.foodMax;
+  state.popGrowthTick++;
+  const growRate = hasTech('col_training') ? 7 : 10;
+  if(o2Pct>0.7 && foodPct>0.7 && state.pop < state.popMax && state.popGrowthTick >= growRate){
+    state.pop++;
+    state.popGrowthTick = 0;
+  }
+  if((o2Pct<0.2 || foodPct<0.2) && state.pop>0){
+    state.popDecayTick++;
+    if(state.popDecayTick >= 15){ state.pop = Math.max(0, state.pop-1); state.popDecayTick=0; addLog('Colonist lost to conditions!','danger'); }
+  } else state.popDecayTick = 0;
+
+  // Low resource warnings (once per 40 ticks to avoid spam)
+  if(t % 40 === 0){
+    if(state.energy <= 10) addLog('⚡ CRITICAL: No power! Build a Reactor!', 'danger');
+    else if(state.energy < state.energyMax * 0.15) addLog('⚠ Low energy!', 'warn');
+    if(state.o2 < state.o2Max * 0.15 && state.o2 > 0) addLog('⚠ O2 critically low! Build O2 Generator!', 'warn');
+    if(state.food < state.foodMax * 0.15 && state.food > 0) addLog('⚠ Food critically low! Build Bio-Farm!', 'warn');
+  }
+
+  // O2 zero death
+  if(state.o2 <= 0){ state.o2ZeroTicks++; if(state.o2ZeroTicks>=6){ endGame('O2 depleted — colony suffocated'); return; } }
+  else state.o2ZeroTicks = 0;
+  if(state.pop <= 0){ endGame('All colonists perished'); return; }
+
+  // Wave system
+  if(!state.waveActive){
+    state.waveTimer--;
+    // Sonar early warning: 3 seconds = 6 ticks before wave
+    if(state.waveTimer === 6 && state.buildings.some(b=>b.type==='sonar')){
+      addLog(`📡 Sonar: wave ${state.wave+1} detected — 3 seconds!`,'wave');
+    }
+    if(state.waveTimer <= 0){ startWave(); }
+  } else {
+    // Check wave complete
+    if(state.enemies.length === 0 && state.pendingSpawns === 0 && state.enemiesInWave > 0){
+      waveComplete();
+    }
+  }
+
+  // Enemy movement
+  state.enemies.forEach(e => {
+    if(e.dead) return;
+    e.moveCooldown = (e.moveCooldown||0) - 0.5;
+    if(e.moveCooldown > 0) return;
+    e.moveCooldown = e.speed;
+
+    // Ensure path
+    if(!e.path || e.pathIdx >= e.path.length){
+      e.path = bfsEnemy(Math.round(e.x/TS), Math.round(e.y/TS), 10, 7);
+      e.pathIdx = 0;
+    }
+
+    if(e.path && e.pathIdx < e.path.length){
+      const [tc, tr] = e.path[e.pathIdx];
+      const tx2 = tc*TS + TS/2, ty2 = tr*TS + TS/2;
+      e.x = tx2; e.y = ty2;
+      e.pathIdx++;
+    }
+
+    // Attack adjacent buildings
+    e.attackCooldown = (e.attackCooldown||0) - 0.5;
+    if(e.attackCooldown <= 0){
+      e.attackCooldown = e.attackRate;
+      const col = Math.round((e.x - TS/2)/TS);
+      const row = Math.round((e.y - TS/2)/TS);
+      // Attack building at current tile or adjacent
+      for(let dx=-1;dx<=1;dx++) for(let dy=-1;dy<=1;dy++){
+        const b = getBuildingAt(col+dx, row+dy);
+        if(b){
+          let dmg = e.damage;
+          if(hasTech('pressure_shields')) dmg *= 0.6;
+          b.hp -= dmg;
+          if(b.hp <= 0){
+            if(b.type==='hq'){ endGame('HQ destroyed!'); return; }
+            addLog(`${BDEFS[b.type].name} destroyed!`,'danger');
+            // refund half minerals
+            state.minerals += Math.floor(BDEFS[b.type].cost.min * 0.5);
+            removeBuilding(b.id);
+          }
+          break;
+        }
+      }
+    }
+  });
+  // Remove dead enemies
+  state.enemies = state.enemies.filter(e=>!e.dead);
+
+  // Turret logic
+  state.buildings.filter(b=>b.type==='turret').forEach(b => {
+    state.turretCooldowns[b.id] = (state.turretCooldowns[b.id]||0) - 0.5;
+    if(state.turretCooldowns[b.id] > 0) return;
+    const range = (hasTech('torpedo_sys') ? 4 : 3) * TS;
+    const bx = b.col*TS+TS/2, by = b.row*TS+TS/2;
+    let target = null, bestDist = Infinity;
+    state.enemies.forEach(e => {
+      const d = Math.hypot(e.x-bx, e.y-by);
+      if(d<=range && d<bestDist){ bestDist=d; target=e; }
+    });
+    if(target){
+      const dmg = hasTech('torpedo_sys') ? 30 : 15;
+      const rate = hasTech('sonar_grid') ? 1.2 : 1.5;
+      state.turretCooldowns[b.id] = rate * 2;
+      state.bullets.push({ x:bx, y:by, tx:target.x, ty:target.y, targetId:target.id, speed:8, damage:dmg, trail:[] });
+    }
+  });
+
+  // Bullet movement
+  state.bullets.forEach(bull => {
+    bull.trail.push({x:bull.x,y:bull.y});
+    if(bull.trail.length>5) bull.trail.shift();
+    const dx = bull.tx-bull.x, dy = bull.ty-bull.y;
+    const d = Math.hypot(dx,dy);
+    if(d < bull.speed+2){
+      // Hit
+      const e = state.enemies.find(e=>e.id===bull.targetId);
+      if(e && !e.dead){ e.hp -= bull.damage; if(e.hp<=0) killEnemy(e); }
+      bull.hit = true;
+    } else {
+      bull.x += (dx/d)*bull.speed;
+      bull.y += (dy/d)*bull.speed;
+      // Update target pos
+      const e = state.enemies.find(en=>en.id===bull.targetId);
+      if(e){ bull.tx=e.x; bull.ty=e.y; }
+    }
+  });
+  state.bullets = state.bullets.filter(b=>!b.hit);
+
+  // Dropped minerals collection (auto after 3s)
+  state.droppedMinerals.forEach(dm => dm.timer = (dm.timer||0)+1);
+  state.droppedMinerals.filter(dm=>dm.timer>=6).forEach(dm=>{ state.minerals+=dm.amount; });
+  state.droppedMinerals = state.droppedMinerals.filter(dm=>dm.timer<6);
+
+  // Ascension
+  if(ascensionActive){
+    ascensionTimer -= 0.5;
+    if(ascensionTimer <= 0){ state.gameWin=true; gameRunning=false; document.getElementById('game-win').style.display='flex'; addLog('ASCENSION DRIVE COMPLETE — YOU WIN!','good'); }
+  }
+
+  updateUI();
+}
+
+function calcEnergyCons(){
+  let e=0;
+  state.buildings.forEach(b => { const c=BDEFS[b.type].cons||{}; e+=(c.e||0); });
+  return e;
+}
+function calcEnergyProd(){
+  let e=0;
+  state.buildings.forEach(b => {
+    const p=BDEFS[b.type].prod||{};
+    if(b.type==='reactor') e+=(p.e||0)*(hasTech('fusion_reactor')?1.8:1);
+    if(b.type==='hq') e+=(p.e||0);
+  });
+  if(hasTech('hydro_tap')){
+    let vc=0; for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++) if(state.map[r][c]===TILE.VENT) vc++;
+    e+=vc*15;
+  }
+  return e;
+}
+
+function killEnemy(e){
+  e.dead = true;
+  e.hp = 0;
+  state.enemiesKilled++;
+  state.droppedMinerals.push({x:e.x, y:e.y, amount:e.reward, timer:0});
+  if(e.type==='leviathan') state.research += 50;
+}
+
+const ENEMY_TYPES = {
+  anglerfish: { name:'Anglerfish Scout', hp:60, speed:1.2*2, damage:8, attackRate:1.5*2, reward:15, color:'#8be', size:10 },
+  crab:       { name:'Giant Crab', hp:200, speed:2*2, damage:25, attackRate:2*2, reward:45, color:'#eb8', size:14 },
+  tentacle:   { name:'Kraken Tentacle', hp:120, speed:1.8*2, damage:15, attackRate:1.5*2, reward:35, color:'#a8f', size:12 },
+  leviathan:  { name:'Deep Leviathan', hp:600, speed:3*2, damage:60, attackRate:3*2, reward:200, color:'#f84', size:20 },
+};
+
+function startWave(){
+  state.wave++;
+  const w = state.wave;
+  const n = w;
+  const units = [];
+  for(let i=0;i<n*2;i++) units.push('anglerfish');
+  for(let i=0;i<n;i++) units.push('crab');
+  if(w>2) for(let i=0;i<n-1;i++) units.push('tentacle');
+  if(w%5===0) units.push('leviathan');
+
+  state.enemiesInWave = units.length;
+  state.enemiesKilled = 0;
+  state.pendingSpawns = units.length;
+  state.waveActive = true;
+
+  // Spawn with delay
+  units.forEach((type, idx) => {
+    setTimeout(()=>{
+      if(!gameRunning||state.gameOver) return;
+      spawnEnemy(type);
+      state.pendingSpawns--;
+    }, idx*1200);
+  });
+
+  const sonarBonus = state.buildings.some(b=>b.type==='sonar') ? ' (Sonar detected them!)' : '';
+  addLog(`⚠ WAVE ${w} — ${units.length} units incoming${sonarBonus}`, 'wave');
+  showWaveOverlay(`WAVE ${w} INCOMING\n${units.length} UNITS`);
+  document.getElementById('wave-num').textContent = w;
+}
+
+function spawnEnemy(type){
+  const def = ENEMY_TYPES[type];
+  // Pick random edge position
+  let col, row;
+  const side = rnd(0,3);
+  if(side===0){ col=rnd(0,COLS-1); row=0; }
+  else if(side===1){ col=rnd(0,COLS-1); row=ROWS-1; }
+  else if(side===2){ col=0; row=rnd(0,ROWS-1); }
+  else { col=COLS-1; row=rnd(0,ROWS-1); }
+
+  // Make sure spawn tile walkable
+  if(state.map[row][col]===TILE.ROCK){
+    for(let dx=-2;dx<=2;dx++) for(let dy=-2;dy<=2;dy++){
+      const nc=Math.max(0,Math.min(COLS-1,col+dx)), nr=Math.max(0,Math.min(ROWS-1,row+dy));
+      if(state.map[nr][nc]!==TILE.ROCK){ col=nc; row=nr; break; }
+    }
+  }
+
+  const e = {
+    id: state.nextEnemyId++,
+    type, ...JSON.parse(JSON.stringify(def)),
+    maxHp: def.hp,
+    x: col*TS+TS/2,
+    y: row*TS+TS/2,
+    path: null, pathIdx: 0,
+    moveCooldown: 0, attackCooldown: 0,
+    dead: false,
+  };
+  state.enemies.push(e);
+}
+
+function waveComplete(){
+  state.waveActive = false;
+  const bonus = 50 + state.wave*20;
+  state.minerals += bonus;
+  addLog(`Wave ${state.wave} complete! +${bonus} minerals`, 'good');
+  const nextInterval = Math.max(45, 120 - state.wave*5);
+  state.waveTimer = nextInterval*2;
+  document.getElementById('wave-timer').textContent = `${nextInterval}s`;
+  // Save
+  try{ localStorage.setItem('deepColonies_save', JSON.stringify({wave:state.wave, minerals:Math.floor(state.minerals), research:Math.floor(state.research)})); }catch(ex){}
+}
+
+function triggerDisaster(){
+  const disasters = ['crack','toxic','tremor','biolumin','thermal'];
+  const d = disasters[rnd(0,disasters.length-1)];
+  state.disasterActive = d;
+  let msg = '', duration = 0;
+  if(d==='crack'){
+    const blds = state.buildings.filter(b=>b.type!=='hq');
+    if(blds.length){ const b=blds[rnd(0,blds.length-1)]; b.hp=Math.max(1,b.hp*0.7); msg=`⚠ Pressure crack damaged ${BDEFS[b.type].name}!`; }
+    state.disasterActive = null; duration=0;
+  } else if(d==='toxic'){
+    msg='☠ Toxic current! O2 production -50% (20s)'; duration=40; effectOverlayMsg='TOXIC CURRENT';
+  } else if(d==='tremor'){
+    state.buildings.forEach(b=>{ b.hp=Math.max(1,b.hp-rnd(5,15)); });
+    msg='🌊 Seismic tremor! All buildings damaged.'; state.disasterActive=null; duration=0;
+  } else if(d==='biolumin'){
+    msg='🦑 Bioluminescent swarm! Food consumption ×2 (15s)'; duration=30; effectOverlayMsg='BIOLUMINESCENT SWARM';
+  } else if(d==='thermal'){
+    msg='🔥 Thermal surge! Energy consumption +80% (20s)'; duration=40; effectOverlayMsg='THERMAL SURGE';
+  }
+  if(msg) addLog(msg,'danger');
+  if(duration>0){ state.disasterTicks=duration; showEffectOverlay(effectOverlayMsg); }
+}
+
+function showWaveOverlay(text){
+  const el = document.getElementById('wave-overlay');
+  el.innerHTML = text.replace('\n','<br>');
+  el.style.display = 'block';
+  waveOverlayTimer = 180;
+}
+
+function showEffectOverlay(text){
+  const el = document.getElementById('effect-overlay');
+  el.textContent = '⚠ '+text;
+  el.style.display = 'block';
+}
+
+function endGame(reason){
+  state.gameOver = true;
+  gameRunning = false;
+  clearInterval(logicInterval);
+  document.getElementById('game-over').style.display = 'flex';
+  document.getElementById('go-reason').textContent = reason;
+  addLog('GAME OVER: '+reason,'danger');
+}
+
+const logEntries = [];
+function addLog(msg, type='info'){
+  logEntries.push({msg, type});
+  if(logEntries.length>50) logEntries.shift();
+  const el = document.getElementById('event-log');
+  el.innerHTML = logEntries.slice(-10).map(e=>`<div class="log-entry log-${e.type}">${e.msg}</div>`).join('');
+  el.scrollTop = el.scrollHeight;
+}
+
+function fmtDelta(d){ const v=d*2; return (v>=0?'+':'')+v.toFixed(1)+'/s'; }
+function deltaColor(d){ return d>0?'#0a9':'#f44'; }
+
+function updateUI(){
+  const s = state;
+  const d = s.deltas||{};
+
+  // Helpers for critical coloring
+  const o2Pct = s.o2/s.o2Max, energyPct = s.energy/s.energyMax, foodPct = s.food/s.foodMax;
+
+  document.getElementById('res-o2').innerHTML =
+    `${Math.floor(s.o2)}/${s.o2Max} <span style="color:${deltaColor(d.o2||0)};font-size:10px">${fmtDelta(d.o2||0)}</span>`;
+  document.getElementById('res-energy').innerHTML =
+    `${Math.floor(s.energy)}/${s.energyMax} <span style="color:${deltaColor(d.energy||0)};font-size:10px">${fmtDelta(d.energy||0)}</span>`;
+  document.getElementById('res-minerals').innerHTML =
+    `${Math.floor(s.minerals)} <span style="color:${deltaColor(d.minerals||0)};font-size:10px">${fmtDelta(d.minerals||0)}</span>`;
+  document.getElementById('res-food').innerHTML =
+    `${Math.floor(s.food)}/${s.foodMax} <span style="color:${deltaColor(d.food||0)};font-size:10px">${fmtDelta(d.food||0)}</span>`;
+  document.getElementById('res-research').textContent = Math.floor(s.research);
+  document.getElementById('res-pop').textContent = `${s.pop}/${s.popMax}`;
+
+  function setBar(id, pct){ const el=document.getElementById(id); el.style.width=(pct*100)+'%'; el.style.background=pct<0.2?'#f44':pct<0.4?'#fa0':''; }
+  setBar('bar-o2', o2Pct); setBar('bar-energy', energyPct); setBar('bar-food', foodPct);
+  document.getElementById('bar-pop').style.width = (s.pop/s.popMax*100)+'%';
+  const nextT = state.waveActive ? 'Active!' : Math.ceil(state.waveTimer/2)+'s';
+  document.getElementById('wave-timer').textContent = nextT;
+  updateTechUI();
+  if(ascensionActive){
+    const sec = Math.ceil(ascensionTimer/2);
+    document.getElementById('effect-overlay').style.display='block';
+    document.getElementById('effect-overlay').textContent = `✦ ASCENSION DRIVE CHARGING: ${sec}s`;
+    document.getElementById('effect-overlay').style.background = 'rgba(0,100,200,0.8)';
+  }
+}
+
+function updateTechUI(){
+  const tier1Done = TECHS.filter(t=>t.tier===1&&state.techDone.has(t.id)).length;
+  const tier2Done = TECHS.filter(t=>t.tier===2&&state.techDone.has(t.id)).length;
+  [1,2,3].forEach(tier=>{
+    const el = document.getElementById(`tech-tier${tier}`);
+    el.innerHTML = '';
+    TECHS.filter(t=>t.tier===tier).forEach(tech=>{
+      const done = state.techDone.has(tech.id);
+      const req1Done = tech.req.length===0 || tech.req.filter(r=>state.techDone.has(r)).length>=2||
+                       (tech.req.length===1&&state.techDone.has(tech.req[0]))||
+                       tech.req.every(r=>state.techDone.has(r));
+      // More precise: require all listed prereqs
+      const reqMet = tech.req.every(r=>state.techDone.has(r));
+      const tierReq = tier===1 ? true : tier===2 ? tier1Done>=2 : tier2Done>=2;
+      const canAfford = state.research >= tech.cost;
+      const avail = !done && reqMet && tierReq;
+      const btn = document.createElement('div');
+      btn.className = 'tech-btn' + (done?' done':avail&&canAfford?' available':avail?' available':' locked');
+      btn.title = `${tech.name}\n${tech.desc}\nCost: ${tech.cost} research${tech.req.length?'\nReq: '+tech.req.join(', '):''}`;
+      btn.innerHTML = `<div>${tech.name}</div><div style="color:#567">${tech.cost}🔬</div>`;
+      if(done) btn.innerHTML += '<div style="color:#0d0">✓</div>';
+      if(!done && avail){
+        btn.onclick = ()=>{ if(state.research>=tech.cost){ state.research-=tech.cost; state.techDone.add(tech.id);
+          addLog(`Tech unlocked: ${tech.name}`,'good');
+          // Apply HP bonus
+          if(tech.id==='reinf_hulls') state.buildings.forEach(b=>{ b.maxHp*=1.8; b.hp=Math.min(b.maxHp,b.hp*1.8); });
+          // Ascension
+          if(tech.id==='ascension'){ ascensionActive=true; ascensionTimer=120; addLog('ASCENSION DRIVE ACTIVATED — 60 seconds to WIN!','good'); }
+          updateTechUI();
+        } else addLog('Not enough research!','warn'); };
+      }
+      el.appendChild(btn);
+    });
+  });
+}
+
+// ==================== RENDERING ====================
+function createBubble(){ return {x:rnd(0,720),y:rnd(0,504),r:rnd(1,4),speed:rndF(0.2,0.8),opacity:rndF(0.2,0.6)}; }
+function createFish(){ return {x:rnd(-100,-20),y:rnd(20,490),speed:rndF(0.5,1.5),dir:1,frame:0}; }
+
+function renderLoop(ts){
+  if(!gameRunning && !state) { animFrame=requestAnimationFrame(renderLoop); return; }
+  render(ts);
+  animFrame = requestAnimationFrame(renderLoop);
+}
+
+let lastRender = 0;
+function render(ts){
+  const dt = ts - lastRender; lastRender=ts;
+  ctx.clearRect(0,0,720,504);
+
+  // Background
+  ctx.fillStyle='#001428';
+  ctx.fillRect(0,0,720,504);
+
+  // Draw tiles
+  for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++){
+    const t = state.map[r][c];
+    const x=c*TS, y=r*TS;
+    ctx.fillStyle = TILE_COLORS[t];
+    ctx.fillRect(x,y,TS,TS);
+
+    // Tile details
+    if(t===TILE.MINERAL){
+      ctx.fillStyle = 'rgba(0,200,150,0.25)';
+      ctx.fillRect(x,y,TS,TS);
+      // Sparkles
+      ctx.fillStyle='rgba(100,255,200,0.6)';
+      for(let i=0;i<3;i++){
+        const sx=x+6+i*10, sy=y+8+(i%2)*12;
+        ctx.fillRect(sx,sy,2,2);
+      }
+    }
+    if(t===TILE.VENT){
+      const glow = ctx.createRadialGradient(x+TS/2,y+TS/2,2,x+TS/2,y+TS/2,TS/2);
+      glow.addColorStop(0,'rgba(255,120,0,0.5)');
+      glow.addColorStop(1,'transparent');
+      ctx.fillStyle=glow;
+      ctx.fillRect(x,y,TS,TS);
+    }
+
+    // Grid lines
+    ctx.strokeStyle='rgba(0,60,100,0.3)';
+    ctx.lineWidth=0.5;
+    ctx.strokeRect(x,y,TS,TS);
+  }
+
+  // Selected tile
+  if(selectedTile){
+    ctx.strokeStyle='rgba(255,220,0,0.8)';
+    ctx.lineWidth=2;
+    ctx.strokeRect(selectedTile.c*TS+1,selectedTile.r*TS+1,TS-2,TS-2);
+  }
+
+  // Build mode highlight
+  if(buildMode && buildMode!=='demolish'){
+    const mx = Math.floor(lastMouseX/TS), my = Math.floor(lastMouseY/TS);
+    if(mx>=0&&mx<COLS&&my>=0&&my<ROWS){
+      const can = isTileBuildable(mx,my);
+      ctx.fillStyle = can ? 'rgba(0,200,100,0.25)' : 'rgba(200,0,0,0.25)';
+      ctx.fillRect(mx*TS,my*TS,TS,TS);
+      ctx.strokeStyle = can ? '#0f8' : '#f44';
+      ctx.lineWidth=2;
+      ctx.strokeRect(mx*TS+1,my*TS+1,TS-2,TS-2);
+    }
+  }
+
+  // Ambient fish
+  ambientFish.forEach(f=>{
+    f.x += f.speed * f.dir;
+    if(f.x > 780) Object.assign(f, createFish());
+    ctx.fillStyle='rgba(100,180,200,0.4)';
+    ctx.beginPath();
+    ctx.ellipse(f.x,f.y,8*f.dir,4,0,0,Math.PI*2);
+    ctx.fill();
+    // Tail
+    ctx.fillStyle='rgba(100,180,200,0.3)';
+    ctx.beginPath();
+    ctx.moveTo(f.x-8*f.dir,f.y);
+    ctx.lineTo(f.x-14*f.dir,f.y-4);
+    ctx.lineTo(f.x-14*f.dir,f.y+4);
+    ctx.closePath();
+    ctx.fill();
+  });
+
+  // Bubbles
+  bubbles.forEach(b=>{
+    b.y -= b.speed;
+    if(b.y < -10) Object.assign(b, createBubble(), {y:510});
+    ctx.strokeStyle=`rgba(100,200,255,${b.opacity})`;
+    ctx.lineWidth=1;
+    ctx.beginPath();
+    ctx.arc(b.x,b.y,b.r,0,Math.PI*2);
+    ctx.stroke();
+  });
+
+  // Buildings
+  state.buildings.forEach(b=>{
+    const x=b.col*TS, y=b.row*TS;
+    const def = BDEFS[b.type];
+    const hpPct = b.hp/b.maxHp;
+
+    // Shadow
+    ctx.fillStyle='rgba(0,0,0,0.3)';
+    ctx.fillRect(x+3,y+3,TS-2,TS-2);
+
+    // Base
+    let color = '#1a4a6a';
+    if(b.type==='hq') color='#1a6a4a';
+    else if(b.type==='reactor') color='#4a3a0a';
+    else if(b.type==='turret') color='#4a1a1a';
+    else if(b.type==='lab') color='#2a1a4a';
+    ctx.fillStyle=color;
+    ctx.fillRect(x+1,y+1,TS-2,TS-2);
+
+    // HQ pulsing glow
+    if(b.type==='hq'){
+      b.glowPhase += 0.05;
+      const g=Math.sin(b.glowPhase)*0.3+0.5;
+      const grd=ctx.createRadialGradient(x+TS/2,y+TS/2,2,x+TS/2,y+TS/2,TS);
+      grd.addColorStop(0,`rgba(0,200,150,${g*0.4})`);
+      grd.addColorStop(1,'transparent');
+      ctx.fillStyle=grd;
+      ctx.fillRect(x-TS/2,y-TS/2,TS*2,TS*2);
+    }
+
+    // Border
+    ctx.strokeStyle = b.type==='hq' ? '#0f8' : '#0a9396';
+    ctx.lineWidth=1.5;
+    ctx.strokeRect(x+1,y+1,TS-2,TS-2);
+
+    // HP indicator (damage crack)
+    if(hpPct<0.5){
+      ctx.strokeStyle=`rgba(255,${Math.floor(hpPct*255)},0,0.7)`;
+      ctx.lineWidth=1;
+      ctx.beginPath();
+      ctx.moveTo(x+4,y+4);
+      ctx.lineTo(x+TS-4,y+TS-4);
+      ctx.stroke();
+    }
+
+    // Icon
+    ctx.font = `${TS*0.45}px serif`;
+    ctx.textAlign='center';
+    ctx.textBaseline='middle';
+    ctx.fillStyle='#fff';
+    ctx.fillText(def.icon, x+TS/2, y+TS/2);
+
+    // HP bar
+    if(hpPct < 1){
+      ctx.fillStyle='#300';
+      ctx.fillRect(x+2,y+TS-6,TS-4,4);
+      ctx.fillStyle = hpPct>0.5?'#0a0':hpPct>0.25?'#aa0':'#a00';
+      ctx.fillRect(x+2,y+TS-6,(TS-4)*hpPct,4);
+    }
+  });
+
+  // Enemies
+  state.enemies.forEach(e=>{
+    if(e.dead) return;
+    const hpPct = e.hp/e.maxHp;
+
+    // Body
+    ctx.fillStyle=e.color;
+    ctx.beginPath();
+    ctx.arc(e.x,e.y,e.size,0,Math.PI*2);
+    ctx.fill();
+
+    // Dark outline
+    ctx.strokeStyle='rgba(0,0,0,0.6)';
+    ctx.lineWidth=1.5;
+    ctx.stroke();
+
+    // Eyes
+    if(e.type==='anglerfish'){
+      ctx.fillStyle='#fff';
+      ctx.beginPath(); ctx.arc(e.x+4,e.y-3,3,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#000';
+      ctx.beginPath(); ctx.arc(e.x+5,e.y-3,1.5,0,Math.PI*2); ctx.fill();
+      // Lure
+      ctx.strokeStyle='#fd0'; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.moveTo(e.x,e.y-e.size); ctx.lineTo(e.x+3,e.y-e.size-8); ctx.stroke();
+      ctx.fillStyle='rgba(255,200,0,0.8)';
+      ctx.beginPath(); ctx.arc(e.x+3,e.y-e.size-8,2,0,Math.PI*2); ctx.fill();
+    } else if(e.type==='leviathan'){
+      // Tentacles
+      for(let i=0;i<4;i++){
+        const ang = (i/4)*Math.PI*2 + state.tick*0.1;
+        ctx.strokeStyle=`rgba(255,140,0,0.6)`;
+        ctx.lineWidth=3;
+        ctx.beginPath();
+        ctx.moveTo(e.x,e.y);
+        ctx.lineTo(e.x+Math.cos(ang)*(e.size+8), e.y+Math.sin(ang)*(e.size+8));
+        ctx.stroke();
+      }
+    }
+
+    // HP bar
+    const bw=e.size*2+4;
+    ctx.fillStyle='#300';
+    ctx.fillRect(e.x-bw/2,e.y-e.size-8,bw,4);
+    ctx.fillStyle=hpPct>0.5?'#0a0':hpPct>0.25?'#aa0':'#a00';
+    ctx.fillRect(e.x-bw/2,e.y-e.size-8,bw*hpPct,4);
+  });
+
+  // Bullets
+  state.bullets.forEach(bull=>{
+    bull.trail.forEach((tp,i)=>{
+      const a=(i+1)/bull.trail.length*0.5;
+      ctx.fillStyle=`rgba(255,255,0,${a})`;
+      ctx.beginPath();
+      ctx.arc(tp.x,tp.y,2*(i+1)/bull.trail.length,0,Math.PI*2);
+      ctx.fill();
+    });
+    ctx.fillStyle='#ff0';
+    ctx.beginPath();
+    ctx.arc(bull.x,bull.y,3,0,Math.PI*2);
+    ctx.fill();
+    // Glow
+    const grd=ctx.createRadialGradient(bull.x,bull.y,0,bull.x,bull.y,8);
+    grd.addColorStop(0,'rgba(255,255,100,0.4)');
+    grd.addColorStop(1,'transparent');
+    ctx.fillStyle=grd;
+    ctx.beginPath(); ctx.arc(bull.x,bull.y,8,0,Math.PI*2); ctx.fill();
+  });
+
+  // Dropped minerals
+  state.droppedMinerals.forEach(dm=>{
+    ctx.fillStyle='rgba(100,200,100,0.7)';
+    ctx.beginPath();
+    ctx.arc(dm.x, dm.y, 4, 0, Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle='#fff';
+    ctx.font='8px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText('+'+dm.amount, dm.x, dm.y-8);
+  });
+
+  // Wave countdown bar
+  if(!state.waveActive && state.waveTimer>0){
+    const totalT = Math.max(45, 120-state.wave*5)*2;
+    const pct = state.waveTimer / totalT;
+    ctx.fillStyle='rgba(0,0,0,0.5)';
+    ctx.fillRect(0,0,720,6);
+    const barColor = pct>0.5?'#0a9':'#f84';
+    ctx.fillStyle=barColor;
+    ctx.fillRect(0,0,720*pct,6);
+    ctx.fillStyle='rgba(255,255,255,0.5)';
+    ctx.font='9px monospace'; ctx.textAlign='center'; ctx.textBaseline='top';
+    ctx.fillText(`Next wave in ${Math.ceil(state.waveTimer/2)}s`,360,8);
+  }
+
+  // Wave overlay fade
+  if(waveOverlayTimer>0){
+    waveOverlayTimer--;
+    if(waveOverlayTimer<=0) document.getElementById('wave-overlay').style.display='none';
+  }
+
+  // Selected tile info
+  if(selectedTile){
+    const b = getBuildingAt(selectedTile.c, selectedTile.r);
+    const t = state.map[selectedTile.r][selectedTile.c];
+    let info = `Tile [${selectedTile.c},${selectedTile.r}]: ${TILE_NAMES[t]}`;
+    if(b){
+      const def=BDEFS[b.type];
+      info += ` | ${def.name} HP:${Math.floor(b.hp)}/${Math.floor(b.maxHp)}`;
+      if(b.type==='turret') info += ` | Turret range:${hasTech('torpedo_sys')?4:3}`;
+    }
+    document.getElementById('selected-info').innerHTML = `<span>${info}</span>`;
+  }
+}
+
+// ==================== INPUT ====================
+let lastMouseX=0, lastMouseY=0;
+canvas.addEventListener('mousemove', e=>{
+  const rect = canvas.getBoundingClientRect();
+  lastMouseX = e.clientX - rect.left;
+  lastMouseY = e.clientY - rect.top;
+});
+
+canvas.addEventListener('click', e=>{
+  if(!gameRunning||state.gameOver) return;
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+  const col = Math.floor(mx/TS), row = Math.floor(my/TS);
+  if(col<0||col>=COLS||row<0||row>=ROWS) return;
+
+  if(buildMode==='demolish'){
+    const b = getBuildingAt(col,row);
+    if(b && b.type!=='hq'){
+      const def=BDEFS[b.type];
+      state.minerals += Math.floor(def.cost.min*0.5);
+      addLog(`Demolished ${def.name}, refunded ${Math.floor(def.cost.min*0.5)} minerals`,'info');
+      removeBuilding(b.id);
+      buildMode=null;
+      document.querySelectorAll('.build-btn').forEach(b=>b.classList.remove('active'));
+    } else if(b && b.type==='hq'){
+      addLog('Cannot demolish HQ!','warn');
+    }
+    return;
+  }
+
+  if(buildMode && buildMode!=='demolish'){
+    // Try to place
+    if(!isTileBuildable(col,row)){
+      addLog('Cannot build here!','warn'); return;
+    }
+    const def=BDEFS[buildMode];
+    if(!def) return;
+    if(state.minerals < def.cost.min){ addLog(`Not enough minerals! Need ${def.cost.min}`,'warn'); return; }
+    if(def.cost.e && state.energy < def.cost.e){ addLog(`Not enough energy! Need ${def.cost.e}`,'warn'); return; }
+    state.minerals -= def.cost.min;
+    if(def.cost.e) state.energy -= def.cost.e;
+    const b = placeBuilding(buildMode, col, row);
+    // Apply hull tech
+    if(hasTech('reinf_hulls')){ b.maxHp *= 1.8; b.hp = b.maxHp; }
+    addLog(`Built ${def.name} at [${col},${row}]`,'good');
+    // Recalc enemy paths
+    state.enemies.forEach(en=>{ en.path=null; en.pathIdx=0; });
+    return;
+  }
+
+  // Select tile
+  selectedTile = {c:col, r:row};
+});
+
+canvas.addEventListener('contextmenu', e=>{
+  e.preventDefault();
+  buildMode = null;
+  document.querySelectorAll('.build-btn').forEach(b=>b.classList.remove('active'));
+});
+
+document.querySelectorAll('.build-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    const type = btn.dataset.type;
+    if(buildMode===type){ buildMode=null; btn.classList.remove('active'); return; }
+    buildMode=type;
+    document.querySelectorAll('.build-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+  });
+  btn.addEventListener('mouseenter', e=>{
+    const type = btn.dataset.type;
+    if(type==='demolish') return;
+    const def=BDEFS[type];
+    if(!def) return;
+    const prod=Object.entries(def.prod||{}).map(([k,v])=>`+${v} ${k}`).join(', ')||'—';
+    const cons=Object.entries(def.cons||{}).map(([k,v])=>v?`-${v} ${k}`:'').filter(Boolean).join(', ')||'—';
+    showTooltip(e, `<b>${def.name}</b><br>Cost: ${def.cost.min}min${def.cost.e?'+'+def.cost.e+'e':''}<br>HP: ${def.hp}<br>Produces: ${prod}<br>Consumes: ${cons}${def.popMax?`<br>+${def.popMax} pop cap`:''}`);
+  });
+  btn.addEventListener('mouseleave', hideTooltip);
+});
+
+const tooltip = document.getElementById('tooltip');
+function showTooltip(e, html){
+  tooltip.innerHTML = html;
+  tooltip.style.display = 'block';
+  tooltip.style.left = (e.clientX+12)+'px';
+  tooltip.style.top = (e.clientY-10)+'px';
+}
+function hideTooltip(){ tooltip.style.display='none'; }
+
+// Start game
+initGame();
+</script>
+</body>
+</html>
