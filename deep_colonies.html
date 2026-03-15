@@ -312,9 +312,9 @@ const BDEFS = {
   hq:     { name:'Штаб', icon:'⚓', hp:500, cost:{min:0,e:0}, prod:{e:8,o2:5}, cons:{e:0}, popMax:0, buildable:false },
   dome:   { name:'Жилой купол', icon:'🏠', hp:200, cost:{min:100,e:30}, prod:{}, cons:{e:1}, popMax:15 },
   reactor:{ name:'Реактор', icon:'⚡', hp:150, cost:{min:150,e:0}, prod:{e:25}, cons:{e:0} },
-  o2gen:  { name:'Генератор O2', icon:'💧', hp:150, cost:{min:120,e:20}, prod:{o2:20}, cons:{e:4} },
-  mine:   { name:'Буровая шахта', icon:'⛏', hp:120, cost:{min:80,e:0}, prod:{min:12}, cons:{e:3} },
-  farm:   { name:'Биоферма', icon:'🌿', hp:130, cost:{min:100,e:20}, prod:{food:18}, cons:{e:3} },
+  o2gen:  { name:'Генератор O2', icon:'💧', hp:150, cost:{min:120,e:20}, prod:{o2:16}, cons:{e:4} },
+  mine:   { name:'Буровая шахта', icon:'⛏', hp:120, cost:{min:80,e:0}, prod:{min:7}, cons:{e:3} },
+  farm:   { name:'Биоферма', icon:'🌿', hp:130, cost:{min:100,e:20}, prod:{food:14}, cons:{e:3} },
   lab:    { name:'Лаборатория', icon:'🔬', hp:100, cost:{min:200,e:40}, prod:{res:8}, cons:{e:5} },
   turret: { name:'Боевая турель', icon:'🔫', hp:200, cost:{min:150,e:30}, prod:{}, cons:{e:2} },
   sonar:  { name:'Сонар-массив', icon:'📡', hp:80, cost:{min:100,e:20}, prod:{}, cons:{e:2} },
@@ -371,14 +371,14 @@ function initGame() {
     droppedMinerals: [],
     tick: 0,
     wave: 0,
-    waveTimer: 120*2,
+    waveTimer: 90*2,
     waveActive: false,
     enemiesInWave: 0,
     enemiesKilled: 0,
     o2: 500, o2Max: 1000,
     energy: 200, energyMax: 600,
-    minerals: 600,
-    food: 450, foodMax: 600,
+    minerals: 300,
+    food: 400, foodMax: 600,
     deltas: {o2:0, energy:0, minerals:0, food:0},
     research: 0,
     pop: 12, popMax: 20,
@@ -576,8 +576,8 @@ function gameTick(){
   // Hydrothermal tap energy already in calcEnergyProd / dE, no double-add needed
 
   // Pop consumption
-  dO2 -= state.pop * 0.5;
-  dFood -= state.pop * 0.3 * (disasterBio ? 2 : 1);
+  dO2 -= state.pop * 0.6;
+  dFood -= state.pop * 0.35 * (disasterBio ? 2 : 1);
 
   // Save deltas for UI display (smooth with previous)
   state.deltas.o2 = dO2;
@@ -780,10 +780,12 @@ function startWave(){
   const w = state.wave;
   const n = w;
   const units = [];
-  for(let i=0;i<n*2;i++) units.push('anglerfish');
-  for(let i=0;i<n;i++) units.push('crab');
-  if(w>2) for(let i=0;i<n-1;i++) units.push('tentacle');
-  if(w%5===0) units.push('leviathan');
+  const nAngler = Math.min(n*3, 24);
+  const nCrab   = Math.min(n*2, 12);
+  for(let i=0;i<nAngler;i++) units.push('anglerfish');
+  for(let i=0;i<nCrab;i++) units.push('crab');
+  if(w>1){ const nTent=Math.min(n, 10); for(let i=0;i<nTent;i++) units.push('tentacle'); }
+  if(w%4===0) units.push('leviathan');
 
   state.enemiesInWave = units.length;
   state.enemiesKilled = 0;
@@ -796,7 +798,7 @@ function startWave(){
       if(!gameRunning||state.gameOver) return;
       spawnEnemy(type);
       state.pendingSpawns--;
-    }, idx*1200);
+    }, idx*800);
   });
 
   const sonarBonus = state.buildings.some(b=>b.type==='sonar') ? ' (сонар засёк врагов!)' : '';
@@ -823,10 +825,19 @@ function spawnEnemy(type){
     }
   }
 
+  // Scale enemy stats with wave: +10% HP/dmg and +4% speed per wave
+  const wScale = 1 + (state.wave - 1) * 0.10;
+  const sScale = 1 + (state.wave - 1) * 0.04;
+  const scaledHp  = Math.round(def.hp  * wScale);
+  const scaledDmg = Math.round(def.damage * wScale);
   const e = {
     id: state.nextEnemyId++,
-    type, ...JSON.parse(JSON.stringify(def)),
-    maxHp: def.hp,
+    type,
+    name: def.name, color: def.color, size: def.size,
+    reward: def.reward, attackRate: def.attackRate,
+    hp: scaledHp, maxHp: scaledHp,
+    speed: def.speed * sScale,
+    damage: scaledDmg,
     x: col*TS+TS/2,
     y: row*TS+TS/2,
     path: null, pathIdx: 0,
@@ -838,12 +849,12 @@ function spawnEnemy(type){
 
 function waveComplete(){
   state.waveActive = false;
-  const bonus = 50 + state.wave*20;
+  const bonus = 30 + state.wave*12;
   state.minerals += bonus;
   addLog(`Волна ${state.wave} отражена! +${bonus} минералов`, 'good');
-  const nextInterval = Math.max(45, 120 - state.wave*5);
+  const nextInterval = Math.max(35, 80 - state.wave*5);
   state.waveTimer = nextInterval*2;
-  document.getElementById('wave-timer').textContent = `${nextInterval}s`;
+  document.getElementById('wave-timer').textContent = `${nextInterval}с`;
   // Save
   try{ localStorage.setItem('deepColonies_save', JSON.stringify({wave:state.wave, minerals:Math.floor(state.minerals), research:Math.floor(state.research)})); }catch(ex){}
 }
