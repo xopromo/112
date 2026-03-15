@@ -828,6 +828,16 @@ function renderResults() {
   renderVisibleResults();
   $('mass-rob-bar').style.display = results.length > 0 ? 'flex' : 'none';
   $('mass-rob-info').textContent = `${results.length} результатов`;
+  // Safety net: если после рендера есть результаты без OOS — пересчитать в фоне
+  if (typeof window._batchOOS === 'function') {
+    const _pendingOOS = results.filter(r => r.cfg && r.cfg._oos === undefined);
+    if (_pendingOOS.length > 0) {
+      setTimeout(async () => {
+        await window._batchOOS();
+        applyFilters(); // перерисовать таблицу с заполненными TV колонками
+      }, 50);
+    }
+  }
 }
 
 // --- Пагинация ---

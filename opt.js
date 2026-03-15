@@ -2013,7 +2013,8 @@ async function runOpt() {
         if (oi % 50 === 0) { await yieldToUI(); }
       }
     }
-    await _batchCPCV(results, 200);
+    results.sort((a,b)=>b.pdd-a.pdd);
+    try { await _batchCPCV(results, 200); } catch(_cpcvErr) { console.error('[MC _batchCPCV]', _cpcvErr); }
     if (typeof setMcPhase === 'function') setMcPhase(null);
     renderResults(); showBestStats(); updateETA(done, mcTotal, results.length);
     $('prog').textContent = '✅ ' + fmtNum(results.length) + ' / ' + fmtNum(done) + ' прошли фильтр';
@@ -2547,7 +2548,7 @@ async function runOpt() {
       }
     }
     results.sort((a,b)=>b.pdd-a.pdd);
-    await _batchCPCV(results, 200);
+    try { await _batchCPCV(results, 200); } catch(_cpcvErr) { console.error('[TPE _batchCPCV]', _cpcvErr); }
     if (typeof setMcPhase==='function') setMcPhase(null);
     renderResults(); showBestStats(); updateETA(done, _tpeMaxIter, results.length);
     const _tpeStopReason = results.length >= _tpeTarget ? `✅ цель ${_tpeTarget} достигнута` : `✅ бюджет ${_tpeMaxIter} итераций исчерпан`;
@@ -3030,7 +3031,7 @@ async function runOpt() {
     }
   }
   results.sort((a,b)=>b.pdd-a.pdd);
-  await _batchCPCV(results, 200);
+  try { await _batchCPCV(results, 200); } catch(_cpcvErr) { console.error('[Exhaustive _batchCPCV]', _cpcvErr); }
   if (typeof setMcPhase === 'function') setMcPhase(null);
   _curPage = 0;
   renderResults();
