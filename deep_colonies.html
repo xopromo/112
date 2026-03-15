@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>DEEP COLONIES — Abyssal Throne</title>
+<title>ГЛУБОКИЕ КОЛОНИИ — Абиссальный Трон</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
@@ -69,12 +69,12 @@ body {
   border-radius: 3px;
 }
 #sidebar {
-  width: 320px;
+  width: 360px;
   background: #001e3c;
   border-left: 1px solid #0a9396;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow-y: auto;
   flex-shrink: 0;
 }
 .sidebar-section {
@@ -129,32 +129,34 @@ body {
 .build-btn.demolish:hover { background: #c44; color: #fff; }
 .build-btn.demolish.active { background: #c44; color: #fff; }
 #tech-section {
-  flex: 1;
-  overflow-y: auto;
   padding: 8px;
   border-bottom: 1px solid #0a9396;
 }
 #tech-section h3 { color: #0a9396; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 6px; }
 .tech-tier { margin-bottom: 6px; }
 .tech-tier-label { color: #567; font-size: 10px; margin-bottom: 3px; }
-.tech-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; }
+.tech-grid { display: grid; grid-template-columns: 1fr; gap: 3px; }
 .tech-btn {
   background: #001428;
   border: 1px solid #345;
   color: #678;
-  padding: 4px;
-  font-size: 9px;
+  padding: 5px 8px;
+  font-size: 10px;
   cursor: pointer;
-  text-align: center;
+  text-align: left;
   border-radius: 2px;
   transition: all 0.15s;
-  line-height: 1.2;
+  line-height: 1.3;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 4px;
 }
 .tech-btn:hover:not(.locked):not(.done) { background: #024; border-color: #0a9396; color: #94d2bd; }
 .tech-btn.available { border-color: #0a9396; color: #94d2bd; }
 .tech-btn.done { background: #012820; border-color: #0a5; color: #0d0; }
 .tech-btn.locked { opacity: 0.4; cursor: not-allowed; }
-#log-section { height: 130px; padding: 6px; overflow-y: auto; flex-shrink: 0; }
+#log-section { padding: 6px; flex-shrink: 0; }
 #log-section h3 { color: #0a9396; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 4px; }
 .log-entry { font-size: 10px; margin-bottom: 2px; padding: 1px 0; }
 .log-info { color: #678; }
@@ -205,9 +207,9 @@ body {
 </head>
 <body>
 <div id="header">
-  <h1>⚓ DEEP COLONIES — Abyssal Throne</h1>
-  <div id="wave-info">Wave: <span id="wave-num">0</span> | Next wave: <span id="wave-timer">120s</span></div>
-  <div id="wave-info" style="margin-left:auto;color:#567;">Click tiles to build • Right-click to cancel</div>
+  <h1>⚓ ГЛУБОКИЕ КОЛОНИИ — Абиссальный Трон</h1>
+  <div id="wave-info">Волна: <span id="wave-num">0</span> | До волны: <span id="wave-timer">120с</span></div>
+  <div id="wave-info" style="margin-left:auto;color:#567;">Клик — постройка • ПКМ — отмена режима</div>
 </div>
 <div id="main">
   <div id="canvas-container">
@@ -217,84 +219,84 @@ body {
   </div>
   <div id="sidebar">
     <div class="sidebar-section" id="res-section">
-      <h3>Resources</h3>
+      <h3>Ресурсы</h3>
       <div id="resources-grid">
         <div class="res-item">
-          <div class="res-label">💧 O2</div>
+          <div class="res-label">💧 Кислород</div>
           <div class="res-val" id="res-o2">500/1000</div>
           <div class="res-bar"><div class="res-bar-fill bar-o2" id="bar-o2" style="width:50%"></div></div>
         </div>
         <div class="res-item">
-          <div class="res-label">⚡ Energy</div>
+          <div class="res-label">⚡ Энергия</div>
           <div class="res-val" id="res-energy">200/600</div>
           <div class="res-bar"><div class="res-bar-fill bar-energy" id="bar-energy" style="width:33%"></div></div>
         </div>
         <div class="res-item">
-          <div class="res-label">🪨 Minerals</div>
+          <div class="res-label">🪨 Минералы</div>
           <div class="res-val" id="res-minerals">500</div>
         </div>
         <div class="res-item">
-          <div class="res-label">🐟 Food</div>
+          <div class="res-label">🐟 Еда</div>
           <div class="res-val" id="res-food">300/600</div>
           <div class="res-bar"><div class="res-bar-fill bar-food" id="bar-food" style="width:50%"></div></div>
         </div>
         <div class="res-item">
-          <div class="res-label">🔬 Research</div>
+          <div class="res-label">🔬 Наука</div>
           <div class="res-val" id="res-research">0</div>
         </div>
         <div class="res-item">
-          <div class="res-label">👥 Population</div>
+          <div class="res-label">👥 Население</div>
           <div class="res-val" id="res-pop">12/20</div>
           <div class="res-bar"><div class="res-bar-fill bar-pop" id="bar-pop" style="width:60%"></div></div>
         </div>
       </div>
     </div>
     <div class="sidebar-section">
-      <h3>Build</h3>
+      <h3>Постройки</h3>
       <div id="build-grid">
-        <div class="build-btn" data-type="dome" title="Habitat Dome">🏠<br>Dome<br><span style="color:#567">100m+30e</span></div>
-        <div class="build-btn" data-type="reactor" title="Reactor">⚡<br>Reactor<br><span style="color:#567">150m</span></div>
-        <div class="build-btn" data-type="o2gen" title="O2 Generator">💧<br>O2 Gen<br><span style="color:#567">120m+20e</span></div>
-        <div class="build-btn" data-type="mine" title="Mining Drill">⛏<br>Mine<br><span style="color:#567">80m</span></div>
-        <div class="build-btn" data-type="farm" title="Bio-Farm">🌿<br>Farm<br><span style="color:#567">100m+20e</span></div>
-        <div class="build-btn" data-type="lab" title="Research Lab">🔬<br>Lab<br><span style="color:#567">200m+40e</span></div>
-        <div class="build-btn" data-type="turret" title="Defense Turret">🔫<br>Turret<br><span style="color:#567">150m+30e</span></div>
-        <div class="build-btn" data-type="sonar" title="Sonar Array">📡<br>Sonar<br><span style="color:#567">100m+20e</span></div>
-        <div class="build-btn demolish" data-type="demolish">🗑<br>Demo<br><span style="color:#c44">+50%</span></div>
+        <div class="build-btn" data-type="dome" title="Жилой купол">🏠<br>Купол<br><span style="color:#567">100м+30э</span></div>
+        <div class="build-btn" data-type="reactor" title="Реактор">⚡<br>Реактор<br><span style="color:#567">150м</span></div>
+        <div class="build-btn" data-type="o2gen" title="Генератор O2">💧<br>Генер.<br><span style="color:#567">120м+20э</span></div>
+        <div class="build-btn" data-type="mine" title="Буровая шахта">⛏<br>Шахта<br><span style="color:#567">80м</span></div>
+        <div class="build-btn" data-type="farm" title="Биоферма">🌿<br>Ферма<br><span style="color:#567">100м+20э</span></div>
+        <div class="build-btn" data-type="lab" title="Лаборатория">🔬<br>Лаборат.<br><span style="color:#567">200м+40э</span></div>
+        <div class="build-btn" data-type="turret" title="Боевая турель">🔫<br>Турель<br><span style="color:#567">150м+30э</span></div>
+        <div class="build-btn" data-type="sonar" title="Сонар-массив">📡<br>Сонар<br><span style="color:#567">100м+20э</span></div>
+        <div class="build-btn demolish" data-type="demolish">🗑<br>Снос<br><span style="color:#c44">возврат 50%</span></div>
       </div>
     </div>
-    <div id="selected-info">Click a tile to see info</div>
+    <div id="selected-info">Кликни по тайлу для информации</div>
     <div id="tech-section">
-      <h3>Technology</h3>
+      <h3>Технологии</h3>
       <div class="tech-tier">
-        <div class="tech-tier-label">— TIER 1 (25 research) —</div>
+        <div class="tech-tier-label">— УРОВЕНЬ 1 (25 науки) —</div>
         <div class="tech-grid" id="tech-tier1"></div>
       </div>
       <div class="tech-tier">
-        <div class="tech-tier-label">— TIER 2 (75 research, req 2×T1) —</div>
+        <div class="tech-tier-label">— УРОВЕНЬ 2 (75 науки, нужно 2×У1) —</div>
         <div class="tech-grid" id="tech-tier2"></div>
       </div>
       <div class="tech-tier">
-        <div class="tech-tier-label">— TIER 3 (150 research, req 2×T2) —</div>
+        <div class="tech-tier-label">— УРОВЕНЬ 3 (150 науки, нужно 2×У2) —</div>
         <div class="tech-grid" id="tech-tier3"></div>
       </div>
     </div>
     <div class="sidebar-section" id="log-section">
-      <h3>Event Log</h3>
+      <h3>Журнал событий</h3>
       <div id="event-log"></div>
     </div>
   </div>
 </div>
 <div id="tooltip"></div>
 <div id="game-over" style="display:none">
-  <h2>⚠ COLONY LOST</h2>
+  <h2>⚠ КОЛОНИЯ УНИЧТОЖЕНА</h2>
   <div id="go-reason" style="color:#f88;font-size:14px"></div>
-  <button class="restart-btn" onclick="initGame()">Restart Mission</button>
+  <button class="restart-btn" onclick="initGame()">Начать заново</button>
 </div>
 <div id="game-win" style="display:none">
-  <h2>✦ ASCENSION ACHIEVED</h2>
-  <div style="color:#0f8;font-size:14px">Your colony has transcended the abyss!</div>
-  <button class="restart-btn" onclick="initGame()">New Colony</button>
+  <h2>✦ ВОЗНЕСЕНИЕ ДОСТИГНУТО</h2>
+  <div style="color:#0f8;font-size:14px">Ваша колония преодолела бездну!</div>
+  <button class="restart-btn" onclick="initGame()">Новая колония</button>
 </div>
 
 <script>
@@ -304,33 +306,33 @@ const COLS = 20, ROWS = 14, TS = 36;
 
 const TILE = { FLOOR:0, ROCK:1, MINERAL:2, VENT:3, SAND:4 };
 const TILE_COLORS = ['#1a2a4a','#3a3a4a','#1a4a3a','#4a2a0a','#3a3020'];
-const TILE_NAMES = ['Floor','Rock','Mineral Deposit','Hydrothermal Vent','Sand'];
+const TILE_NAMES = ['Пол','Скала','Месторождение','Гидротерм. вентиляция','Песок'];
 
 const BDEFS = {
-  hq:     { name:'HQ', icon:'⚓', hp:500, cost:{min:0,e:0}, prod:{e:8,o2:5}, cons:{e:0}, popMax:0, buildable:false },
-  dome:   { name:'Habitat Dome', icon:'🏠', hp:200, cost:{min:100,e:30}, prod:{}, cons:{e:1}, popMax:15 },
-  reactor:{ name:'Reactor', icon:'⚡', hp:150, cost:{min:150,e:0}, prod:{e:25}, cons:{e:0} },
-  o2gen:  { name:'O2 Generator', icon:'💧', hp:150, cost:{min:120,e:20}, prod:{o2:20}, cons:{e:4} },
-  mine:   { name:'Mining Drill', icon:'⛏', hp:120, cost:{min:80,e:0}, prod:{min:12}, cons:{e:3} },
-  farm:   { name:'Bio-Farm', icon:'🌿', hp:130, cost:{min:100,e:20}, prod:{food:18}, cons:{e:3} },
-  lab:    { name:'Research Lab', icon:'🔬', hp:100, cost:{min:200,e:40}, prod:{res:8}, cons:{e:5} },
-  turret: { name:'Defense Turret', icon:'🔫', hp:200, cost:{min:150,e:30}, prod:{}, cons:{e:2} },
-  sonar:  { name:'Sonar Array', icon:'📡', hp:80, cost:{min:100,e:20}, prod:{}, cons:{e:2} },
+  hq:     { name:'Штаб', icon:'⚓', hp:500, cost:{min:0,e:0}, prod:{e:8,o2:5}, cons:{e:0}, popMax:0, buildable:false },
+  dome:   { name:'Жилой купол', icon:'🏠', hp:200, cost:{min:100,e:30}, prod:{}, cons:{e:1}, popMax:15 },
+  reactor:{ name:'Реактор', icon:'⚡', hp:150, cost:{min:150,e:0}, prod:{e:25}, cons:{e:0} },
+  o2gen:  { name:'Генератор O2', icon:'💧', hp:150, cost:{min:120,e:20}, prod:{o2:20}, cons:{e:4} },
+  mine:   { name:'Буровая шахта', icon:'⛏', hp:120, cost:{min:80,e:0}, prod:{min:12}, cons:{e:3} },
+  farm:   { name:'Биоферма', icon:'🌿', hp:130, cost:{min:100,e:20}, prod:{food:18}, cons:{e:3} },
+  lab:    { name:'Лаборатория', icon:'🔬', hp:100, cost:{min:200,e:40}, prod:{res:8}, cons:{e:5} },
+  turret: { name:'Боевая турель', icon:'🔫', hp:200, cost:{min:150,e:30}, prod:{}, cons:{e:2} },
+  sonar:  { name:'Сонар-массив', icon:'📡', hp:80, cost:{min:100,e:20}, prod:{}, cons:{e:2} },
 };
 
 const TECHS = [
-  { id:'adv_mining', name:'Adv Mining', tier:1, cost:25, desc:'+60% mineral drills', req:[] },
-  { id:'pressure_filters', name:'Pressure Filters', tier:1, cost:25, desc:'+40% O2 gen', req:[] },
-  { id:'reinf_hulls', name:'Reinf. Hulls', tier:1, cost:25, desc:'+80% building HP', req:[] },
-  { id:'sonar_grid', name:'Sonar Grid', tier:1, cost:25, desc:'Turrets fire 0.3s faster', req:[] },
-  { id:'fusion_reactor', name:'Fusion Reactor', tier:2, cost:75, desc:'+80% reactor energy', req:['adv_mining','pressure_filters'] },
-  { id:'bioengineering', name:'Bio-Engineering', tier:2, cost:75, desc:'+60% food farms', req:['pressure_filters','reinf_hulls'] },
-  { id:'torpedo_sys', name:'Torpedo Systems', tier:2, cost:75, desc:'Turret dmg×2, range+1', req:['sonar_grid','reinf_hulls'] },
-  { id:'col_training', name:'Colonist Training', tier:2, cost:75, desc:'Pop grows 50% faster, +20 popMax', req:['adv_mining','sonar_grid'] },
-  { id:'pressure_shields', name:'Pressure Shields', tier:3, cost:150, desc:'Bldgs take 40% less dmg', req:['fusion_reactor','bioengineering'] },
-  { id:'nano_repair', name:'Nano-Repair Bots', tier:3, cost:150, desc:'Bldgs self-repair 1HP/5s', req:['fusion_reactor','torpedo_sys'] },
-  { id:'hydro_tap', name:'Hydrothermal Tap', tier:3, cost:150, desc:'+15e/tick per vent tile', req:['bioengineering','col_training'] },
-  { id:'ascension', name:'ASCENSION DRIVE', tier:3, cost:500, desc:'WIN — 60s to charge', req:['pressure_shields','nano_repair'] },
+  { id:'adv_mining', name:'Улучш. добыча', tier:1, cost:25, desc:'+60% к шахтам', req:[] },
+  { id:'pressure_filters', name:'Фильтры давл.', tier:1, cost:25, desc:'+40% к генераторам O2', req:[] },
+  { id:'reinf_hulls', name:'Бронекорпус', tier:1, cost:25, desc:'+80% HP зданий', req:[] },
+  { id:'sonar_grid', name:'Сонар-сеть', tier:1, cost:25, desc:'Турели стреляют быстрее', req:[] },
+  { id:'fusion_reactor', name:'Термояд. реактор', tier:2, cost:75, desc:'+80% энергии реакторов', req:['adv_mining','pressure_filters'] },
+  { id:'bioengineering', name:'Биоинженерия', tier:2, cost:75, desc:'+60% еды с ферм', req:['pressure_filters','reinf_hulls'] },
+  { id:'torpedo_sys', name:'Торпедные сист.', tier:2, cost:75, desc:'Урон турелей ×2, дальность +1', req:['sonar_grid','reinf_hulls'] },
+  { id:'col_training', name:'Подготовка кол.', tier:2, cost:75, desc:'Рост нас. +50%, макс +20', req:['adv_mining','sonar_grid'] },
+  { id:'pressure_shields', name:'Щиты давления', tier:3, cost:150, desc:'Здания получают −40% урона', req:['fusion_reactor','bioengineering'] },
+  { id:'nano_repair', name:'Нано-ремонт', tier:3, cost:150, desc:'Авторемонт зданий 1HP/5с', req:['fusion_reactor','torpedo_sys'] },
+  { id:'hydro_tap', name:'Гидротерм. отвод', tier:3, cost:150, desc:'+15э/тик за вентиляцию', req:['bioengineering','col_training'] },
+  { id:'ascension', name:'ДВИГ. ВОЗНЕСЕНИЯ', tier:3, cost:500, desc:'ПОБЕДА — зарядка 60 сек', req:['pressure_shields','nano_repair'] },
 ];
 
 let state, gameRunning, logicInterval, animFrame;
@@ -397,9 +399,9 @@ function initGame() {
   // Place HQ at center
   placeBuilding('hq', 10, 7);
   updateTechUI();
-  addLog('Colony established. Survive the abyss.', 'good');
-  setTimeout(()=>addLog('⚠ Build a Reactor + O2 Gen + Farm ASAP!', 'warn'), 800);
-  setTimeout(()=>addLog('Right-click canvas to cancel build mode.', 'info'), 1600);
+  addLog('Колония основана. Выживи в бездне.', 'good');
+  setTimeout(()=>addLog('⚠ Срочно: Реактор + Генератор O2 + Ферма!', 'warn'), 800);
+  setTimeout(()=>addLog('ПКМ по карте отменяет режим постройки.', 'info'), 1600);
   gameRunning = true;
 
   logicInterval = setInterval(gameTick, 500);
@@ -606,28 +608,28 @@ function gameTick(){
   }
   if((o2Pct<0.2 || foodPct<0.2) && state.pop>0){
     state.popDecayTick++;
-    if(state.popDecayTick >= 15){ state.pop = Math.max(0, state.pop-1); state.popDecayTick=0; addLog('Colonist lost to conditions!','danger'); }
+    if(state.popDecayTick >= 15){ state.pop = Math.max(0, state.pop-1); state.popDecayTick=0; addLog('Колонист погиб от недостатка ресурсов!','danger'); }
   } else state.popDecayTick = 0;
 
   // Low resource warnings (once per 40 ticks to avoid spam)
   if(t % 40 === 0){
-    if(state.energy <= 10) addLog('⚡ CRITICAL: No power! Build a Reactor!', 'danger');
-    else if(state.energy < state.energyMax * 0.15) addLog('⚠ Low energy!', 'warn');
-    if(state.o2 < state.o2Max * 0.15 && state.o2 > 0) addLog('⚠ O2 critically low! Build O2 Generator!', 'warn');
-    if(state.food < state.foodMax * 0.15 && state.food > 0) addLog('⚠ Food critically low! Build Bio-Farm!', 'warn');
+    if(state.energy <= 10) addLog('⚡ КРИТИЧНО: нет энергии! Построй Реактор!', 'danger');
+    else if(state.energy < state.energyMax * 0.15) addLog('⚠ Мало энергии!', 'warn');
+    if(state.o2 < state.o2Max * 0.15 && state.o2 > 0) addLog('⚠ Критически мало O2! Нужен Генератор O2!', 'warn');
+    if(state.food < state.foodMax * 0.15 && state.food > 0) addLog('⚠ Критически мало еды! Нужна Биоферма!', 'warn');
   }
 
   // O2 zero death
-  if(state.o2 <= 0){ state.o2ZeroTicks++; if(state.o2ZeroTicks>=6){ endGame('O2 depleted — colony suffocated'); return; } }
+  if(state.o2 <= 0){ state.o2ZeroTicks++; if(state.o2ZeroTicks>=6){ endGame('O2 исчерпан — колония задохнулась'); return; } }
   else state.o2ZeroTicks = 0;
-  if(state.pop <= 0){ endGame('All colonists perished'); return; }
+  if(state.pop <= 0){ endGame('Все колонисты погибли'); return; }
 
   // Wave system
   if(!state.waveActive){
     state.waveTimer--;
     // Sonar early warning: 3 seconds = 6 ticks before wave
     if(state.waveTimer === 6 && state.buildings.some(b=>b.type==='sonar')){
-      addLog(`📡 Sonar: wave ${state.wave+1} detected — 3 seconds!`,'wave');
+      addLog(`📡 Сонар: обнаружена волна ${state.wave+1} — 3 секунды!`,'wave');
     }
     if(state.waveTimer <= 0){ startWave(); }
   } else {
@@ -671,8 +673,8 @@ function gameTick(){
           if(hasTech('pressure_shields')) dmg *= 0.6;
           b.hp -= dmg;
           if(b.hp <= 0){
-            if(b.type==='hq'){ endGame('HQ destroyed!'); return; }
-            addLog(`${BDEFS[b.type].name} destroyed!`,'danger');
+            if(b.type==='hq'){ endGame('Штаб уничтожен!'); return; }
+            addLog(`${BDEFS[b.type].name} уничтожена!`,'danger');
             // refund half minerals
             state.minerals += Math.floor(BDEFS[b.type].cost.min * 0.5);
             removeBuilding(b.id);
@@ -767,10 +769,10 @@ function killEnemy(e){
 }
 
 const ENEMY_TYPES = {
-  anglerfish: { name:'Anglerfish Scout', hp:60, speed:1.2*2, damage:8, attackRate:1.5*2, reward:15, color:'#8be', size:10 },
-  crab:       { name:'Giant Crab', hp:200, speed:2*2, damage:25, attackRate:2*2, reward:45, color:'#eb8', size:14 },
-  tentacle:   { name:'Kraken Tentacle', hp:120, speed:1.8*2, damage:15, attackRate:1.5*2, reward:35, color:'#a8f', size:12 },
-  leviathan:  { name:'Deep Leviathan', hp:600, speed:3*2, damage:60, attackRate:3*2, reward:200, color:'#f84', size:20 },
+  anglerfish: { name:'Удильщик', hp:60, speed:1.2*2, damage:8, attackRate:1.5*2, reward:15, color:'#8be', size:10 },
+  crab:       { name:'Гигантский краб', hp:200, speed:2*2, damage:25, attackRate:2*2, reward:45, color:'#eb8', size:14 },
+  tentacle:   { name:'Щупальце Кракена', hp:120, speed:1.8*2, damage:15, attackRate:1.5*2, reward:35, color:'#a8f', size:12 },
+  leviathan:  { name:'Глубинный Левиафан', hp:600, speed:3*2, damage:60, attackRate:3*2, reward:200, color:'#f84', size:20 },
 };
 
 function startWave(){
@@ -797,9 +799,9 @@ function startWave(){
     }, idx*1200);
   });
 
-  const sonarBonus = state.buildings.some(b=>b.type==='sonar') ? ' (Sonar detected them!)' : '';
-  addLog(`⚠ WAVE ${w} — ${units.length} units incoming${sonarBonus}`, 'wave');
-  showWaveOverlay(`WAVE ${w} INCOMING\n${units.length} UNITS`);
+  const sonarBonus = state.buildings.some(b=>b.type==='sonar') ? ' (сонар засёк врагов!)' : '';
+  addLog(`⚠ ВОЛНА ${w} — ${units.length} врагов идут${sonarBonus}`, 'wave');
+  showWaveOverlay(`ВОЛНА ${w}\n${units.length} ЕДИНИЦ`);
   document.getElementById('wave-num').textContent = w;
 }
 
@@ -838,7 +840,7 @@ function waveComplete(){
   state.waveActive = false;
   const bonus = 50 + state.wave*20;
   state.minerals += bonus;
-  addLog(`Wave ${state.wave} complete! +${bonus} minerals`, 'good');
+  addLog(`Волна ${state.wave} отражена! +${bonus} минералов`, 'good');
   const nextInterval = Math.max(45, 120 - state.wave*5);
   state.waveTimer = nextInterval*2;
   document.getElementById('wave-timer').textContent = `${nextInterval}s`;
@@ -853,17 +855,17 @@ function triggerDisaster(){
   let msg = '', duration = 0;
   if(d==='crack'){
     const blds = state.buildings.filter(b=>b.type!=='hq');
-    if(blds.length){ const b=blds[rnd(0,blds.length-1)]; b.hp=Math.max(1,b.hp*0.7); msg=`⚠ Pressure crack damaged ${BDEFS[b.type].name}!`; }
+    if(blds.length){ const b=blds[rnd(0,blds.length-1)]; b.hp=Math.max(1,b.hp*0.7); msg=`⚠ Трещина давления повредила ${BDEFS[b.type].name}!`; }
     state.disasterActive = null; duration=0;
   } else if(d==='toxic'){
-    msg='☠ Toxic current! O2 production -50% (20s)'; duration=40; effectOverlayMsg='TOXIC CURRENT';
+    msg='☠ Токсическое течение! Производство O2 −50% (20с)'; duration=40; effectOverlayMsg='ТОКСИЧЕСКОЕ ТЕЧЕНИЕ';
   } else if(d==='tremor'){
     state.buildings.forEach(b=>{ b.hp=Math.max(1,b.hp-rnd(5,15)); });
-    msg='🌊 Seismic tremor! All buildings damaged.'; state.disasterActive=null; duration=0;
+    msg='🌊 Сейсмическое дрожание! Все здания повреждены.'; state.disasterActive=null; duration=0;
   } else if(d==='biolumin'){
-    msg='🦑 Bioluminescent swarm! Food consumption ×2 (15s)'; duration=30; effectOverlayMsg='BIOLUMINESCENT SWARM';
+    msg='🦑 Биолюминесцентный рой! Потребление еды ×2 (15с)'; duration=30; effectOverlayMsg='БИОЛЮМИНЕСЦ. РОЙ';
   } else if(d==='thermal'){
-    msg='🔥 Thermal surge! Energy consumption +80% (20s)'; duration=40; effectOverlayMsg='THERMAL SURGE';
+    msg='🔥 Термальный выброс! Потребление энергии +80% (20с)'; duration=40; effectOverlayMsg='ТЕРМАЛЬНЫЙ ВЫБРОС';
   }
   if(msg) addLog(msg,'danger');
   if(duration>0){ state.disasterTicks=duration; showEffectOverlay(effectOverlayMsg); }
@@ -888,7 +890,7 @@ function endGame(reason){
   clearInterval(logicInterval);
   document.getElementById('game-over').style.display = 'flex';
   document.getElementById('go-reason').textContent = reason;
-  addLog('GAME OVER: '+reason,'danger');
+  addLog('КОНЕЦ ИГРЫ: '+reason,'danger');
 }
 
 const logEntries = [];
@@ -924,13 +926,13 @@ function updateUI(){
   function setBar(id, pct){ const el=document.getElementById(id); el.style.width=(pct*100)+'%'; el.style.background=pct<0.2?'#f44':pct<0.4?'#fa0':''; }
   setBar('bar-o2', o2Pct); setBar('bar-energy', energyPct); setBar('bar-food', foodPct);
   document.getElementById('bar-pop').style.width = (s.pop/s.popMax*100)+'%';
-  const nextT = state.waveActive ? 'Active!' : Math.ceil(state.waveTimer/2)+'s';
+  const nextT = state.waveActive ? 'Атака!' : Math.ceil(state.waveTimer/2)+'с';
   document.getElementById('wave-timer').textContent = nextT;
   updateTechUI();
   if(ascensionActive){
     const sec = Math.ceil(ascensionTimer/2);
     document.getElementById('effect-overlay').style.display='block';
-    document.getElementById('effect-overlay').textContent = `✦ ASCENSION DRIVE CHARGING: ${sec}s`;
+    document.getElementById('effect-overlay').textContent = `✦ ДВИГАТЕЛЬ ВОЗНЕСЕНИЯ: ${sec}с`;
     document.getElementById('effect-overlay').style.background = 'rgba(0,100,200,0.8)';
   }
 }
@@ -953,18 +955,18 @@ function updateTechUI(){
       const avail = !done && reqMet && tierReq;
       const btn = document.createElement('div');
       btn.className = 'tech-btn' + (done?' done':avail&&canAfford?' available':avail?' available':' locked');
-      btn.title = `${tech.name}\n${tech.desc}\nCost: ${tech.cost} research${tech.req.length?'\nReq: '+tech.req.join(', '):''}`;
-      btn.innerHTML = `<div>${tech.name}</div><div style="color:#567">${tech.cost}🔬</div>`;
+      btn.title = `${tech.name}\n${tech.desc}\nЦена: ${tech.cost} науки${tech.req.length?'\nТреб: '+tech.req.join(', '):''}`;
+      btn.innerHTML = `<div style="flex:1">${tech.name}</div><div style="color:#567;white-space:nowrap">${tech.cost}🔬</div>`;
       if(done) btn.innerHTML += '<div style="color:#0d0">✓</div>';
       if(!done && avail){
         btn.onclick = ()=>{ if(state.research>=tech.cost){ state.research-=tech.cost; state.techDone.add(tech.id);
-          addLog(`Tech unlocked: ${tech.name}`,'good');
+          addLog(`Технология изучена: ${tech.name}`,'good');
           // Apply HP bonus
           if(tech.id==='reinf_hulls') state.buildings.forEach(b=>{ b.maxHp*=1.8; b.hp=Math.min(b.maxHp,b.hp*1.8); });
           // Ascension
-          if(tech.id==='ascension'){ ascensionActive=true; ascensionTimer=120; addLog('ASCENSION DRIVE ACTIVATED — 60 seconds to WIN!','good'); }
+          if(tech.id==='ascension'){ ascensionActive=true; ascensionTimer=120; addLog('ДВИГАТЕЛЬ ВОЗНЕСЕНИЯ АКТИВИРОВАН — 60 секунд до ПОБЕДЫ!','good'); }
           updateTechUI();
-        } else addLog('Not enough research!','warn'); };
+        } else addLog('Недостаточно науки!','warn'); };
       }
       el.appendChild(btn);
     });
@@ -1236,11 +1238,11 @@ function render(ts){
   if(selectedTile){
     const b = getBuildingAt(selectedTile.c, selectedTile.r);
     const t = state.map[selectedTile.r][selectedTile.c];
-    let info = `Tile [${selectedTile.c},${selectedTile.r}]: ${TILE_NAMES[t]}`;
+    let info = `Тайл [${selectedTile.c},${selectedTile.r}]: ${TILE_NAMES[t]}`;
     if(b){
       const def=BDEFS[b.type];
       info += ` | ${def.name} HP:${Math.floor(b.hp)}/${Math.floor(b.maxHp)}`;
-      if(b.type==='turret') info += ` | Turret range:${hasTech('torpedo_sys')?4:3}`;
+      if(b.type==='turret') info += ` | Дальность:${hasTech('torpedo_sys')?4:3}`;
     }
     document.getElementById('selected-info').innerHTML = `<span>${info}</span>`;
   }
@@ -1267,12 +1269,12 @@ canvas.addEventListener('click', e=>{
     if(b && b.type!=='hq'){
       const def=BDEFS[b.type];
       state.minerals += Math.floor(def.cost.min*0.5);
-      addLog(`Demolished ${def.name}, refunded ${Math.floor(def.cost.min*0.5)} minerals`,'info');
+      addLog(`Снесено: ${def.name}, возврат ${Math.floor(def.cost.min*0.5)} минералов`,'info');
       removeBuilding(b.id);
       buildMode=null;
       document.querySelectorAll('.build-btn').forEach(b=>b.classList.remove('active'));
     } else if(b && b.type==='hq'){
-      addLog('Cannot demolish HQ!','warn');
+      addLog('Штаб нельзя сносить!','warn');
     }
     return;
   }
@@ -1280,18 +1282,18 @@ canvas.addEventListener('click', e=>{
   if(buildMode && buildMode!=='demolish'){
     // Try to place
     if(!isTileBuildable(col,row)){
-      addLog('Cannot build here!','warn'); return;
+      addLog('Здесь нельзя строить!','warn'); return;
     }
     const def=BDEFS[buildMode];
     if(!def) return;
-    if(state.minerals < def.cost.min){ addLog(`Not enough minerals! Need ${def.cost.min}`,'warn'); return; }
-    if(def.cost.e && state.energy < def.cost.e){ addLog(`Not enough energy! Need ${def.cost.e}`,'warn'); return; }
+    if(state.minerals < def.cost.min){ addLog(`Не хватает минералов! Нужно ${def.cost.min}`,'warn'); return; }
+    if(def.cost.e && state.energy < def.cost.e){ addLog(`Не хватает энергии! Нужно ${def.cost.e}`,'warn'); return; }
     state.minerals -= def.cost.min;
     if(def.cost.e) state.energy -= def.cost.e;
     const b = placeBuilding(buildMode, col, row);
     // Apply hull tech
     if(hasTech('reinf_hulls')){ b.maxHp *= 1.8; b.hp = b.maxHp; }
-    addLog(`Built ${def.name} at [${col},${row}]`,'good');
+    addLog(`Построено: ${def.name} [${col},${row}]`,'good');
     // Recalc enemy paths
     state.enemies.forEach(en=>{ en.path=null; en.pathIdx=0; });
     return;
@@ -1320,9 +1322,10 @@ document.querySelectorAll('.build-btn').forEach(btn=>{
     if(type==='demolish') return;
     const def=BDEFS[type];
     if(!def) return;
-    const prod=Object.entries(def.prod||{}).map(([k,v])=>`+${v} ${k}`).join(', ')||'—';
-    const cons=Object.entries(def.cons||{}).map(([k,v])=>v?`-${v} ${k}`:'').filter(Boolean).join(', ')||'—';
-    showTooltip(e, `<b>${def.name}</b><br>Cost: ${def.cost.min}min${def.cost.e?'+'+def.cost.e+'e':''}<br>HP: ${def.hp}<br>Produces: ${prod}<br>Consumes: ${cons}${def.popMax?`<br>+${def.popMax} pop cap`:''}`);
+    const resN={e:'⚡',o2:'💧O2',min:'🪨',food:'🐟',res:'🔬'};
+    const prod=Object.entries(def.prod||{}).map(([k,v])=>`+${v} ${resN[k]||k}`).join(', ')||'—';
+    const cons=Object.entries(def.cons||{}).map(([k,v])=>v?`-${v} ${resN[k]||k}`:'').filter(Boolean).join(', ')||'—';
+    showTooltip(e, `<b>${def.name}</b><br>Цена: ${def.cost.min}м${def.cost.e?'+'+def.cost.e+'э':''}<br>HP: ${def.hp}<br>Производит: ${prod}<br>Потребляет: ${cons}${def.popMax?`<br>+${def.popMax} к населению`:''}`);
   });
   btn.addEventListener('mouseleave', hideTooltip);
 });
