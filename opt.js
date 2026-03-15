@@ -1905,7 +1905,10 @@ async function runOpt() {
         useMacdFilter:_fCombo.useMacdFilter??useMacdFilter,
         useER:_fCombo.useER??useER,erArr,erPeriod:erPeriod||10,erThresh,
         useKalmanMA:_fCombo.useKalmanMA??useKalmanMA,kalmanArr,kalmanLen, // ##KALMAN_MA##
-        start:Math.max((maP||0)*(htfRatio||1),(confN||0)*(_confHtf||1),50)+2,
+        start:Math.max(
+          (_effUseMa&&maP>0?(maP||0)*(htfRatio||1):0),
+          (_effUseConfirm&&confN>0?(confN||0)*(_confHtf||1):0),
+          50)+2,
         pruning:false, maxDDLimit:maxDD
       };
 
@@ -2229,7 +2232,10 @@ async function runOpt() {
         useMacdFilter:_fCombo.useMacdFilter??useMacdFilter,
         useER:_fCombo.useER??useER,erArr,erPeriod:erPeriod||10,erThresh,
         useKalmanMA:_fCombo.useKalmanMA??useKalmanMA,kalmanArr,kalmanLen, // ##KALMAN_MA##
-        start:Math.max((maP||0)*(htfRatio||1),(confN||0)*(_confHtf||1),50)+2,pruning:false,maxDDLimit:maxDD
+        start:Math.max(
+          (_effUseMa&&maP>0?(maP||0)*(htfRatio||1):0),
+          (_effUseConfirm&&confN>0?(confN||0)*(_confHtf||1):0),
+          50)+2,pruning:false,maxDDLimit:maxDD
       };
 
       if (_useOOS) DATA = _isData;
@@ -2812,7 +2818,7 @@ async function runOpt() {
                                       usePartial,partRR,partPct,partBE,
                                       useClimax:useClimaxExit&&HAS_VOLUME,clxVolMult,clxBodyMult,clxMode,
                                       // Filters
-                                      useMA:maP>0,maArr,maType:mType,maP,htfRatio,
+                                      useMA:useMa&&maP>0,maArr,maType:mType,maP,htfRatio,
                                       useADX:useAdx&&adxT>0,adxArr:adxCache[_adxCk],adxThresh:adxT,adxLen:adxL,adxHtfRatio,useAdxSlope,adxSlopeBars,
                                       useRSI:useRsi,rsiArr:useRsi?calcRSI(14):null,
                                       rsiOS:rsiPair.os,rsiOB:rsiPair.ob,
@@ -2833,7 +2839,10 @@ async function runOpt() {
                                       useKalmanMA,kalmanArr,kalmanLen, // ##KALMAN_MA##
                                       useMacdFilter,useER,erArr:erArrEx,erPeriod:erPArr[0]||10,erThresh,
                                       bodyAvg:bodyAvgArr,
-                                      start:Math.max((maP||0)*(htfRatio||1),(confN||0)*(_confHtf||1),50)+2,
+                                      start:Math.max(
+                                        (useMa&&maP>0?(maP||0)*(htfRatio||1):0),
+                                        (useConfirm&&confN>0?(confN||0)*(_confHtf||1):0),
+                                        50)+2,
                                       // Pruning
                                       pruning:optMode==='prune',maxDDLimit:maxDD
                                     };
@@ -2904,7 +2913,7 @@ async function runOpt() {
                                           useTime, timeBars, timeMode,
                                           usePartial, partRR, partPct, partBE,
                                           useClimax:useClimaxExit&&HAS_VOLUME, clxVolMult, clxBodyMult, clxMode,
-                                          useMA:maP>0, maType:mType, maP, htfRatio,
+                                          useMA:useMa&&maP>0, maType:mType, maP, htfRatio,
                                           useADX:useAdx&&adxT>0, adxThresh:adxT, adxLen:adxL, adxHtfRatio, useAdxSlope, adxSlopeBars,
                                           useRSI:useRsi, rsiOS:rsiPair.os, rsiOB:rsiPair.ob,
                                           useVolF:useVolF&&vfM>0, volFMult:vfM,
@@ -3582,7 +3591,10 @@ function buildBtCfg(cfg, ind) {
     kalmanCrossArr: ind.kalmanCrossArr,
     kalmanCrossLen: cfg.kalmanCrossLen || 20,
 
-    start: Math.max((maP || 0) * (cfg.htfRatio || 1), (cfg.confN || 0) * (cfg.confHtfRatio || 1), 50) + 2,
+    start: Math.max(
+      (cfg.useMA      ? (maP || 0)       * (cfg.htfRatio     || 1) : 0),
+      (cfg.useConfirm ? (cfg.confN || 0) * (cfg.confHtfRatio || 1) : 0),
+      50) + 2,
     pruning: false,
     maxDDLimit: 300,
   };
