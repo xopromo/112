@@ -8987,7 +8987,7 @@ async function runOpt() {
         hasTPB:!!(tpPair.b),tpMultB:tpPair.b?tpPair.b.m:0,tpModeB:tpPair.b?tpPair.b.type:'rr',tpLogic,
         useBE,beTrig,beOff,
         useTrail,trTrig,trDist,
-        useRev,revBars,revMode,revAct,revSrc,revSkip,revCooldown,
+        useRev,revBars,revMode,revAct,revSrc,revSkip,revCooldown,revNoFilters:true,
         useTime,timeBars,timeMode,
         usePartial,partRR,partPct,partBE,
         useClimax:useClimaxExit&&HAS_VOLUME,clxVolMult,clxBodyMult,clxMode,
@@ -9324,7 +9324,7 @@ async function runOpt() {
         hasTPA:!!(tpPair.a),tpMult:tpPair.a?tpPair.a.m:0,tpMode:tpPair.a?tpPair.a.type:'rr',
         hasTPB:!!(tpPair.b),tpMultB:tpPair.b?tpPair.b.m:0,tpModeB:tpPair.b?tpPair.b.type:'rr',tpLogic,
         useBE,beTrig,beOff,useTrail,trTrig,trDist,
-        useRev,revBars,revMode,revAct,revSrc,revSkip,revCooldown,
+        useRev,revBars,revMode,revAct,revSrc,revSkip,revCooldown,revNoFilters:true,
         useTime,timeBars,timeMode,usePartial,partRR,partPct,partBE,
         useClimax:useClimaxExit&&HAS_VOLUME,clxVolMult,clxBodyMult,clxMode,
         useMA:_effUseMa&&maP>0,maArr,maType:_mType,maP,htfRatio,
@@ -9938,7 +9938,7 @@ async function runOpt() {
                                       // Exits
                                       useBE,beTrig,beOff,
                                       useTrail,trTrig,trDist,
-                                      useRev,revBars,revMode,revAct,revSrc,revSkip,revCooldown,
+                                      useRev,revBars,revMode,revAct,revSrc,revSkip,revCooldown,revNoFilters:true,
                                       useTime,timeBars,timeMode,
                                       usePartial,partRR,partPct,partBE,
                                       useClimax:useClimaxExit&&HAS_VOLUME,clxVolMult,clxBodyMult,clxMode,
@@ -10636,6 +10636,7 @@ function buildBtCfg(cfg, ind) {
     revSrc:   cfg.revSrc   || 'same',
     revSkip:       cfg.revSkip       || 0,
     revCooldown:   cfg.revCooldown   || 0,
+    revNoFilters:  true,
     useTime:  cfg.useTime  || false,
     timeBars: cfg.timeBars || 20,
     timeMode: cfg.timeMode || 'any',
@@ -18000,7 +18001,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1773567851198;
+window._BUILD_TS = 1773569510720;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
