@@ -1884,7 +1884,7 @@ async function runOpt() {
         hasTPB:!!(tpPair.b),tpMultB:tpPair.b?tpPair.b.m:0,tpModeB:tpPair.b?tpPair.b.type:'rr',tpLogic,
         useBE,beTrig,beOff,
         useTrail,trTrig,trDist,
-        useRev,revBars,revMode,revAct,revSrc,revSkip,revCooldown,
+        useRev,revBars,revMode,revAct,revSrc,revSkip,revCooldown,revNoFilters:true,
         useTime,timeBars,timeMode,
         usePartial,partRR,partPct,partBE,
         useClimax:useClimaxExit&&HAS_VOLUME,clxVolMult,clxBodyMult,clxMode,
@@ -1945,6 +1945,7 @@ async function runOpt() {
               useKalmanCross,kalmanCrossLen, // ##KALMAN_CROSS##
               useMaCross,maCrossP,maCrossType,
               useFreeEntry,
+              useEIS,eisPeriod:eisPeriod||13,useSoldiers,
               useMacd,macdFast,macdSlow,macdSignalP:macdSigP,
               useStochExit,stochKP,stochDP,stochOS,stochOB,
               useVolMove,volMoveMult,
@@ -2220,7 +2221,7 @@ async function runOpt() {
         hasTPA:!!(tpPair.a),tpMult:tpPair.a?tpPair.a.m:0,tpMode:tpPair.a?tpPair.a.type:'rr',
         hasTPB:!!(tpPair.b),tpMultB:tpPair.b?tpPair.b.m:0,tpModeB:tpPair.b?tpPair.b.type:'rr',tpLogic,
         useBE,beTrig,beOff,useTrail,trTrig,trDist,
-        useRev,revBars,revMode,revAct,revSrc,revSkip,revCooldown,
+        useRev,revBars,revMode,revAct,revSrc,revSkip,revCooldown,revNoFilters:true,
         useTime,timeBars,timeMode,usePartial,partRR,partPct,partBE,
         useClimax:useClimaxExit&&HAS_VOLUME,clxVolMult,clxBodyMult,clxMode,
         useMA:_effUseMa&&maP>0,maArr,maType:_mType,maP,htfRatio,
@@ -2311,6 +2312,7 @@ async function runOpt() {
               useKalmanCross,kalmanCrossLen, // ##KALMAN_CROSS##
               useMaCross,maCrossP,maCrossType:_mCrossType,
               useFreeEntry,
+              useEIS,eisPeriod:eisPeriod||13,useSoldiers,
               useMacd,macdFast,macdSlow,macdSignalP:macdSigP,
               useStochExit,stochKP,stochDP,stochOS,stochOB,
               useVolMove,volMoveMult,
@@ -2833,7 +2835,7 @@ async function runOpt() {
                                       // Exits
                                       useBE,beTrig,beOff,
                                       useTrail,trTrig,trDist,
-                                      useRev,revBars,revMode,revAct,revSrc,revSkip,revCooldown,
+                                      useRev,revBars,revMode,revAct,revSrc,revSkip,revCooldown,revNoFilters:true,
                                       useTime,timeBars,timeMode,
                                       usePartial,partRR,partPct,partBE,
                                       useClimax:useClimaxExit&&HAS_VOLUME,clxVolMult,clxBodyMult,clxMode,
@@ -2917,6 +2919,7 @@ async function runOpt() {
                                           useKalmanCross,kalmanCrossLen, // ##KALMAN_CROSS##
                                           useMaCross,maCrossP,maCrossType:_mCrossTyp,
                                           useFreeEntry,
+                                          useEIS,eisPeriod:eisPeriod||13,useSoldiers,
                                           useMacd,macdFast,macdSlow,macdSignalP:macdSigP,
                                           useStochExit,stochKP,stochDP,stochOS,stochOB,
                                           useVolMove,volMoveMult,
@@ -3530,6 +3533,7 @@ function buildBtCfg(cfg, ind) {
     revSrc:   cfg.revSrc   || 'same',
     revSkip:       cfg.revSkip       || 0,
     revCooldown:   cfg.revCooldown   || 0,
+    revNoFilters:  true,
     useTime:  cfg.useTime  || false,
     timeBars: cfg.timeBars || 20,
     timeMode: cfg.timeMode || 'any',
