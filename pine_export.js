@@ -1088,6 +1088,11 @@ function generatePineScript(r) {
     lines.push(`                box.set_bottom(b_trade, math.min(v_ep, vxp))`);
     lines.push(`                box.set_right(b_trade, bar_index)`);
     lines.push(`                box.set_bgcolor(b_trade, win ? c_win : c_loss)`);
+    lines.push(`                // Удаляем TP/SL линии при закрытии — чтобы не путать с уровнями следующей сделки`);
+    lines.push(`                line.delete(l_tp)`);
+    lines.push(`                line.delete(l_sl)`);
+    lines.push(`                l_tp := na`);
+    lines.push(`                l_sl := na`);
   lines.push(`                float vpct = v_dir == 1 ? (vxp - v_ep)/v_ep*100 : (v_ep - vxp)/v_ep*100`);
     lines.push(`                label.new(`);
     lines.push(`                    bar_index,`);
