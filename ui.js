@@ -3121,7 +3121,7 @@ function _runTVcompare(tvRows, resultsEl) {
     const _ind   = typeof _calcIndicators === 'function' ? _calcIndicators(r.cfg) : null;
     const _btCfg = (_ind && typeof buildBtCfg === 'function') ? buildBtCfg(r.cfg, _ind) : null;
     if (_btCfg && typeof backtest === 'function') {
-      const rFull = backtest(_btCfg, DATA);
+      const rFull = backtest(_ind.pvLo, _ind.pvHi, _ind.atrArr, _btCfg);
       if (rFull && rFull.eq && rFull.eq.length > 0) {
         fullEq = rFull.eq;
         isFullRun = true;
