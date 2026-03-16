@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}Рассылка — VK Sales Bot{% endblock %}
+
+{% block content %}
+<h4 class="fw-bold mb-4">Новая рассылка</h4>
+
+<div class="row g-4">
+  <!-- Форма добавления -->
+  <div class="col-md-7">
+    <div class="card p-4">
+      <h6 class="fw-bold mb-3"><i class="bi bi-people me-2 text-primary"></i>Добавить пользователей</h6>
+
+      <form method="post" action="/campaign/start" enctype="multipart/form-data">
+        <!-- Метод 1: вставить ID вручную -->
+        <div class="mb-3">
+          <label class="form-label">Вставить VK ID вручную</label>
+          <textarea name="ids_text" class="form-control font-monospace" rows="6"
+            placeholder="Введи ID через запятую или каждый на новой строке:&#10;&#10;123456789&#10;987654321&#10;111222333"></textarea>
+          <div class="form-text">
+            Где взять ID: открой профиль человека ВКонтакте,
+            в адресной строке будет <code>vk.com/id<b>123456789</b></code>
+          </div>
+        </div>
+
+        <div class="text-center text-muted my-2">— или —</div>
+
+        <!-- Метод 2: загрузить файл -->
+        <div class="mb-3">
+          <label class="form-label">Загрузить файл со списком ID</label>
+          <input type="file" name="ids_file" class="form-control" accept=".txt,.csv">
+          <div class="form-text">Текстовый файл (.txt), по одному ID на строке</div>
+        </div>
+
+        <hr>
+
+        <!-- Настройки рассылки -->
+        <div class="row g-2 mb-3">
+          <div class="col-6">
+            <label class="form-label small">Задержка между сообщениями</label>
+            <div class="input-group input-group-sm">
+              <input type="number" name="delay_min" value="{{ cfg_delay_min }}" class="form-control" min="1" max="60">
+              <span class="input-group-text">–</span>
+              <input type="number" name="delay_max" value="{{ cfg_delay_max }}" class="form-control" min="1" max="60">
+              <span class="input-group-text">сек</span>
+            </div>
+          </div>
+          <div class="col-6">
+            <label class="form-label small">Режим</label>
+            <div class="form-check mt-1">
+              <input class="form-check-input" type="checkbox" name="dry_run" id="dryRun"
+                     {% if cfg_dry_run %}checked{% endif %}>
+              <label class="form-check-label" for="dryRun">
+                Тестовый режим (не отправлять реально)
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary w-100">
+          <i class="bi bi-send me-2"></i>Запустить рассылку
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Подсказки -->
+  <div class="col-md-5">
+    <div class="card p-4 mb-3">
+      <h6 class="fw-bold mb-3"><i class="bi bi-lightbulb me-2 text-warning"></i>Как получить список ID</h6>
+      <ol class="small text-muted mb-0 ps-3">
+        <li class="mb-2">
+          <strong>Из подписчиков сообщества:</strong><br>
+          ВКонтакте → Управление → Участники → экспорт или скопировать ID
+        </li>
+        <li class="mb-2">
+          <strong>Из статистики рекламы:</strong><br>
+          Кабинет VK Ads → аудитории → сохранить как файл
+        </li>
+        <li class="mb-2">
+          <strong>Из парсеров:</strong><br>
+          Pepper.Ninja, TargetHunter, Церебро
+        </li>
+        <li>
+          <strong>Важно:</strong> пользователи должны разрешить сообщения от твоего сообщества
+        </li>
+      </ol>
+    </div>
+
+    <div class="card p-4">
+      <h6 class="fw-bold mb-3"><i class="bi bi-map me-2 text-success"></i>Схема воронки</h6>
+      <div class="small">
+        {% set steps = [
+          ('1', 'Приветствие', 'Знакомство, есть ли бизнес?', 'primary'),
+          ('2', 'Квалификация', 'Какие проблемы с продвижением?', 'info'),
+          ('3', 'Питч', 'Предложение услуг, кейсы', 'warning'),
+          ('4', 'Возражения', 'Дорого / не сейчас / есть другой', 'danger'),
+          ('5', 'Призыв к действию', 'Аудит / созвон / оплата', 'success'),
+        ] %}
+        {% for num, title, desc, color in steps %}
+        <div class="d-flex gap-2 mb-2 align-items-start">
+          <span class="badge bg-{{ color }} rounded-pill" style="min-width:22px">{{ num }}</span>
+          <div>
+            <div class="fw-semibold">{{ title }}</div>
+            <div class="text-muted">{{ desc }}</div>
+          </div>
+        </div>
+        {% endfor %}
+        <div class="d-flex gap-2 mt-1 align-items-start">
+          <span class="bi bi-arrow-down-right text-success ms-1"></span>
+          <div class="text-success fw-semibold">CLOSED_WON — клиент!</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

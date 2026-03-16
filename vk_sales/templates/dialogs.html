@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block title %}Диалоги — VK Sales Bot{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="fw-bold mb-0">Диалоги</h4>
+  <a href="/campaign" class="btn btn-primary">
+    <i class="bi bi-plus-lg me-1"></i>Новая рассылка
+  </a>
+</div>
+
+<!-- Фильтры -->
+<div class="card p-3 mb-4">
+  <form method="get" class="row g-2 align-items-end">
+    <div class="col-md-3">
+      <label class="form-label small text-muted">Этап воронки</label>
+      <select name="state" class="form-select form-select-sm">
+        <option value="">— Все этапы —</option>
+        {% for s in all_states %}
+        <option value="{{ s }}" {% if filter_state==s %}selected{% endif %}>{{ s }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label small text-muted">Вариант A/B</label>
+      <select name="variant" class="form-select form-select-sm">
+        <option value="">— Все —</option>
+        <option value="A" {% if filter_variant=='A' %}selected{% endif %}>A</option>
+        <option value="B" {% if filter_variant=='B' %}selected{% endif %}>B</option>
+      </select>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label small text-muted">Поиск по имени или ID</label>
+      <input type="text" name="q" value="{{ filter_q }}" class="form-control form-control-sm" placeholder="Иван / 123456">
+    </div>
+    <div class="col-md-2">
+      <button class="btn btn-primary btn-sm w-100">
+        <i class="bi bi-search me-1"></i>Найти
+      </button>
+    </div>
+  </form>
+</div>
+
+<!-- Таблица -->
+<div class="card">
+  <div class="card-body p-0">
+    {% if dialogs %}
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th class="ps-4">Пользователь</th>
+            <th>Этап</th>
+            <th>A/B</th>
+            <th>Follow-up</th>
+            <th>Создан</th>
+            <th>Обновлён</th>
+            <th class="pe-4"></th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for d in dialogs %}
+        <tr>
+          <td class="ps-4">
+            <a href="https://vk.com/id{{ d.user_id }}" target="_blank" class="text-decoration-none text-dark">
+              <strong>{{ d.first_name or '—' }} {{ d.last_name or '' }}</strong>
+            </a>
+            <div class="text-muted" style="font-size:.78rem">id{{ d.user_id }}
+              {% if d.city %} · {{ d.city }}{% endif %}
+            </div>
+          </td>
+          <td>{{ state_badge(d.state) | safe }}</td>
+          <td>
+            <span class="badge bg-{{ 'primary' if d.ab_variant=='A' else 'warning' }} bg-opacity-75">
+              {{ d.ab_variant }}
+            </span>
+          </td>
+          <td class="small text-muted">
+            {% if d.next_followup %}
+              <i class="bi bi-clock text-warning"></i>
+              {{ d.next_followup[:16].replace('T',' ') }}
+            {% else %}—{% endif %}
+          </td>
+          <td class="small text-muted">{{ d.created_at[:10] }}</td>
+          <td class="small text-muted">{{ d.updated_at[:16].replace('T',' ') }}</td>
+          <td class="pe-4">
+            <div class="d-flex gap-1">
+              <a href="/dialog/{{ d.user_id }}" class="btn btn-sm btn-outline-secondary" title="Просмотр">
+                <i class="bi bi-eye"></i>
+              </a>
+              {% if d.state not in ('CLOSED_WON','CLOSED_LOST','UNSUBSCRIBED') %}
+              <form method="post" action="/dialog/{{ d.user_id }}/close"
+                    onsubmit="return confirm('Закрыть диалог как проигранный?')">
+                <button class="btn btn-sm btn-outline-danger" title="Закрыть">
+                  <i class="bi bi-x-lg"></i>
+                </button>
+              </form>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Пагинация -->
+    {% if total_pages > 1 %}
+    <div class="d-flex justify-content-center p-3">
+      <nav>
+        <ul class="pagination pagination-sm mb-0">
+          {% for p in range(1, total_pages+1) %}
+          <li class="page-item {% if p==page %}active{% endif %}">
+            <a class="page-link" href="?page={{ p }}&state={{ filter_state }}&variant={{ filter_variant }}&q={{ filter_q }}">
+              {{ p }}
+            </a>
+          </li>
+          {% endfor %}
+        </ul>
+      </nav>
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div class="text-center text-muted py-5">
+      <i class="bi bi-inbox display-4 d-block mb-2"></i>
+      {% if filter_state or filter_q %}
+        Ничего не найдено по вашему запросу
+      {% else %}
+        Диалогов пока нет. <a href="/campaign">Запустить рассылку →</a>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

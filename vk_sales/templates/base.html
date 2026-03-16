@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}VK Sales Bot{% endblock %}</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <style>
+    body { background: #f0f2f5; }
+    .sidebar {
+      min-height: 100vh;
+      background: #1a1a2e;
+      color: #fff;
+      width: 220px;
+      position: fixed;
+      top: 0; left: 0;
+      padding-top: 20px;
+      z-index: 100;
+    }
+    .sidebar .brand {
+      padding: 0 20px 20px;
+      font-size: 1.1rem;
+      font-weight: 700;
+      border-bottom: 1px solid #ffffff22;
+    }
+    .sidebar .nav-link {
+      color: #ffffffaa;
+      padding: 10px 20px;
+      border-radius: 0;
+      font-size: 0.95rem;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .sidebar .nav-link:hover, .sidebar .nav-link.active {
+      color: #fff;
+      background: #ffffff18;
+    }
+    .sidebar .nav-link i { font-size: 1.1rem; }
+    .main-content { margin-left: 220px; padding: 30px; }
+    .card { border: none; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,.07); }
+    .stat-card { border-radius: 12px; padding: 20px 24px; color: #fff; }
+    .stat-card .num { font-size: 2.2rem; font-weight: 700; line-height: 1; }
+    .stat-card .label { font-size: 0.85rem; opacity: .85; margin-top: 4px; }
+    .badge-state { font-size: 0.78rem; font-weight: 500; }
+    .bot-status { display: inline-flex; align-items: center; gap: 6px; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+    .dot-green { background: #2ecc71; box-shadow: 0 0 6px #2ecc71; }
+    .dot-red   { background: #e74c3c; }
+    .msg-out { background: #e3f2fd; border-radius: 12px 12px 4px 12px; padding: 8px 14px; margin-left: auto; max-width: 75%; }
+    .msg-in  { background: #fff; border: 1px solid #e0e0e0; border-radius: 12px 12px 12px 4px; padding: 8px 14px; max-width: 75%; }
+    .msg-wrap { display: flex; flex-direction: column; gap: 8px; }
+    .msg-row { display: flex; }
+    .msg-row.out { justify-content: flex-end; }
+    .msg-meta { font-size: 0.72rem; color: #888; margin-top: 2px; }
+    .flash-msg { position: fixed; top: 20px; right: 20px; z-index: 9999; min-width: 280px; }
+  </style>
+</head>
+<body>
+
+<!-- Боковое меню -->
+<nav class="sidebar">
+  <div class="brand">
+    <i class="bi bi-robot me-2"></i>VK Sales Bot
+  </div>
+  <ul class="nav flex-column mt-2">
+    <li class="nav-item">
+      <a href="/" class="nav-link {% if request.path=='/' %}active{% endif %}">
+        <i class="bi bi-speedometer2"></i> Дашборд
+      </a>
+    </li>
+    <li class="nav-item">
+      <a href="/dialogs" class="nav-link {% if '/dialogs' in request.path %}active{% endif %}">
+        <i class="bi bi-chat-dots"></i> Диалоги
+      </a>
+    </li>
+    <li class="nav-item">
+      <a href="/campaign" class="nav-link {% if '/campaign' in request.path %}active{% endif %}">
+        <i class="bi bi-send"></i> Рассылка
+      </a>
+    </li>
+    <li class="nav-item">
+      <a href="/settings" class="nav-link {% if '/settings' in request.path %}active{% endif %}">
+        <i class="bi bi-gear"></i> Настройки
+      </a>
+    </li>
+  </ul>
+
+  <!-- Статус бота внизу -->
+  <div style="position:absolute;bottom:20px;left:0;right:0;padding:0 20px;">
+    <div class="bot-status mb-2">
+      <span class="dot {% if bot_running %}dot-green{% else %}dot-red{% endif %}"></span>
+      <span style="font-size:.85rem;color:#ffffffaa">
+        {% if bot_running %}Бот работает{% else %}Бот остановлен{% endif %}
+      </span>
+    </div>
+    {% if bot_running %}
+    <form method="post" action="/bot/stop">
+      <button class="btn btn-sm btn-outline-danger w-100">
+        <i class="bi bi-stop-circle"></i> Остановить
+      </button>
+    </form>
+    {% else %}
+    <form method="post" action="/bot/start">
+      <button class="btn btn-sm btn-success w-100">
+        <i class="bi bi-play-circle"></i> Запустить бота
+      </button>
+    </form>
+    {% endif %}
+  </div>
+</nav>
+
+<!-- Основной контент -->
+<div class="main-content">
+
+  <!-- Flash-сообщения -->
+  {% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+  <div class="flash-msg">
+    {% for cat, msg in messages %}
+    <div class="alert alert-{{ 'success' if cat=='success' else 'danger' }} alert-dismissible fade show shadow" role="alert">
+      {{ msg }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% endwith %}
+
+  {% block content %}{% endblock %}
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

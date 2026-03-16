@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% block title %}Диалог с {{ dialog.first_name or dialog.user_id }}{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-3 mb-4">
+  <a href="/dialogs" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left"></i>
+  </a>
+  <div>
+    <h4 class="fw-bold mb-0">
+      {{ dialog.first_name or '—' }} {{ dialog.last_name or '' }}
+      <a href="https://vk.com/id{{ dialog.user_id }}" target="_blank"
+         class="text-muted text-decoration-none" style="font-size:.9rem">
+        <i class="bi bi-box-arrow-up-right ms-1"></i>
+      </a>
+    </h4>
+    <div class="text-muted small">
+      id{{ dialog.user_id }}
+      {% if dialog.city %} · {{ dialog.city }}{% endif %}
+      · Вариант {{ dialog.ab_variant }}
+    </div>
+  </div>
+  <div class="ms-auto d-flex gap-2 align-items-center">
+    {{ state_badge(dialog.state) | safe }}
+    {% if dialog.state not in ('CLOSED_WON','CLOSED_LOST','UNSUBSCRIBED') %}
+    <form method="post" action="/dialog/{{ dialog.user_id }}/close"
+          onsubmit="return confirm('Закрыть диалог?')">
+      <button class="btn btn-sm btn-outline-danger">
+        <i class="bi bi-x-lg me-1"></i>Закрыть
+      </button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+<div class="row g-3">
+  <!-- Переписка -->
+  <div class="col-md-8">
+    <div class="card">
+      <div class="card-header bg-white fw-semibold">
+        <i class="bi bi-chat-text me-2"></i>Переписка
+        <span class="badge bg-secondary ms-1">{{ messages | length }}</span>
+      </div>
+      <div class="card-body msg-wrap" style="max-height:520px;overflow-y:auto" id="chatBox">
+        {% if messages %}
+        {% for m in messages %}
+        <div class="msg-row {{ 'out' if m.direction=='out' else 'in' }}">
+          <div>
+            <div class="{{ 'msg-out' if m.direction=='out' else 'msg-in' }}" style="white-space:pre-wrap">{{ m.text }}</div>
+            <div class="msg-meta {{ 'text-end' if m.direction=='out' else '' }}">
+              {% if m.direction=='out' %}
+                <i class="bi bi-robot me-1"></i>Бот
+              {% else %}
+                <i class="bi bi-person me-1"></i>Пользователь
+              {% endif %}
+              · {{ m.sent_at[:16].replace('T',' ') }}
+              {% if m.state_at %} · {{ m.state_at }}{% endif %}
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="text-center text-muted py-4">
+          Сообщений пока нет
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- Ручная отправка -->
+      {% if dialog.state not in ('UNSUBSCRIBED',) %}
+      <div class="card-footer bg-white">
+        <form method="post" action="/dialog/{{ dialog.user_id }}/send">
+          <div class="input-group">
+            <textarea name="text" class="form-control" rows="2"
+                      placeholder="Написать вручную..." required></textarea>
+            <button class="btn btn-primary" type="submit">
+              <i class="bi bi-send-fill"></i>
+            </button>
+          </div>
+          <div class="form-text">Сообщение будет отправлено от имени группы и записано в историю</div>
+        </form>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Детали -->
+  <div class="col-md-4">
+    <div class="card p-3 mb-3">
+      <h6 class="fw-bold mb-3"><i class="bi bi-info-circle me-2"></i>Информация</h6>
+      <table class="table table-sm table-borderless mb-0">
+        <tr><td class="text-muted">Этап</td><td>{{ state_badge(dialog.state)|safe }}</td></tr>
+        <tr><td class="text-muted">A/B вариант</td><td>
+          <span class="badge bg-{{ 'primary' if dialog.ab_variant=='A' else 'warning' }}">{{ dialog.ab_variant }}</span>
+        </td></tr>
+        <tr><td class="text-muted">Создан</td><td class="small">{{ dialog.created_at[:16].replace('T',' ') }}</td></tr>
+        <tr><td class="text-muted">Обновлён</td><td class="small">{{ dialog.updated_at[:16].replace('T',' ') }}</td></tr>
+        {% if dialog.next_followup %}
+        <tr><td class="text-muted">Follow-up</td><td class="small text-warning">{{ dialog.next_followup[:16].replace('T',' ') }}</td></tr>
+        {% endif %}
+      </table>
+    </div>
+
+    <!-- Ручная смена этапа -->
+    <div class="card p-3">
+      <h6 class="fw-bold mb-3"><i class="bi bi-arrow-repeat me-2"></i>Изменить этап</h6>
+      <form method="post" action="/dialog/{{ dialog.user_id }}/set_state">
+        <select name="state" class="form-select form-select-sm mb-2">
+          {% for s in ['NEW','GREETING','QUALIFYING','PAIN','PITCH','OBJECTION','CTA','CLOSED_WON','CLOSED_LOST'] %}
+          <option value="{{ s }}" {% if s==dialog.state %}selected{% endif %}>{{ s }}</option>
+          {% endfor %}
+        </select>
+        <button class="btn btn-outline-primary btn-sm w-100">Применить</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Прокрутить чат вниз
+  const box = document.getElementById('chatBox');
+  if(box) box.scrollTop = box.scrollHeight;
+</script>
+{% endblock %}
