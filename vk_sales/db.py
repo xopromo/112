@@ -124,7 +124,7 @@ def get_stats():
         return {r['state']: r['count'] for r in rows}
 
 
-def add_users_from_list(user_ids: list[int]):
+def add_users_from_list(user_ids):
     """Добавить список user_id с состоянием NEW (пропустить дубли)."""
     import random
     added = 0

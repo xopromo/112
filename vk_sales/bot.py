@@ -94,7 +94,7 @@ class VKSalesBot:
     # ЗАПУСК РАССЫЛКИ (первый контакт)
     # ─────────────────────────────────────────────────────────────────────────
 
-    def start_campaign(self, user_ids: list[int] = None):
+    def start_campaign(self, user_ids=None):
         """
         Начать диалог с пользователями.
         user_ids — список id для добавления. Если None — берём из БД (state=NEW).

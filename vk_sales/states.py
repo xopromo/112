@@ -22,7 +22,7 @@ FOLLOWUP_HOURS = {
 }
 
 
-def followup_dt(state: str) -> str | None:
+def followup_dt(state: str):
     """ISO-строка когда нужен follow-up."""
     hours = FOLLOWUP_HOURS.get(state)
     if hours is None:
@@ -36,7 +36,7 @@ def on_enter(state: str, variant: str, name: str, city: str) -> str:
 
 
 def transition(current_state: str, user_text: str, variant: str,
-               name: str, city: str) -> tuple[str, str | None]:
+               name: str, city: str):
     """
     Возвращает (next_state, reply_text | None).
     reply_text=None если нужно просто сменить состояние без ответа.
@@ -151,7 +151,7 @@ def transition(current_state: str, user_text: str, variant: str,
     return current_state, None
 
 
-def get_followup_message(state: str, variant: str, name: str, city: str) -> str | None:
+def get_followup_message(state: str, variant: str, name: str, city: str):
     """Текст follow-up сообщения если пользователь не ответил."""
     followup_map = {
         "GREETING": "GREETING_FOLLOWUP",
