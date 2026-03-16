@@ -41,6 +41,43 @@
         </div>
 
         <hr>
+        <h6 class="fw-bold mb-3"><i class="bi bi-cpu me-2 text-success"></i>AI-ответы (Groq, бесплатно)</h6>
+
+        <div class="mb-3">
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" name="use_ai" id="useAI"
+                   {% if cfg.use_ai %}checked{% endif %}>
+            <label class="form-check-label" for="useAI">
+              <strong>Включить нейросеть (llama-3.3-70b)</strong>
+            </label>
+          </div>
+          <div class="form-text">Когда включено — бот отвечает через Groq AI, а не по скриптам. При ошибке AI автоматически переключается на скрипт.</div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Groq API ключ</label>
+          <div class="input-group">
+            <input type="password" name="groq_key" id="groqKeyField"
+                   class="form-control font-monospace"
+                   value="{{ cfg.groq_key or '' }}"
+                   placeholder="gsk_xxxxxxxxxxxxxxxxxx">
+            <button type="button" class="btn btn-outline-secondary" onclick="toggleGroqKey()">
+              <i class="bi bi-eye" id="groqEyeIcon"></i>
+            </button>
+          </div>
+          <div class="form-text">
+            Получить бесплатно: <strong>console.groq.com</strong> → API Keys → Create new
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Описание продукта/услуги</label>
+          <textarea name="ai_product" class="form-control" rows="3"
+                    placeholder="Например: SMM-услуги для малого бизнеса. Ведём ВКонтакте, создаём контент, настраиваем рекламу. Цена от 15 000 руб/мес.">{{ cfg.ai_product or '' }}</textarea>
+          <div class="form-text">AI будет использовать это описание в каждом диалоге.</div>
+        </div>
+
+        <hr>
         <h6 class="fw-bold mb-3">Параметры отправки</h6>
 
         <div class="row g-2 mb-3">
@@ -129,6 +166,12 @@
 function toggleToken() {
   const f = document.getElementById('tokenField');
   const i = document.getElementById('eyeIcon');
+  if(f.type === 'password') { f.type='text'; i.className='bi bi-eye-slash'; }
+  else { f.type='password'; i.className='bi bi-eye'; }
+}
+function toggleGroqKey() {
+  const f = document.getElementById('groqKeyField');
+  const i = document.getElementById('groqEyeIcon');
   if(f.type === 'password') { f.type='text'; i.className='bi bi-eye-slash'; }
   else { f.type='password'; i.className='bi bi-eye'; }
 }

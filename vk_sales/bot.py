@@ -18,6 +18,7 @@ from .states import (
     transition, on_enter, followup_dt,
     get_followup_message, FINAL_STATES
 )
+from .ai_responder import ask_groq
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +31,10 @@ class VKSalesBot:
 
         self.token = self.cfg["group_token"]
         self.group_id = self.cfg["group_id"]
-        self.dry_run = self.cfg.get("dry_run", False)
+        self.dry_run   = self.cfg.get("dry_run", False)
+        self.use_ai    = self.cfg.get("use_ai", False)
+        self.groq_key  = self.cfg.get("groq_key", "")
+        self.ai_product = self.cfg.get("ai_product", "")
 
         # Задержки между сообщениями (защита от спам-фильтра)
         self.send_delay_min = self.cfg.get("send_delay_min", 2)   # сек
@@ -192,6 +196,24 @@ class VKSalesBot:
             logger.info("Message from closed dialog user=%s", user_id)
             return
 
+        # ── AI или скрипт ────────────────────────────────────────────────────
+        if self.use_ai and self.groq_key and state not in FINAL_STATES:
+            history = db.get_messages(user_id, limit=20)
+            ai_reply = ask_groq(
+                api_key=self.groq_key,
+                history_rows=history,
+                user_text=text,
+                state=state,
+                name=name,
+                product=self.ai_product,
+            )
+            if ai_reply:
+                # состояние не меняем — AI сам ведёт диалог
+                self._send(user_id, ai_reply, state)
+                return
+            logger.warning("AI fallback to script for user=%s", user_id)
+
+        # ── Скриптовая машина состояний (fallback) ───────────────────────────
         next_state, reply = transition(state, text, variant, name, city)
 
         if next_state != state or reply:

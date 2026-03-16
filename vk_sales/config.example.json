@@ -7,5 +7,9 @@
   "dry_run": true,
 
   "send_delay_min": 2,
-  "send_delay_max": 8
+  "send_delay_max": 8,
+
+  "use_ai":     false,
+  "groq_key":   "",
+  "ai_product": "Опиши свой продукт/услугу для AI"
 }
