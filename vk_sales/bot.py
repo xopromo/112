@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Optional
 
 import vk_api
-from vk_api.longpoll import VkBotLongPoll, VkBotEventType
+from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
 
 from . import db
 from .states import (
