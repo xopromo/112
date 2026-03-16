@@ -65,12 +65,17 @@ def state_badge(state: str) -> str:
 
 
 def load_config() -> dict:
+    defaults = {"group_token": "", "group_id": 0, "dry_run": True,
+                "send_delay_min": 2, "send_delay_max": 8,
+                "use_ai": False, "groq_key": "", "ai_product": ""}
     if CONFIG_PATH.exists():
-        with open(CONFIG_PATH) as f:
-            return json.load(f)
-    return {"group_token": "", "group_id": 0, "dry_run": True,
-            "send_delay_min": 2, "send_delay_max": 8,
-            "use_ai": False, "groq_key": "", "ai_product": ""}
+        try:
+            with open(CONFIG_PATH, encoding="utf-8") as f:
+                data = json.load(f)
+            defaults.update(data)
+        except Exception as e:
+            logger.error("Failed to load config: %s", e)
+    return defaults
 
 
 def save_config(data: dict):
@@ -334,17 +339,26 @@ def settings():
 
 @app.route("/settings/save", methods=["POST"])
 def settings_save():
-    save_config({
-        "group_token":    request.form.get("group_token", ""),
-        "group_id":       int(request.form.get("group_id", 0) or 0),
-        "dry_run":        "dry_run" in request.form,
-        "send_delay_min": int(request.form.get("send_delay_min", 2)),
-        "send_delay_max": int(request.form.get("send_delay_max", 8)),
-        "use_ai":         "use_ai" in request.form,
-        "groq_key":       request.form.get("groq_key", "").strip(),
-        "ai_product":     request.form.get("ai_product", "").strip(),
-    })
-    flash("Настройки сохранены!", "success")
+    def _int(val, default):
+        try:
+            return int(val or default)
+        except (ValueError, TypeError):
+            return default
+    try:
+        save_config({
+            "group_token":    request.form.get("group_token", ""),
+            "group_id":       _int(request.form.get("group_id"), 0),
+            "dry_run":        "dry_run" in request.form,
+            "send_delay_min": _int(request.form.get("send_delay_min"), 2),
+            "send_delay_max": _int(request.form.get("send_delay_max"), 8),
+            "use_ai":         "use_ai" in request.form,
+            "groq_key":       request.form.get("groq_key", "").strip(),
+            "ai_product":     request.form.get("ai_product", "").strip(),
+        })
+        flash("Настройки сохранены!", "success")
+    except Exception as e:
+        logger.error("settings_save error: %s", e)
+        flash(f"Ошибка сохранения: {e}", "danger")
     return redirect(url_for("settings"))
 
 
