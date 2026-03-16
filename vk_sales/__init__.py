@@ -1,0 +1,1 @@
+# VK Sales Bot package
