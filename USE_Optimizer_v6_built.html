@@ -2980,6 +2980,27 @@ function generatePineScript(r) {
     lines.push(`bool a_lx = false`);
     lines.push(`bool a_sx = false`);
   lines.push(``);
+  // ── INTRA-BAR TP/SL BLOCK ───────────────────────────────────────────────
+  // Runs on every tick (not confirmed) to fire alerts and update box immediately
+  // when TP/SL is touched intra-bar (before bar close).
+  lines.push(`// Intra-bar TP/SL: fire alert and update trade box immediately on touch`);
+  lines.push(`if v_in and bar_index > v_eb and bar_index > (last_bar_index - max_bars) and not barstate.isconfirmed`);
+  lines.push(`    bool _ib_htp = v_dir == 1 ? (high >= v_tp) : (low <= v_tp)`);
+  lines.push(`    bool _ib_hsl = v_dir == 1 ? (low <= v_sl) : (high >= v_sl)`);
+  lines.push(`    if _ib_hsl or _ib_htp`);
+  lines.push(`        float _ib_xp = _ib_hsl ? v_sl : v_tp`);
+  lines.push(`        string _ib_xt = _ib_hsl ? "SL" : "TP"`);
+  lines.push(`        if show_tr and not na(b_trade)`);
+  lines.push(`            bool _ib_win = v_dir == 1 ? _ib_xp > v_ep : _ib_xp < v_ep`);
+  lines.push(`            box.set_top(b_trade, math.max(v_ep, _ib_xp))`);
+  lines.push(`            box.set_bottom(b_trade, math.min(v_ep, _ib_xp))`);
+  lines.push(`            box.set_right(b_trade, bar_index)`);
+  lines.push(`            box.set_bgcolor(b_trade, _ib_win ? c_win : c_loss)`);
+  lines.push(`        if v_dir == 1`);
+  lines.push(`            alert("XL " + _ib_xt + " @" + str.tostring(_ib_xp, "#.####"), alert.freq_once_per_bar)`);
+  lines.push(`        else`);
+  lines.push(`            alert("XS " + _ib_xt + " @" + str.tostring(_ib_xp, "#.####"), alert.freq_once_per_bar)`);
+  lines.push(``);
   lines.push(`if bar_index > (last_bar_index - max_bars) and confirmed`);
   lines.push(`    if v_in and bar_index > v_eb`);
   lines.push(`        float _u  = atr_v[1]`);
@@ -3120,7 +3141,7 @@ function generatePineScript(r) {
   lines.push(`                float vpct = v_dir == 1 ? (vxp - v_ep)/v_ep*100 : (v_ep - vxp)/v_ep*100`);
     lines.push(`                label.new(`);
     lines.push(`                    bar_index,`);
-    lines.push(`                    v_dir == 1 ? high + atr_v[1] * lbl_off_m : low - atr_v[1] * lbl_off_m,`);
+    lines.push(`                    v_dir == 1 ? vxp + atr_v[1] * lbl_off_m : vxp - atr_v[1] * lbl_off_m,`);
     lines.push(`                    vxt + " " + str.tostring(vpct, "#.#") + "%",`);
     lines.push(`                    color=win ? color.green : color.red,`);
     lines.push(`                    style=v_dir == 1 ? label.style_label_down : label.style_label_up,`);
@@ -18042,7 +18063,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1773659907942;
+window._BUILD_TS = 1773663580097;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
