@@ -3117,13 +3117,18 @@ function _runTVcompare(tvRows, resultsEl) {
   let fullEq = r.eq; // fallback
   let isFullRun = false;
   let fullRunErr = '';
+  let freshPnl = NaN, storedPnlFull = NaN, storedEqLast = NaN, storedEqLen = 0;
   try {
+    storedPnlFull = r.cfg?._oos?.forward?.pnlFull ?? NaN;
+    storedEqLast  = r.eq && r.eq.length ? r.eq[r.eq.length - 1] : NaN;
+    storedEqLen   = r.eq ? r.eq.length : 0;
     const _ind   = typeof _calcIndicators === 'function' ? _calcIndicators(r.cfg) : null;
     const _btCfg = (_ind && typeof buildBtCfg === 'function') ? buildBtCfg(r.cfg, _ind) : null;
     if (_btCfg && typeof backtest === 'function') {
       const rFull = backtest(_ind.pvLo, _ind.pvHi, _ind.atrArr, _btCfg);
       if (rFull && rFull.eq && rFull.eq.length > 0) {
         fullEq = rFull.eq;
+        freshPnl = rFull.pnl;
         isFullRun = true;
       } else { fullRunErr = 'backtest вернул пустой eq'; }
     } else { fullRunErr = '_calcIndicators/buildBtCfg/backtest не найдены'; }
@@ -3211,7 +3216,7 @@ function _runTVcompare(tvRows, resultsEl) {
   const fdC   = Math.abs(finalDiff) < 1 ? 'pos' : Math.abs(finalDiff) < 5 ? 'warn' : 'neg';
 
   // Сохраняем диагностику для copyTVdiag()
-  _tvCmpDiag = { r, pairs, corr, rmse, finalDiff, jsLast, tvLast, firstDivBar, firstDivTime, maxDiff, maxDiffBar, maxDiffTime, hasSigs, tvSigCount, fullEq, isFullRun, missingEnd, jsFullFinal, fullRunErr };
+  _tvCmpDiag = { r, pairs, corr, rmse, finalDiff, jsLast, tvLast, firstDivBar, firstDivTime, maxDiff, maxDiffBar, maxDiffTime, hasSigs, tvSigCount, fullEq, isFullRun, missingEnd, jsFullFinal, fullRunErr, freshPnl, storedPnlFull, storedEqLast, storedEqLen };
 
   let html = '';
   html += row('Режим сравнения', isFullRun
@@ -3284,7 +3289,8 @@ function copyTVdiag() {
   if (!d) { alert('Нет данных диагностики — сначала загрузи TV CSV'); return; }
   const { r, pairs, corr, rmse, finalDiff, jsLast, tvLast,
           firstDivBar, firstDivTime, maxDiff, maxDiffBar, maxDiffTime, hasSigs, isFullRun,
-          missingEnd, jsFullFinal, fullRunErr } = d;
+          missingEnd, jsFullFinal, fullRunErr,
+          freshPnl, storedPnlFull, storedEqLast, storedEqLen } = d;
   const c = r.cfg;
   const lastPairBar2 = pairs.length > 0 ? pairs[pairs.length - 1].i : -1;
 
@@ -3292,6 +3298,8 @@ function copyTVdiag() {
   lines.push('=== TV vs JS ДИАГНОСТИКА РАСХОЖДЕНИЯ ===');
   lines.push(`Результат: ${r.name}`);
   lines.push(`Режим: ${isFullRun ? 'IS+OOS (полный прогон)' : `fallback (r.eq)${fullRunErr ? ' — ' + fullRunErr : ''}`} | Данные: ${pairs.length}/${DATA.length} баров`);
+  // Debug: compare fresh backtest vs stored optimization result
+  lines.push(`[DEBUG] freshPnl=${isNaN(freshPnl)?'—':freshPnl.toFixed(2)+'%'} | storedPnlFull=${isNaN(storedPnlFull)?'—':storedPnlFull.toFixed(2)+'%'} | r.eq[last]=${isNaN(storedEqLast)?'—':storedEqLast.toFixed(2)+'%'} (len=${storedEqLen}) | DATA.len=${DATA.length}`);
   if (missingEnd > 0) {
     const missedPnl = !isNaN(jsFullFinal) ? (jsFullFinal - jsLast).toFixed(1) : '?';
     lines.push(`⚠️ TV CSV НЕ ПОКРЫВАЕТ последние ${missingEnd} баров DATA (пропущено JS PnL ≈ ${missedPnl}%)`);
