@@ -118,6 +118,16 @@ def get_all_new_users():
         ).fetchall()
 
 
+def get_messages(user_id: int, limit: int = 20):
+    """Последние N сообщений диалога (для контекста AI)."""
+    with get_conn() as conn:
+        return conn.execute(
+            """SELECT direction, text FROM messages
+               WHERE user_id=? ORDER BY id DESC LIMIT ?""",
+            (user_id, limit)
+        ).fetchall()[::-1]  # хронологический порядок
+
+
 def get_stats():
     with get_conn() as conn:
         rows = conn.execute("SELECT state, count FROM stats ORDER BY count DESC").fetchall()

@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Лог бота — VK Sales Bot{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center mb-3 gap-3">
+  <h4 class="fw-bold mb-0">Лог бота</h4>
+  <button class="btn btn-sm btn-outline-secondary" onclick="location.reload()">
+    <i class="bi bi-arrow-clockwise me-1"></i>Обновить
+  </button>
+  <div class="form-check form-switch mb-0">
+    <input class="form-check-input" type="checkbox" id="autoRefresh" checked>
+    <label class="form-check-label small" for="autoRefresh">Авто-обновление</label>
+  </div>
+</div>
+
+<div class="card p-0" style="background:#1a1a2e">
+  <pre id="logBox" style="color:#d4f5d4;font-size:.78rem;padding:16px;margin:0;
+    max-height:72vh;overflow-y:auto;white-space:pre-wrap;word-break:break-all">{{ log }}</pre>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const box = document.getElementById('logBox');
+box.scrollTop = box.scrollHeight;
+
+let timer = setInterval(() => {
+  if (!document.getElementById('autoRefresh').checked) return;
+  fetch('/api/log_tail')
+    .then(r => r.json())
+    .then(d => { box.textContent = d.log; box.scrollTop = box.scrollHeight; });
+}, 3000);
+</script>
+{% endblock %}

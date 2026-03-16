@@ -69,7 +69,8 @@ def load_config() -> dict:
         with open(CONFIG_PATH) as f:
             return json.load(f)
     return {"group_token": "", "group_id": 0, "dry_run": True,
-            "send_delay_min": 2, "send_delay_max": 8}
+            "send_delay_min": 2, "send_delay_max": 8,
+            "use_ai": False, "groq_key": "", "ai_product": ""}
 
 
 def save_config(data: dict):
@@ -332,13 +333,15 @@ def settings():
 
 @app.route("/settings/save", methods=["POST"])
 def settings_save():
-    dry_run = "dry_run" in request.form
     save_config({
         "group_token":    request.form.get("group_token", ""),
         "group_id":       int(request.form.get("group_id", 0) or 0),
-        "dry_run":        dry_run,
+        "dry_run":        "dry_run" in request.form,
         "send_delay_min": int(request.form.get("send_delay_min", 2)),
         "send_delay_max": int(request.form.get("send_delay_max", 8)),
+        "use_ai":         "use_ai" in request.form,
+        "groq_key":       request.form.get("groq_key", "").strip(),
+        "ai_product":     request.form.get("ai_product", "").strip(),
     })
     flash("Настройки сохранены!", "success")
     return redirect(url_for("settings"))
@@ -356,10 +359,21 @@ def api_messages(user_id: int):
 @app.route("/bot/log")
 def bot_log():
     if not BOT_LOG_FILE.exists():
-        return "<pre>Лог пуст</pre>"
+        lines_html = "Лог пуст — запусти бота чтобы появились записи."
+    else:
+        import html as _html
+        lines = BOT_LOG_FILE.read_text(encoding="utf-8", errors="replace").splitlines()
+        lines_html = _html.escape("\n".join(lines[-300:]))
+    return render_template("bot_log.html", log=lines_html, bot_running=_bot_running())
+
+
+@app.route("/api/log_tail")
+def api_log_tail():
+    if not BOT_LOG_FILE.exists():
+        return jsonify({"log": "Лог пуст"})
+    import html as _html
     lines = BOT_LOG_FILE.read_text(encoding="utf-8", errors="replace").splitlines()
-    last = "\n".join(lines[-200:])  # последние 200 строк
-    return f"<pre style='font-size:.8rem'>{last}</pre>"
+    return jsonify({"log": _html.escape("\n".join(lines[-300:]))})
 
 
 @app.route("/api/test_connection")
