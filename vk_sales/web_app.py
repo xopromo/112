@@ -374,11 +374,18 @@ def bot_start():
         return redirect(url_for("settings"))
     try:
         python = sys.executable
+        kwargs = dict(
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            stdin=subprocess.DEVNULL,
+        )
+        if sys.platform == "win32":
+            kwargs["creationflags"] = (subprocess.CREATE_NO_WINDOW
+                                       | subprocess.DETACHED_PROCESS)
         proc = subprocess.Popen(
             [python, str(Path(__file__).parent.parent / "run_vk_bot.py"),
              "--config", str(CONFIG_PATH)],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            **kwargs,
         )
         BOT_PID_FILE.write_text(str(proc.pid))
         flash("Бот запущен!", "success")
@@ -451,7 +458,7 @@ def db_reset():
 
 def run_web(host="127.0.0.1", port=5001, debug=False):
     db.init_db()
-    app.run(host=host, port=port, debug=debug)
+    app.run(host=host, port=port, debug=debug, threaded=True, use_reloader=False)
 
 
 if __name__ == "__main__":
