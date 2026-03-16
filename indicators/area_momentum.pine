@@ -1,0 +1,327 @@
+//@version=6
+// ============================================================
+// Area Momentum Indicator
+// Идея: вход когда площадь между ценой и МА стабильно растёт,
+//       выход когда прирост площади замедляется.
+// Структура: сделки на графике + таблица статистики + equity
+// ============================================================
+indicator("Area Momentum [USE]", shorttitle="AreaMom", overlay=true,
+          max_lines_count=500, max_labels_count=500, max_boxes_count=500)
+
+// ==========================================
+// 1. ВХОДНЫЕ ДАННЫЕ
+// ==========================================
+
+grp_ma = "📈 МА НАСТРОЙКИ"
+ma_type      = input.string("EMA",  "Тип МА", options=["SMA","EMA","WMA","HMA"], group=grp_ma)
+ma_len       = input.int(50, "Период МА", minval=5, maxval=500, group=grp_ma)
+
+grp_sig = "🎯 СИГНАЛЫ"
+confirm_bars = input.int(2, "Баров ускорения для входа", minval=1, maxval=10, group=grp_sig,
+              tooltip="Сколько баров подряд прирост площади должен расти для сигнала входа")
+use_long     = input.bool(true,  "Long",  group=grp_sig)
+use_short    = input.bool(true,  "Short", group=grp_sig)
+
+grp_sl = "🛡️ SL / TP"
+sl_atr_m     = input.float(1.5, "SL × ATR",  minval=0.1, step=0.1, group=grp_sl)
+tp_rr        = input.float(2.0, "TP (R:R)",  minval=0.1, step=0.1, group=grp_sl)
+atr_len      = input.int(14,    "ATR период",minval=1,   group=grp_sl)
+
+grp_vis = "🎨 ВНЕШНИЙ ВИД"
+show_ma_line = input.bool(true,  "Показать МА",            group=grp_vis)
+show_area    = input.bool(true,  "Закрашивать область",    group=grp_vis)
+show_tr      = input.bool(true,  "Метки сделок на графике",group=grp_vis)
+show_eq      = input.bool(true,  "Equity кривая",          group=grp_vis)
+lbl_off_m    = input.float(1.5,  "Отступ меток (× ATR)",   group=grp_vis)
+lbl_size     = input.string("small", "Размер меток",
+              options=["tiny","small","normal","large"], group=grp_vis)
+
+grp_tbl = "📊 ТАБЛИЦА"
+pos_main     = input.string("bottom_right", "Позиция таблицы",
+              options=["bottom_right","bottom_left","top_right","top_left"], group=grp_tbl)
+commission   = input.float(0.08, "Комиссия %",       minval=0, step=0.01, group=grp_tbl)
+start_cap    = input.float(10000,"Начальный капитал", minval=1, group=grp_tbl)
+max_bars     = input.int(5000,   "Глубина теста (баров)", minval=100, group=grp_tbl)
+
+// ==========================================
+// 2. ИНДИКАТОРЫ
+// ==========================================
+
+// МА
+float ma = switch ma_type
+    "SMA" => ta.sma(close, ma_len)
+    "WMA" => ta.wma(close, ma_len)
+    "HMA" => ta.hma(close, ma_len)
+    =>       ta.ema(close, ma_len)
+
+// ATR
+float atr_v = ta.atr(atr_len)
+
+// Площадь между ценой и МА на каждом баре
+float area        = math.abs(close - ma)
+
+// Прирост площади за бар (первая производная)
+float area_delta  = area - area[1]
+
+// Ускорение прироста (вторая производная)
+float area_accel  = area_delta - area_delta[1]
+
+// ── Условие входа: N баров подряд прирост растёт ──────────
+// area_delta[0] > area_delta[1] > ... > area_delta[confirm_bars-1]
+bool accel_ok = true
+for i = 0 to confirm_bars - 1
+    if area_delta[i] <= area_delta[i + 1]
+        accel_ok := false
+
+// МА прогрелась (первые ma_len баров данных нулевые)
+bool ma_warm = not na(ma) and bar_index >= ma_len
+
+// Финальные сигналы входа
+bool sig_l = ma_warm and close > ma and accel_ok   // цена выше МА, площадь разгоняется
+bool sig_s = ma_warm and close < ma and accel_ok   // цена ниже МА, площадь разгоняется
+
+// Выход: прирост площади замедлился (текущий < предыдущего)
+bool exit_sig = area_delta < area_delta[1]
+
+// ==========================================
+// 3. ВИЗУАЛИЗАЦИЯ МА + ЗАКРАШЕННАЯ ОБЛАСТЬ
+// ==========================================
+
+ma_col = close > ma ? color.new(color.lime, 20) : color.new(color.red, 20)
+plot(show_ma_line ? ma : na, "MA", color=ma_col, linewidth=2)
+
+// Цвет области: ярче когда площадь растёт с ускорением
+bool is_bull_momentum = close > ma and accel_ok
+bool is_bear_momentum = close < ma and accel_ok
+area_fill = is_bull_momentum ? color.new(color.green, 55) :
+            is_bear_momentum ? color.new(color.red,   55) :
+            close > ma       ? color.new(color.green, 82) :
+                               color.new(color.red,   82)
+
+p_close = plot(show_area ? close : na, display=display.none)
+p_ma    = plot(show_area ? ma    : na, display=display.none)
+fill(p_close, p_ma, color=show_area ? area_fill : na, title="Area fill")
+
+// ==========================================
+// 4. БЭКТЕСТ-ДВИЖОК (простой, без перезагрузки)
+// ==========================================
+
+var float _pnl  = 0.0
+var float _eq   = 0.0
+var float _dd   = 0.0
+var float _peak = 0.0
+var int   _cnt  = 0
+var int   _wins = 0
+var bool  _in   = false
+var int   _dir  = 0
+var float _ep   = 0.0
+var float _sl   = 0.0
+var float _tp   = 0.0
+var int   _eb   = -1
+var int   _xb   = -1
+
+// визуальные объекты текущей сделки
+var box   _box  = na
+var line  _ltp  = na
+var line  _lsl  = na
+
+// алерт-флаги (сбрасываются на каждом баре)
+bool a_le = false
+bool a_se = false
+bool a_lx = false
+bool a_sx = false
+
+// round-trip комиссия
+float _comm2 = commission * 2.0 / 100.0
+
+if bar_index > (last_bar_index - max_bars)
+    float _u = nz(atr_v[1], atr_v)
+
+    // ── УПРАВЛЕНИЕ ОТКРЫТОЙ СДЕЛКОЙ ──────────────────────
+    if _in and bar_index > _eb
+        bool hit_sl = (_dir ==  1 and low  <= _sl) or (_dir == -1 and high >= _sl)
+        bool hit_tp = (_dir ==  1 and high >= _tp) or (_dir == -1 and low  <= _tp)
+        bool hit_ex = (_dir ==  1 and exit_sig)    or (_dir == -1 and exit_sig)
+
+        if hit_sl or hit_tp or hit_ex
+            float xp  = hit_sl ? _sl : hit_tp ? _tp : close
+            float ret = (_dir == 1 ? (xp - _ep) / _ep : (_ep - xp) / _ep) * 100.0 - _comm2 * 100.0
+
+            _pnl += ret
+            _eq  := _pnl
+            _cnt += 1
+            if ret > 0
+                _wins += 1
+            if _eq > _peak
+                _peak := _eq
+            float dd_now = _peak - _eq
+            if dd_now > _dd
+                _dd := dd_now
+
+            // закрыть визуальные объекты
+            if show_tr
+                string xt  = hit_sl ? "SL" : hit_tp ? "TP" : "EXIT"
+                color  xc  = ret > 0 ? color.new(color.green, 50) : color.new(color.red, 50)
+                label.new(
+                    bar_index,
+                    _dir == 1 ? high + _u * lbl_off_m : low - _u * lbl_off_m,
+                    xt,
+                    color=xc,
+                    style=_dir == 1 ? label.style_label_down : label.style_label_up,
+                    textcolor=color.white,
+                    size=size.tiny)
+                if not na(_box)
+                    box.set_right(_box, bar_index)
+                    box.set_bgcolor(_box, ret > 0 ? color.new(color.green, 80) : color.new(color.red, 80))
+                if not na(_ltp)
+                    line.set_x2(_ltp, bar_index)
+                if not na(_lsl)
+                    line.set_x2(_lsl, bar_index)
+
+            if _dir == 1
+                a_lx := true
+            else
+                a_sx := true
+
+            _in  := false
+            _xb  := bar_index
+
+    // ── ОТКРЫТИЕ НОВОЙ СДЕЛКИ ─────────────────────────────
+    if not _in and bar_index > _xb
+        bool do_l = use_long  and sig_l
+        bool do_s = use_short and sig_s and not do_l
+
+        if do_l or do_s
+            _in  := true
+            _dir := do_l ? 1 : -1
+            _ep  := close
+            _sl  := do_l ? close - _u * sl_atr_m : close + _u * sl_atr_m
+            float sl_d = math.abs(_ep - _sl)
+            _tp  := do_l ? close + sl_d * tp_rr : close - sl_d * tp_rr
+            _eb  := bar_index
+
+            if show_tr
+                string elbl = do_l ? "L" : "S"
+                color  ecol = do_l ? color.green : color.red
+                _lsize = lbl_size == "tiny" ? size.tiny :
+                         lbl_size == "normal" ? size.normal :
+                         lbl_size == "large" ? size.large : size.small
+                label.new(
+                    bar_index,
+                    do_l ? low - _u * lbl_off_m : high + _u * lbl_off_m,
+                    elbl,
+                    color=ecol,
+                    style=do_l ? label.style_label_up : label.style_label_down,
+                    textcolor=color.white,
+                    size=_lsize)
+                _ltp := line.new(bar_index, _tp, bar_index, _tp,
+                         color=color.new(color.lime, 40), style=line.style_dotted, width=1)
+                _lsl := line.new(bar_index, _sl, bar_index, _sl,
+                         color=color.new(color.red,  40), style=line.style_dotted, width=1)
+                _box := box.new(bar_index, _ep, bar_index, _ep,
+                         bgcolor=color.new(color.blue, 90), border_width=0)
+
+            if do_l
+                a_le := true
+                alert("LONG @" + str.tostring(close, "#.####") +
+                      " SL:" + str.tostring(_sl, "#.####") +
+                      " TP:" + str.tostring(_tp, "#.####"), alert.freq_once_per_bar)
+            else
+                a_se := true
+                alert("SHORT @" + str.tostring(close, "#.####") +
+                      " SL:" + str.tostring(_sl, "#.####") +
+                      " TP:" + str.tostring(_tp, "#.####"), alert.freq_once_per_bar)
+
+// Обновить бокс открытой сделки каждый бар
+if _in and not na(_box)
+    float top_price = _dir == 1 ? math.max(_ep, close) : _tp
+    float bot_price = _dir == 1 ? _sl : math.min(_ep, close)
+    box.set_right(_box, bar_index)
+    box.set_top(_box, top_price)
+    box.set_bottom(_box, bot_price)
+
+// ==========================================
+// 5. EQUITY
+// ==========================================
+
+eq_col = _eq >= 0 ? color.new(color.lime, 30) : color.new(color.red, 30)
+plot(show_eq ? _eq : na, "Equity %", color=eq_col, linewidth=2, display=display.pane)
+plot(show_eq ? 0   : na, "Zero",     color=color.new(color.gray, 70),
+     style=plot.style_circles, display=display.pane)
+
+// Area delta в той же панели (нормализован для наглядности)
+plot(area_delta / math.max(close * 0.0001, 0.0001), "Δ Площадь (норм)",
+     color=area_delta > area_delta[1] ? color.new(color.aqua, 50) : color.new(color.orange, 60),
+     linewidth=1, display=display.pane)
+
+// ==========================================
+// 6. ТАБЛИЦА СТАТИСТИКИ
+// ==========================================
+
+tbl_pos = pos_main == "bottom_right" ? position.bottom_right :
+          pos_main == "bottom_left"  ? position.bottom_left  :
+          pos_main == "top_right"    ? position.top_right    : position.top_left
+
+c_bg = color.new(color.black, 20)
+
+tc(row, lbl, val, vc) =>
+    table.cell(t_stat, 0, row, lbl, text_color=color.new(color.gray, 20),
+               bgcolor=c_bg, text_size=size.small)
+    table.cell(t_stat, 1, row, val, text_color=vc,
+               bgcolor=c_bg, text_size=size.small)
+
+var table t_stat = table.new(tbl_pos, 2, 12, bgcolor=c_bg, border_width=1, force_overlay=true)
+
+if barstate.islast
+    float wr    = _cnt > 0 ? _wins * 100.0 / _cnt : 0.0
+    float avg_t = _cnt > 0 ? _pnl  / _cnt : 0.0
+    float rf    = _dd  > 0 ? _pnl  / _dd  : 0.0
+    float cpnl  = start_cap * math.pow(1.0 + _pnl / 100.0 / math.max(1, _cnt), _cnt) - start_cap
+
+    // Заголовок
+    table.cell(t_stat, 0, 0, "📐 Area Momentum",
+               text_color=color.white, bgcolor=color.new(color.blue, 30), text_size=size.normal)
+    table.merge_cells(t_stat, 0, 0, 1, 0)
+
+    // Настройки
+    table.cell(t_stat, 0, 1,
+               ma_type + str.tostring(ma_len) + " | подтв:" + str.tostring(confirm_bars) +
+               " | SL×" + str.tostring(sl_atr_m,"#.#") + " TP:" + str.tostring(tp_rr,"#.#") + "R",
+               text_color=color.new(color.gray,30), bgcolor=color.new(color.navy,60), text_size=size.tiny)
+    table.merge_cells(t_stat, 0, 1, 1, 1)
+
+    // Метрики
+    tc(2,  "PnL %",  str.tostring(_pnl, "#.##") + "%",
+       _pnl > 0 ? color.lime : color.red)
+    tc(3,  "DD %",   str.tostring(_dd,  "#.##") + "%",
+       _dd < 10 ? color.lime : _dd < 25 ? color.orange : color.red)
+    tc(4,  "RF",     str.tostring(rf,   "#.##"),
+       rf > 2 ? color.lime : rf > 1 ? color.orange : color.red)
+    tc(5,  "WR",     str.tostring(wr,   "#.#") + "%",
+       wr > 55 ? color.lime : wr > 45 ? color.orange : color.red)
+    tc(6,  "Сделок", str.tostring(_cnt), color.white)
+    tc(7,  "Avg %",  str.tostring(avg_t, "#.###") + "%",
+       avg_t > 0 ? color.lime : color.red)
+    tc(8,  "Капитал",str.tostring(math.round(cpnl)) + "$",
+       cpnl > 0 ? color.lime : color.red)
+
+    // Предупреждения
+    if _cnt == 0
+        table.cell(t_stat, 0, 9, "⚠️ 0 сделок — увеличь глубину теста",
+                   text_color=color.white, bgcolor=color.red, text_size=size.small)
+        table.merge_cells(t_stat, 0, 9, 1, 9)
+    else if max_bars < last_bar_index + 1
+        int _miss = last_bar_index + 1 - max_bars
+        table.cell(t_stat, 0, 9,
+                   "⚠️ Пропущено " + str.tostring(_miss) + " баров. Увеличь глубину до " +
+                   str.tostring(last_bar_index + 1),
+                   text_color=color.white, bgcolor=color.new(color.orange, 40), text_size=size.tiny)
+        table.merge_cells(t_stat, 0, 9, 1, 9)
+
+// ==========================================
+// 7. АЛЕРТЫ
+// ==========================================
+alertcondition(a_le, "Long Entry",  "Area Momentum: Long")
+alertcondition(a_se, "Short Entry", "Area Momentum: Short")
+alertcondition(a_lx, "Exit Long",   "Area Momentum: Exit Long")
+alertcondition(a_sx, "Exit Short",  "Area Momentum: Exit Short")
