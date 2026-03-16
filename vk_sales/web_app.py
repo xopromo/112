@@ -76,8 +76,9 @@ def load_config() -> dict:
 def save_config(data: dict):
     existing = load_config()
     existing.update(data)
-    with open(CONFIG_PATH, "w") as f:
+    with open(CONFIG_PATH, "w", encoding="utf-8") as f:
         json.dump(existing, f, indent=2, ensure_ascii=False)
+    logger.info("Config saved to %s, keys: %s", CONFIG_PATH, list(data.keys()))
 
 
 def is_bot_running() -> bool:
@@ -365,6 +366,19 @@ def bot_log():
         lines = BOT_LOG_FILE.read_text(encoding="utf-8", errors="replace").splitlines()
         lines_html = _html.escape("\n".join(lines[-300:]))
     return render_template("bot_log.html", log=lines_html, bot_running=_bot_running())
+
+
+@app.route("/api/debug")
+def api_debug():
+    cfg = load_config()
+    return jsonify({
+        "config_path": str(CONFIG_PATH),
+        "config_exists": CONFIG_PATH.exists(),
+        "has_groq_key": bool(cfg.get("groq_key")),
+        "use_ai": cfg.get("use_ai"),
+        "groq_key_len": len(cfg.get("groq_key") or ""),
+        "ai_product_len": len(cfg.get("ai_product") or ""),
+    })
 
 
 @app.route("/api/log_tail")
