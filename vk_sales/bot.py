@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 class VKSalesBot:
     def __init__(self, config_path: str = None):
         cfg_path = config_path or (Path(__file__).parent / "config.json")
-        with open(cfg_path) as f:
+        with open(cfg_path, encoding="utf-8") as f:
             self.cfg = json.load(f)
 
         self.token = self.cfg["group_token"]
