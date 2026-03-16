@@ -7,6 +7,7 @@ import json
 import logging
 import urllib.request
 import urllib.error
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +72,7 @@ def build_messages(history_rows, user_text: str) -> list:
 
 
 def ask_groq(api_key: str, history_rows, user_text: str,
-             state: str, name: str, product: str) -> str | None:
+             state: str, name: str, product: str) -> Optional[str]:
     """
     Вызвать Groq API. Возвращает текст ответа или None при ошибке.
     history_rows — результат db.get_messages()
