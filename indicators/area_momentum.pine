@@ -93,10 +93,9 @@ plot(show_ma_line ? ma : na, "MA", color=ma_col, linewidth=2)
 // Цвет области: ярче когда площадь растёт с ускорением
 bool is_bull_momentum = close > ma and accel_ok
 bool is_bear_momentum = close < ma and accel_ok
-area_fill = is_bull_momentum ? color.new(color.green, 55) :
-            is_bear_momentum ? color.new(color.red,   55) :
-            close > ma       ? color.new(color.green, 82) :
-                               color.new(color.red,   82)
+bool _above = close > ma
+int  _alpha  = (is_bull_momentum or is_bear_momentum) ? 55 : 82
+color area_fill = _above ? color.new(color.green, _alpha) : color.new(color.red, _alpha)
 
 p_close = plot(show_area ? close : na, display=display.none)
 p_ma    = plot(show_area ? ma    : na, display=display.none)
