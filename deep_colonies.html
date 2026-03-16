@@ -257,10 +257,10 @@ body {
         <div class="build-btn" data-type="dome" title="Жилой купол">🏠<br>Купол<br><span style="color:#567">100м+30э</span></div>
         <div class="build-btn" data-type="reactor" title="Реактор">⚡<br>Реактор<br><span style="color:#567">150м</span></div>
         <div class="build-btn" data-type="o2gen" title="Генератор O2">💧<br>Генер.<br><span style="color:#567">120м+20э</span></div>
-        <div class="build-btn" data-type="mine" title="Буровая шахта">⛏<br>Шахта<br><span style="color:#567">80м</span></div>
-        <div class="build-btn" data-type="farm" title="Биоферма">🌿<br>Ферма<br><span style="color:#567">100м+20э</span></div>
-        <div class="build-btn" data-type="lab" title="Лаборатория">🔬<br>Лаборат.<br><span style="color:#567">200м+40э</span></div>
-        <div class="build-btn" data-type="turret" title="Боевая турель">🔫<br>Турель<br><span style="color:#567">150м+30э</span></div>
+        <div class="build-btn" data-type="mine" title="Буровая шахта">⛏<br>Шахта<br><span style="color:#567">100м</span></div>
+        <div class="build-btn" data-type="farm" title="Биоферма">🌿<br>Ферма<br><span style="color:#567">110м+20э</span></div>
+        <div class="build-btn" data-type="lab" title="Лаборатория">🔬<br>Лаборат.<br><span style="color:#567">230м+45э</span></div>
+        <div class="build-btn" data-type="turret" title="Боевая турель">🔫<br>Турель<br><span style="color:#567">180м+40э</span></div>
         <div class="build-btn" data-type="sonar" title="Сонар-массив">📡<br>Сонар<br><span style="color:#567">100м+20э</span></div>
         <div class="build-btn demolish" data-type="demolish">🗑<br>Снос<br><span style="color:#c44">возврат 50%</span></div>
       </div>
@@ -269,15 +269,15 @@ body {
     <div id="tech-section">
       <h3>Технологии</h3>
       <div class="tech-tier">
-        <div class="tech-tier-label">— УРОВЕНЬ 1 (25 науки) —</div>
+        <div class="tech-tier-label">— УРОВЕНЬ 1 (50 науки) —</div>
         <div class="tech-grid" id="tech-tier1"></div>
       </div>
       <div class="tech-tier">
-        <div class="tech-tier-label">— УРОВЕНЬ 2 (75 науки, нужно 2×У1) —</div>
+        <div class="tech-tier-label">— УРОВЕНЬ 2 (150 науки, нужно 2×У1 + волна 3) —</div>
         <div class="tech-grid" id="tech-tier2"></div>
       </div>
       <div class="tech-tier">
-        <div class="tech-tier-label">— УРОВЕНЬ 3 (150 науки, нужно 2×У2) —</div>
+        <div class="tech-tier-label">— УРОВЕНЬ 3 (300 науки, нужно 2×У2 + волна 6) —</div>
         <div class="tech-grid" id="tech-tier3"></div>
       </div>
     </div>
@@ -313,26 +313,26 @@ const BDEFS = {
   dome:   { name:'Жилой купол', icon:'🏠', hp:200, cost:{min:100,e:30}, prod:{}, cons:{e:1}, popMax:15 },
   reactor:{ name:'Реактор', icon:'⚡', hp:150, cost:{min:150,e:0}, prod:{e:25}, cons:{e:0} },
   o2gen:  { name:'Генератор O2', icon:'💧', hp:150, cost:{min:120,e:20}, prod:{o2:16}, cons:{e:4} },
-  mine:   { name:'Буровая шахта', icon:'⛏', hp:120, cost:{min:80,e:0}, prod:{min:7}, cons:{e:3} },
-  farm:   { name:'Биоферма', icon:'🌿', hp:130, cost:{min:100,e:20}, prod:{food:14}, cons:{e:3} },
-  lab:    { name:'Лаборатория', icon:'🔬', hp:100, cost:{min:200,e:40}, prod:{res:8}, cons:{e:5} },
-  turret: { name:'Боевая турель', icon:'🔫', hp:200, cost:{min:150,e:30}, prod:{}, cons:{e:2} },
+  mine:   { name:'Буровая шахта', icon:'⛏', hp:120, cost:{min:100,e:0}, prod:{min:4}, cons:{e:3} },
+  farm:   { name:'Биоферма', icon:'🌿', hp:130, cost:{min:110,e:20}, prod:{food:14}, cons:{e:3} },
+  lab:    { name:'Лаборатория', icon:'🔬', hp:100, cost:{min:230,e:45}, prod:{res:4}, cons:{e:5} },
+  turret: { name:'Боевая турель', icon:'🔫', hp:200, cost:{min:180,e:40}, prod:{}, cons:{e:2} },
   sonar:  { name:'Сонар-массив', icon:'📡', hp:80, cost:{min:100,e:20}, prod:{}, cons:{e:2} },
 };
 
 const TECHS = [
-  { id:'adv_mining', name:'Улучш. добыча', tier:1, cost:25, desc:'+60% к шахтам', req:[] },
-  { id:'pressure_filters', name:'Фильтры давл.', tier:1, cost:25, desc:'+40% к генераторам O2', req:[] },
-  { id:'reinf_hulls', name:'Бронекорпус', tier:1, cost:25, desc:'+80% HP зданий', req:[] },
-  { id:'sonar_grid', name:'Сонар-сеть', tier:1, cost:25, desc:'Турели стреляют быстрее', req:[] },
-  { id:'fusion_reactor', name:'Термояд. реактор', tier:2, cost:75, desc:'+80% энергии реакторов', req:['adv_mining','pressure_filters'] },
-  { id:'bioengineering', name:'Биоинженерия', tier:2, cost:75, desc:'+60% еды с ферм', req:['pressure_filters','reinf_hulls'] },
-  { id:'torpedo_sys', name:'Торпедные сист.', tier:2, cost:75, desc:'Урон турелей ×2, дальность +1', req:['sonar_grid','reinf_hulls'] },
-  { id:'col_training', name:'Подготовка кол.', tier:2, cost:75, desc:'Рост нас. +50%, макс +20', req:['adv_mining','sonar_grid'] },
-  { id:'pressure_shields', name:'Щиты давления', tier:3, cost:150, desc:'Здания получают −40% урона', req:['fusion_reactor','bioengineering'] },
-  { id:'nano_repair', name:'Нано-ремонт', tier:3, cost:150, desc:'Авторемонт зданий 1HP/5с', req:['fusion_reactor','torpedo_sys'] },
-  { id:'hydro_tap', name:'Гидротерм. отвод', tier:3, cost:150, desc:'+15э/тик за вентиляцию', req:['bioengineering','col_training'] },
-  { id:'ascension', name:'ДВИГ. ВОЗНЕСЕНИЯ', tier:3, cost:500, desc:'ПОБЕДА — зарядка 60 сек', req:['pressure_shields','nano_repair'] },
+  { id:'adv_mining',       name:'Улучш. добыча',    tier:1, cost:50,  desc:'+60% к шахтам',                req:[],                                    reqWave:0 },
+  { id:'pressure_filters', name:'Фильтры давл.',     tier:1, cost:50,  desc:'+40% к генераторам O2',         req:[],                                    reqWave:0 },
+  { id:'reinf_hulls',      name:'Бронекорпус',       tier:1, cost:50,  desc:'+80% HP зданий',               req:[],                                    reqWave:0 },
+  { id:'sonar_grid',       name:'Сонар-сеть',        tier:1, cost:50,  desc:'Турели стреляют быстрее',       req:[],                                    reqWave:0 },
+  { id:'fusion_reactor',   name:'Термояд. реактор',  tier:2, cost:150, desc:'+80% энергии реакторов',        req:['adv_mining','pressure_filters'],      reqWave:3 },
+  { id:'bioengineering',   name:'Биоинженерия',      tier:2, cost:150, desc:'+60% еды с ферм',               req:['pressure_filters','reinf_hulls'],     reqWave:3 },
+  { id:'torpedo_sys',      name:'Торпедные сист.',   tier:2, cost:150, desc:'Урон турелей ×2, дальность +1', req:['sonar_grid','reinf_hulls'],           reqWave:3 },
+  { id:'col_training',     name:'Подготовка кол.',   tier:2, cost:150, desc:'Рост нас. +50%, макс +20',      req:['adv_mining','sonar_grid'],            reqWave:3 },
+  { id:'pressure_shields', name:'Щиты давления',     tier:3, cost:300, desc:'Здания получают −40% урона',    req:['fusion_reactor','bioengineering'],    reqWave:6 },
+  { id:'nano_repair',      name:'Нано-ремонт',       tier:3, cost:300, desc:'Авторемонт зданий 1HP/5с',      req:['fusion_reactor','torpedo_sys'],       reqWave:6 },
+  { id:'hydro_tap',        name:'Гидротерм. отвод',  tier:3, cost:300, desc:'+15э/тик за вентиляцию',        req:['bioengineering','col_training'],      reqWave:6 },
+  { id:'ascension',        name:'ДВИГ. ВОЗНЕСЕНИЯ',  tier:3, cost:800, desc:'ПОБЕДА — зарядка 60 сек',       req:['pressure_shields','nano_repair'],     reqWave:10 },
 ];
 
 let state, gameRunning, logicInterval, animFrame;
@@ -769,10 +769,10 @@ function killEnemy(e){
 }
 
 const ENEMY_TYPES = {
-  anglerfish: { name:'Удильщик', hp:60, speed:1.2*2, damage:8, attackRate:1.5*2, reward:15, color:'#8be', size:10 },
-  crab:       { name:'Гигантский краб', hp:200, speed:2*2, damage:25, attackRate:2*2, reward:45, color:'#eb8', size:14 },
-  tentacle:   { name:'Щупальце Кракена', hp:120, speed:1.8*2, damage:15, attackRate:1.5*2, reward:35, color:'#a8f', size:12 },
-  leviathan:  { name:'Глубинный Левиафан', hp:600, speed:3*2, damage:60, attackRate:3*2, reward:200, color:'#f84', size:20 },
+  anglerfish: { name:'Удильщик', hp:60, speed:1.2*2, damage:12, attackRate:1.2*2, reward:15, color:'#8be', size:10 },
+  crab:       { name:'Гигантский краб', hp:220, speed:2*2, damage:35, attackRate:1.8*2, reward:45, color:'#eb8', size:14 },
+  tentacle:   { name:'Щупальце Кракена', hp:140, speed:1.8*2, damage:22, attackRate:1.4*2, reward:35, color:'#a8f', size:12 },
+  leviathan:  { name:'Глубинный Левиафан', hp:700, speed:3*2, damage:80, attackRate:2.5*2, reward:200, color:'#f84', size:20 },
 };
 
 function startWave(){
@@ -962,12 +962,14 @@ function updateTechUI(){
       // More precise: require all listed prereqs
       const reqMet = tech.req.every(r=>state.techDone.has(r));
       const tierReq = tier===1 ? true : tier===2 ? tier1Done>=2 : tier2Done>=2;
+      const waveOk = !tech.reqWave || state.wave >= tech.reqWave;
       const canAfford = state.research >= tech.cost;
-      const avail = !done && reqMet && tierReq;
+      const avail = !done && reqMet && tierReq && waveOk;
       const btn = document.createElement('div');
       btn.className = 'tech-btn' + (done?' done':avail&&canAfford?' available':avail?' available':' locked');
-      btn.title = `${tech.name}\n${tech.desc}\nЦена: ${tech.cost} науки${tech.req.length?'\nТреб: '+tech.req.join(', '):''}`;
-      btn.innerHTML = `<div style="flex:1">${tech.name}</div><div style="color:#567;white-space:nowrap">${tech.cost}🔬</div>`;
+      const waveHint = tech.reqWave && !waveOk ? ` 🔒волна ${tech.reqWave}` : '';
+      btn.title = `${tech.name}\n${tech.desc}\nЦена: ${tech.cost} науки${tech.req.length?'\nТреб: '+tech.req.join(', '):''}${tech.reqWave?'\nОткрывается: волна '+tech.reqWave:''}`;
+      btn.innerHTML = `<div style="flex:1">${tech.name}${waveHint}</div><div style="color:#567;white-space:nowrap">${tech.cost}🔬</div>`;
       if(done) btn.innerHTML += '<div style="color:#0d0">✓</div>';
       if(!done && avail){
         btn.onclick = ()=>{ if(state.research>=tech.cost){ state.research-=tech.cost; state.techDone.add(tech.id);
