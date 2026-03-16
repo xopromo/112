@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Optional
 
 import vk_api
-from vk_api.longpoll import VkBotLongPoll, VkBotEventType
+from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
 
 from . import db
 from .states import (
@@ -94,7 +94,7 @@ class VKSalesBot:
     # ЗАПУСК РАССЫЛКИ (первый контакт)
     # ─────────────────────────────────────────────────────────────────────────
 
-    def start_campaign(self, user_ids: list[int] = None):
+    def start_campaign(self, user_ids=None):
         """
         Начать диалог с пользователями.
         user_ids — список id для добавления. Если None — берём из БД (state=NEW).

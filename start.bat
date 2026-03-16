@@ -1,8 +1,6 @@
 @echo off
-chcp 65001 >nul 2>&1
 title VK Sales Bot
 
-:: Проверяем что установка была сделана
 if not exist "venv\" (
     echo Сначала запусти install.bat !
     pause
@@ -10,13 +8,13 @@ if not exist "venv\" (
 )
 
 echo.
-echo ╔════════════════════════════════════╗
-echo ║         VK Sales Bot               ║
-echo ╚════════════════════════════════════╝
+echo =====================================
+echo   VK Sales Bot
+echo =====================================
 echo.
 echo  Запускаю...
 echo.
-echo  Открой браузер и перейди по адресу:
+echo  Открой браузер и перейди:
 echo.
 echo       http://localhost:5001
 echo.
