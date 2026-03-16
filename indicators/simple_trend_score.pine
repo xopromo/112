@@ -1,0 +1,344 @@
+//@version=6
+// ============================================================
+// Simple Trend Score [USE]
+// Идея: считаем долю свечей из N, закрывшихся выше/ниже МА.
+//       3 независимых тренда (разные ТФ/МА/окна) → голосование.
+//       Вход: min_votes трендов согласны. Выход: консенсус пропал.
+// ============================================================
+indicator("Simple Trend Score [USE]", shorttitle="STS", overlay=true,
+          max_lines_count=500, max_labels_count=500, max_boxes_count=500)
+
+// ==========================================
+// 1. ВХОДНЫЕ ДАННЫЕ
+// ==========================================
+
+grp1     = "📊 ТРЕНД 1"
+tf1      = input.timeframe("",    "Таймфрейм (пусто = текущий)", group=grp1)
+ma1_type = input.string("EMA",    "Тип МА", options=["SMA","EMA","WMA","HMA"], group=grp1)
+ma1_len  = input.int(20,          "Период МА",    minval=2, group=grp1)
+n1       = input.int(10,          "Окно N свечей",minval=2, maxval=200, group=grp1)
+th1      = input.float(0.6,       "Порог бычий/медвежий", minval=0.51, maxval=0.99, step=0.05, group=grp1,
+           tooltip="0.6 = 60% свечей из N должны быть выше МА для бычьего голоса")
+
+grp2     = "📊 ТРЕНД 2"
+tf2      = input.timeframe("",    "Таймфрейм (пусто = текущий)", group=grp2)
+ma2_type = input.string("EMA",    "Тип МА", options=["SMA","EMA","WMA","HMA"], group=grp2)
+ma2_len  = input.int(50,          "Период МА",    minval=2, group=grp2)
+n2       = input.int(20,          "Окно N свечей",minval=2, maxval=200, group=grp2)
+th2      = input.float(0.6,       "Порог бычий/медвежий", minval=0.51, maxval=0.99, step=0.05, group=grp2)
+
+grp3     = "📊 ТРЕНД 3"
+tf3      = input.timeframe("",    "Таймфрейм (пусто = текущий)", group=grp3)
+ma3_type = input.string("EMA",    "Тип МА", options=["SMA","EMA","WMA","HMA"], group=grp3)
+ma3_len  = input.int(200,         "Период МА",    minval=2, group=grp3)
+n3       = input.int(50,          "Окно N свечей",minval=2, maxval=200, group=grp3)
+th3      = input.float(0.6,       "Порог бычий/медвежий", minval=0.51, maxval=0.99, step=0.05, group=grp3)
+
+grp_sig  = "🎯 СИГНАЛЫ"
+min_votes = input.int(2,          "Мин. трендов для сигнала (1–3)", minval=1, maxval=3, group=grp_sig)
+use_long  = input.bool(true,      "Long",  group=grp_sig)
+use_short = input.bool(true,      "Short", group=grp_sig)
+
+grp_sl   = "🛡️ SL / TP"
+sl_atr_m = input.float(1.5,       "SL × ATR",  minval=0.1, step=0.1, group=grp_sl)
+tp_rr    = input.float(2.0,       "TP (R:R)",  minval=0.1, step=0.1, group=grp_sl)
+atr_len  = input.int(14,          "ATR период",minval=1,   group=grp_sl)
+
+grp_vis  = "🎨 ВНЕШНИЙ ВИД"
+show_tr  = input.bool(true,       "Метки сделок на графике", group=grp_vis)
+show_eq  = input.bool(true,       "Equity кривая",           group=grp_vis)
+lbl_off  = input.float(1.5,       "Отступ меток × ATR",      group=grp_vis)
+lbl_sz   = input.string("small",  "Размер меток", options=["tiny","small","normal"], group=grp_vis)
+
+grp_tbl  = "📋 ТАБЛИЦА"
+pos_main   = input.string("bottom_right", "Позиция", options=["bottom_right","bottom_left","top_right","top_left"], group=grp_tbl)
+commission = input.float(0.08,    "Комиссия %",        minval=0, step=0.01, group=grp_tbl)
+start_cap  = input.float(10000,   "Начальный капитал", minval=1, group=grp_tbl)
+max_bars   = input.int(5000,      "Глубина теста (баров)", minval=100, group=grp_tbl)
+
+// ==========================================
+// 2. ФУНКЦИЯ СЧЁТА СВЕЧЕЙ
+// Вызывается внутри request.security → close = данные нужного ТФ
+// ==========================================
+
+calc_score(ma_t, ma_l, n_p) =>
+    float _ma = switch ma_t
+        "SMA" => ta.sma(close, ma_l)
+        "WMA" => ta.wma(close, ma_l)
+        "HMA" => ta.hma(close, ma_l)
+        =>       ta.ema(close, ma_l)
+    int cnt = 0
+    for i = 0 to n_p - 1
+        if close[i] > _ma[i]
+            cnt += 1
+    // возвращаем долю [0..1]: 1.0 = все свечи выше МА
+    float(cnt) / float(n_p)
+
+// ==========================================
+// 3. ЗАПРОС ДАННЫХ ПО ТАЙМФРЕЙМАМ
+// ==========================================
+
+// Если ТФ не задан — используем текущий (timeframe.period)
+string _tf1 = tf1 == "" ? timeframe.period : tf1
+string _tf2 = tf2 == "" ? timeframe.period : tf2
+string _tf3 = tf3 == "" ? timeframe.period : tf3
+
+float s1 = request.security(syminfo.tickerid, _tf1, calc_score(ma1_type, ma1_len, n1), lookahead=barmerge.lookahead_off)
+float s2 = request.security(syminfo.tickerid, _tf2, calc_score(ma2_type, ma2_len, n2), lookahead=barmerge.lookahead_off)
+float s3 = request.security(syminfo.tickerid, _tf3, calc_score(ma3_type, ma3_len, n3), lookahead=barmerge.lookahead_off)
+
+// ==========================================
+// 4. ГОЛОСОВАНИЕ
+// ==========================================
+
+// +1 = бычий, -1 = медвежий, 0 = нейтральный
+int v1 = s1 >= th1 ? 1 : s1 <= (1.0 - th1) ? -1 : 0
+int v2 = s2 >= th2 ? 1 : s2 <= (1.0 - th2) ? -1 : 0
+int v3 = s3 >= th3 ? 1 : s3 <= (1.0 - th3) ? -1 : 0
+
+int total_votes = v1 + v2 + v3
+
+bool sig_l = total_votes >= min_votes
+bool sig_s = total_votes <= -min_votes
+
+// Выход: консенсус в нужную сторону пропал
+bool exit_l = total_votes < min_votes
+bool exit_s = total_votes > -min_votes
+
+// ==========================================
+// 5. ATR
+// ==========================================
+
+float atr_v = ta.atr(atr_len)
+
+// ==========================================
+// 6. ФОНОВАЯ ПОДСВЕТКА (сигнал на графике)
+// ==========================================
+
+color bg_col = sig_l ? color.new(color.green, 88) : sig_s ? color.new(color.red, 88) : na
+bgcolor(bg_col, title="Сигнал фон")
+
+// ==========================================
+// 7. БЭКТЕСТ-ДВИЖОК
+// ==========================================
+
+var float _pnl  = 0.0
+var float _eq   = 0.0
+var float _dd   = 0.0
+var float _peak = 0.0
+var int   _cnt  = 0
+var int   _wins = 0
+var bool  _in   = false
+var int   _dir  = 0
+var float _ep   = 0.0
+var float _sl   = 0.0
+var float _tp   = 0.0
+var int   _eb   = -1
+var int   _xb   = -1
+var box   _box  = na
+var line  _ltp  = na
+var line  _lsl  = na
+
+bool a_le = false
+bool a_se = false
+bool a_lx = false
+bool a_sx = false
+
+float _comm2 = commission * 2.0 / 100.0
+
+// Размер метки — вычисляем один раз в глобальном скоупе
+string _lsz = lbl_sz == "tiny" ? size.tiny : lbl_sz == "normal" ? size.normal : size.small
+
+if bar_index > (last_bar_index - max_bars)
+    float _u = nz(atr_v[1], atr_v)
+
+    // ── Управление открытой сделкой ──────────────────────
+    if _in and bar_index > _eb
+        bool hit_sl = (_dir ==  1 and low  <= _sl) or (_dir == -1 and high >= _sl)
+        bool hit_tp = (_dir ==  1 and high >= _tp) or (_dir == -1 and low  <= _tp)
+        bool hit_ex = (_dir ==  1 and exit_l)      or (_dir == -1 and exit_s)
+
+        if hit_sl or hit_tp or hit_ex
+            float xp  = hit_sl ? _sl : hit_tp ? _tp : close
+            float ret = (_dir == 1 ? (xp - _ep) / _ep : (_ep - xp) / _ep) * 100.0 - _comm2 * 100.0
+
+            _pnl += ret
+            _eq  := _pnl
+            _cnt += 1
+            if ret > 0
+                _wins += 1
+            if _eq > _peak
+                _peak := _eq
+            float dd_now = _peak - _eq
+            if dd_now > _dd
+                _dd := dd_now
+
+            if show_tr
+                string xt = hit_sl ? "SL" : hit_tp ? "TP" : "EXIT"
+                color  xc = ret > 0 ? color.new(color.green, 50) : color.new(color.red, 50)
+                label.new(bar_index, _dir == 1 ? high + _u * lbl_off : low - _u * lbl_off, xt, color=xc, style=_dir == 1 ? label.style_label_down : label.style_label_up, textcolor=color.white, size=size.tiny)
+                if not na(_box)
+                    box.set_right(_box, bar_index)
+                    box.set_bgcolor(_box, ret > 0 ? color.new(color.green, 80) : color.new(color.red, 80))
+                if not na(_ltp)
+                    line.set_x2(_ltp, bar_index)
+                if not na(_lsl)
+                    line.set_x2(_lsl, bar_index)
+
+            if _dir == 1
+                a_lx := true
+            else
+                a_sx := true
+
+            _in := false
+            _xb := bar_index
+
+    // ── Открытие новой сделки ─────────────────────────────
+    if not _in and bar_index > _xb
+        bool do_l = use_long  and sig_l
+        bool do_s = use_short and sig_s and not do_l
+
+        if do_l or do_s
+            _in  := true
+            _dir := do_l ? 1 : -1
+            _ep  := close
+            _sl  := do_l ? close - _u * sl_atr_m : close + _u * sl_atr_m
+            float sl_d = math.abs(_ep - _sl)
+            _tp  := do_l ? close + sl_d * tp_rr : close - sl_d * tp_rr
+            _eb  := bar_index
+
+            if show_tr
+                string elbl = do_l ? "L" : "S"
+                color  ecol = do_l ? color.green : color.red
+                label.new(bar_index, do_l ? low - _u * lbl_off : high + _u * lbl_off, elbl, color=ecol, style=do_l ? label.style_label_up : label.style_label_down, textcolor=color.white, size=_lsz)
+                _ltp := line.new(bar_index, _tp, bar_index, _tp, color=color.new(color.lime, 40), style=line.style_dotted, width=1)
+                _lsl := line.new(bar_index, _sl, bar_index, _sl, color=color.new(color.red,  40), style=line.style_dotted, width=1)
+                _box := box.new(bar_index, _ep, bar_index, _ep, bgcolor=color.new(color.blue, 90), border_width=0)
+
+            if do_l
+                a_le := true
+                alert("LONG @" + str.tostring(close, "#.####"), alert.freq_once_per_bar)
+            else
+                a_se := true
+                alert("SHORT @" + str.tostring(close, "#.####"), alert.freq_once_per_bar)
+
+// Обновлять бокс каждый бар пока сделка открыта
+if _in and not na(_box)
+    box.set_right(_box, bar_index)
+    box.set_top(_box,    _dir == 1 ? math.max(_ep, close) : _tp)
+    box.set_bottom(_box, _dir == 1 ? _sl : math.min(_ep, close))
+
+// ==========================================
+// 8. EQUITY + SCORE ОСЦИЛЛЯТОР
+// ==========================================
+
+plot(show_eq ? _eq : na, "Equity %", color=_eq >= 0 ? color.new(color.lime, 30) : color.new(color.red, 30), linewidth=2, display=display.pane)
+plot(show_eq ? 0   : na, "Zero",     color=color.new(color.gray, 70), style=plot.style_circles, display=display.pane)
+
+// Три score-линии в нижней панели (0..100%)
+plot(s1 * 100, "Score T1 %", color=color.new(color.aqua,    40), linewidth=1, display=display.pane)
+plot(s2 * 100, "Score T2 %", color=color.new(color.yellow,  40), linewidth=1, display=display.pane)
+plot(s3 * 100, "Score T3 %", color=color.new(color.fuchsia, 40), linewidth=1, display=display.pane)
+hline(50, "50%", color=color.gray,   linestyle=hline.style_dotted)
+
+// ==========================================
+// 9. ТАБЛИЦА
+// ==========================================
+
+// Все ternary-цепочки — одной строкой, без переносов (Pine v6)
+var string _tbl_pos = pos_main == "bottom_right" ? position.bottom_right : pos_main == "bottom_left" ? position.bottom_left : pos_main == "top_right" ? position.top_right : position.top_left
+
+color c_bg = color.new(color.black, 20)
+
+// Хелпер цвета строки по score
+row_bg(sc, th) => sc >= th ? color.new(color.green, 55) : sc <= (1.0 - th) ? color.new(color.red, 55) : color.new(color.gray, 70)
+
+// Хелпер строки score: "7/10 (70%)"
+score_str(sc, n_p) => str.tostring(math.round(sc * n_p)) + "/" + str.tostring(n_p) + " (" + str.tostring(math.round(sc * 100)) + "%)"
+
+var table t = table.new(_tbl_pos, 3, 13, bgcolor=c_bg, border_width=1, force_overlay=true)
+
+if barstate.islast
+    float wr    = _cnt > 0 ? _wins * 100.0 / _cnt : 0.0
+    float avg_t = _cnt > 0 ? _pnl  / _cnt : 0.0
+    float rf    = _dd  > 0 ? _pnl  / _dd  : 0.0
+    float cpnl  = start_cap * math.pow(1.0 + _pnl / 100.0 / math.max(1, _cnt), _cnt) - start_cap
+
+    // ── Заголовок ────────────────────────────────────────
+    table.cell(t, 0, 0, "🔢 Simple Trend Score", text_color=color.white, bgcolor=color.new(color.blue, 30), text_size=size.normal)
+    table.merge_cells(t, 0, 0, 2, 0)
+
+    // ── Заголовки колонок ─────────────────────────────────
+    table.cell(t, 0, 1, "Тренд",  text_color=color.white, bgcolor=color.new(color.gray, 55), text_size=size.small)
+    table.cell(t, 1, 1, "Score",  text_color=color.white, bgcolor=color.new(color.gray, 55), text_size=size.small)
+    table.cell(t, 2, 1, "Голос",  text_color=color.white, bgcolor=color.new(color.gray, 55), text_size=size.small)
+
+    // ── Тренд 1 ───────────────────────────────────────────
+    string t1_label = (tf1 == "" ? "Тек." : tf1) + " " + ma1_type + str.tostring(ma1_len) + "/" + str.tostring(n1)
+    color  t1_bg    = row_bg(s1, th1)
+    string t1_vote  = v1 == 1 ? "▲ BULL" : v1 == -1 ? "▼ BEAR" : "● нейтр"
+    color  t1_vc    = v1 == 1 ? color.lime : v1 == -1 ? color.red : color.gray
+    table.cell(t, 0, 2, t1_label,          text_color=color.white, bgcolor=t1_bg, text_size=size.small)
+    table.cell(t, 1, 2, score_str(s1, n1), text_color=color.white, bgcolor=t1_bg, text_size=size.small)
+    table.cell(t, 2, 2, t1_vote,           text_color=t1_vc,       bgcolor=t1_bg, text_size=size.small)
+
+    // ── Тренд 2 ───────────────────────────────────────────
+    string t2_label = (tf2 == "" ? "Тек." : tf2) + " " + ma2_type + str.tostring(ma2_len) + "/" + str.tostring(n2)
+    color  t2_bg    = row_bg(s2, th2)
+    string t2_vote  = v2 == 1 ? "▲ BULL" : v2 == -1 ? "▼ BEAR" : "● нейтр"
+    color  t2_vc    = v2 == 1 ? color.lime : v2 == -1 ? color.red : color.gray
+    table.cell(t, 0, 3, t2_label,          text_color=color.white, bgcolor=t2_bg, text_size=size.small)
+    table.cell(t, 1, 3, score_str(s2, n2), text_color=color.white, bgcolor=t2_bg, text_size=size.small)
+    table.cell(t, 2, 3, t2_vote,           text_color=t2_vc,       bgcolor=t2_bg, text_size=size.small)
+
+    // ── Тренд 3 ───────────────────────────────────────────
+    string t3_label = (tf3 == "" ? "Тек." : tf3) + " " + ma3_type + str.tostring(ma3_len) + "/" + str.tostring(n3)
+    color  t3_bg    = row_bg(s3, th3)
+    string t3_vote  = v3 == 1 ? "▲ BULL" : v3 == -1 ? "▼ BEAR" : "● нейтр"
+    color  t3_vc    = v3 == 1 ? color.lime : v3 == -1 ? color.red : color.gray
+    table.cell(t, 0, 4, t3_label,          text_color=color.white, bgcolor=t3_bg, text_size=size.small)
+    table.cell(t, 1, 4, score_str(s3, n3), text_color=color.white, bgcolor=t3_bg, text_size=size.small)
+    table.cell(t, 2, 4, t3_vote,           text_color=t3_vc,       bgcolor=t3_bg, text_size=size.small)
+
+    // ── Итоговый сигнал ───────────────────────────────────
+    string sig_txt = total_votes >= min_votes ? "▲ LONG (" + str.tostring(total_votes) + "/3)" : total_votes <= -min_votes ? "▼ SHORT (" + str.tostring(-total_votes) + "/3)" : "● НЕЙТРАЛЬНО"
+    color  sig_bg  = total_votes >= min_votes ? color.new(color.green, 30) : total_votes <= -min_votes ? color.new(color.red, 30) : color.new(color.gray, 50)
+    table.cell(t, 0, 5, sig_txt, text_color=color.white, bgcolor=sig_bg, text_size=size.normal)
+    table.merge_cells(t, 0, 5, 2, 5)
+
+    // ── Разделитель ───────────────────────────────────────
+    table.cell(t, 0, 6, "──────────────────────", text_color=color.new(color.gray, 50), bgcolor=c_bg, text_size=size.tiny)
+    table.merge_cells(t, 0, 6, 2, 6)
+
+    // ── Бэктест метрики ───────────────────────────────────
+    table.cell(t, 0, 7,  "PnL %",   text_color=color.new(color.gray, 20), bgcolor=c_bg, text_size=size.small)
+    table.cell(t, 1, 7,  str.tostring(_pnl, "#.##") + "%", text_color=_pnl > 0 ? color.lime : color.red, bgcolor=c_bg, text_size=size.small)
+    table.cell(t, 2, 7,  "n=" + str.tostring(_cnt),         text_color=color.white, bgcolor=c_bg, text_size=size.small)
+
+    table.cell(t, 0, 8,  "DD %",    text_color=color.new(color.gray, 20), bgcolor=c_bg, text_size=size.small)
+    table.cell(t, 1, 8,  str.tostring(_dd, "#.##") + "%",  text_color=_dd < 10 ? color.lime : _dd < 25 ? color.orange : color.red, bgcolor=c_bg, text_size=size.small)
+    table.cell(t, 2, 8,  "RF " + str.tostring(rf, "#.##"), text_color=rf > 2 ? color.lime : rf > 1 ? color.orange : color.red, bgcolor=c_bg, text_size=size.small)
+
+    table.cell(t, 0, 9,  "WR",      text_color=color.new(color.gray, 20), bgcolor=c_bg, text_size=size.small)
+    table.cell(t, 1, 9,  str.tostring(wr, "#.1") + "%",    text_color=wr > 55 ? color.lime : wr > 45 ? color.orange : color.red, bgcolor=c_bg, text_size=size.small)
+    table.cell(t, 2, 9,  "Avg " + str.tostring(avg_t, "#.###") + "%", text_color=avg_t > 0 ? color.lime : color.red, bgcolor=c_bg, text_size=size.small)
+
+    table.cell(t, 0, 10, "Капитал", text_color=color.new(color.gray, 20), bgcolor=c_bg, text_size=size.small)
+    table.cell(t, 1, 10, str.tostring(math.round(cpnl)) + "$", text_color=cpnl > 0 ? color.lime : color.red, bgcolor=c_bg, text_size=size.small)
+    table.cell(t, 2, 10, "comm " + str.tostring(commission) + "%", text_color=color.new(color.gray, 30), bgcolor=c_bg, text_size=size.tiny)
+
+    // ── Предупреждения ────────────────────────────────────
+    if _cnt == 0
+        table.cell(t, 0, 11, "⚠️ 0 сделок — увеличь глубину теста", text_color=color.white, bgcolor=color.red, text_size=size.small)
+        table.merge_cells(t, 0, 11, 2, 11)
+    else if max_bars < last_bar_index + 1
+        table.cell(t, 0, 11, "⚠️ Пропущено " + str.tostring(last_bar_index + 1 - max_bars) + " баров. Увеличь до " + str.tostring(last_bar_index + 1), text_color=color.white, bgcolor=color.new(color.orange, 40), text_size=size.tiny)
+        table.merge_cells(t, 0, 11, 2, 11)
+
+// ==========================================
+// 10. АЛЕРТЫ
+// ==========================================
+alertcondition(a_le, "Long Entry",  "STS: Long")
+alertcondition(a_se, "Short Entry", "STS: Short")
+alertcondition(a_lx, "Exit Long",   "STS: Exit Long")
+alertcondition(a_sx, "Exit Short",  "STS: Exit Short")
