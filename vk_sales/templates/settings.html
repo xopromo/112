@@ -9,12 +9,13 @@
     <div class="card p-4">
       <h6 class="fw-bold mb-3"><i class="bi bi-key me-2 text-primary"></i>Подключение к VKontakte</h6>
 
-      <form method="post" action="/settings/save">
+      <form method="post" action="/settings/save" autocomplete="off">
         <div class="mb-3">
           <label class="form-label">Токен сообщества</label>
           <div class="input-group">
-            <input type="password" name="group_token" id="tokenField"
+            <input type="text" name="group_token" id="tokenField"
                    class="form-control font-monospace"
+                   autocomplete="off"
                    value="{{ cfg.group_token or '' }}"
                    placeholder="vk1.a.xxxxxxxxxxxxx">
             <button type="button" class="btn btn-outline-secondary" onclick="toggleToken()">
@@ -57,8 +58,10 @@
         <div class="mb-3">
           <label class="form-label">Groq API ключ</label>
           <div class="input-group">
-            <input type="password" name="groq_key" id="groqKeyField"
+            <input type="text" name="groq_key" id="groqKeyField"
                    class="form-control font-monospace"
+                   style="letter-spacing: {{ '0.15em' if cfg.groq_key else 'normal' }}"
+                   autocomplete="off"
                    value="{{ cfg.groq_key or '' }}"
                    placeholder="gsk_xxxxxxxxxxxxxxxxxx">
             <button type="button" class="btn btn-outline-secondary" onclick="toggleGroqKey()">
@@ -166,14 +169,28 @@
 function toggleToken() {
   const f = document.getElementById('tokenField');
   const i = document.getElementById('eyeIcon');
-  if(f.type === 'password') { f.type='text'; i.className='bi bi-eye-slash'; }
-  else { f.type='password'; i.className='bi bi-eye'; }
+  if(f.style.webkitTextSecurity !== 'disc') {
+    f.style.webkitTextSecurity = 'disc';
+    f.style.letterSpacing = '0.15em';
+    i.className = 'bi bi-eye-slash';
+  } else {
+    f.style.webkitTextSecurity = '';
+    f.style.letterSpacing = 'normal';
+    i.className = 'bi bi-eye';
+  }
 }
 function toggleGroqKey() {
   const f = document.getElementById('groqKeyField');
   const i = document.getElementById('groqEyeIcon');
-  if(f.type === 'password') { f.type='text'; i.className='bi bi-eye-slash'; }
-  else { f.type='password'; i.className='bi bi-eye'; }
+  if(f.style.webkitTextSecurity !== 'disc') {
+    f.style.webkitTextSecurity = 'disc';
+    f.style.letterSpacing = '0.15em';
+    i.className = 'bi bi-eye-slash';
+  } else {
+    f.style.webkitTextSecurity = '';
+    f.style.letterSpacing = 'normal';
+    i.className = 'bi bi-eye';
+  }
 }
 
 function testConnection() {
