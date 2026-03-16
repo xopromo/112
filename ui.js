@@ -193,6 +193,8 @@ function loadFile(file) {
     // Track last loaded file for the current project
     if (typeof ProjectManager !== 'undefined' && ProjectManager.getCurrentId()) {
       ProjectManager.updateLastFile(file.name);
+      // Cache CSV text for restore on page reload (no file permission needed)
+      try { localStorage.setItem(`use6_csv_${ProjectManager.getCurrentId()}`, e.target.result); } catch(_) {}
     }
   };
   reader.readAsText(file);
@@ -826,6 +828,16 @@ function renderResults() {
   renderVisibleResults();
   $('mass-rob-bar').style.display = results.length > 0 ? 'flex' : 'none';
   $('mass-rob-info').textContent = `${results.length} результатов`;
+  // Safety net: если после рендера есть результаты без OOS — пересчитать в фоне
+  if (typeof window._batchOOS === 'function') {
+    const _pendingOOS = results.filter(r => r.cfg && r.cfg._oos === undefined);
+    if (_pendingOOS.length > 0) {
+      setTimeout(async () => {
+        await window._batchOOS();
+        applyFilters(); // перерисовать таблицу с заполненными TV колонками
+      }, 50);
+    }
+  }
 }
 
 // --- Пагинация ---
@@ -3311,8 +3323,8 @@ function copyTVdiag() {
     const pvHiVal = pvHi_ ? pvHi_[i] : '?';
     const maVal   = (maArr && i > 0) ? maArr[i-1] : null;
     const maStr   = maVal != null ? maVal.toFixed(6) : '—';
-    let maBlock = '—';
-    if (maArr && i > 0) {
+    let maBlock = c.useMA ? '—' : 'off';
+    if (c.useMA && maArr && i > 0) {
       const prevC = DATA[i-1]?.c || 0;
       const ma = maArr[i-1];
       maBlock = (ma <= 0) ? 'WARMUP' : (prevC <= ma ? 'BLK_L' : 'ok');
@@ -3399,12 +3411,14 @@ function copyTVdiag() {
         }
         // Анализ фильтров на СИГНАЛЬНОМ баре jsSigBar
         lines.push(`--- Фильтры на сигнальном баре JS #${jsSigBar} (bar.i-1=${jsSigBar-1}) ---`);
-        if (maArr && jsSigBar > 0) {
+        if (maArr && jsSigBar > 0 && c.useMA) {
           const prevC2 = DATA[jsSigBar-1]?.c || 0;
           const ma2 = maArr[jsSigBar-1] || 0;
           const blocked2 = ma2 > 0 && (entryDir===1 ? prevC2 <= ma2 : prevC2 >= ma2);
           lines.push(`MA(${c.maP}×${c.htfRatio||1}tf)[${jsSigBar-1}] = ${ma2>0?ma2.toFixed(6):'0(warmup)'}  close=${prevC2.toFixed(6)}`);
           lines.push(ma2 <= 0 ? `⚠️  MA warmup → блокирует` : blocked2 ? `⚠️  MA БЛОКИРУЕТ (close${entryDir===1?'<=':'>='}MA)` : `✅ MA ok`);
+        } else if (maArr && jsSigBar > 0 && !c.useMA) {
+          lines.push(`MA(${c.maP}×${c.htfRatio||1}tf) — отключён (useMA=false), не влияет`);
         }
         if (confArr && jsSigBar > 0) {
           const prevC3 = DATA[jsSigBar-1]?.c || 0;
@@ -3425,7 +3439,7 @@ function copyTVdiag() {
     }
     // MA и Confirm MA filter на БАРЕ ВХОДА (для справки)
     const checkBar = (jsSigBar >= 0 && waitB > 0) ? jsSigBar : entrySignalBar;
-    if (checkBar !== jsSigBar && maArr && entrySignalBar > 0) {
+    if (checkBar !== jsSigBar && c.useMA && maArr && entrySignalBar > 0) {
       // только если уже не показали выше
       const prevC = DATA[entrySignalBar - 1]?.c || 0;
       const ma = maArr[entrySignalBar - 1] || 0;
@@ -6359,22 +6373,47 @@ async function setProject(id) {
   _favNs = (state && state.favNs) ? state.favNs : '';
   localStorage.setItem('use6_fav_ns', _favNs);
 
+  // Clear stale data from previous project before loading new one
+  DATA = null; _rawDATA = null;
+  _rawDataInfo = '';
+  if ($('finfo')) $('finfo').textContent = 'Нет данных';
+  results = []; equities = {};
+  if ($('tb')) $('tb').innerHTML = '';
+  if ($('eqc')) $('eqc').style.display = 'none';
+  if ($('rbtn')) $('rbtn').disabled = true;
+
   // Update UI
   _updateProjBar(proj);
   renderFavBar();
   const nsEl = document.getElementById('fav-ns-label');
   if (nsEl) nsEl.textContent = _favNs ? _favNs : '';
 
+  // Helper: try to restore CSV from localStorage cache (no permission needed)
+  function _restoreFromCache(filename) {
+    const cached = localStorage.getItem(`use6_csv_${id}`);
+    if (!cached) return false;
+    parseCSV(cached);
+    _rawDATA = DATA;
+    _rawDataInfo = '✅ ' + (filename || 'данные') + ' (кэш)';
+    applyMaxBars();
+    if ($('rbtn')) $('rbtn').disabled = false;
+    updateVolStatus();
+    updatePreview();
+    return true;
+  }
+
   // Auto-load last CSV from project folder
   if (proj.lastFile) {
     const file = await ProjectManager.readCSVFile(id, proj.lastFile);
     if (file) loadFile(file);
+    else _restoreFromCache(proj.lastFile); // fallback: restore from cache on reload
   } else {
     // No lastFile — try to pick the most recent CSV
     const files = await ProjectManager.listCSVFiles(id);
     if (files.length > 0) {
       const file = await ProjectManager.readCSVFile(id, files[0].name);
       if (file) { loadFile(file); ProjectManager.updateLastFile(files[0].name); }
+      else _restoreFromCache(files[0].name);
       ProjectManager.markFilesKnown(id, files.map(f => f.name));
     }
   }
@@ -6511,9 +6550,11 @@ async function _pollNewFiles() {
   const id = ProjectManager.getCurrentId();
   if (!id) return;
   try {
-    const newFiles = await ProjectManager.checkNewFiles(id);
+    // Use IfGranted variant — doesn't call requestPermission (requires user gesture)
+    const newFiles = await ProjectManager.checkNewFilesIfGranted(id);
     const badge = document.getElementById('proj-new-badge');
-    if (badge) badge.style.display = newFiles.length > 0 ? 'inline' : 'none';
+    // null = permission not yet granted → don't hide badge (it may have been set earlier)
+    if (badge && newFiles !== null) badge.style.display = newFiles.length > 0 ? 'inline' : 'none';
   } catch(e) {}
 }
 

@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>FRACTURED FRONT v2</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #06090f; color: #cdd; font-family: monospace; display: flex; height: 100vh; overflow: hidden; }
+#map-wrap { position: relative; flex-shrink: 0; }
+canvas { display: block; }
+#sidebar {
+  width: 260px; background: #0d1420; border-left: 2px solid #1e3050;
+  display: flex; flex-direction: column; overflow-y: auto; padding: 8px; gap: 4px;
+}
+.title { text-align:center; padding:5px 0; color:#6af; font-size:13px;
+  font-weight:bold; letter-spacing:2px; border-bottom:1px solid #1e3050; margin-bottom:3px; }
+.res-row { display:flex; justify-content:space-between; align-items:center;
+  padding:4px 8px; background:#0e1a2c; border-radius:4px; font-size:11px; }
+.res-label { color:#79a; }
+.res-val { color:#eef; font-weight:bold; }
+.army-bar { display:flex; justify-content:space-between; padding:4px 8px;
+  background:#1a0e2c; border-radius:4px; font-size:11px; }
+.wave-bar { background:#1a1030; border-radius:4px; padding:5px 8px;
+  font-size:11px; color:#f84; border:1px solid #3a1050; }
+h3 { color:#6af; font-size:10px; margin:5px 0 3px; text-transform:uppercase; letter-spacing:1px; }
+.btn { width:100%; padding:5px 7px; margin:2px 0; background:#152040;
+  border:1px solid #243060; color:#bcd; font-size:11px; cursor:pointer;
+  border-radius:3px; display:flex; justify-content:space-between; align-items:center; }
+.btn:hover:not(:disabled) { background:#1e3060; border-color:#3a50a0; }
+.btn:disabled { opacity:0.35; cursor:not-allowed; }
+.btn.active { background:#103030; border-color:#30a070; color:#aef; }
+.btn.upgrade { background:#201430; border-color:#402060; color:#caf; }
+.btn.upgrade:hover:not(:disabled) { background:#2a1a40; }
+.btn .cost { color:#79a; font-size:10px; }
+#sel-panel { background:#0e1a2c; border-radius:4px; padding:7px; font-size:11px; min-height:48px; }
+.hp-bar { height:5px; background:#1a0808; border-radius:3px; margin:3px 0; overflow:hidden; }
+.hp-fill { height:100%; background:#3a8; border-radius:3px; }
+#log { flex:1; min-height:70px; background:#080d18; border-radius:4px;
+  padding:5px; font-size:10px; color:#567; overflow-y:auto; }
+#log div { padding:1px 0; }
+.lw { color:#f84 !important; }
+.lo { color:#4c8 !important; }
+.hint { background:#0a1220; border-radius:4px; padding:5px 7px; font-size:10px; color:#456;
+  border:1px solid #182030; }
+</style>
+</head>
+<body>
+<div id="map-wrap"><canvas id="c"></canvas></div>
+<div id="sidebar">
+  <div class="title">⚔ FRACTURED FRONT</div>
+  <div class="res-row"><span class="res-label">⛏ Руда</span><span class="res-val" id="r-ore">0</span></div>
+  <div class="res-row"><span class="res-label">⚡ Энергия</span><span class="res-val" id="r-pow">0</span></div>
+  <div class="res-row"><span class="res-label">📈 Доход</span><span class="res-val" id="r-inc">—</span></div>
+  <div class="army-bar">
+    <span>🔵 <span id="a-p">0</span> юн.</span>
+    <span style="color:#567">vs</span>
+    <span>🔴 <span id="a-e">0</span> юн.</span>
+  </div>
+  <div class="wave-bar" id="wave-bar">—</div>
+
+  <h3>Выделено (<span id="sel-count">0</span>)</h3>
+  <div id="sel-panel"><span style="color:#456">Кликни или выдели рамкой</span></div>
+
+  <h3>🏗 Постройки</h3>
+  <div id="build-btns"></div>
+
+  <h3>⚔ Тренировка</h3>
+  <div id="train-btns"></div>
+
+  <h3>🔬 Апгрейды</h3>
+  <div id="upgrade-btns"></div>
+
+  <h3>📜 Журнал</h3>
+  <div id="log"></div>
+
+  <div class="hint">
+    ЛКМ — выбрать юнит/здание<br>
+    Зажать ЛКМ — выделить рамкой<br>
+    ПКМ на карту — переместить группу<br>
+    ПКМ на пусто — отмена
+  </div>
+</div>
+
+<script>
+// ─── CONSTANTS ────────────────────────────────────────────────────────────────
+const COLS=22, ROWS=15, TS=38;
+const C=document.getElementById('c'), ctx=C.getContext('2d');
+C.width=COLS*TS; C.height=ROWS*TS;
+
+const T={PLAIN:0,MOUNTAIN:1,ORE:2,WATER:3};
+const TC={0:'#131d0f',1:'#363644',2:'#281808',3:'#071624'};
+const TW={0:true,1:false,2:true,3:false};
+
+// Buildings
+const BD={
+  hq:      {n:'Штаб',       ic:'🏛',hp:800, c:{o:0,  p:0},  po:4, pp:2, cp:0},
+  drill:   {n:'Буровая',   ic:'⛏',hp:160, c:{o:80, p:0},  po:10,pp:0, cp:2, ore:true},
+  reactor: {n:'Реактор',   ic:'⚡',hp:130, c:{o:70, p:0},  po:0, pp:18,cp:0},
+  barracks:{n:'Казармы',   ic:'⚔',hp:190, c:{o:130,p:12}, po:0, pp:0, cp:3},
+  armory:  {n:'Арсенал',   ic:'🔧',hp:210, c:{o:180,p:22}, po:0, pp:0, cp:4},
+  turret:  {n:'Турель',    ic:'🔫',hp:240, c:{o:110,p:12}, po:0, pp:0, cp:2},
+  wall:    {n:'Стена',     ic:'🧱',hp:400, c:{o:40, p:0},  po:0, pp:0, cp:0},
+};
+
+// Units
+const UD={
+  scout:  {n:'Разведчик',ic:'👁',hp:70,  dmg:10,rng:2.4,spd:2.2,sgt:5,c:{o:45, p:5},  bld:'barracks',tt:6},
+  soldier:{n:'Солдат',  ic:'⚔',hp:150, dmg:22,rng:1.8,spd:1.5,sgt:3,c:{o:80, p:10}, bld:'barracks',tt:9},
+  tank:   {n:'Танк',   ic:'🚂',hp:340, dmg:60,rng:2.2,spd:0.9,sgt:3,c:{o:200,p:25}, bld:'armory',  tt:16},
+  drone:  {n:'Дрон',  ic:'✈', hp:85,  dmg:24,rng:3.5,spd:1.8,sgt:5,c:{o:120,p:20}, bld:'armory',  tt:11, fly:true},
+};
+
+// Upgrades
+const UPGRADES={
+  adv_drill:  {n:'Улучш. добыча', ic:'⛏+',cost:{o:200,p:0},  desc:'+50% руды', done:false},
+  heavy_armor:{n:'Бронекорпус',  ic:'🛡', cost:{o:150,p:30}, desc:'+50% HP юнитов', done:false},
+  rapid_fire: {n:'Скорострельность',ic:'🔫+',cost:{o:0,p:120}, desc:'Турели: +40% урон', done:false},
+  adv_training:{n:'Доп. тренировка',ic:'⚔+',cost:{o:180,p:40},desc:'-30% время обуч.', done:false},
+};
+
+// ─── STATE ────────────────────────────────────────────────────────────────────
+const G={
+  map:[], units:[], fx:[],
+  nextId:1,
+  ore:250, pow:50,
+  selected:[],     // array of unit ids
+  buildMode:null,
+  trainQueues:{},
+  aiOre:200, aiPow:40,
+  aiTimer:58, aiInterval:60,
+  aiBuildCool:0,
+  aiPhase:0,       // escalating phases
+  wave:0,
+  tick:0,
+  gameOver:false, winner:null,
+  // Drag select
+  drag:false, dragX0:0, dragY0:0, dragX1:0, dragY1:0,
+  _incDisp:'—',
+};
+
+// ─── MAP ──────────────────────────────────────────────────────────────────────
+function T_(r,c){return r>=0&&r<ROWS&&c>=0&&c<COLS?G.map[r*COLS+c]:null;}
+
+function genMap(){
+  G.map=[];
+  for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++)
+    G.map.push({type:T.PLAIN,building:null,visible:false,explored:false,r,c});
+
+  // Mountains — create corridors forcing chokepoints
+  const mts=[
+    [2,5],[3,5],[4,5],[4,6],[5,6],[6,5],[6,6],
+    [2,16],[3,16],[4,16],[4,15],[5,15],[6,16],[6,15],
+    [8,4],[9,4],[9,5],[10,4],[10,5],
+    [8,17],[9,17],[9,16],[10,17],[10,16],
+    [5,10],[5,11],[6,10],[6,11],[8,10],[8,11],[9,10],[9,11],
+  ];
+  mts.forEach(([r,c])=>{const t=T_(r,c);if(t)t.type=T.MOUNTAIN;});
+
+  // Water — central river with bridges (gaps)
+  for(let c=0;c<COLS;c++) if(c!==4&&c!==10&&c!==17){
+    const t=T_(7,c);if(t)t.type=T.WATER;
+  }
+
+  // Ore deposits
+  [[1,3],[2,3],[1,6],[2,6],[0,9],[0,12],
+   [13,3],[12,3],[13,6],[12,6],[14,9],[14,12],
+   [4,1],[5,1],[10,1],[11,1],
+   [4,20],[5,20],[10,20],[11,20],
+   [3,9],[3,12],[11,9],[11,12]].forEach(([r,c])=>{
+    const t=T_(r,c);if(t&&t.type===T.PLAIN)t.type=T.ORE;
+  });
+
+  // Player HQ top-left, Enemy HQ bottom-right
+  placeB(1,1,'hq','p'); placeB(13,20,'hq','e');
+  // Starter buildings
+  placeB(1,3,'drill','p'); placeB(2,1,'reactor','p');
+  placeB(13,17,'drill','e'); placeB(12,20,'reactor','e');
+  // Starting walls (player)
+  placeB(3,4,'wall','p'); placeB(4,4,'wall','p');
+
+  // Starting units
+  spawnU(1,2,'soldier','p'); spawnU(0,2,'scout','p'); spawnU(2,2,'soldier','p');
+  spawnU(13,19,'soldier','e'); spawnU(14,19,'scout','e'); spawnU(12,19,'soldier','e');
+}
+
+function placeB(r,c,type,owner){
+  const t=T_(r,c); if(!t||t.building)return false;
+  if(BD[type].ore&&t.type!==T.ORE)return false;
+  if(!TW[t.type]&&type!=='wall')return false;
+  t.building={type,owner,hp:BD[type].hp,maxHp:BD[type].hp,r,c,id:G.nextId++,atkCool:0};
+  return true;
+}
+
+function spawnU(r,c,type,owner){
+  const d=UD[type];
+  const hpMult=UPGRADES.heavy_armor.done?1.5:1;
+  G.units.push({id:G.nextId++,type,owner,dead:false,
+    x:c*TS+TS/2,y:r*TS+TS/2,
+    hp:Math.round(d.hp*hpMult),maxHp:Math.round(d.hp*hpMult),
+    path:[],atkCool:0,fly:d.fly||false,patrol:false});
+}
+
+// ─── FOG ──────────────────────────────────────────────────────────────────────
+function updateFog(){
+  for(const t of G.map)t.visible=false;
+  for(const t of G.map)if(t.building&&t.building.owner==='p')revealAround(t.r,t.c,2);
+  for(const u of G.units)if(u.owner==='p'&&!u.dead)
+    revealAround(Math.round(u.y/TS),Math.round(u.x/TS),UD[u.type].sgt);
+}
+function revealAround(r,c,rad){
+  for(let dr=-rad;dr<=rad;dr++) for(let dc=-rad;dc<=rad;dc++){
+    if(dr*dr+dc*dc<=rad*rad){const t=T_(r+dr,c+dc);if(t){t.visible=true;t.explored=true;}}
+  }
+}
+
+// ─── PATHFINDING (BFS with caching) ─────────────────────────────────────────
+const _pathCache=new Map();
+function findPath(sr,sc,er,ec,fly){
+  const key=`${sr},${sc},${er},${ec},${fly?1:0}`;
+  if(_pathCache.has(key))return _pathCache.get(key);
+  if(sr===er&&sc===ec)return[];
+  const vis=new Uint8Array(ROWS*COLS);
+  const prev=new Int16Array(ROWS*COLS).fill(-1);
+  const q=[];
+  const start=sr*COLS+sc,goal=er*COLS+ec;
+  vis[start]=1;q.push(start);
+  let head=0;
+  while(head<q.length){
+    const idx=q[head++];if(idx===goal)break;
+    const r=Math.floor(idx/COLS),c=idx%COLS;
+    for(const[dr,dc]of[[-1,0],[1,0],[0,-1],[0,1]]){
+      const nr=r+dr,nc=c+dc;
+      if(nr<0||nr>=ROWS||nc<0||nc>=COLS)continue;
+      const t=T_(nr,nc);
+      if(!fly&&!TW[t.type])continue;
+      const ni=nr*COLS+nc;
+      if(vis[ni])continue;
+      vis[ni]=1;prev[ni]=idx;q.push(ni);
+    }
+  }
+  if(prev[goal]===-1){_pathCache.set(key,null);return null;}
+  const path=[];let cur=goal;
+  while(cur!==start){path.push([Math.floor(cur/COLS),cur%COLS]);cur=prev[cur];}
+  path.reverse();
+  if(_pathCache.size>2000)_pathCache.clear();
+  _pathCache.set(key,path);
+  return path;
+}
+
+// ─── UTILS ────────────────────────────────────────────────────────────────────
+function dist(x1,y1,x2,y2){return Math.sqrt((x1-x2)**2+(y1-y2)**2);}
+function addBullet(x1,y1,x2,y2,col){G.fx.push({t:'b',x1,y1,x2,y2,col:col||'#ffa030',life:.12,ml:.12});}
+function addExp(x,y,big){G.fx.push({t:'e',x,y,big:big||false,life:.5,ml:.5});}
+
+// ─── RESOURCES ────────────────────────────────────────────────────────────────
+function updateResources(dt){
+  let dO=0,dP=0,aiO=0,aiP=0;
+  for(const t of G.map){
+    if(!t.building)continue;
+    const d=BD[t.building.type];
+    let po=d.po;
+    if(t.building.type==='drill'&&UPGRADES.adv_drill.done)po=Math.round(po*1.5);
+    if(t.building.owner==='p'){dO+=po;dP+=d.pp-d.cp;}
+    else{aiO+=po;aiP+=d.pp-d.cp;}
+  }
+  G.ore=Math.max(0,G.ore+dO*dt); G.pow=Math.max(0,G.pow+dP*dt);
+  G.aiOre=Math.max(0,G.aiOre+aiO*dt); G.aiPow=Math.max(0,G.aiPow+aiP*dt);
+  G._incDisp=`⛏+${Math.round(dO)} ⚡${dP>=0?'+':''}${Math.round(dP)}/с`;
+}
+
+// ─── UNIT LOGIC ───────────────────────────────────────────────────────────────
+function updateUnits(dt){
+  for(const u of G.units){
+    if(u.dead)continue;
+    u.atkCool=Math.max(0,u.atkCool-dt);
+    const d=UD[u.type];
+    const rPx=d.rng*TS;
+    const opp=u.owner==='p'?'e':'p';
+
+    // Acquire target
+    let tgt=null,tgx=0,tgy=0;
+    // Enemy units first
+    let bestD=rPx*rPx;
+    for(const v of G.units){
+      if(v.dead||v.owner===u.owner)continue;
+      const dd=(v.x-u.x)**2+(v.y-u.y)**2;
+      if(dd<bestD){bestD=dd;tgt=v;tgx=v.x;tgy=v.y;}
+    }
+    // Enemy buildings
+    if(!tgt){
+      bestD=rPx*rPx;
+      for(const t of G.map){
+        if(!t.building||t.building.owner===u.owner)continue;
+        const bx=t.c*TS+TS/2,by=t.r*TS+TS/2;
+        const dd=(bx-u.x)**2+(by-u.y)**2;
+        if(dd<bestD){bestD=dd;tgt=t.building;tgx=bx;tgy=by;}
+      }
+    }
+
+    if(tgt){
+      if(u.atkCool<=0){
+        tgt.hp-=d.dmg;
+        addBullet(u.x,u.y,tgx,tgy,u.owner==='p'?'#60c0ff':'#ff6040');
+        u.atkCool=1.0;
+        if(tgt.hp<=0){
+          if('path' in tgt){tgt.dead=true;addExp(tgx,tgy);}
+          else{
+            addExp(tgx,tgy,true);
+            log(`💥 ${BD[tgt.type].n} уничтожен!`,u.owner==='p'?'o':'w');
+            T_(tgt.r,tgt.c).building=null;
+          }
+        }
+      }
+      // If target in range stop and fight unless very close to path end
+      if(dist(u.x,u.y,tgx,tgy)<rPx*0.8) u.path=[];
+    }
+
+    if(u.path.length>0){
+      const[tr,tc]=u.path[0];
+      const tx=tc*TS+TS/2,ty=tr*TS+TS/2;
+      const dx=tx-u.x,dy=ty-u.y;
+      const dd=Math.sqrt(dx*dx+dy*dy);
+      const step=d.spd*TS*dt;
+      if(dd<step+1){u.x=tx;u.y=ty;u.path.shift();}
+      else{u.x+=dx/dd*step;u.y+=dy/dd*step;}
+    }
+  }
+  G.units=G.units.filter(u=>!u.dead);
+}
+
+// ─── TURRETS ──────────────────────────────────────────────────────────────────
+function updateTurrets(dt){
+  for(const t of G.map){
+    if(!t.building||t.building.type!=='turret')continue;
+    const b=t.building;
+    b.atkCool=Math.max(0,(b.atkCool||0)-dt);
+    if(b.atkCool>0)continue;
+    const bx=t.c*TS+TS/2,by=t.r*TS+TS/2;
+    const opp=b.owner==='p'?'e':'p';
+    const dmg=UPGRADES.rapid_fire.done?28:20;
+    const enemy=G.units.find(u=>!u.dead&&u.owner===opp&&dist(bx,by,u.x,u.y)<3.4*TS);
+    if(!enemy)continue;
+    enemy.hp-=dmg;
+    addBullet(bx,by,enemy.x,enemy.y,'#ffd060');
+    if(enemy.hp<=0){enemy.dead=true;addExp(enemy.x,enemy.y);}
+    b.atkCool=UPGRADES.rapid_fire.done?0.9:1.3;
+  }
+}
+
+// ─── TRAINING ─────────────────────────────────────────────────────────────────
+function updateTraining(dt){
+  for(const[bid,q]of Object.entries(G.trainQueues)){
+    if(!q.length)continue;
+    const item=q[0];
+    item.timer-=dt;
+    if(item.timer<=0){
+      q.shift();
+      // Spawn beside building
+      const spawnR=item.r,spawnC=Math.min(COLS-1,item.c+1);
+      const t=T_(spawnR,spawnC);
+      const ok=t&&TW[t.type]&&!t.building;
+      spawnU(ok?spawnR:item.r,ok?spawnC:item.c,item.type,item.owner);
+      if(item.owner==='p')log(`✅ ${UD[item.type].n} готов`,'o');
+    }
+  }
+}
+
+// ─── AI ───────────────────────────────────────────────────────────────────────
+function updateAI(dt){
+  G.aiTimer-=dt;
+  G.aiBuildCool-=dt;
+  if(G.aiBuildCool<=0){G.aiBuildCool=2.0;aiBuild();}
+  if(G.aiTimer<=0){
+    G.wave++;
+    G.aiTimer=G.aiInterval;
+    G.aiInterval=Math.max(25,G.aiInterval-3);
+    G.aiPhase=Math.min(5,G.aiPhase+1);
+    aiAttack();
+  }
+}
+
+function aiBuild(){
+  const eb={};
+  for(const t of G.map)if(t.building&&t.building.owner==='e')eb[t.building.type]=(eb[t.building.type]||0)+1;
+  const hq=G.map.find(t=>t.building&&t.building.type==='hq'&&t.building.owner==='e');
+  if(!hq)return;
+  if((eb.drill||0)<4&&G.aiOre>=80)aiPlaceDrill(hq);
+  else if((eb.reactor||0)<3&&G.aiOre>=70)aiPlaceNear(hq,'reactor');
+  else if((eb.barracks||0)<3&&G.aiOre>=130&&G.aiPow>=12)aiPlaceNear(hq,'barracks');
+  else if((eb.armory||0)<2&&G.aiOre>=180&&G.aiPow>=22)aiPlaceNear(hq,'armory');
+  else if((eb.turret||0)<5&&G.aiOre>=110&&G.aiPow>=12)aiPlaceNear(hq,'turret');
+  aiTrain(eb,hq);
+}
+
+function aiPlaceDrill(hq){
+  let best=null,bestD=999;
+  for(const t of G.map)if(t.type===T.ORE&&!t.building){
+    const d=Math.abs(t.r-hq.r)+Math.abs(t.c-hq.c);
+    if(d<bestD){bestD=d;best=t;}
+  }
+  if(!best)return;
+  G.aiOre-=80;placeB(best.r,best.c,'drill','e');
+}
+function aiPlaceNear(hq,type){
+  const cost=BD[type].c;
+  if(G.aiOre<cost.o||G.aiPow<cost.p)return;
+  for(let rad=1;rad<8;rad++)
+    for(let dr=-rad;dr<=rad;dr++) for(let dc=-rad;dc<=rad;dc++){
+      const t=T_(hq.r+dr,hq.c+dc);
+      if(t&&t.type===T.PLAIN&&!t.building){
+        G.aiOre-=cost.o;G.aiPow-=cost.p;placeB(t.r,t.c,type,'e');return;
+      }
+    }
+}
+function aiTrain(eb,hq){
+  for(const t of G.map){
+    if(!t.building||t.building.owner!=='e')continue;
+    const bt=t.building.type;
+    if(bt!=='barracks'&&bt!=='armory')continue;
+    const bid=t.building.id;
+    if(!G.trainQueues[bid])G.trainQueues[bid]=[];
+    if(G.trainQueues[bid].length>0)continue;
+    const cnt=G.units.filter(u=>u.owner==='e').length;
+    // Scale unit cap with wave
+    if(cnt>=8+G.aiPhase*3)continue;
+    let ut=null;
+    if(bt==='barracks'){
+      if(G.aiPhase<2)ut=Math.random()<0.6?'soldier':'scout';
+      else ut=Math.random()<0.7?'soldier':'scout';
+    } else {
+      ut=G.aiPhase>=3?(Math.random()<0.5?'tank':'drone'):(Math.random()<0.4?'tank':'drone');
+    }
+    const ud=UD[ut];
+    if(G.aiOre<ud.c.o||G.aiPow<ud.c.p)continue;
+    G.aiOre-=ud.c.o;G.aiPow-=ud.c.p;
+    G.trainQueues[bid].push({type:ut,owner:'e',r:t.r,c:t.c,timer:ud.tt});
+  }
+}
+
+function aiAttack(){
+  const phq=G.map.find(t=>t.building&&t.building.type==='hq'&&t.building.owner==='p');
+  if(!phq)return;
+  const attackers=G.units.filter(u=>u.owner==='e'&&!u.dead);
+  if(!attackers.length){log(`⚔ Волна ${G.wave}: ИИ готовится...`,'w');return;}
+  // Fan out a bit around HQ
+  for(const u of attackers){
+    const cr=Math.round(u.y/TS),cc=Math.round(u.x/TS);
+    // Target slightly randomized around HQ
+    const tr=phq.r+(Math.random()<0.4?Math.floor(Math.random()*3-1):0);
+    const tc=phq.c+(Math.random()<0.4?Math.floor(Math.random()*3-1):0);
+    const path=findPath(cr,cc,Math.max(0,Math.min(ROWS-1,tr)),Math.max(0,Math.min(COLS-1,tc)),u.fly);
+    if(path)u.path=path;
+  }
+  log(`⚔ Волна ${G.wave}: ИИ атакует! (${attackers.length} юн.)`,'w');
+}
+
+// ─── VICTORY ──────────────────────────────────────────────────────────────────
+function checkVictory(){
+  if(!G.map.find(t=>t.building&&t.building.type==='hq'&&t.building.owner==='p')){G.gameOver=true;G.winner='e';}
+  if(!G.map.find(t=>t.building&&t.building.type==='hq'&&t.building.owner==='e')){G.gameOver=true;G.winner='p';}
+}
+
+// ─── INPUT ────────────────────────────────────────────────────────────────────
+let mouseX=0,mouseY=0;
+C.addEventListener('mousemove',e=>{
+  const r=C.getBoundingClientRect();
+  mouseX=(e.clientX-r.left)*(C.width/r.width);
+  mouseY=(e.clientY-r.top)*(C.height/r.height);
+  if(G.drag){G.dragX1=mouseX;G.dragY1=mouseY;}
+});
+
+C.addEventListener('mousedown',e=>{
+  if(G.gameOver||e.button!==0)return;
+  const r=C.getBoundingClientRect();
+  const mx=(e.clientX-r.left)*(C.width/r.width);
+  const my=(e.clientY-r.top)*(C.height/r.height);
+  if(G.buildMode){
+    const cc=Math.floor(mx/TS),cr=Math.floor(my/TS);
+    tryBuild(cr,cc,G.buildMode); G.buildMode=null; return;
+  }
+  G.drag=true;G.dragX0=mx;G.dragY0=my;G.dragX1=mx;G.dragY1=my;
+});
+
+C.addEventListener('mouseup',e=>{
+  if(!G.drag)return;
+  G.drag=false;
+  const r=C.getBoundingClientRect();
+  const mx=(e.clientX-r.left)*(C.width/r.width);
+  const my=(e.clientY-r.top)*(C.height/r.height);
+  const dx=Math.abs(mx-G.dragX0),dy=Math.abs(my-G.dragY0);
+
+  if(dx<6&&dy<6){
+    // Click — select unit or building
+    const u=G.units.find(v=>!v.dead&&v.owner==='p'&&dist(v.x,v.y,mx,my)<TS*0.65);
+    if(u){G.selected=[u.id];return;}
+    const cc=Math.floor(mx/TS),cr=Math.floor(my/TS);
+    const t=T_(cr,cc);
+    if(t&&t.building&&t.building.owner==='p'&&t.visible){G.selected=['b_'+t.building.id];return;}
+    // Click empty: move selected units
+    if(G.selected.length>0&&!G.selected[0].toString().startsWith('b_')){
+      moveSelectedTo(cr,cc); return;
+    }
+    G.selected=[];
+  } else {
+    // Box select player units
+    const x0=Math.min(G.dragX0,mx),x1=Math.max(G.dragX0,mx);
+    const y0=Math.min(G.dragY0,my),y1=Math.max(G.dragY0,my);
+    G.selected=G.units
+      .filter(u=>!u.dead&&u.owner==='p'&&u.x>=x0&&u.x<=x1&&u.y>=y0&&u.y<=y1)
+      .map(u=>u.id);
+    if(!G.selected.length)G.selected=[];
+  }
+});
+
+C.addEventListener('contextmenu',e=>{
+  e.preventDefault();
+  if(G.buildMode){G.buildMode=null;return;}
+  const r=C.getBoundingClientRect();
+  const mx=(e.clientX-r.left)*(C.width/r.width);
+  const my=(e.clientY-r.top)*(C.height/r.height);
+  const cc=Math.floor(mx/TS),cr=Math.floor(my/TS);
+  if(G.selected.length>0&&!G.selected[0].toString().startsWith('b_')){
+    moveSelectedTo(cr,cc);
+  } else {
+    G.selected=[];
+  }
+});
+
+function moveSelectedTo(tr,tc){
+  const selUnits=G.units.filter(u=>!u.dead&&G.selected.includes(u.id));
+  if(!selUnits.length)return;
+  const t=T_(tr,tc);if(!t)return;
+  // Formation: spread out units around target
+  let i=0;
+  for(const u of selUnits){
+    const offsets=[[0,0],[0,1],[0,-1],[1,0],[-1,0],[1,1],[1,-1],[-1,1],[-1,-1]];
+    const[dr,dc]=offsets[i%offsets.length];i++;
+    const nr=Math.max(0,Math.min(ROWS-1,tr+dr));
+    const nc=Math.max(0,Math.min(COLS-1,tc+dc));
+    const tt=T_(nr,nc);
+    const dest=(tt&&(TW[tt.type]||u.fly))?[nr,nc]:[tr,tc];
+    const cr=Math.round(u.y/TS),cc=Math.round(u.x/TS);
+    const path=findPath(cr,cc,dest[0],dest[1],u.fly);
+    if(path)u.path=path;
+  }
+}
+
+function tryBuild(r,c,type){
+  const t=T_(r,c);
+  if(!t||!t.visible){log('Туман войны','w');return;}
+  if(t.building){log('Место занято','w');return;}
+  if(BD[type].ore&&t.type!==T.ORE){log('Буровая — только на руде ⛏','w');return;}
+  if(!TW[t.type]){log('Нельзя строить здесь','w');return;}
+  const d=BD[type];
+  if(G.ore<d.c.o){log(`Нужно руды: ${d.c.o}`,'w');return;}
+  if(G.pow<d.c.p){log(`Нужно энергии: ${d.c.p}`,'w');return;}
+  G.ore-=d.c.o;G.pow-=d.c.p;
+  placeB(r,c,type,'p');
+  log(`✅ ${d.n} построен`,'o');
+}
+
+function startTrain(type){
+  const d=UD[type];
+  const bld=G.map.find(t=>t.building&&t.building.owner==='p'&&t.building.type===d.bld&&
+    (!(G.trainQueues[t.building.id])||G.trainQueues[t.building.id].length===0));
+  if(!bld){log(`Нет свободных ${d.bld==='barracks'?'казарм':'арсенала'}`,'w');return;}
+  if(G.ore<d.c.o){log(`Нужно руды: ${d.c.o}`,'w');return;}
+  if(G.pow<d.c.p){log(`Нужно энергии: ${d.c.p}`,'w');return;}
+  G.ore-=d.c.o;G.pow-=d.c.p;
+  const ttime=UPGRADES.adv_training.done?Math.round(d.tt*0.7):d.tt;
+  const bid=bld.building.id;
+  if(!G.trainQueues[bid])G.trainQueues[bid]=[];
+  G.trainQueues[bid].push({type,owner:'p',r:bld.r,c:bld.c,timer:ttime});
+  log(`⏳ ${d.n} обучается (${ttime}с)`);
+}
+
+function buyUpgrade(id){
+  const up=UPGRADES[id];
+  if(up.done){log('Уже исследовано','w');return;}
+  if(G.ore<up.cost.o){log(`Нужно руды: ${up.cost.o}`,'w');return;}
+  if(G.pow<up.cost.p){log(`Нужно энергии: ${up.cost.p}`,'w');return;}
+  G.ore-=up.cost.o;G.pow-=up.cost.p;
+  up.done=true;
+  log(`✅ Апгрейд: ${up.n}`,'o');
+  _pathCache.clear();
+}
+
+// ─── UI ───────────────────────────────────────────────────────────────────────
+const logEl=document.getElementById('log');
+function log(msg,cls){
+  const d=document.createElement('div');d.textContent=msg;
+  if(cls==='w')d.className='lw';if(cls==='o')d.className='lo';
+  logEl.prepend(d);
+  while(logEl.children.length>40)logEl.removeChild(logEl.lastChild);
+}
+
+function updateHUD(){
+  document.getElementById('r-ore').textContent=Math.floor(G.ore);
+  document.getElementById('r-pow').textContent=Math.floor(G.pow);
+  document.getElementById('r-inc').textContent=G._incDisp;
+  document.getElementById('a-p').textContent=G.units.filter(u=>!u.dead&&u.owner==='p').length;
+  document.getElementById('a-e').textContent=G.units.filter(u=>!u.dead&&u.owner==='e').length;
+  const at=Math.max(0,Math.ceil(G.aiTimer));
+  document.getElementById('wave-bar').textContent=at>5?`⚔ Атака ИИ через: ${at}с (волна ${G.wave+1})`:`⚠ АТАКА НАЧИНАЕТСЯ!`;
+}
+
+function updateSelPanel(){
+  document.getElementById('sel-count').textContent=G.selected.length;
+  const p=document.getElementById('sel-panel');
+  if(!G.selected.length){p.innerHTML='<span style="color:#456">Нет выделения</span>';return;}
+  if(G.selected.length===1&&G.selected[0].toString().startsWith('b_')){
+    const bid=parseInt(G.selected[0].split('_')[1]);
+    let bld=null;for(const t of G.map)if(t.building&&t.building.id===bid){bld=t.building;break;}
+    if(!bld){p.innerHTML='';G.selected=[];return;}
+    const d=BD[bld.type];
+    const q=G.trainQueues[bld.id]||[];
+    const hpPct=Math.max(0,bld.hp/bld.maxHp*100);
+    const qi=q.length?`<br>⏳ ${UD[q[0].type].n}: ${Math.ceil(q[0].timer)}с`:'';
+    p.innerHTML=`<b>${d.ic} ${d.n}</b><br>HP:${Math.max(0,bld.hp)}/${bld.maxHp}
+      <div class="hp-bar"><div class="hp-fill" style="width:${hpPct}%"></div></div>${qi}`;
+  } else {
+    // Multiple or single units
+    const sel=G.units.filter(u=>!u.dead&&G.selected.includes(u.id));
+    if(!sel.length){p.innerHTML='';G.selected=[];return;}
+    if(sel.length===1){
+      const u=sel[0];const d=UD[u.type];
+      const hpPct=Math.max(0,u.hp/u.maxHp*100);
+      p.innerHTML=`<b>${d.ic} ${d.n}</b><br>HP:${Math.max(0,u.hp)}/${u.maxHp}
+        <div class="hp-bar"><div class="hp-fill" style="width:${hpPct}%"></div></div>
+        Урон:${d.dmg} Дальн:${d.rng}<br>
+        <small style="color:#456">ПКМ на карту → двигать</small>`;
+    } else {
+      const types={};for(const u of sel)types[u.type]=(types[u.type]||0)+1;
+      const info=Object.entries(types).map(([t,n])=>`${UD[t].ic}×${n}`).join(' ');
+      p.innerHTML=`<b>Группа: ${sel.length} юн.</b><br>${info}<br>
+        <small style="color:#456">ПКМ на карту → двигать группу</small>`;
+    }
+  }
+}
+
+function updateBuildUI(){
+  const div=document.getElementById('build-btns');div.innerHTML='';
+  for(const type of['drill','reactor','barracks','armory','turret','wall']){
+    const d=BD[type];
+    const canAfford=G.ore>=d.c.o&&G.pow>=d.c.p;
+    const btn=document.createElement('button');
+    btn.className='btn'+(G.buildMode===type?' active':'');
+    btn.disabled=!canAfford;
+    const costStr=`⛏${d.c.o}${d.c.p>0?' ⚡'+d.c.p:''}`;
+    btn.innerHTML=`<span>${d.ic} ${d.n}</span><span class="cost">${costStr}</span>`;
+    if(type==='drill')btn.title='Только на руде (оранжевые клетки)';
+    btn.onclick=()=>{G.buildMode=G.buildMode===type?null:type;};
+    div.appendChild(btn);
+  }
+}
+
+function updateTrainUI(){
+  const div=document.getElementById('train-btns');div.innerHTML='';
+  for(const type of['scout','soldier','tank','drone']){
+    const d=UD[type];
+    const hasBld=G.map.some(t=>t.building&&t.building.owner==='p'&&t.building.type===d.bld);
+    const canAfford=G.ore>=d.c.o&&G.pow>=d.c.p;
+    const tt=UPGRADES.adv_training.done?Math.round(d.tt*0.7):d.tt;
+    const btn=document.createElement('button');
+    btn.className='btn';btn.disabled=!hasBld||!canAfford;
+    btn.innerHTML=`<span>${d.ic} ${d.n} (${tt}с)</span><span class="cost">⛏${d.c.o} ⚡${d.c.p}</span>`;
+    btn.onclick=()=>startTrain(type);
+    div.appendChild(btn);
+  }
+}
+
+function updateUpgradeUI(){
+  const div=document.getElementById('upgrade-btns');div.innerHTML='';
+  for(const[id,up]of Object.entries(UPGRADES)){
+    const btn=document.createElement('button');
+    btn.className='btn upgrade';
+    if(up.done){
+      btn.innerHTML=`<span>✅ ${up.n}</span><span class="cost" style="color:#4a8">сделано</span>`;
+      btn.disabled=true;
+    } else {
+      const canAfford=G.ore>=up.cost.o&&G.pow>=up.cost.p;
+      btn.disabled=!canAfford;
+      const costStr=`${up.cost.o>0?'⛏'+up.cost.o:''}${up.cost.p>0?' ⚡'+up.cost.p:''}`;
+      btn.innerHTML=`<span>${up.ic} ${up.n}</span><span class="cost">${costStr}</span>`;
+      btn.title=up.desc;
+      btn.onclick=()=>buyUpgrade(id);
+    }
+    div.appendChild(btn);
+  }
+}
+
+// ─── RENDER ───────────────────────────────────────────────────────────────────
+function render(){
+  ctx.clearRect(0,0,C.width,C.height);
+
+  // Tiles
+  for(const t of G.map){
+    const x=t.c*TS,y=t.r*TS;
+    if(!t.explored){ctx.fillStyle='#03050a';ctx.fillRect(x,y,TS,TS);continue;}
+    ctx.fillStyle=TC[t.type];ctx.fillRect(x,y,TS,TS);
+
+    if(t.visible){
+      if(t.type===T.ORE){
+        ctx.fillStyle='rgba(160,100,15,0.45)';ctx.fillRect(x+1,y+1,TS-2,TS-2);
+        ctx.font='11px serif';ctx.textAlign='center';ctx.fillText('⛏',x+TS/2,y+TS/2+4);
+      }
+      if(t.type===T.MOUNTAIN){
+        ctx.fillStyle='rgba(90,80,110,0.4)';ctx.fillRect(x+2,y+2,TS-4,TS-4);
+        ctx.font='13px serif';ctx.textAlign='center';ctx.fillText('🗻',x+TS/2,y+TS/2+4);
+      }
+      if(t.type===T.WATER){
+        ctx.fillStyle='rgba(15,50,110,0.55)';ctx.fillRect(x,y,TS,TS);
+      }
+    }
+
+    if(!t.visible){ctx.fillStyle='rgba(0,0,0,0.52)';ctx.fillRect(x,y,TS,TS);}
+    ctx.strokeStyle='rgba(30,50,30,0.2)';ctx.strokeRect(x,y,TS,TS);
+
+    // Building
+    if(t.building&&(t.visible||t.building.owner==='p')){
+      const b=t.building;const d=BD[b.type];
+      const bc=b.owner==='p'?'#0b2040':'#401008';
+      const bc2=b.owner==='p'?'#1a4070':'#703020';
+      ctx.fillStyle=bc;ctx.fillRect(x+3,y+3,TS-6,TS-6);
+      ctx.strokeStyle=bc2;ctx.lineWidth=1.5;ctx.strokeRect(x+3,y+3,TS-6,TS-6);ctx.lineWidth=1;
+      // HP bar
+      const hp=Math.max(0,b.hp/b.maxHp);
+      ctx.fillStyle='#200';ctx.fillRect(x+4,y+TS-6,TS-8,3);
+      ctx.fillStyle=hp>0.5?'#3a8':'#f74';
+      ctx.fillRect(x+4,y+TS-6,(TS-8)*hp,3);
+      // Icon
+      ctx.font='15px serif';ctx.textAlign='center';
+      ctx.fillText(d.ic,x+TS/2,y+TS/2+5);
+      // Owner
+      ctx.font='bold 7px monospace';
+      ctx.fillStyle=b.owner==='p'?'#48f':'#f64';
+      ctx.fillText(b.owner==='p'?'P':'E',x+TS-6,y+9);
+      // Selection
+      if(G.selected.includes('b_'+b.id)){
+        ctx.strokeStyle='#ffe050';ctx.lineWidth=2;
+        ctx.strokeRect(x+2,y+2,TS-4,TS-4);ctx.lineWidth=1;
+      }
+    }
+  }
+
+  // Build highlight
+  if(G.buildMode){
+    for(const t of G.map){
+      if(!t.visible||t.building)continue;
+      if(G.buildMode==='drill'&&t.type!==T.ORE)continue;
+      if(G.buildMode!=='drill'&&G.buildMode!=='wall'&&!TW[t.type])continue;
+      ctx.fillStyle='rgba(70,200,70,0.15)';ctx.fillRect(t.c*TS,t.r*TS,TS,TS);
+      ctx.strokeStyle='rgba(70,200,70,0.45)';ctx.strokeRect(t.c*TS,t.r*TS,TS,TS);
+    }
+  }
+
+  // Drag select box
+  if(G.drag&&Math.abs(G.dragX1-G.dragX0)>4){
+    const x=Math.min(G.dragX0,G.dragX1),y=Math.min(G.dragY0,G.dragY1);
+    const w=Math.abs(G.dragX1-G.dragX0),h=Math.abs(G.dragY1-G.dragY0);
+    ctx.strokeStyle='rgba(100,200,100,0.8)';ctx.lineWidth=1.5;
+    ctx.strokeRect(x,y,w,h);ctx.lineWidth=1;
+    ctx.fillStyle='rgba(100,200,100,0.05)';ctx.fillRect(x,y,w,h);
+  }
+
+  // Units
+  for(const u of G.units){
+    if(u.dead)continue;
+    const tr=Math.round(u.y/TS),tc2=Math.round(u.x/TS);
+    const tile_=T_(tr,tc2);
+    if(tile_&&!tile_.visible&&u.owner==='e')continue;
+    const d=UD[u.type];
+    const col=u.owner==='p'?'#1a55b0':'#b03015';
+    const colB=u.owner==='p'?'#4080e0':'#e05030';
+    const r=u.fly?6:9;
+
+    ctx.fillStyle='rgba(0,0,0,0.28)';
+    ctx.beginPath();ctx.ellipse(u.x,u.y+3,r+1,4,0,0,Math.PI*2);ctx.fill();
+
+    ctx.fillStyle=col;ctx.beginPath();ctx.arc(u.x,u.y,r,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle=colB;ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(u.x,u.y,r,0,Math.PI*2);ctx.stroke();ctx.lineWidth=1;
+
+    // HP
+    ctx.fillStyle='rgba(0,0,0,0.7)';ctx.fillRect(u.x-9,u.y+r+1,18,3);
+    ctx.fillStyle=u.hp>u.maxHp*0.5?'#3a8':'#f74';
+    ctx.fillRect(u.x-9,u.y+r+1,18*Math.max(0,u.hp/u.maxHp),3);
+
+    ctx.font=`${u.fly?9:10}px serif`;ctx.textAlign='center';
+    ctx.fillText(d.ic,u.x,u.y+3);
+
+    // Selection ring + path
+    if(G.selected.includes(u.id)){
+      ctx.strokeStyle='#ffe040';ctx.lineWidth=2;
+      ctx.beginPath();ctx.arc(u.x,u.y,r+3,0,Math.PI*2);ctx.stroke();ctx.lineWidth=1;
+      if(u.path.length>0){
+        ctx.strokeStyle='rgba(255,240,60,0.3)';ctx.setLineDash([3,4]);
+        ctx.beginPath();ctx.moveTo(u.x,u.y);
+        for(const[pr,pc]of u.path)ctx.lineTo(pc*TS+TS/2,pr*TS+TS/2);
+        ctx.stroke();ctx.setLineDash([]);
+      }
+    }
+  }
+
+  // FX
+  for(const fx of G.fx){
+    const a=fx.life/fx.ml;
+    if(fx.t==='b'){
+      ctx.strokeStyle=fx.col.replace(')',`,${a*0.95})`).replace('rgb','rgba');
+      // Simple: just use fixed alpha
+      ctx.globalAlpha=a;
+      ctx.strokeStyle=fx.col;ctx.lineWidth=1.8;
+      ctx.beginPath();ctx.moveTo(fx.x1,fx.y1);ctx.lineTo(fx.x2,fx.y2);ctx.stroke();
+      ctx.lineWidth=1;ctx.globalAlpha=1;
+    } else {
+      const r2=(fx.big?TS:TS*0.6)*(1.2-a*0.5);
+      ctx.globalAlpha=a*0.6;
+      ctx.fillStyle=a>0.6?'#ffa030':'#c04010';
+      ctx.beginPath();ctx.arc(fx.x,fx.y,r2,0,Math.PI*2);ctx.fill();
+      ctx.globalAlpha=1;
+    }
+  }
+
+  // Game over
+  if(G.gameOver){
+    ctx.fillStyle='rgba(0,0,0,0.78)';ctx.fillRect(0,0,C.width,C.height);
+    ctx.font='bold 48px monospace';ctx.textAlign='center';
+    ctx.fillStyle=G.winner==='p'?'#4d9':'#f74';
+    ctx.fillText(G.winner==='p'?'ПОБЕДА!':'ПОРАЖЕНИЕ',C.width/2,C.height/2-20);
+    ctx.font='16px monospace';ctx.fillStyle='#789';
+    ctx.fillText(G.winner==='p'?'Штаб противника уничтожен':'Ваш Штаб пал',C.width/2,C.height/2+20);
+    ctx.fillStyle='#456';ctx.font='13px monospace';
+    ctx.fillText('Нажмите F5 для новой игры',C.width/2,C.height/2+50);
+  }
+}
+
+// ─── MAIN LOOP ─────────────────────────────────────────────────────────────────
+genMap();updateFog();
+updateBuildUI();updateTrainUI();updateUpgradeUI();
+
+log('Добро пожаловать в FRACTURED FRONT!','o');
+log('Цель: уничтожь вражеский 🏛 Штаб');
+log('Ставь Буровые на ⛏ руду, Реакторы — везде');
+log('Зажми ЛКМ для выделения группы юнитов');
+
+let lastT=null,uiT=0;
+function loop(ts){
+  if(!lastT)lastT=ts;
+  const dt=Math.min((ts-lastT)/1000,0.06);
+  lastT=ts;
+
+  if(!G.gameOver){
+    updateResources(dt);
+    updateUnits(dt);
+    updateTurrets(dt);
+    updateTraining(dt);
+    updateAI(dt);
+    updateFog();
+    checkVictory();
+    for(const fx of G.fx)fx.life-=dt;
+    G.fx.splice(0,G.fx.length,...G.fx.filter(f=>f.life>0));
+  }
+
+  render();
+  uiT+=dt;
+  if(uiT>=0.2){
+    uiT=0;
+    updateHUD();
+    updateSelPanel();
+    updateBuildUI();
+    updateTrainUI();
+    updateUpgradeUI();
+  }
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

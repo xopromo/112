@@ -76,7 +76,7 @@ function generatePineScript(r) {
   // MA filter
   lines.push(`grp_ma   = "📈 MA ФИЛЬТР"`);
   lines.push(`use_int_ma = input.bool(${b(c.useMA)}, "Включить MA фильтр", group=grp_ma)`);
-  lines.push(`ma_type      = input.string("${c.maType||'EMA'}", "Тип", options=["SMA","EMA","WMA","HMA","VWMA"], group=grp_ma)`);
+  lines.push(`ma_type      = input.string("${c.maType||'EMA'}", "Тип", options=["SMA","EMA","WMA","HMA","VWMA","DEMA","TEMA","Kalman"], group=grp_ma)`);
   lines.push(`ma_len       = input.int(${c.maP||200}, "Период", group=grp_ma)`);
   lines.push(`ma_htf_ratio = input.int(${c.htfRatio||1}, "HTF ratio (1=текущий ТФ)", minval=1, maxval=1000, group=grp_ma)`);
   lines.push(``);
@@ -84,7 +84,7 @@ function generatePineScript(r) {
   // Confirm MA filter
   lines.push(`grp_conf     = "🔍 CONFIRM MA"`);
   lines.push(`use_conf_ma  = input.bool(${b(c.useConfirm)}, "Включить Confirm MA", group=grp_conf)`);
-  lines.push(`conf_ma_type = input.string("${c.confMatType||'EMA'}", "Тип", options=["SMA","EMA","WMA"], group=grp_conf)`);
+  lines.push(`conf_ma_type = input.string("${c.confMatType||'EMA'}", "Тип", options=["SMA","EMA","WMA","HMA","DEMA","TEMA","Kalman"], group=grp_conf)`);
   lines.push(`conf_ma_len  = input.int(${c.confN||100}, "Период", group=grp_conf)`);
   lines.push(`conf_ma_htf  = input.int(${c.confHtfRatio||1}, "HTF ratio (1=текущий ТФ)", minval=1, maxval=1000, group=grp_conf)`);
   lines.push(``);
@@ -306,9 +306,26 @@ function generatePineScript(r) {
   lines.push(`bool struct_ok_l = not use_struct or struct_bull`);
   lines.push(`bool struct_ok_s = not use_struct or struct_bear`);
   lines.push(``);
-  lines.push(`// MA`);
+  lines.push(`// MA helpers`);
+  lines.push(`f_dema(s, l) =>`);
+  lines.push(`    e1 = ta.ema(s, l)`);
+  lines.push(`    2.0 * e1 - ta.ema(e1, l)`);
+  lines.push(`f_tema(s, l) =>`);
+  lines.push(`    e1 = ta.ema(s, l)`);
+  lines.push(`    e2 = ta.ema(e1, l)`);
+  lines.push(`    3.0 * e1 - 3.0 * e2 + ta.ema(e2, l)`);
+  lines.push(`f_kalman(s, len) =>`);
+  lines.push(`    var float _kx = na`);
+  lines.push(`    var float _kp = 1.0`);
+  lines.push(`    float _kq = 1.0 / math.max(len * len, 1.0)`);
+  lines.push(`    if na(_kx)`);
+  lines.push(`        _kx := s`);
+  lines.push(`    float _kk = _kp / (_kp + 1.0)`);
+  lines.push(`    _kx := _kx + _kk * (s - _kx)`);
+  lines.push(`    _kp := (1.0 - _kk) * _kp + _kq`);
+  lines.push(`    _kx`);
   lines.push(`calc_ma(t, s, l) =>`);
-  lines.push(`    t == "SMA" ? ta.sma(s,l) : t == "EMA" ? ta.ema(s,l) : t == "WMA" ? ta.wma(s,l) : t == "VWMA" ? ta.vwma(s,l) : ta.hma(s,l)`);
+  lines.push(`    t == "SMA" ? ta.sma(s,l) : t == "EMA" ? ta.ema(s,l) : t == "WMA" ? ta.wma(s,l) : t == "VWMA" ? ta.vwma(s,l) : t == "DEMA" ? f_dema(s,l) : t == "TEMA" ? f_tema(s,l) : t == "Kalman" ? f_kalman(s,l) : ta.hma(s,l)`);
   lines.push(`string _ma_tf_str   = ma_htf_ratio   <= 1 ? timeframe.period : f_tf_str(timeframe.in_seconds() * ma_htf_ratio)`);
   lines.push(`string _conf_tf_str = conf_ma_htf <= 1 ? timeframe.period : f_tf_str(timeframe.in_seconds() * conf_ma_htf)`);
   lines.push(`float ma_raw = request.security(syminfo.tickerid, _ma_tf_str, calc_ma(ma_type, close, ma_len)[1], barmerge.gaps_off, barmerge.lookahead_on)`);
@@ -373,8 +390,8 @@ function generatePineScript(r) {
   lines.push(`safe_body   = math.max(body_cur, syminfo.mintick)`);
   lines.push(`bull_pin = (math.min(close,open) - low)  > safe_body * pin_ratio and (high - math.max(close,open)) < safe_body`);
   lines.push(`bear_pin = (high - math.max(close,open)) > safe_body * pin_ratio and (math.min(close,open) - low)  < safe_body`);
-  lines.push(`donch_hi = ta.highest(high, donch_len)[1]`);
-  lines.push(`donch_lo = ta.lowest(low,   donch_len)[1]`);
+  lines.push(`donch_hi = ta.highest(high, donch_len)[2]`);
+  lines.push(`donch_lo = ta.lowest(low,   donch_len)[2]`);
   lines.push(`bool donch_l = use_donch and high[1] > donch_hi`);
   lines.push(`bool donch_s = use_donch and low[1]  < donch_lo`);
   lines.push(`boll_basis = ta.sma(close, boll_len)`);

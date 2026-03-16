@@ -999,8 +999,13 @@ async function runOpt() {
     if (pending.length === 0) return;
     if (typeof setMcPhase === 'function') setMcPhase(`⏳ OOS для ${pending.length} результатов…`);
     for (let oi = 0; oi < pending.length; oi++) {
-      _attachOOS(pending[oi].cfg, pending[oi].name, pending[oi].n);
-      if (equities[pending[oi].name]) pending[oi].eq = equities[pending[oi].name];
+      try {
+        _attachOOS(pending[oi].cfg, pending[oi].name, pending[oi].n);
+        if (equities[pending[oi].name]) pending[oi].eq = equities[pending[oi].name];
+      } catch(_oosErr) {
+        console.error('[_batchOOS] oi='+oi, _oosErr);
+        if (!pending[oi].cfg._oos) pending[oi].cfg._oos = { forward: null, isPct: Math.round(_isN / N * 100) };
+      }
       if (oi % 20 === 0) await yieldToUI();
     }
     if (typeof setMcPhase === 'function') setMcPhase(null);
@@ -1879,7 +1884,7 @@ async function runOpt() {
         hasTPB:!!(tpPair.b),tpMultB:tpPair.b?tpPair.b.m:0,tpModeB:tpPair.b?tpPair.b.type:'rr',tpLogic,
         useBE,beTrig,beOff,
         useTrail,trTrig,trDist,
-        useRev,revBars,revMode,revAct,revSrc,revSkip,revCooldown,
+        useRev,revBars,revMode,revAct,revSrc,revSkip,revCooldown,revNoFilters:true,
         useTime,timeBars,timeMode,
         usePartial,partRR,partPct,partBE,
         useClimax:useClimaxExit&&HAS_VOLUME,clxVolMult,clxBodyMult,clxMode,
@@ -1905,7 +1910,10 @@ async function runOpt() {
         useMacdFilter:_fCombo.useMacdFilter??useMacdFilter,
         useER:_fCombo.useER??useER,erArr,erPeriod:erPeriod||10,erThresh,
         useKalmanMA:_fCombo.useKalmanMA??useKalmanMA,kalmanArr,kalmanLen, // ##KALMAN_MA##
-        start:Math.max((maP||0)*(htfRatio||1),(confN||0)*(_confHtf||1),50)+2,
+        start:Math.max(
+          (_effUseMa&&maP>0?(maP||0)*(htfRatio||1):0),
+          (_effUseConfirm&&confN>0?(confN||0)*(_confHtf||1):0),
+          50)+2,
         pruning:false, maxDDLimit:maxDD
       };
 
@@ -1937,6 +1945,7 @@ async function runOpt() {
               useKalmanCross,kalmanCrossLen, // ##KALMAN_CROSS##
               useMaCross,maCrossP,maCrossType,
               useFreeEntry,
+              useEIS,eisPeriod:eisPeriod||13,useSoldiers,
               useMacd,macdFast,macdSlow,macdSignalP:macdSigP,
               useStochExit,stochKP,stochDP,stochOS,stochOB,
               useVolMove,volMoveMult,
@@ -1994,13 +2003,18 @@ async function runOpt() {
     if (_useOOS && results.length > 0) {
       setMcPhase(`⏳ OOS проверка ${results.length} результатов…`);
       for (let oi = 0; oi < results.length; oi++) {
-        _attachOOS(results[oi].cfg, results[oi].name, results[oi].n);
-        if (equities[results[oi].name]) results[oi].eq = equities[results[oi].name];
+        try {
+          _attachOOS(results[oi].cfg, results[oi].name, results[oi].n);
+          if (equities[results[oi].name]) results[oi].eq = equities[results[oi].name];
+        } catch(_oosErr) {
+          console.error('[MC OOS батч] oi='+oi, _oosErr);
+          if (!results[oi].cfg._oos) results[oi].cfg._oos = { forward: null, isPct: Math.round(_isN / N * 100) };
+        }
         if (oi % 50 === 0) { await yieldToUI(); }
       }
     }
-    results.sort((a,b) => b.pdd-a.pdd);
-    await _batchCPCV(results, 200);
+    results.sort((a,b)=>b.pdd-a.pdd);
+    try { await _batchCPCV(results, 200); } catch(_cpcvErr) { console.error('[MC _batchCPCV]', _cpcvErr); }
     if (typeof setMcPhase === 'function') setMcPhase(null);
     renderResults(); showBestStats(); updateETA(done, mcTotal, results.length);
     $('prog').textContent = '✅ ' + fmtNum(results.length) + ' / ' + fmtNum(done) + ' прошли фильтр';
@@ -2208,7 +2222,7 @@ async function runOpt() {
         hasTPA:!!(tpPair.a),tpMult:tpPair.a?tpPair.a.m:0,tpMode:tpPair.a?tpPair.a.type:'rr',
         hasTPB:!!(tpPair.b),tpMultB:tpPair.b?tpPair.b.m:0,tpModeB:tpPair.b?tpPair.b.type:'rr',tpLogic,
         useBE,beTrig,beOff,useTrail,trTrig,trDist,
-        useRev,revBars,revMode,revAct,revSrc,revSkip,revCooldown,
+        useRev,revBars,revMode,revAct,revSrc,revSkip,revCooldown,revNoFilters:true,
         useTime,timeBars,timeMode,usePartial,partRR,partPct,partBE,
         useClimax:useClimaxExit&&HAS_VOLUME,clxVolMult,clxBodyMult,clxMode,
         useMA:_effUseMa&&maP>0,maArr,maType:_mType,maP,htfRatio,
@@ -2229,7 +2243,10 @@ async function runOpt() {
         useMacdFilter:_fCombo.useMacdFilter??useMacdFilter,
         useER:_fCombo.useER??useER,erArr,erPeriod:erPeriod||10,erThresh,
         useKalmanMA:_fCombo.useKalmanMA??useKalmanMA,kalmanArr,kalmanLen, // ##KALMAN_MA##
-        start:Math.max((maP||0)*(htfRatio||1),(confN||0)*(_confHtf||1),50)+2,pruning:false,maxDDLimit:maxDD
+        start:Math.max(
+          (_effUseMa&&maP>0?(maP||0)*(htfRatio||1):0),
+          (_effUseConfirm&&confN>0?(confN||0)*(_confHtf||1):0),
+          50)+2,pruning:false,maxDDLimit:maxDD
       };
 
       if (_useOOS) DATA = _isData;
@@ -2296,6 +2313,7 @@ async function runOpt() {
               useKalmanCross,kalmanCrossLen, // ##KALMAN_CROSS##
               useMaCross,maCrossP,maCrossType:_mCrossType,
               useFreeEntry,
+              useEIS,eisPeriod:eisPeriod||13,useSoldiers,
               useMacd,macdFast,macdSlow,macdSignalP:macdSigP,
               useStochExit,stochKP,stochDP,stochOS,stochOB,
               useVolMove,volMoveMult,
@@ -2519,12 +2537,18 @@ async function runOpt() {
     if (_useOOS && results.length > 0) {
       setMcPhase(`⏳ OOS проверка ${results.length} результатов…`);
       for (let oi = 0; oi < results.length; oi++) {
-        _attachOOS(results[oi].cfg, results[oi].name, results[oi].n);
+        try {
+          _attachOOS(results[oi].cfg, results[oi].name, results[oi].n);
+          if (equities[results[oi].name]) results[oi].eq = equities[results[oi].name];
+        } catch(_oosErr) {
+          console.error('[TPE OOS батч] oi='+oi, _oosErr);
+          if (!results[oi].cfg._oos) results[oi].cfg._oos = { forward: null, isPct: Math.round(_isN / N * 100) };
+        }
         if (oi % 50 === 0) { await yieldToUI(); }
       }
     }
     results.sort((a,b)=>b.pdd-a.pdd);
-    await _batchCPCV(results, 200);
+    try { await _batchCPCV(results, 200); } catch(_cpcvErr) { console.error('[TPE _batchCPCV]', _cpcvErr); }
     if (typeof setMcPhase==='function') setMcPhase(null);
     renderResults(); showBestStats(); updateETA(done, _tpeMaxIter, results.length);
     const _tpeStopReason = results.length >= _tpeTarget ? `✅ цель ${_tpeTarget} достигнута` : `✅ бюджет ${_tpeMaxIter} итераций исчерпан`;
@@ -2624,8 +2648,13 @@ async function runOpt() {
     if (_useOOS && results.length > 0) {
       setMcPhase(`⏳ OOS проверка ${results.length} результатов…`);
       for (let oi = 0; oi < results.length; oi++) {
-        _attachOOS(results[oi].cfg, results[oi].name, results[oi].n);
-        if (equities[results[oi].name]) results[oi].eq = equities[results[oi].name];
+        try {
+          _attachOOS(results[oi].cfg, results[oi].name, results[oi].n);
+          if (equities[results[oi].name]) results[oi].eq = equities[results[oi].name];
+        } catch(_oosErr) {
+          console.error('[BO OOS батч] oi='+oi, _oosErr);
+          if (!results[oi].cfg._oos) results[oi].cfg._oos = { forward: null, isPct: Math.round(_isN / N * 100) };
+        }
         if (oi % 50 === 0) { await yieldToUI(); }
       }
     }
@@ -2807,12 +2836,12 @@ async function runOpt() {
                                       // Exits
                                       useBE,beTrig,beOff,
                                       useTrail,trTrig,trDist,
-                                      useRev,revBars,revMode,revAct,revSrc,revSkip,revCooldown,
+                                      useRev,revBars,revMode,revAct,revSrc,revSkip,revCooldown,revNoFilters:true,
                                       useTime,timeBars,timeMode,
                                       usePartial,partRR,partPct,partBE,
                                       useClimax:useClimaxExit&&HAS_VOLUME,clxVolMult,clxBodyMult,clxMode,
                                       // Filters
-                                      useMA:maP>0,maArr,maType:mType,maP,htfRatio,
+                                      useMA:useMa&&maP>0,maArr,maType:mType,maP,htfRatio,
                                       useADX:useAdx&&adxT>0,adxArr:adxCache[_adxCk],adxThresh:adxT,adxLen:adxL,adxHtfRatio,useAdxSlope,adxSlopeBars,
                                       useRSI:useRsi,rsiArr:useRsi?calcRSI(14):null,
                                       rsiOS:rsiPair.os,rsiOB:rsiPair.ob,
@@ -2833,7 +2862,10 @@ async function runOpt() {
                                       useKalmanMA,kalmanArr,kalmanLen, // ##KALMAN_MA##
                                       useMacdFilter,useER,erArr:erArrEx,erPeriod:erPArr[0]||10,erThresh,
                                       bodyAvg:bodyAvgArr,
-                                      start:Math.max((maP||0)*(htfRatio||1),(confN||0)*(_confHtf||1),50)+2,
+                                      start:Math.max(
+                                        (useMa&&maP>0?(maP||0)*(htfRatio||1):0),
+                                        (useConfirm&&confN>0?(confN||0)*(_confHtf||1):0),
+                                        50)+2,
                                       // Pruning
                                       pruning:optMode==='prune',maxDDLimit:maxDD
                                     };
@@ -2888,6 +2920,7 @@ async function runOpt() {
                                           useKalmanCross,kalmanCrossLen, // ##KALMAN_CROSS##
                                           useMaCross,maCrossP,maCrossType:_mCrossTyp,
                                           useFreeEntry,
+                                          useEIS,eisPeriod:eisPeriod||13,useSoldiers,
                                           useMacd,macdFast,macdSlow,macdSignalP:macdSigP,
                                           useStochExit,stochKP,stochDP,stochOS,stochOB,
                                           useVolMove,volMoveMult,
@@ -2904,7 +2937,7 @@ async function runOpt() {
                                           useTime, timeBars, timeMode,
                                           usePartial, partRR, partPct, partBE,
                                           useClimax:useClimaxExit&&HAS_VOLUME, clxVolMult, clxBodyMult, clxMode,
-                                          useMA:maP>0, maType:mType, maP, htfRatio,
+                                          useMA:useMa&&maP>0, maType:mType, maP, htfRatio,
                                           useADX:useAdx&&adxT>0, adxThresh:adxT, adxLen:adxL, adxHtfRatio, useAdxSlope, adxSlopeBars,
                                           useRSI:useRsi, rsiOS:rsiPair.os, rsiOB:rsiPair.ob,
                                           useVolF:useVolF&&vfM>0, volFMult:vfM,
@@ -2979,8 +3012,13 @@ async function runOpt() {
     // OOS вычисляется только если не synthesis режим (для synthesis отложено до detail modal)
     if (!_isSynthMode) {
       for (let oi = 0; oi < results.length; oi++) {
-        _attachOOS(results[oi].cfg, results[oi].name, results[oi].n);
-        if (equities[results[oi].name]) results[oi].eq = equities[results[oi].name];
+        try {
+          _attachOOS(results[oi].cfg, results[oi].name, results[oi].n);
+          if (equities[results[oi].name]) results[oi].eq = equities[results[oi].name];
+        } catch(_oosErr) {
+          console.error('[Exhaustive OOS батч] oi='+oi, _oosErr);
+          if (!results[oi].cfg._oos) results[oi].cfg._oos = { forward: null, isPct: Math.round(_isN / N * 100) };
+        }
         if (oi % 50 === 0) { await yieldToUI(); }
       }
     } else {
@@ -2993,7 +3031,7 @@ async function runOpt() {
     }
   }
   results.sort((a,b)=>b.pdd-a.pdd);
-  await _batchCPCV(results, 200);
+  try { await _batchCPCV(results, 200); } catch(_cpcvErr) { console.error('[Exhaustive _batchCPCV]', _cpcvErr); }
   if (typeof setMcPhase === 'function') setMcPhase(null);
   _curPage = 0;
   renderResults();
@@ -3496,6 +3534,7 @@ function buildBtCfg(cfg, ind) {
     revSrc:   cfg.revSrc   || 'same',
     revSkip:       cfg.revSkip       || 0,
     revCooldown:   cfg.revCooldown   || 0,
+    revNoFilters:  true,
     useTime:  cfg.useTime  || false,
     timeBars: cfg.timeBars || 20,
     timeMode: cfg.timeMode || 'any',
@@ -3509,7 +3548,7 @@ function buildBtCfg(cfg, ind) {
     clxMode:     cfg.clxMode     || 'any',
 
     // ── Фильтры ───────────────────────────────────────────────
-    useMA:    maP > 0,
+    useMA:    !!(cfg.useMA) && maP > 0,
     maArr:    ind.maArr,
     maType:   cfg.maType   || 'EMA',
     maP:      maP,
@@ -3582,7 +3621,10 @@ function buildBtCfg(cfg, ind) {
     kalmanCrossArr: ind.kalmanCrossArr,
     kalmanCrossLen: cfg.kalmanCrossLen || 20,
 
-    start: Math.max((maP || 0) * (cfg.htfRatio || 1), (cfg.confN || 0) * (cfg.confHtfRatio || 1), 50) + 2,
+    start: Math.max(
+      (cfg.useMA      ? (maP || 0)       * (cfg.htfRatio     || 1) : 0),
+      (cfg.useConfirm ? (cfg.confN || 0) * (cfg.confHtfRatio || 1) : 0),
+      50) + 2,
     pruning: false,
     maxDDLimit: 300,
   };

@@ -2100,7 +2100,7 @@ function generatePineScript(r) {
   // MA filter
   lines.push(`grp_ma   = "📈 MA ФИЛЬТР"`);
   lines.push(`use_int_ma = input.bool(${b(c.useMA)}, "Включить MA фильтр", group=grp_ma)`);
-  lines.push(`ma_type      = input.string("${c.maType||'EMA'}", "Тип", options=["SMA","EMA","WMA","HMA","VWMA"], group=grp_ma)`);
+  lines.push(`ma_type      = input.string("${c.maType||'EMA'}", "Тип", options=["SMA","EMA","WMA","HMA","VWMA","DEMA","TEMA","Kalman"], group=grp_ma)`);
   lines.push(`ma_len       = input.int(${c.maP||200}, "Период", group=grp_ma)`);
   lines.push(`ma_htf_ratio = input.int(${c.htfRatio||1}, "HTF ratio (1=текущий ТФ)", minval=1, maxval=1000, group=grp_ma)`);
   lines.push(``);
@@ -2108,7 +2108,7 @@ function generatePineScript(r) {
   // Confirm MA filter
   lines.push(`grp_conf     = "🔍 CONFIRM MA"`);
   lines.push(`use_conf_ma  = input.bool(${b(c.useConfirm)}, "Включить Confirm MA", group=grp_conf)`);
-  lines.push(`conf_ma_type = input.string("${c.confMatType||'EMA'}", "Тип", options=["SMA","EMA","WMA"], group=grp_conf)`);
+  lines.push(`conf_ma_type = input.string("${c.confMatType||'EMA'}", "Тип", options=["SMA","EMA","WMA","HMA","DEMA","TEMA","Kalman"], group=grp_conf)`);
   lines.push(`conf_ma_len  = input.int(${c.confN||100}, "Период", group=grp_conf)`);
   lines.push(`conf_ma_htf  = input.int(${c.confHtfRatio||1}, "HTF ratio (1=текущий ТФ)", minval=1, maxval=1000, group=grp_conf)`);
   lines.push(``);
@@ -2330,9 +2330,26 @@ function generatePineScript(r) {
   lines.push(`bool struct_ok_l = not use_struct or struct_bull`);
   lines.push(`bool struct_ok_s = not use_struct or struct_bear`);
   lines.push(``);
-  lines.push(`// MA`);
+  lines.push(`// MA helpers`);
+  lines.push(`f_dema(s, l) =>`);
+  lines.push(`    e1 = ta.ema(s, l)`);
+  lines.push(`    2.0 * e1 - ta.ema(e1, l)`);
+  lines.push(`f_tema(s, l) =>`);
+  lines.push(`    e1 = ta.ema(s, l)`);
+  lines.push(`    e2 = ta.ema(e1, l)`);
+  lines.push(`    3.0 * e1 - 3.0 * e2 + ta.ema(e2, l)`);
+  lines.push(`f_kalman(s, len) =>`);
+  lines.push(`    var float _kx = na`);
+  lines.push(`    var float _kp = 1.0`);
+  lines.push(`    float _kq = 1.0 / math.max(len * len, 1.0)`);
+  lines.push(`    if na(_kx)`);
+  lines.push(`        _kx := s`);
+  lines.push(`    float _kk = _kp / (_kp + 1.0)`);
+  lines.push(`    _kx := _kx + _kk * (s - _kx)`);
+  lines.push(`    _kp := (1.0 - _kk) * _kp + _kq`);
+  lines.push(`    _kx`);
   lines.push(`calc_ma(t, s, l) =>`);
-  lines.push(`    t == "SMA" ? ta.sma(s,l) : t == "EMA" ? ta.ema(s,l) : t == "WMA" ? ta.wma(s,l) : t == "VWMA" ? ta.vwma(s,l) : ta.hma(s,l)`);
+  lines.push(`    t == "SMA" ? ta.sma(s,l) : t == "EMA" ? ta.ema(s,l) : t == "WMA" ? ta.wma(s,l) : t == "VWMA" ? ta.vwma(s,l) : t == "DEMA" ? f_dema(s,l) : t == "TEMA" ? f_tema(s,l) : t == "Kalman" ? f_kalman(s,l) : ta.hma(s,l)`);
   lines.push(`string _ma_tf_str   = ma_htf_ratio   <= 1 ? timeframe.period : f_tf_str(timeframe.in_seconds() * ma_htf_ratio)`);
   lines.push(`string _conf_tf_str = conf_ma_htf <= 1 ? timeframe.period : f_tf_str(timeframe.in_seconds() * conf_ma_htf)`);
   lines.push(`float ma_raw = request.security(syminfo.tickerid, _ma_tf_str, calc_ma(ma_type, close, ma_len)[1], barmerge.gaps_off, barmerge.lookahead_on)`);
@@ -2397,8 +2414,8 @@ function generatePineScript(r) {
   lines.push(`safe_body   = math.max(body_cur, syminfo.mintick)`);
   lines.push(`bull_pin = (math.min(close,open) - low)  > safe_body * pin_ratio and (high - math.max(close,open)) < safe_body`);
   lines.push(`bear_pin = (high - math.max(close,open)) > safe_body * pin_ratio and (math.min(close,open) - low)  < safe_body`);
-  lines.push(`donch_hi = ta.highest(high, donch_len)[1]`);
-  lines.push(`donch_lo = ta.lowest(low,   donch_len)[1]`);
+  lines.push(`donch_hi = ta.highest(high, donch_len)[2]`);
+  lines.push(`donch_lo = ta.lowest(low,   donch_len)[2]`);
   lines.push(`bool donch_l = use_donch and high[1] > donch_hi`);
   lines.push(`bool donch_s = use_donch and low[1]  < donch_lo`);
   lines.push(`boll_basis = ta.sma(close, boll_len)`);
@@ -5014,6 +5031,8 @@ function loadFile(file) {
     // Track last loaded file for the current project
     if (typeof ProjectManager !== 'undefined' && ProjectManager.getCurrentId()) {
       ProjectManager.updateLastFile(file.name);
+      // Cache CSV text for restore on page reload (no file permission needed)
+      try { localStorage.setItem(`use6_csv_${ProjectManager.getCurrentId()}`, e.target.result); } catch(_) {}
     }
   };
   reader.readAsText(file);
@@ -8100,8 +8119,13 @@ async function runOpt() {
     if (pending.length === 0) return;
     if (typeof setMcPhase === 'function') setMcPhase(`⏳ OOS для ${pending.length} результатов…`);
     for (let oi = 0; oi < pending.length; oi++) {
-      _attachOOS(pending[oi].cfg, pending[oi].name, pending[oi].n);
-      if (equities[pending[oi].name]) pending[oi].eq = equities[pending[oi].name];
+      try {
+        _attachOOS(pending[oi].cfg, pending[oi].name, pending[oi].n);
+        if (equities[pending[oi].name]) pending[oi].eq = equities[pending[oi].name];
+      } catch(_oosErr) {
+        console.error('[_batchOOS] oi='+oi, _oosErr);
+        if (!pending[oi].cfg._oos) pending[oi].cfg._oos = { forward: null, isPct: Math.round(_isN / N * 100) };
+      }
       if (oi % 20 === 0) await yieldToUI();
     }
     if (typeof setMcPhase === 'function') setMcPhase(null);
@@ -8980,7 +9004,7 @@ async function runOpt() {
         hasTPB:!!(tpPair.b),tpMultB:tpPair.b?tpPair.b.m:0,tpModeB:tpPair.b?tpPair.b.type:'rr',tpLogic,
         useBE,beTrig,beOff,
         useTrail,trTrig,trDist,
-        useRev,revBars,revMode,revAct,revSrc,revSkip,revCooldown,
+        useRev,revBars,revMode,revAct,revSrc,revSkip,revCooldown,revNoFilters:true,
         useTime,timeBars,timeMode,
         usePartial,partRR,partPct,partBE,
         useClimax:useClimaxExit&&HAS_VOLUME,clxVolMult,clxBodyMult,clxMode,
@@ -9006,7 +9030,10 @@ async function runOpt() {
         useMacdFilter:_fCombo.useMacdFilter??useMacdFilter,
         useER:_fCombo.useER??useER,erArr,erPeriod:erPeriod||10,erThresh,
         useKalmanMA:_fCombo.useKalmanMA??useKalmanMA,kalmanArr,kalmanLen, // ##KALMAN_MA##
-        start:Math.max((maP||0)*(htfRatio||1),(confN||0)*(_confHtf||1),50)+2,
+        start:Math.max(
+          (_effUseMa&&maP>0?(maP||0)*(htfRatio||1):0),
+          (_effUseConfirm&&confN>0?(confN||0)*(_confHtf||1):0),
+          50)+2,
         pruning:false, maxDDLimit:maxDD
       };
 
@@ -9038,6 +9065,7 @@ async function runOpt() {
               useKalmanCross,kalmanCrossLen, // ##KALMAN_CROSS##
               useMaCross,maCrossP,maCrossType,
               useFreeEntry,
+              useEIS,eisPeriod:eisPeriod||13,useSoldiers,
               useMacd,macdFast,macdSlow,macdSignalP:macdSigP,
               useStochExit,stochKP,stochDP,stochOS,stochOB,
               useVolMove,volMoveMult,
@@ -9095,13 +9123,18 @@ async function runOpt() {
     if (_useOOS && results.length > 0) {
       setMcPhase(`⏳ OOS проверка ${results.length} результатов…`);
       for (let oi = 0; oi < results.length; oi++) {
-        _attachOOS(results[oi].cfg, results[oi].name, results[oi].n);
-        if (equities[results[oi].name]) results[oi].eq = equities[results[oi].name];
+        try {
+          _attachOOS(results[oi].cfg, results[oi].name, results[oi].n);
+          if (equities[results[oi].name]) results[oi].eq = equities[results[oi].name];
+        } catch(_oosErr) {
+          console.error('[MC OOS батч] oi='+oi, _oosErr);
+          if (!results[oi].cfg._oos) results[oi].cfg._oos = { forward: null, isPct: Math.round(_isN / N * 100) };
+        }
         if (oi % 50 === 0) { await yieldToUI(); }
       }
     }
-    results.sort((a,b) => b.pdd-a.pdd);
-    await _batchCPCV(results, 200);
+    results.sort((a,b)=>b.pdd-a.pdd);
+    try { await _batchCPCV(results, 200); } catch(_cpcvErr) { console.error('[MC _batchCPCV]', _cpcvErr); }
     if (typeof setMcPhase === 'function') setMcPhase(null);
     renderResults(); showBestStats(); updateETA(done, mcTotal, results.length);
     $('prog').textContent = '✅ ' + fmtNum(results.length) + ' / ' + fmtNum(done) + ' прошли фильтр';
@@ -9309,7 +9342,7 @@ async function runOpt() {
         hasTPA:!!(tpPair.a),tpMult:tpPair.a?tpPair.a.m:0,tpMode:tpPair.a?tpPair.a.type:'rr',
         hasTPB:!!(tpPair.b),tpMultB:tpPair.b?tpPair.b.m:0,tpModeB:tpPair.b?tpPair.b.type:'rr',tpLogic,
         useBE,beTrig,beOff,useTrail,trTrig,trDist,
-        useRev,revBars,revMode,revAct,revSrc,revSkip,revCooldown,
+        useRev,revBars,revMode,revAct,revSrc,revSkip,revCooldown,revNoFilters:true,
         useTime,timeBars,timeMode,usePartial,partRR,partPct,partBE,
         useClimax:useClimaxExit&&HAS_VOLUME,clxVolMult,clxBodyMult,clxMode,
         useMA:_effUseMa&&maP>0,maArr,maType:_mType,maP,htfRatio,
@@ -9330,7 +9363,10 @@ async function runOpt() {
         useMacdFilter:_fCombo.useMacdFilter??useMacdFilter,
         useER:_fCombo.useER??useER,erArr,erPeriod:erPeriod||10,erThresh,
         useKalmanMA:_fCombo.useKalmanMA??useKalmanMA,kalmanArr,kalmanLen, // ##KALMAN_MA##
-        start:Math.max((maP||0)*(htfRatio||1),(confN||0)*(_confHtf||1),50)+2,pruning:false,maxDDLimit:maxDD
+        start:Math.max(
+          (_effUseMa&&maP>0?(maP||0)*(htfRatio||1):0),
+          (_effUseConfirm&&confN>0?(confN||0)*(_confHtf||1):0),
+          50)+2,pruning:false,maxDDLimit:maxDD
       };
 
       if (_useOOS) DATA = _isData;
@@ -9397,6 +9433,7 @@ async function runOpt() {
               useKalmanCross,kalmanCrossLen, // ##KALMAN_CROSS##
               useMaCross,maCrossP,maCrossType:_mCrossType,
               useFreeEntry,
+              useEIS,eisPeriod:eisPeriod||13,useSoldiers,
               useMacd,macdFast,macdSlow,macdSignalP:macdSigP,
               useStochExit,stochKP,stochDP,stochOS,stochOB,
               useVolMove,volMoveMult,
@@ -9620,12 +9657,18 @@ async function runOpt() {
     if (_useOOS && results.length > 0) {
       setMcPhase(`⏳ OOS проверка ${results.length} результатов…`);
       for (let oi = 0; oi < results.length; oi++) {
-        _attachOOS(results[oi].cfg, results[oi].name, results[oi].n);
+        try {
+          _attachOOS(results[oi].cfg, results[oi].name, results[oi].n);
+          if (equities[results[oi].name]) results[oi].eq = equities[results[oi].name];
+        } catch(_oosErr) {
+          console.error('[TPE OOS батч] oi='+oi, _oosErr);
+          if (!results[oi].cfg._oos) results[oi].cfg._oos = { forward: null, isPct: Math.round(_isN / N * 100) };
+        }
         if (oi % 50 === 0) { await yieldToUI(); }
       }
     }
     results.sort((a,b)=>b.pdd-a.pdd);
-    await _batchCPCV(results, 200);
+    try { await _batchCPCV(results, 200); } catch(_cpcvErr) { console.error('[TPE _batchCPCV]', _cpcvErr); }
     if (typeof setMcPhase==='function') setMcPhase(null);
     renderResults(); showBestStats(); updateETA(done, _tpeMaxIter, results.length);
     const _tpeStopReason = results.length >= _tpeTarget ? `✅ цель ${_tpeTarget} достигнута` : `✅ бюджет ${_tpeMaxIter} итераций исчерпан`;
@@ -9725,8 +9768,13 @@ async function runOpt() {
     if (_useOOS && results.length > 0) {
       setMcPhase(`⏳ OOS проверка ${results.length} результатов…`);
       for (let oi = 0; oi < results.length; oi++) {
-        _attachOOS(results[oi].cfg, results[oi].name, results[oi].n);
-        if (equities[results[oi].name]) results[oi].eq = equities[results[oi].name];
+        try {
+          _attachOOS(results[oi].cfg, results[oi].name, results[oi].n);
+          if (equities[results[oi].name]) results[oi].eq = equities[results[oi].name];
+        } catch(_oosErr) {
+          console.error('[BO OOS батч] oi='+oi, _oosErr);
+          if (!results[oi].cfg._oos) results[oi].cfg._oos = { forward: null, isPct: Math.round(_isN / N * 100) };
+        }
         if (oi % 50 === 0) { await yieldToUI(); }
       }
     }
@@ -9908,12 +9956,12 @@ async function runOpt() {
                                       // Exits
                                       useBE,beTrig,beOff,
                                       useTrail,trTrig,trDist,
-                                      useRev,revBars,revMode,revAct,revSrc,revSkip,revCooldown,
+                                      useRev,revBars,revMode,revAct,revSrc,revSkip,revCooldown,revNoFilters:true,
                                       useTime,timeBars,timeMode,
                                       usePartial,partRR,partPct,partBE,
                                       useClimax:useClimaxExit&&HAS_VOLUME,clxVolMult,clxBodyMult,clxMode,
                                       // Filters
-                                      useMA:maP>0,maArr,maType:mType,maP,htfRatio,
+                                      useMA:useMa&&maP>0,maArr,maType:mType,maP,htfRatio,
                                       useADX:useAdx&&adxT>0,adxArr:adxCache[_adxCk],adxThresh:adxT,adxLen:adxL,adxHtfRatio,useAdxSlope,adxSlopeBars,
                                       useRSI:useRsi,rsiArr:useRsi?calcRSI(14):null,
                                       rsiOS:rsiPair.os,rsiOB:rsiPair.ob,
@@ -9934,7 +9982,10 @@ async function runOpt() {
                                       useKalmanMA,kalmanArr,kalmanLen, // ##KALMAN_MA##
                                       useMacdFilter,useER,erArr:erArrEx,erPeriod:erPArr[0]||10,erThresh,
                                       bodyAvg:bodyAvgArr,
-                                      start:Math.max((maP||0)*(htfRatio||1),(confN||0)*(_confHtf||1),50)+2,
+                                      start:Math.max(
+                                        (useMa&&maP>0?(maP||0)*(htfRatio||1):0),
+                                        (useConfirm&&confN>0?(confN||0)*(_confHtf||1):0),
+                                        50)+2,
                                       // Pruning
                                       pruning:optMode==='prune',maxDDLimit:maxDD
                                     };
@@ -9989,6 +10040,7 @@ async function runOpt() {
                                           useKalmanCross,kalmanCrossLen, // ##KALMAN_CROSS##
                                           useMaCross,maCrossP,maCrossType:_mCrossTyp,
                                           useFreeEntry,
+                                          useEIS,eisPeriod:eisPeriod||13,useSoldiers,
                                           useMacd,macdFast,macdSlow,macdSignalP:macdSigP,
                                           useStochExit,stochKP,stochDP,stochOS,stochOB,
                                           useVolMove,volMoveMult,
@@ -10005,7 +10057,7 @@ async function runOpt() {
                                           useTime, timeBars, timeMode,
                                           usePartial, partRR, partPct, partBE,
                                           useClimax:useClimaxExit&&HAS_VOLUME, clxVolMult, clxBodyMult, clxMode,
-                                          useMA:maP>0, maType:mType, maP, htfRatio,
+                                          useMA:useMa&&maP>0, maType:mType, maP, htfRatio,
                                           useADX:useAdx&&adxT>0, adxThresh:adxT, adxLen:adxL, adxHtfRatio, useAdxSlope, adxSlopeBars,
                                           useRSI:useRsi, rsiOS:rsiPair.os, rsiOB:rsiPair.ob,
                                           useVolF:useVolF&&vfM>0, volFMult:vfM,
@@ -10080,8 +10132,13 @@ async function runOpt() {
     // OOS вычисляется только если не synthesis режим (для synthesis отложено до detail modal)
     if (!_isSynthMode) {
       for (let oi = 0; oi < results.length; oi++) {
-        _attachOOS(results[oi].cfg, results[oi].name, results[oi].n);
-        if (equities[results[oi].name]) results[oi].eq = equities[results[oi].name];
+        try {
+          _attachOOS(results[oi].cfg, results[oi].name, results[oi].n);
+          if (equities[results[oi].name]) results[oi].eq = equities[results[oi].name];
+        } catch(_oosErr) {
+          console.error('[Exhaustive OOS батч] oi='+oi, _oosErr);
+          if (!results[oi].cfg._oos) results[oi].cfg._oos = { forward: null, isPct: Math.round(_isN / N * 100) };
+        }
         if (oi % 50 === 0) { await yieldToUI(); }
       }
     } else {
@@ -10094,7 +10151,7 @@ async function runOpt() {
     }
   }
   results.sort((a,b)=>b.pdd-a.pdd);
-  await _batchCPCV(results, 200);
+  try { await _batchCPCV(results, 200); } catch(_cpcvErr) { console.error('[Exhaustive _batchCPCV]', _cpcvErr); }
   if (typeof setMcPhase === 'function') setMcPhase(null);
   _curPage = 0;
   renderResults();
@@ -10597,6 +10654,7 @@ function buildBtCfg(cfg, ind) {
     revSrc:   cfg.revSrc   || 'same',
     revSkip:       cfg.revSkip       || 0,
     revCooldown:   cfg.revCooldown   || 0,
+    revNoFilters:  true,
     useTime:  cfg.useTime  || false,
     timeBars: cfg.timeBars || 20,
     timeMode: cfg.timeMode || 'any',
@@ -10610,7 +10668,7 @@ function buildBtCfg(cfg, ind) {
     clxMode:     cfg.clxMode     || 'any',
 
     // ── Фильтры ───────────────────────────────────────────────
-    useMA:    maP > 0,
+    useMA:    !!(cfg.useMA) && maP > 0,
     maArr:    ind.maArr,
     maType:   cfg.maType   || 'EMA',
     maP:      maP,
@@ -10683,7 +10741,10 @@ function buildBtCfg(cfg, ind) {
     kalmanCrossArr: ind.kalmanCrossArr,
     kalmanCrossLen: cfg.kalmanCrossLen || 20,
 
-    start: Math.max((maP || 0) * (cfg.htfRatio || 1), (cfg.confN || 0) * (cfg.confHtfRatio || 1), 50) + 2,
+    start: Math.max(
+      (cfg.useMA      ? (maP || 0)       * (cfg.htfRatio     || 1) : 0),
+      (cfg.useConfirm ? (cfg.confN || 0) * (cfg.confHtfRatio || 1) : 0),
+      50) + 2,
     pruning: false,
     maxDDLimit: 300,
   };
@@ -11097,6 +11158,16 @@ function renderResults() {
   renderVisibleResults();
   $('mass-rob-bar').style.display = results.length > 0 ? 'flex' : 'none';
   $('mass-rob-info').textContent = `${results.length} результатов`;
+  // Safety net: если после рендера есть результаты без OOS — пересчитать в фоне
+  if (typeof window._batchOOS === 'function') {
+    const _pendingOOS = results.filter(r => r.cfg && r.cfg._oos === undefined);
+    if (_pendingOOS.length > 0) {
+      setTimeout(async () => {
+        await window._batchOOS();
+        applyFilters(); // перерисовать таблицу с заполненными TV колонками
+      }, 50);
+    }
+  }
 }
 
 // --- Пагинация ---
@@ -13582,8 +13653,8 @@ function copyTVdiag() {
     const pvHiVal = pvHi_ ? pvHi_[i] : '?';
     const maVal   = (maArr && i > 0) ? maArr[i-1] : null;
     const maStr   = maVal != null ? maVal.toFixed(6) : '—';
-    let maBlock = '—';
-    if (maArr && i > 0) {
+    let maBlock = c.useMA ? '—' : 'off';
+    if (c.useMA && maArr && i > 0) {
       const prevC = DATA[i-1]?.c || 0;
       const ma = maArr[i-1];
       maBlock = (ma <= 0) ? 'WARMUP' : (prevC <= ma ? 'BLK_L' : 'ok');
@@ -13670,12 +13741,14 @@ function copyTVdiag() {
         }
         // Анализ фильтров на СИГНАЛЬНОМ баре jsSigBar
         lines.push(`--- Фильтры на сигнальном баре JS #${jsSigBar} (bar.i-1=${jsSigBar-1}) ---`);
-        if (maArr && jsSigBar > 0) {
+        if (maArr && jsSigBar > 0 && c.useMA) {
           const prevC2 = DATA[jsSigBar-1]?.c || 0;
           const ma2 = maArr[jsSigBar-1] || 0;
           const blocked2 = ma2 > 0 && (entryDir===1 ? prevC2 <= ma2 : prevC2 >= ma2);
           lines.push(`MA(${c.maP}×${c.htfRatio||1}tf)[${jsSigBar-1}] = ${ma2>0?ma2.toFixed(6):'0(warmup)'}  close=${prevC2.toFixed(6)}`);
           lines.push(ma2 <= 0 ? `⚠️  MA warmup → блокирует` : blocked2 ? `⚠️  MA БЛОКИРУЕТ (close${entryDir===1?'<=':'>='}MA)` : `✅ MA ok`);
+        } else if (maArr && jsSigBar > 0 && !c.useMA) {
+          lines.push(`MA(${c.maP}×${c.htfRatio||1}tf) — отключён (useMA=false), не влияет`);
         }
         if (confArr && jsSigBar > 0) {
           const prevC3 = DATA[jsSigBar-1]?.c || 0;
@@ -13696,7 +13769,7 @@ function copyTVdiag() {
     }
     // MA и Confirm MA filter на БАРЕ ВХОДА (для справки)
     const checkBar = (jsSigBar >= 0 && waitB > 0) ? jsSigBar : entrySignalBar;
-    if (checkBar !== jsSigBar && maArr && entrySignalBar > 0) {
+    if (checkBar !== jsSigBar && c.useMA && maArr && entrySignalBar > 0) {
       // только если уже не показали выше
       const prevC = DATA[entrySignalBar - 1]?.c || 0;
       const ma = maArr[entrySignalBar - 1] || 0;
@@ -17011,22 +17084,47 @@ async function setProject(id) {
   _favNs = (state && state.favNs) ? state.favNs : '';
   localStorage.setItem('use6_fav_ns', _favNs);
 
+  // Clear stale data from previous project before loading new one
+  DATA = null; _rawDATA = null;
+  _rawDataInfo = '';
+  if ($('finfo')) $('finfo').textContent = 'Нет данных';
+  results = []; equities = {};
+  if ($('tb')) $('tb').innerHTML = '';
+  if ($('eqc')) $('eqc').style.display = 'none';
+  if ($('rbtn')) $('rbtn').disabled = true;
+
   // Update UI
   _updateProjBar(proj);
   renderFavBar();
   const nsEl = document.getElementById('fav-ns-label');
   if (nsEl) nsEl.textContent = _favNs ? _favNs : '';
 
+  // Helper: try to restore CSV from localStorage cache (no permission needed)
+  function _restoreFromCache(filename) {
+    const cached = localStorage.getItem(`use6_csv_${id}`);
+    if (!cached) return false;
+    parseCSV(cached);
+    _rawDATA = DATA;
+    _rawDataInfo = '✅ ' + (filename || 'данные') + ' (кэш)';
+    applyMaxBars();
+    if ($('rbtn')) $('rbtn').disabled = false;
+    updateVolStatus();
+    updatePreview();
+    return true;
+  }
+
   // Auto-load last CSV from project folder
   if (proj.lastFile) {
     const file = await ProjectManager.readCSVFile(id, proj.lastFile);
     if (file) loadFile(file);
+    else _restoreFromCache(proj.lastFile); // fallback: restore from cache on reload
   } else {
     // No lastFile — try to pick the most recent CSV
     const files = await ProjectManager.listCSVFiles(id);
     if (files.length > 0) {
       const file = await ProjectManager.readCSVFile(id, files[0].name);
       if (file) { loadFile(file); ProjectManager.updateLastFile(files[0].name); }
+      else _restoreFromCache(files[0].name);
       ProjectManager.markFilesKnown(id, files.map(f => f.name));
     }
   }
@@ -17163,9 +17261,11 @@ async function _pollNewFiles() {
   const id = ProjectManager.getCurrentId();
   if (!id) return;
   try {
-    const newFiles = await ProjectManager.checkNewFiles(id);
+    // Use IfGranted variant — doesn't call requestPermission (requires user gesture)
+    const newFiles = await ProjectManager.checkNewFilesIfGranted(id);
     const badge = document.getElementById('proj-new-badge');
-    if (badge) badge.style.display = newFiles.length > 0 ? 'inline' : 'none';
+    // null = permission not yet granted → don't hide badge (it may have been set earlier)
+    if (badge && newFiles !== null) badge.style.display = newFiles.length > 0 ? 'inline' : 'none';
   } catch(e) {}
 }
 
@@ -17481,6 +17581,35 @@ const ProjectManager = (() => {
     } catch(e) { return null; }
   }
 
+  // Returns handle only if permission already granted (no requestPermission — safe in setInterval)
+  async function getHandleIfGranted(id) {
+    const handle = await _getHandle(id || _currentId);
+    if (!handle) return null;
+    try {
+      const perm = await handle.queryPermission({ mode: 'readwrite' });
+      return perm === 'granted' ? handle : null;
+    } catch(e) { return null; }
+  }
+
+  // Returns new CSV filenames without requesting permission (safe to call from setInterval)
+  // Returns null if permission not yet granted, [] if granted but no new files
+  async function checkNewFilesIfGranted(id) {
+    const proj = _projects.find(p => p.id === (id || _currentId));
+    if (!proj) return null;
+    const handle = await getHandleIfGranted(id || _currentId);
+    if (!handle) return null; // permission not granted — skip silently
+    const known = new Set(proj.knownFiles || []);
+    const files = [];
+    try {
+      for await (const [name, entry] of handle.entries()) {
+        if (entry.kind === 'file' && name.toLowerCase().endsWith('.csv')) {
+          files.push(name);
+        }
+      }
+    } catch(e) { return null; }
+    return files.filter(n => !known.has(n));
+  }
+
   // Returns sorted array: [{ name, size, lastModified }]
   async function listCSVFiles(id) {
     const handle = await getHandle(id || _currentId);
@@ -17573,8 +17702,8 @@ const ProjectManager = (() => {
     init,
     getAll, getCurrentId, getCurrent, getById,
     create, switchTo, duplicate, rename, remove,
-    getHandle, listCSVFiles, readCSVFile, saveToFolder,
-    checkNewFiles, markFilesKnown, updateLastFile,
+    getHandle, getHandleIfGranted, listCSVFiles, readCSVFile, saveToFolder,
+    checkNewFiles, checkNewFilesIfGranted, markFilesKnown, updateLastFile,
     saveState, loadState,
   };
 })();
@@ -17900,7 +18029,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1773561410748;
+window._BUILD_TS = 1773655080310;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
