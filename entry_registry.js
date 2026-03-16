@@ -158,8 +158,10 @@ const ENTRY_REGISTRY = [
       return crossDn && DATA[i-1].h >= cfg.matMA[i-1] - zone;
     },
     pineLines: (c, b) => [
-      `use_ma_touch = input.bool(${b(c.useMaTouch)}, "Касание MA",         group=grp_entry)`,
-      `ma_touch_bars= input.int(3, "  Баров от касания", minval=1, maxval=10, group=grp_entry)`,
+      `use_ma_touch  = input.bool(${b(c.useMaTouch)}, "Касание MA",                                                    group=grp_entry)`,
+      `mat_type      = input.string("${c.matType||'EMA'}", "  Тип MA касания", options=["SMA","EMA","WMA","HMA","DEMA","TEMA","Kalman"], group=grp_entry)`,
+      `mat_len       = input.int(${c.matPeriod||20}, "  Период MA касания", minval=1, maxval=500,                       group=grp_entry)`,
+      `mat_zone_pct  = input.float(${+(c.matZone||0.2).toFixed(3)}, "  Зона %", step=0.05, minval=0,                   group=grp_entry)`,
     ],
   },
 

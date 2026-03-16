@@ -1145,11 +1145,11 @@ async function runOpt() {
   const pvRs=usePv?parseRange('e_pvr'):[2];
   const atrPs=parseRange('c_atr');
   const maPs=useMa?parseRange('f_map'):[0];
-  const maTypeArr=useMa?(_sweepMaTypes?['EMA','SMA','WMA']:[$v('f_mat')||'EMA']):['EMA'];
+  const maTypeArr=useMa?(_sweepMaTypes?['EMA','SMA','WMA','DEMA','TEMA','Kalman']:[$v('f_mat')||'EMA']):['EMA'];
   const htfRatioArr=useMa?parseRange('f_ma_htf'):[1];
-  const confTypeArr=useConfirm?(_sweepConfTypes?['EMA','SMA','WMA']:[confMatType]):['EMA'];
+  const confTypeArr=useConfirm?(_sweepConfTypes?['EMA','SMA','WMA','HMA','DEMA','TEMA','Kalman']:[confMatType]):['EMA'];
   const confHtfArr=useConfirm?parseRange('f_conf_htf'):[1];
-  const maCrossTypeArr=$c('e_macr')?(_sweepMaCrossTypes?['EMA','SMA','WMA']:[$v('e_macr_t')||'EMA']):['EMA'];
+  const maCrossTypeArr=$c('e_macr')?(_sweepMaCrossTypes?['EMA','SMA','WMA','RMA','DEMA','TEMA','Kalman']:[$v('e_macr_t')||'EMA']):['EMA'];
   const adxTs=useAdx?parseRange('f_adxt'):[0];
   const adxHtfArr=useAdx?parseRange('f_adx_htf'):[1];
   const atrExpMs=useAtrExp?parseRange('f_atrexpm'):[0];

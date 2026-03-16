@@ -403,22 +403,19 @@ function generatePineScript(r) {
   lines.push(`bool atr_bo_l = use_atr_bo and close[1] > (atr_bo_ma + atr_bo_atr * atr_bo_mult)[1]`);
   lines.push(`bool atr_bo_s = use_atr_bo and close[1] < (atr_bo_ma - atr_bo_atr * atr_bo_mult)[1]`);
   lines.push(``);
-  lines.push(`// MA Touch`);
-    lines.push(`bool ma_touch_l = false`);
-    lines.push(`bool ma_touch_s = false`);
-  lines.push(`if use_ma_touch`);
-  lines.push(`    bool crossed_up = close[1] > ma_val and close[2] <= ma_val[1]`);
+  lines.push(`// MA Touch — использует отдельную MA (mat_len/mat_type), не фильтр-MA`);
+  lines.push(`float _mat_raw = request.security(syminfo.tickerid, timeframe.period, calc_ma(mat_type, close, mat_len)[1], barmerge.gaps_off, barmerge.lookahead_on)`);
+  lines.push(`float mat_val = _mat_raw`);
+  lines.push(`bool ma_touch_l = false`);
+  lines.push(`bool ma_touch_s = false`);
+  lines.push(`if use_ma_touch and not na(mat_val)`);
+  lines.push(`    float _mat_zone = mat_val * mat_zone_pct / 100`);
+  lines.push(`    bool crossed_up = close[1] > mat_val and close[2] <= mat_val[1]`);
+  lines.push(`    bool crossed_dn = close[1] < mat_val and close[2] >= mat_val[1]`);
   lines.push(`    if crossed_up`);
-  lines.push(`        for i = 1 to ma_touch_bars`);
-  lines.push(`            if low[i] <= ma_val[i] * 1.002`);
-  lines.push(`                ma_touch_l := true`);
-  lines.push(`                break`);
-  lines.push(`    bool crossed_dn = close[1] < ma_val and close[2] >= ma_val[1]`);
+  lines.push(`        ma_touch_l := low[1] <= mat_val + _mat_zone`);
   lines.push(`    if crossed_dn`);
-  lines.push(`        for i = 1 to ma_touch_bars`);
-  lines.push(`            if high[i] >= ma_val[i] * 0.998`);
-  lines.push(`                ma_touch_s := true`);
-  lines.push(`                break`);
+  lines.push(`        ma_touch_s := high[1] >= mat_val - _mat_zone`);
   lines.push(``);
 
   // ── Trendline Figures ────────────────────────────────────────────────────
@@ -959,6 +956,27 @@ function generatePineScript(r) {
     lines.push(`bool a_lx = false`);
     lines.push(`bool a_sx = false`);
   lines.push(``);
+  // ── INTRA-BAR TP/SL BLOCK ───────────────────────────────────────────────
+  // Runs on every tick (not confirmed) to fire alerts and update box immediately
+  // when TP/SL is touched intra-bar (before bar close).
+  lines.push(`// Intra-bar TP/SL: fire alert and update trade box immediately on touch`);
+  lines.push(`if v_in and bar_index > v_eb and bar_index > (last_bar_index - max_bars) and not barstate.isconfirmed`);
+  lines.push(`    bool _ib_htp = v_dir == 1 ? (high >= v_tp) : (low <= v_tp)`);
+  lines.push(`    bool _ib_hsl = v_dir == 1 ? (low <= v_sl) : (high >= v_sl)`);
+  lines.push(`    if _ib_hsl or _ib_htp`);
+  lines.push(`        float _ib_xp = _ib_hsl ? v_sl : v_tp`);
+  lines.push(`        string _ib_xt = _ib_hsl ? "SL" : "TP"`);
+  lines.push(`        if show_tr and not na(b_trade)`);
+  lines.push(`            bool _ib_win = v_dir == 1 ? _ib_xp > v_ep : _ib_xp < v_ep`);
+  lines.push(`            box.set_top(b_trade, math.max(v_ep, _ib_xp))`);
+  lines.push(`            box.set_bottom(b_trade, math.min(v_ep, _ib_xp))`);
+  lines.push(`            box.set_right(b_trade, bar_index)`);
+  lines.push(`            box.set_bgcolor(b_trade, _ib_win ? c_win : c_loss)`);
+  lines.push(`        if v_dir == 1`);
+  lines.push(`            alert("XL " + _ib_xt + " @" + str.tostring(_ib_xp, "#.####"), alert.freq_once_per_bar)`);
+  lines.push(`        else`);
+  lines.push(`            alert("XS " + _ib_xt + " @" + str.tostring(_ib_xp, "#.####"), alert.freq_once_per_bar)`);
+  lines.push(``);
   lines.push(`if bar_index > (last_bar_index - max_bars) and confirmed`);
   lines.push(`    if v_in and bar_index > v_eb`);
   lines.push(`        float _u  = atr_v[1]`);
@@ -1091,10 +1109,15 @@ function generatePineScript(r) {
     lines.push(`                box.set_bottom(b_trade, math.min(v_ep, vxp))`);
     lines.push(`                box.set_right(b_trade, bar_index)`);
     lines.push(`                box.set_bgcolor(b_trade, win ? c_win : c_loss)`);
+    lines.push(`                // Удаляем TP/SL линии при закрытии — чтобы не путать с уровнями следующей сделки`);
+    lines.push(`                line.delete(l_tp)`);
+    lines.push(`                line.delete(l_sl)`);
+    lines.push(`                l_tp := na`);
+    lines.push(`                l_sl := na`);
   lines.push(`                float vpct = v_dir == 1 ? (vxp - v_ep)/v_ep*100 : (v_ep - vxp)/v_ep*100`);
     lines.push(`                label.new(`);
     lines.push(`                    bar_index,`);
-    lines.push(`                    v_dir == 1 ? high + atr_v[1] * lbl_off_m : low - atr_v[1] * lbl_off_m,`);
+    lines.push(`                    v_dir == 1 ? vxp + atr_v[1] * lbl_off_m : vxp - atr_v[1] * lbl_off_m,`);
     lines.push(`                    vxt + " " + str.tostring(vpct, "#.#") + "%",`);
     lines.push(`                    color=win ? color.green : color.red,`);
     lines.push(`                    style=v_dir == 1 ? label.style_label_down : label.style_label_up,`);
@@ -1399,7 +1422,7 @@ function _addActivePinev6(code) {
     ['use_donch',      ['donch_len']],
     ['use_boll',       ['boll_len','boll_mult']],
     ['use_atr_bo',     ['atr_bo_len','atr_bo_mult']],
-    ['use_ma_touch',   ['ma_touch_bars']],
+    ['use_ma_touch',   ['mat_type','mat_len','mat_zone_pct']],
     ['use_rsi',        ['rsi_os','rsi_ob']],
     ['use_ma',         ['ma_period','ma_type']],
     ['use_adx',        ['adx_thresh','adx_len']],

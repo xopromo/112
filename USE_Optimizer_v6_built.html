@@ -1011,7 +1011,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
     <div class="field"><label>Период MA</label><input id="e_macr_p" value="20" data-tip="Период скользящей средней для пересечения"></div>
     <div class="field"><label>Тип MA</label><select id="e_macr_t"><option value="EMA">EMA</option><option value="SMA">SMA</option><option value="WMA">WMA</option><option value="RMA">RMA</option><option value="DEMA">DEMA</option><option value="TEMA">TEMA</option><option value="Kalman">Kalman</option></select></div>
   </div>
-  <div class="field"><label data-tip="Перебирать все типы MA (EMA, SMA, WMA) для MA Crossover входа"><input type="checkbox" id="e_macr_sweep_types"> Все типы MA</label></div>
+  <div class="field"><label data-tip="Перебирать все типы MA (EMA, SMA, WMA, RMA, DEMA, TEMA, Kalman) для MA Crossover входа"><input type="checkbox" id="e_macr_sweep_types"> Все типы MA</label></div>
 
   <div class="cb"><input type="checkbox" id="e_free"><label data-tip="Свободный вход: вход разрешён после каждой закрытой свечи (если позволяют фильтры). Полезно для тестирования чистой работы фильтров">Свободный вход (Free)</label></div>
 
@@ -1185,7 +1185,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
     <div class="field"><label>Период</label><input id="f_map" value="50,100,200" data-tip="Период MA. Можно задать несколько через запятую для оптимизации: 50,100,200"></div>
   </div>
   <div class="g2">
-    <div class="field"><label data-tip="Перебирать все типы MA (EMA, SMA, WMA) вместо одного выбранного"><input type="checkbox" id="f_ma_sweep_types"> Все типы MA</label></div>
+    <div class="field"><label data-tip="Перебирать все типы MA (EMA, SMA, WMA, DEMA, TEMA, Kalman) вместо одного выбранного"><input type="checkbox" id="f_ma_sweep_types"> Все типы MA</label></div>
     <div class="field"><label>HTF ratio</label><input id="f_ma_htf" value="1" data-tip="Коэффициент старшего ТФ. 1=текущий ТФ, 4=4x (напр. 1H→4H), 24=24x. Несколько через запятую: 1,4,24"></div>
   </div>
 
@@ -1216,7 +1216,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
     <div class="field"><label>Период</label><input id="f_confn" value="50,100,200" data-tip="Период второй MA. Например 200 для трендового фильтра, 50 для среднесрочного"></div>
   </div>
   <div class="g2">
-    <div class="field"><label data-tip="Перебирать все типы MA (EMA, SMA, WMA) для второй MA"><input type="checkbox" id="f_conf_sweep_types"> Все типы</label></div>
+    <div class="field"><label data-tip="Перебирать все типы MA (EMA, SMA, WMA, HMA, DEMA, TEMA, Kalman) для второй MA"><input type="checkbox" id="f_conf_sweep_types"> Все типы</label></div>
     <div class="field"><label>HTF ratio</label><input id="f_conf_htf" value="1" data-tip="HTF коэффициент для второй MA. 1=текущий ТФ, 4=4x (1H→4H), 24=24x. Несколько через запятую: 1,4,24"></div>
   </div>
 
@@ -2427,22 +2427,19 @@ function generatePineScript(r) {
   lines.push(`bool atr_bo_l = use_atr_bo and close[1] > (atr_bo_ma + atr_bo_atr * atr_bo_mult)[1]`);
   lines.push(`bool atr_bo_s = use_atr_bo and close[1] < (atr_bo_ma - atr_bo_atr * atr_bo_mult)[1]`);
   lines.push(``);
-  lines.push(`// MA Touch`);
-    lines.push(`bool ma_touch_l = false`);
-    lines.push(`bool ma_touch_s = false`);
-  lines.push(`if use_ma_touch`);
-  lines.push(`    bool crossed_up = close[1] > ma_val and close[2] <= ma_val[1]`);
+  lines.push(`// MA Touch — использует отдельную MA (mat_len/mat_type), не фильтр-MA`);
+  lines.push(`float _mat_raw = request.security(syminfo.tickerid, timeframe.period, calc_ma(mat_type, close, mat_len)[1], barmerge.gaps_off, barmerge.lookahead_on)`);
+  lines.push(`float mat_val = _mat_raw`);
+  lines.push(`bool ma_touch_l = false`);
+  lines.push(`bool ma_touch_s = false`);
+  lines.push(`if use_ma_touch and not na(mat_val)`);
+  lines.push(`    float _mat_zone = mat_val * mat_zone_pct / 100`);
+  lines.push(`    bool crossed_up = close[1] > mat_val and close[2] <= mat_val[1]`);
+  lines.push(`    bool crossed_dn = close[1] < mat_val and close[2] >= mat_val[1]`);
   lines.push(`    if crossed_up`);
-  lines.push(`        for i = 1 to ma_touch_bars`);
-  lines.push(`            if low[i] <= ma_val[i] * 1.002`);
-  lines.push(`                ma_touch_l := true`);
-  lines.push(`                break`);
-  lines.push(`    bool crossed_dn = close[1] < ma_val and close[2] >= ma_val[1]`);
+  lines.push(`        ma_touch_l := low[1] <= mat_val + _mat_zone`);
   lines.push(`    if crossed_dn`);
-  lines.push(`        for i = 1 to ma_touch_bars`);
-  lines.push(`            if high[i] >= ma_val[i] * 0.998`);
-  lines.push(`                ma_touch_s := true`);
-  lines.push(`                break`);
+  lines.push(`        ma_touch_s := high[1] >= mat_val - _mat_zone`);
   lines.push(``);
 
   // ── Trendline Figures ────────────────────────────────────────────────────
@@ -2983,6 +2980,27 @@ function generatePineScript(r) {
     lines.push(`bool a_lx = false`);
     lines.push(`bool a_sx = false`);
   lines.push(``);
+  // ── INTRA-BAR TP/SL BLOCK ───────────────────────────────────────────────
+  // Runs on every tick (not confirmed) to fire alerts and update box immediately
+  // when TP/SL is touched intra-bar (before bar close).
+  lines.push(`// Intra-bar TP/SL: fire alert and update trade box immediately on touch`);
+  lines.push(`if v_in and bar_index > v_eb and bar_index > (last_bar_index - max_bars) and not barstate.isconfirmed`);
+  lines.push(`    bool _ib_htp = v_dir == 1 ? (high >= v_tp) : (low <= v_tp)`);
+  lines.push(`    bool _ib_hsl = v_dir == 1 ? (low <= v_sl) : (high >= v_sl)`);
+  lines.push(`    if _ib_hsl or _ib_htp`);
+  lines.push(`        float _ib_xp = _ib_hsl ? v_sl : v_tp`);
+  lines.push(`        string _ib_xt = _ib_hsl ? "SL" : "TP"`);
+  lines.push(`        if show_tr and not na(b_trade)`);
+  lines.push(`            bool _ib_win = v_dir == 1 ? _ib_xp > v_ep : _ib_xp < v_ep`);
+  lines.push(`            box.set_top(b_trade, math.max(v_ep, _ib_xp))`);
+  lines.push(`            box.set_bottom(b_trade, math.min(v_ep, _ib_xp))`);
+  lines.push(`            box.set_right(b_trade, bar_index)`);
+  lines.push(`            box.set_bgcolor(b_trade, _ib_win ? c_win : c_loss)`);
+  lines.push(`        if v_dir == 1`);
+  lines.push(`            alert("XL " + _ib_xt + " @" + str.tostring(_ib_xp, "#.####"), alert.freq_once_per_bar)`);
+  lines.push(`        else`);
+  lines.push(`            alert("XS " + _ib_xt + " @" + str.tostring(_ib_xp, "#.####"), alert.freq_once_per_bar)`);
+  lines.push(``);
   lines.push(`if bar_index > (last_bar_index - max_bars) and confirmed`);
   lines.push(`    if v_in and bar_index > v_eb`);
   lines.push(`        float _u  = atr_v[1]`);
@@ -3115,10 +3133,15 @@ function generatePineScript(r) {
     lines.push(`                box.set_bottom(b_trade, math.min(v_ep, vxp))`);
     lines.push(`                box.set_right(b_trade, bar_index)`);
     lines.push(`                box.set_bgcolor(b_trade, win ? c_win : c_loss)`);
+    lines.push(`                // Удаляем TP/SL линии при закрытии — чтобы не путать с уровнями следующей сделки`);
+    lines.push(`                line.delete(l_tp)`);
+    lines.push(`                line.delete(l_sl)`);
+    lines.push(`                l_tp := na`);
+    lines.push(`                l_sl := na`);
   lines.push(`                float vpct = v_dir == 1 ? (vxp - v_ep)/v_ep*100 : (v_ep - vxp)/v_ep*100`);
     lines.push(`                label.new(`);
     lines.push(`                    bar_index,`);
-    lines.push(`                    v_dir == 1 ? high + atr_v[1] * lbl_off_m : low - atr_v[1] * lbl_off_m,`);
+    lines.push(`                    v_dir == 1 ? vxp + atr_v[1] * lbl_off_m : vxp - atr_v[1] * lbl_off_m,`);
     lines.push(`                    vxt + " " + str.tostring(vpct, "#.#") + "%",`);
     lines.push(`                    color=win ? color.green : color.red,`);
     lines.push(`                    style=v_dir == 1 ? label.style_label_down : label.style_label_up,`);
@@ -3423,7 +3446,7 @@ function _addActivePinev6(code) {
     ['use_donch',      ['donch_len']],
     ['use_boll',       ['boll_len','boll_mult']],
     ['use_atr_bo',     ['atr_bo_len','atr_bo_mult']],
-    ['use_ma_touch',   ['ma_touch_bars']],
+    ['use_ma_touch',   ['mat_type','mat_len','mat_zone_pct']],
     ['use_rsi',        ['rsi_os','rsi_ob']],
     ['use_ma',         ['ma_period','ma_type']],
     ['use_adx',        ['adx_thresh','adx_len']],
@@ -5409,8 +5432,10 @@ const ENTRY_REGISTRY = [
       return crossDn && DATA[i-1].h >= cfg.matMA[i-1] - zone;
     },
     pineLines: (c, b) => [
-      `use_ma_touch = input.bool(${b(c.useMaTouch)}, "Касание MA",         group=grp_entry)`,
-      `ma_touch_bars= input.int(3, "  Баров от касания", minval=1, maxval=10, group=grp_entry)`,
+      `use_ma_touch  = input.bool(${b(c.useMaTouch)}, "Касание MA",                                                    group=grp_entry)`,
+      `mat_type      = input.string("${c.matType||'EMA'}", "  Тип MA касания", options=["SMA","EMA","WMA","HMA","DEMA","TEMA","Kalman"], group=grp_entry)`,
+      `mat_len       = input.int(${c.matPeriod||20}, "  Период MA касания", minval=1, maxval=500,                       group=grp_entry)`,
+      `mat_zone_pct  = input.float(${+(c.matZone||0.2).toFixed(3)}, "  Зона %", step=0.05, minval=0,                   group=grp_entry)`,
     ],
   },
 
@@ -8265,11 +8290,11 @@ async function runOpt() {
   const pvRs=usePv?parseRange('e_pvr'):[2];
   const atrPs=parseRange('c_atr');
   const maPs=useMa?parseRange('f_map'):[0];
-  const maTypeArr=useMa?(_sweepMaTypes?['EMA','SMA','WMA']:[$v('f_mat')||'EMA']):['EMA'];
+  const maTypeArr=useMa?(_sweepMaTypes?['EMA','SMA','WMA','DEMA','TEMA','Kalman']:[$v('f_mat')||'EMA']):['EMA'];
   const htfRatioArr=useMa?parseRange('f_ma_htf'):[1];
-  const confTypeArr=useConfirm?(_sweepConfTypes?['EMA','SMA','WMA']:[confMatType]):['EMA'];
+  const confTypeArr=useConfirm?(_sweepConfTypes?['EMA','SMA','WMA','HMA','DEMA','TEMA','Kalman']:[confMatType]):['EMA'];
   const confHtfArr=useConfirm?parseRange('f_conf_htf'):[1];
-  const maCrossTypeArr=$c('e_macr')?(_sweepMaCrossTypes?['EMA','SMA','WMA']:[$v('e_macr_t')||'EMA']):['EMA'];
+  const maCrossTypeArr=$c('e_macr')?(_sweepMaCrossTypes?['EMA','SMA','WMA','RMA','DEMA','TEMA','Kalman']:[$v('e_macr_t')||'EMA']):['EMA'];
   const adxTs=useAdx?parseRange('f_adxt'):[0];
   const adxHtfArr=useAdx?parseRange('f_adx_htf'):[1];
   const atrExpMs=useAtrExp?parseRange('f_atrexpm'):[0];
@@ -15935,6 +15960,15 @@ function _hcCluster(found, step, pvStep) {
     if (a.useTrail && b.useTrail) d += Math.abs((a.trTrig||1) - (b.trTrig||1)) / step;
     // MA
     d += Math.abs((a.maP||0) - (b.maP||0)) / 5;
+    // ATR Breakout multiplier — HC варьирует его, cfgDist должен это учитывать
+    if (a.useAtrBo && b.useAtrBo)
+      d += Math.abs((a.atrBoMult||2) - (b.atrBoMult||2)) / step;
+    // Confirm MA period — варьируется через vConf
+    if (a.useConfirm && b.useConfirm)
+      d += Math.abs((a.confN||14) - (b.confN||14)) / 10;
+    // ADX threshold
+    if (a.useADX && b.useADX)
+      d += Math.abs((a.adxThresh||20) - (b.adxThresh||20)) / 10;
     return d;
   }
 
@@ -18029,7 +18063,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1773655091063;
+window._BUILD_TS = 1773663580097;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
