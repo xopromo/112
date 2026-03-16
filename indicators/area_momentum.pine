@@ -257,19 +257,16 @@ plot(area_delta / math.max(close * 0.0001, 0.0001), "Δ Площадь (норм
 // 6. ТАБЛИЦА СТАТИСТИКИ
 // ==========================================
 
-tbl_pos = pos_main == "bottom_right" ? position.bottom_right :
-          pos_main == "bottom_left"  ? position.bottom_left  :
-          pos_main == "top_right"    ? position.top_right    : position.top_left
+var _tbl_pos = pos_main == "bottom_right" ? position.bottom_right : pos_main == "bottom_left" ? position.bottom_left : pos_main == "top_right" ? position.top_right : position.top_left
 
-c_bg = color.new(color.black, 20)
+color c_bg = color.new(color.black, 20)
 
-tc(row, lbl, val, vc) =>
-    table.cell(t_stat, 0, row, lbl, text_color=color.new(color.gray, 20),
-               bgcolor=c_bg, text_size=size.small)
-    table.cell(t_stat, 1, row, val, text_color=vc,
-               bgcolor=c_bg, text_size=size.small)
+// helper: принимает таблицу явно (Pine v6 не видит внешние переменные в функциях)
+tc(tbl, row, lbl, val, vc, bg) =>
+    table.cell(tbl, 0, row, lbl, text_color=color.new(color.gray, 20), bgcolor=bg, text_size=size.small)
+    table.cell(tbl, 1, row, val, text_color=vc,                        bgcolor=bg, text_size=size.small)
 
-var table t_stat = table.new(tbl_pos, 2, 12, bgcolor=c_bg, border_width=1, force_overlay=true)
+var table t_stat = table.new(_tbl_pos, 2, 12, bgcolor=c_bg, border_width=1, force_overlay=true)
 
 if barstate.islast
     float wr    = _cnt > 0 ? _wins * 100.0 / _cnt : 0.0
@@ -278,31 +275,21 @@ if barstate.islast
     float cpnl  = start_cap * math.pow(1.0 + _pnl / 100.0 / math.max(1, _cnt), _cnt) - start_cap
 
     // Заголовок
-    table.cell(t_stat, 0, 0, "📐 Area Momentum",
-               text_color=color.white, bgcolor=color.new(color.blue, 30), text_size=size.normal)
+    table.cell(t_stat, 0, 0, "📐 Area Momentum", text_color=color.white, bgcolor=color.new(color.blue, 30), text_size=size.normal)
     table.merge_cells(t_stat, 0, 0, 1, 0)
 
     // Настройки
-    table.cell(t_stat, 0, 1,
-               ma_type + str.tostring(ma_len) + " | подтв:" + str.tostring(confirm_bars) +
-               " | SL×" + str.tostring(sl_atr_m,"#.#") + " TP:" + str.tostring(tp_rr,"#.#") + "R",
-               text_color=color.new(color.gray,30), bgcolor=color.new(color.navy,60), text_size=size.tiny)
+    table.cell(t_stat, 0, 1, ma_type + str.tostring(ma_len) + " | подтв:" + str.tostring(confirm_bars) + " | SL×" + str.tostring(sl_atr_m,"#.#") + " TP:" + str.tostring(tp_rr,"#.#") + "R", text_color=color.new(color.gray,30), bgcolor=color.new(color.navy,60), text_size=size.tiny)
     table.merge_cells(t_stat, 0, 1, 1, 1)
 
     // Метрики
-    tc(2,  "PnL %",  str.tostring(_pnl, "#.##") + "%",
-       _pnl > 0 ? color.lime : color.red)
-    tc(3,  "DD %",   str.tostring(_dd,  "#.##") + "%",
-       _dd < 10 ? color.lime : _dd < 25 ? color.orange : color.red)
-    tc(4,  "RF",     str.tostring(rf,   "#.##"),
-       rf > 2 ? color.lime : rf > 1 ? color.orange : color.red)
-    tc(5,  "WR",     str.tostring(wr,   "#.#") + "%",
-       wr > 55 ? color.lime : wr > 45 ? color.orange : color.red)
-    tc(6,  "Сделок", str.tostring(_cnt), color.white)
-    tc(7,  "Avg %",  str.tostring(avg_t, "#.###") + "%",
-       avg_t > 0 ? color.lime : color.red)
-    tc(8,  "Капитал",str.tostring(math.round(cpnl)) + "$",
-       cpnl > 0 ? color.lime : color.red)
+    tc(t_stat, 2, "PnL %",   str.tostring(_pnl,  "#.##")  + "%", _pnl  > 0 ? color.lime : color.red, c_bg)
+    tc(t_stat, 3, "DD %",    str.tostring(_dd,   "#.##")  + "%", _dd   < 10 ? color.lime : _dd < 25 ? color.orange : color.red, c_bg)
+    tc(t_stat, 4, "RF",      str.tostring(rf,    "#.##"),        rf    > 2  ? color.lime : rf > 1 ? color.orange : color.red, c_bg)
+    tc(t_stat, 5, "WR",      str.tostring(wr,    "#.#")   + "%", wr    > 55 ? color.lime : wr > 45 ? color.orange : color.red, c_bg)
+    tc(t_stat, 6, "Сделок",  str.tostring(_cnt),                 color.white, c_bg)
+    tc(t_stat, 7, "Avg %",   str.tostring(avg_t, "#.###") + "%", avg_t > 0  ? color.lime : color.red, c_bg)
+    tc(t_stat, 8, "Капитал", str.tostring(math.round(cpnl)) + "$", cpnl > 0 ? color.lime : color.red, c_bg)
 
     // Предупреждения
     if _cnt == 0
