@@ -122,5 +122,18 @@
   // Прокрутить чат вниз
   const box = document.getElementById('chatBox');
   if(box) box.scrollTop = box.scrollHeight;
+
+  // Авто-обновление: каждые 5 сек перезагружаем сообщения
+  let _msgCount = {{ messages | length }};
+  setInterval(async () => {
+    try {
+      const r = await fetch('/api/messages/{{ dialog.user_id }}');
+      const data = await r.json();
+      if (data.count !== _msgCount) {
+        _msgCount = data.count;
+        location.reload();
+      }
+    } catch(e) {}
+  }, 5000);
 </script>
 {% endblock %}

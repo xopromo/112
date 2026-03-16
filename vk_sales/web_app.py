@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 BASE_DIR = Path(__file__).parent
 CONFIG_PATH = BASE_DIR / "config.json"
 BOT_PID_FILE = BASE_DIR / "bot.pid"
+BOT_LOG_FILE = BASE_DIR / "bot.log"
 
 app = Flask(__name__, template_folder="templates")
 app.secret_key = "vk-sales-secret-key-2024"
@@ -343,6 +344,24 @@ def settings_save():
     return redirect(url_for("settings"))
 
 
+@app.route("/api/messages/<int:user_id>")
+def api_messages(user_id: int):
+    conn = db.get_conn()
+    count = conn.execute(
+        "SELECT COUNT(*) FROM messages WHERE user_id=?", (user_id,)
+    ).fetchone()[0]
+    return jsonify({"count": count})
+
+
+@app.route("/bot/log")
+def bot_log():
+    if not BOT_LOG_FILE.exists():
+        return "<pre>Лог пуст</pre>"
+    lines = BOT_LOG_FILE.read_text(encoding="utf-8", errors="replace").splitlines()
+    last = "\n".join(lines[-200:])  # последние 200 строк
+    return f"<pre style='font-size:.8rem'>{last}</pre>"
+
+
 @app.route("/api/test_connection")
 def api_test_connection():
     cfg = load_config()
@@ -374,9 +393,10 @@ def bot_start():
         return redirect(url_for("settings"))
     try:
         python = sys.executable
+        log_f = open(BOT_LOG_FILE, "a", encoding="utf-8")
         kwargs = dict(
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            stdout=log_f,
+            stderr=log_f,
             stdin=subprocess.DEVNULL,
         )
         if sys.platform == "win32":
