@@ -1,0 +1,11 @@
+{
+  "_comment": "Скопируй в config.json и заполни своими данными",
+
+  "group_token": "YOUR_GROUP_TOKEN_HERE",
+  "group_id":    123456789,
+
+  "dry_run": true,
+
+  "send_delay_min": 2,
+  "send_delay_max": 8
+}

@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+{% block title %}Настройки — VK Sales Bot{% endblock %}
+
+{% block content %}
+<h4 class="fw-bold mb-4">Настройки</h4>
+
+<div class="row g-4">
+  <div class="col-md-7">
+    <div class="card p-4">
+      <h6 class="fw-bold mb-3"><i class="bi bi-key me-2 text-primary"></i>Подключение к VKontakte</h6>
+
+      <form method="post" action="/settings/save">
+        <div class="mb-3">
+          <label class="form-label">Токен сообщества</label>
+          <div class="input-group">
+            <input type="password" name="group_token" id="tokenField"
+                   class="form-control font-monospace"
+                   value="{{ cfg.group_token or '' }}"
+                   placeholder="vk1.a.xxxxxxxxxxxxx">
+            <button type="button" class="btn btn-outline-secondary" onclick="toggleToken()">
+              <i class="bi bi-eye" id="eyeIcon"></i>
+            </button>
+          </div>
+          <div class="form-text">
+            Как получить:
+            <strong>Управление сообществом → Работа с API → Создать ключ</strong>
+            → выбрать права: <code>Сообщения</code>
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">ID сообщества</label>
+          <input type="number" name="group_id" class="form-control"
+                 value="{{ cfg.group_id or '' }}"
+                 placeholder="123456789">
+          <div class="form-text">
+            Открой сообщество → адрес страницы →
+            <code>vk.com/public<b>123456789</b></code> — вот этот номер.
+            Или через <code>vk.com/club<b>123456789</b></code>
+          </div>
+        </div>
+
+        <hr>
+        <h6 class="fw-bold mb-3">Параметры отправки</h6>
+
+        <div class="row g-2 mb-3">
+          <div class="col-6">
+            <label class="form-label small">Мин. задержка (сек)</label>
+            <input type="number" name="send_delay_min" class="form-control form-control-sm"
+                   value="{{ cfg.send_delay_min or 2 }}" min="1" max="60">
+          </div>
+          <div class="col-6">
+            <label class="form-label small">Макс. задержка (сек)</label>
+            <input type="number" name="send_delay_max" class="form-control form-control-sm"
+                   value="{{ cfg.send_delay_max or 8 }}" min="1" max="60">
+          </div>
+          <div class="col-12">
+            <div class="form-text">Случайная задержка между сообщениями. Рекомендуем 2–10 сек чтобы не попасть в спам.</div>
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="dry_run" id="dryRunSet"
+                   {% if cfg.dry_run %}checked{% endif %}>
+            <label class="form-check-label" for="dryRunSet">
+              <strong>Тестовый режим (dry_run)</strong>
+            </label>
+          </div>
+          <div class="form-text text-warning">
+            <i class="bi bi-exclamation-triangle me-1"></i>
+            В тестовом режиме сообщения НЕ отправляются — только записываются в лог.
+            Отключи перед реальной работой.
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-check2 me-1"></i>Сохранить
+        </button>
+
+        {% if cfg.group_token %}
+        <button type="button" class="btn btn-outline-secondary ms-2" onclick="testConnection()">
+          <i class="bi bi-wifi me-1"></i>Проверить подключение
+        </button>
+        {% endif %}
+      </form>
+    </div>
+  </div>
+
+  <!-- Инструкция -->
+  <div class="col-md-5">
+    <div class="card p-4 mb-3 border-warning">
+      <h6 class="fw-bold mb-3 text-warning">
+        <i class="bi bi-exclamation-triangle me-2"></i>Важно перед стартом
+      </h6>
+      <ol class="small mb-0 ps-3">
+        <li class="mb-2">В настройках сообщества ВКонтакте включи <strong>«Сообщения сообщества»</strong></li>
+        <li class="mb-2">В разделе <strong>«Работа с API»</strong> создай ключ с правом на <strong>сообщения</strong></li>
+        <li class="mb-2">Убедись что пользователи <strong>разрешили</strong> сообщения от сообщества (подписаны)</li>
+        <li>Сначала протестируй на нескольких ID с dry_run=ON</li>
+      </ol>
+    </div>
+
+    <div class="card p-4">
+      <h6 class="fw-bold mb-3"><i class="bi bi-database me-2"></i>База данных</h6>
+      <div class="small text-muted mb-2">
+        Файл: <code>vk_sales/sales.db</code>
+      </div>
+      <a href="/export/csv" class="btn btn-outline-secondary btn-sm w-100 mb-2">
+        <i class="bi bi-download me-1"></i>Экспорт диалогов (CSV)
+      </a>
+      <button class="btn btn-outline-danger btn-sm w-100"
+              onclick="if(confirm('Удалить все данные?')) location.href='/db/reset'">
+        <i class="bi bi-trash me-1"></i>Очистить базу
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Тест подключения -->
+<div id="testResult" class="mt-3" style="display:none">
+  <div class="alert" id="testAlert"></div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleToken() {
+  const f = document.getElementById('tokenField');
+  const i = document.getElementById('eyeIcon');
+  if(f.type === 'password') { f.type='text'; i.className='bi bi-eye-slash'; }
+  else { f.type='password'; i.className='bi bi-eye'; }
+}
+
+function testConnection() {
+  fetch('/api/test_connection')
+    .then(r => r.json())
+    .then(data => {
+      const div = document.getElementById('testResult');
+      const alert = document.getElementById('testAlert');
+      div.style.display = 'block';
+      if(data.ok) {
+        alert.className = 'alert alert-success';
+        alert.innerHTML = `<i class="bi bi-check-circle me-2"></i>Подключено! Группа: <b>${data.group_name}</b>`;
+      } else {
+        alert.className = 'alert alert-danger';
+        alert.innerHTML = `<i class="bi bi-x-circle me-2"></i>Ошибка: ${data.error}`;
+      }
+    });
+}
+</script>
+{% endblock %}
