@@ -2,9 +2,10 @@
 title VK Sales Bot
 
 if not exist "venv\" (
-    echo Сначала запусти install.bat !
-    pause
-    exit /b 1
+    echo Первый запуск - устанавливаю зависимости...
+    python -m venv venv
+    venv\Scripts\pip install --upgrade pip >nul 2>&1
+    venv\Scripts\pip install vk-api flask apscheduler
 )
 
 echo.

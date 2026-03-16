@@ -43,7 +43,7 @@ if not exist "venv\" (
 :: Устанавливаем пакеты
 echo [3/3] Устанавливаю пакеты (подожди 1-2 минуты)...
 venv\Scripts\pip install --upgrade pip >nul 2>&1
-venv\Scripts\pip install vk-api flask
+venv\Scripts\pip install vk-api flask apscheduler
 
 if errorlevel 1 (
     echo ОШИБКА при установке пакетов

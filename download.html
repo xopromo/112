@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>VK Sales Bot — скачать скрипты</title>
+<style>
+  body { font-family: Arial, sans-serif; max-width: 500px; margin: 60px auto; text-align: center; }
+  h2 { margin-bottom: 30px; }
+  .btn { display: inline-block; margin: 10px; padding: 14px 32px; background: #2ea44f;
+         color: #fff; text-decoration: none; border-radius: 6px; font-size: 16px; }
+  .btn:hover { background: #22863a; }
+  p { color: #666; font-size: 14px; margin-top: 30px; }
+</style>
+</head>
+<body>
+<h2>VK Sales Bot — скрипты запуска</h2>
+<a class="btn" id="dl-start" download="start.bat">⬇ start.bat</a>
+<a class="btn" id="dl-install" download="install.bat">⬇ install.bat</a>
+<p>Сохрани оба файла в папку с ботом и запускай <b>start.bat</b></p>
+<script>
+const startBat = `@echo off\r\ntitle VK Sales Bot\r\n\r\nif not exist "venv\\" (\r\n    echo Первый запуск - устанавливаю зависимости...\r\n    python -m venv venv\r\n    venv\\Scripts\\pip install --upgrade pip >nul 2>&1\r\n    venv\\Scripts\\pip install vk-api flask apscheduler\r\n)\r\n\r\necho.\r\necho =====================================\r\necho   VK Sales Bot\r\necho =====================================\r\necho.\r\necho  Запускаю...\r\necho.\r\necho  Открой браузер и перейди:\r\necho.\r\necho       http://localhost:5001\r\necho.\r\necho  Для остановки закрой это окно.\r\necho \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\r\necho.\r\n\r\n:: Открываем браузер через 2 секунды\r\nstart "" cmd /c "timeout /t 2 >nul && start http://localhost:5001"\r\n\r\n:: Запускаем Flask\r\nvenv\\Scripts\\python -c "import sys; sys.path.insert(0,'.'); from vk_sales.web_app import run_web; run_web()"\r\n`;
+
+const installBat = `@echo off\r\ntitle VK Sales Bot - Ustanovka\r\n\r\necho.\r\necho =====================================\r\necho   VK Sales Bot - Ustanovka\r\necho =====================================\r\necho.\r\n\r\n:: Проверяем Python\r\npython --version >nul 2>&1\r\nif errorlevel 1 (\r\n    echo PYTHON НЕ НАЙДЕН!\r\n    echo.\r\n    echo Сделай следующее:\r\n    echo 1. Открой браузер\r\n    echo 2. Зайди: https://python.org/downloads\r\n    echo 3. Нажми Download Python\r\n    echo 4. Запусти скачанный файл\r\n    echo 5. ВАЖНО: поставь галочку "Add Python to PATH"\r\n    echo 6. После установки снова запусти этот файл\r\n    echo.\r\n    pause\r\n    exit /b 1\r\n)\r\n\r\necho [1/3] Python найден OK\r\necho.\r\n\r\n:: Создаём виртуальное окружение\r\nif not exist "venv\\" (\r\n    echo [2/3] Создаю окружение...\r\n    python -m venv venv\r\n    if errorlevel 1 (\r\n        echo ОШИБКА при создании окружения\r\n        pause\r\n        exit /b 1\r\n    )\r\n) else (\r\n    echo [2/3] Окружение уже есть OK\r\n)\r\n\r\n:: Устанавливаем пакеты\r\necho [3/3] Устанавливаю пакеты (подожди 1-2 минуты)...\r\nvenv\\Scripts\\pip install --upgrade pip >nul 2>&1\r\nvenv\\Scripts\\pip install vk-api flask apscheduler\r\n\r\nif errorlevel 1 (\r\n    echo ОШИБКА при установке пакетов\r\n    pause\r\n    exit /b 1\r\n)\r\n\r\n:: Конфиг\r\nif not exist "vk_sales\\config.json" (\r\n    copy "vk_sales\\config.example.json" "vk_sales\\config.json" >nul\r\n)\r\n\r\necho.\r\necho =====================================\r\necho   Установка завершена успешно!\r\necho =====================================\r\necho.\r\necho Теперь дважды кликни на файл: start.bat\r\necho.\r\npause\r\n`;
+
+function makeBlob(content, name) {
+  const blob = new Blob([content], {type: 'application/octet-stream'});
+  return URL.createObjectURL(blob);
+}
+document.getElementById('dl-start').href = makeBlob(startBat, 'start.bat');
+document.getElementById('dl-install').href = makeBlob(installBat, 'install.bat');
+</script>
+</body>
+</html>
