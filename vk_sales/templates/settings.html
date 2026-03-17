@@ -299,15 +299,20 @@ function serializeProviders() {
   document.getElementById('aiModelsJson').value = JSON.stringify(active);
 }
 
-document.addEventListener('DOMContentLoaded', renderProviders);
-// serialize before form submit (keys may not have triggered oninput)
-document.querySelector('form[action="/settings/save"]').addEventListener('submit', () => {
-  _providers.forEach((p, idx) => {
-    const el = document.getElementById(`pkey_${p.provider}`);
-    if (el) p.key = el.value;
+// Script is at end of body — DOM is ready, call directly
+renderProviders();
+
+// serialize before form submit so latest key values are captured
+const _settingsForm = document.querySelector('form[action="/settings/save"]');
+if (_settingsForm) {
+  _settingsForm.addEventListener('submit', () => {
+    _providers.forEach((p) => {
+      const el = document.getElementById(`pkey_${p.provider}`);
+      if (el) p.key = el.value;
+    });
+    serializeProviders();
   });
-  serializeProviders();
-});
+}
 
 function testConnection() {
   fetch('/api/test_connection')
