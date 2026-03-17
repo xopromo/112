@@ -1,0 +1,175 @@
+//@version=5
+// ═══════════════════════════════════════════════════════════════════
+// Liquidation Cascade Strategy
+//
+// Idea: OI delta spike → large amount of leveraged positions opened.
+// Their liquidation prices sit at fixed distances (5x/10x/25x/50x/100x).
+// When price reaches those levels, cascading liquidations push price
+// further in the same direction → momentum trade.
+//
+// Long signal : price crosses UP through an upper liq level
+//               (short liquidation cascade → upward pressure)
+// Short signal: price crosses DOWN through a lower liq level
+//               (long liquidation cascade → downward pressure)
+//
+// Based on: "Liquidation Levels on OI w/ profile" by @Mysterysauce
+// ═══════════════════════════════════════════════════════════════════
+strategy(
+     title             = 'Liquidation Cascade Signals',
+     shorttitle        = 'Liq Cascade',
+     overlay           = true,
+     max_lines_count   = 500,
+     default_qty_type  = strategy.percent_of_equity,
+     default_qty_value = 10,
+     commission_type   = strategy.commission.percent,
+     commission_value  = 0.05,
+     slippage          = 2)
+
+// ─── OI Data ─────────────────────────────────────────────────────────────────
+string userSymbol = 'BINANCE:' + syminfo.basecurrency + 'USDT.P'
+string oiFormula  = userSymbol + '_OI'
+float  OI         = request.security(oiFormula, timeframe.period, close)
+float  OI_delta   = OI - nz(OI[1])
+
+string g_oi = 'OI Settings'
+int    maLength       = input.int  (60,  'OI MA Length',            minval=5,   group=g_oi)
+float  h3             = input.float(3.0, 'Large Spike Threshold',   minval=1.0, group=g_oi, step=0.1)
+float  h2             = input.float(2.0, 'Medium Spike Threshold',  minval=1.0, group=g_oi, step=0.1)
+float  h1             = input.float(1.2, 'Small Spike Threshold',   minval=1.0, group=g_oi, step=0.1)
+
+float OI_abs    = math.abs(OI_delta)
+float OI_abs_MA = ta.sma(OI_abs, maLength)
+
+bool spike_large  = OI_abs >= OI_abs_MA * h3 and OI_delta > 0
+bool spike_medium = OI_abs >= OI_abs_MA * h2 and OI_abs < OI_abs_MA * h3 and OI_delta > 0
+bool spike_small  = OI_abs >= OI_abs_MA * h1 and OI_abs < OI_abs_MA * h2 and OI_delta > 0
+
+float kline_price = (open + close + high + low) / 4
+
+// ─── Strategy Settings ───────────────────────────────────────────────────────
+string g_s = 'Strategy Settings'
+
+string levInput = input.string('100x', 'Leverage Level (liquidation distance)',
+     options=['5x','10x','25x','50x','100x'], group=g_s,
+     tooltip='Which leverage tier to use for entry signals.\n5x=±20%, 10x=±10%, 25x=±4%, 50x=±2%, 100x=±1%')
+
+string minSpikeInput = input.string('Small', 'Minimum OI Spike Size',
+     options=['Small','Medium','Large'], group=g_s,
+     tooltip='Small = all spikes ≥h1\nMedium = spikes ≥h2\nLarge = only spikes ≥h3')
+
+string dirInput = input.string('Both', 'Trade Direction',
+     options=['Long Only','Short Only','Both'], group=g_s)
+
+float tpPct  = input.float(1.5, 'Take Profit %', minval=0.01, step=0.1, group=g_s) / 100
+float slPct  = input.float(0.5, 'Stop Loss %',   minval=0.01, step=0.1, group=g_s) / 100
+int   maxAge = input.int  (30,  'Level Expiry (bars)', minval=1, maxval=500, group=g_s,
+     tooltip='Liquidation level is removed after this many bars without being triggered')
+
+float levMult = levInput == '5x'  ? 0.20 :
+                levInput == '10x' ? 0.10 :
+                levInput == '25x' ? 0.04 :
+                levInput == '50x' ? 0.02 : 0.01
+
+// ─── Liquidation Level Tracking ──────────────────────────────────────────────
+var float[] lvlPrices = array.new_float()
+var bool[]  lvlUpper  = array.new_bool()    // true = upper liq, false = lower liq
+var int[]   lvlAge    = array.new_int()
+
+bool spikeQualifies = minSpikeInput == 'Large'  ?  spike_large :
+                      minSpikeInput == 'Medium' ? (spike_large or spike_medium) :
+                                                  (spike_large or spike_medium or spike_small)
+
+// Register new pair of liquidation levels on OI spike
+if spikeQualifies
+    // Upper level: shorts get liquidated if price rises here
+    array.push(lvlPrices, kline_price * (1 + levMult))
+    array.push(lvlUpper,  true)
+    array.push(lvlAge,    bar_index)
+    // Lower level: longs get liquidated if price falls here
+    array.push(lvlPrices, kline_price * (1 - levMult))
+    array.push(lvlUpper,  false)
+    array.push(lvlAge,    bar_index)
+
+// Expire levels that are too old
+if array.size(lvlPrices) > 0
+    for i = array.size(lvlPrices) - 1 to 0
+        if bar_index - array.get(lvlAge, i) > maxAge
+            array.remove(lvlPrices, i)
+            array.remove(lvlUpper,  i)
+            array.remove(lvlAge,    i)
+
+// ─── Signal Detection ─────────────────────────────────────────────────────────
+// Entry only when flat. Scan all active levels for a cross.
+bool goLong  = false
+bool goShort = false
+
+if strategy.position_size == 0 and array.size(lvlPrices) > 0
+    for i = array.size(lvlPrices) - 1 to 0
+        float lvl  = array.get(lvlPrices, i)
+        bool  isUp = array.get(lvlUpper,  i)
+
+        // Previous close was below the level and current candle reached it:
+        // → short liquidation cascade → follow with Long
+        if isUp and high >= lvl and close[1] < lvl
+            goLong := true
+            array.remove(lvlPrices, i)
+            array.remove(lvlUpper,  i)
+            array.remove(lvlAge,    i)
+            break
+
+        // Previous close was above the level and current candle touched it:
+        // → long liquidation cascade → follow with Short
+        if not isUp and low <= lvl and close[1] > lvl
+            goShort := true
+            array.remove(lvlPrices, i)
+            array.remove(lvlUpper,  i)
+            array.remove(lvlAge,    i)
+            break
+
+// ─── Entries ──────────────────────────────────────────────────────────────────
+if goLong and (dirInput == 'Long Only' or dirInput == 'Both')
+    strategy.entry('Long', strategy.long, comment='Liq Long')
+
+if goShort and (dirInput == 'Short Only' or dirInput == 'Both')
+    strategy.entry('Short', strategy.short, comment='Liq Short')
+
+// ─── Exits (TP / SL) ──────────────────────────────────────────────────────────
+if strategy.position_size > 0
+    float ep = strategy.position_avg_price
+    strategy.exit('Long Exit', from_entry='Long',
+         limit          = ep * (1 + tpPct),
+         stop           = ep * (1 - slPct),
+         comment_profit = 'TP',
+         comment_loss   = 'SL')
+
+if strategy.position_size < 0
+    float ep = strategy.position_avg_price
+    strategy.exit('Short Exit', from_entry='Short',
+         limit          = ep * (1 - tpPct),
+         stop           = ep * (1 + slPct),
+         comment_profit = 'TP',
+         comment_loss   = 'SL')
+
+// ─── Visuals ──────────────────────────────────────────────────────────────────
+// Entry arrows
+plotshape(goLong,  title='Long Signal',  style=shape.triangleup,
+     location=location.belowbar, color=color.new(color.lime, 0),
+     size=size.normal, text='Long')
+plotshape(goShort, title='Short Signal', style=shape.triangledown,
+     location=location.abovebar, color=color.new(color.red, 0),
+     size=size.normal, text='Short')
+
+// OI spike markers (top of chart)
+plotchar(spike_large,  title='Large OI Spike',  char='L',
+     location=location.top, color=color.orange, size=size.tiny)
+plotchar(spike_medium, title='Medium OI Spike', char='M',
+     location=location.top, color=color.yellow, size=size.tiny)
+plotchar(spike_small,  title='Small OI Spike',  char='S',
+     location=location.top, color=color.gray,   size=size.tiny)
+
+// Position background
+bgcolor(strategy.position_size > 0 ? color.new(color.green, 90) : na, title='In Long')
+bgcolor(strategy.position_size < 0 ? color.new(color.red,   90) : na, title='In Short')
+
+// Active level count (data window)
+plot(array.size(lvlPrices), title='Active Liq Levels', display=display.data_window, color=color.na)
