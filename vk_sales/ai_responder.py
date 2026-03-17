@@ -42,7 +42,7 @@ PROVIDER_CONFIGS = {
     },
     "cerebras": {
         "url":           "https://api.cerebras.ai/v1/chat/completions",
-        "default_model": "llama-3.3-70b",
+        "default_model": "llama3.3-70b",
         "rpm_limit":     60,
         "format":        "openai",
     },
