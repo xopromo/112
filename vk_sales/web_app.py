@@ -69,7 +69,7 @@ def state_badge(state: str) -> str:
 def load_config() -> dict:
     defaults = {"group_token": "", "group_id": 0, "dry_run": True,
                 "send_delay_min": 2, "send_delay_max": 8,
-                "use_ai": False, "groq_key": "", "ai_product": ""}
+                "use_ai": False, "groq_key": "", "ai_models": [], "ai_product": ""}
     if CONFIG_PATH.exists():
         try:
             with open(CONFIG_PATH, encoding="utf-8") as f:
@@ -358,6 +358,13 @@ def settings_save():
         except (ValueError, TypeError):
             return default
     try:
+        ai_models_json = request.form.get("ai_models_json", "").strip()
+        try:
+            ai_models = json.loads(ai_models_json) if ai_models_json else []
+            if not isinstance(ai_models, list):
+                ai_models = []
+        except (ValueError, TypeError):
+            ai_models = []
         save_config({
             "group_token":    request.form.get("group_token", ""),
             "group_id":       _int(request.form.get("group_id"), 0),
@@ -365,7 +372,7 @@ def settings_save():
             "send_delay_min": _int(request.form.get("send_delay_min"), 2),
             "send_delay_max": _int(request.form.get("send_delay_max"), 8),
             "use_ai":         "use_ai" in request.form,
-            "groq_key":       request.form.get("groq_key", "").strip(),
+            "ai_models":      ai_models,
             "ai_product":     request.form.get("ai_product", "").strip(),
         })
         flash("Настройки сохранены!", "success")
