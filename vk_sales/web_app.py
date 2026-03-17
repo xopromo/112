@@ -379,7 +379,7 @@ def bot_log():
         import html as _html
         lines = BOT_LOG_FILE.read_text(encoding="utf-8", errors="replace").splitlines()
         lines_html = _html.escape("\n".join(lines[-300:]))
-    return render_template("bot_log.html", log=lines_html, bot_running=_bot_running())
+    return render_template("bot_log.html", log=lines_html, bot_running=is_bot_running())
 
 
 @app.route("/api/debug")
