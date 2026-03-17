@@ -6,10 +6,40 @@
 
   "dry_run": true,
 
+  "_comment_delay": "Защита от спам-фильтра VK (случайная пауза перед каждым сообщением)",
   "send_delay_min": 2,
   "send_delay_max": 8,
 
+  "_comment_typing": [
+    "Имитация набора текста — пауза ДО отправки (сверх send_delay).",
+    "typing_delay_mode: 'none' | 'normal' | 'natural'",
+    "  none    — без доп. паузы",
+    "  normal  — фиксированная пауза typing_delay_sec секунд",
+    "  natural — пауза пропорциональна длине ответа (чем длиннее — тем дольше 'набирает')"
+  ],
+  "typing_delay_mode":    "none",
+  "typing_delay_sec":     4,
+  "typing_speed_cpm":     280,
+  "typing_delay_max_sec": 20,
+
   "use_ai":     false,
-  "groq_key":   "",
-  "ai_product": "Опиши свой продукт/услугу для AI"
+  "ai_product": "Опиши свой продукт/услугу для AI",
+
+  "_comment_ai_models": [
+    "Очередь провайдеров AI — бот перебирает по порядку.",
+    "Если у провайдера закончились токены — автоматически переходит к следующему.",
+    "Поддерживаемые провайдеры: groq, cerebras, mistral, gemini",
+    "Поле model — опционально, если не указано — используется модель по умолчанию.",
+    "Модели по умолчанию:",
+    "  groq:     llama-3.3-70b-versatile",
+    "  cerebras: llama-3.3-70b",
+    "  mistral:  mistral-small-latest",
+    "  gemini:   gemini-2.0-flash"
+  ],
+  "ai_models": [
+    {"provider": "groq",     "key": ""},
+    {"provider": "cerebras", "key": ""},
+    {"provider": "mistral",  "key": ""},
+    {"provider": "gemini",   "key": ""}
+  ]
 }

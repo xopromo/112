@@ -1,0 +1,82 @@
+name: Generate VK Bot Config
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'dry_run (true/false)'
+        required: false
+        default: 'false'
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate config.json from secrets
+        env:
+          VK_GROUP_TOKEN:  ${{ secrets.VK_GROUP_TOKEN }}
+          VK_GROUP_ID:     ${{ secrets.VK_GROUP_ID }}
+          VK_GROQ_KEY:     ${{ secrets.GROQ_KEY }}
+          VK_CEREBRAS_KEY: ${{ secrets.VK_CEREBRAS_KEY }}
+          VK_MISTRAL_KEY:  ${{ secrets.VK_MISTRAL_KEY }}
+          VK_GEMINI_KEY:   ${{ secrets.VK_GEMINI_KEY }}
+          VK_AI_PRODUCT:   ${{ secrets.VK_AI_PRODUCT }}
+          DRY_RUN:         ${{ github.event.inputs.dry_run }}
+        run: |
+          python3 - <<'EOF'
+          import json, os
+
+          with open('vk_sales/config.example.json') as f:
+              cfg = json.load(f)
+
+          # Strip comment keys
+          cfg = {k: v for k, v in cfg.items() if not k.startswith('_comment')}
+
+          cfg['group_token'] = os.environ.get('VK_GROUP_TOKEN', '')
+          raw_id = os.environ.get('VK_GROUP_ID', '0') or '0'
+          cfg['group_id']    = int(raw_id) if raw_id.isdigit() else 0
+          cfg['dry_run']     = os.environ.get('DRY_RUN', 'false').lower() == 'true'
+          cfg['use_ai']      = True
+          cfg['ai_product']  = os.environ.get('VK_AI_PRODUCT', cfg.get('ai_product', ''))
+
+          providers = [
+              ('cerebras', 'VK_CEREBRAS_KEY'),
+              ('mistral',  'VK_MISTRAL_KEY'),
+              ('gemini',   'VK_GEMINI_KEY'),
+              ('groq',     'VK_GROQ_KEY'),
+          ]
+          cfg['ai_models'] = [
+              {'provider': p, 'key': os.environ[env]}
+              for p, env in providers
+              if os.environ.get(env, '').strip()
+          ]
+
+          with open('vk_sales/config.json', 'w') as f:
+              json.dump(cfg, f, ensure_ascii=False, indent=2)
+
+          names = [m['provider'] for m in cfg['ai_models']]
+          print(f"Config generated: {len(names)} AI providers: {names}")
+          EOF
+
+      - name: Push config.json to _config branch
+        run: |
+          git config user.email "actions@github.com"
+          git config user.name "GitHub Actions"
+
+          # Write config.json to _config branch using git plumbing (no checkout)
+          BLOB=$(git hash-object -w vk_sales/config.json)
+          TREE=$(printf "100644 blob %s\tvk_sales/config.json\n" "$BLOB" | git mktree)
+
+          # Get parent commit of _config branch if it exists
+          PARENT=$(git ls-remote origin refs/heads/_config | cut -f1)
+          if [ -n "$PARENT" ]; then
+            git fetch origin _config
+            COMMIT=$(git commit-tree "$TREE" -p "$PARENT" -m "config: update $(date -u +%Y-%m-%dT%H:%M:%SZ)")
+          else
+            COMMIT=$(git commit-tree "$TREE" -m "config: init $(date -u +%Y-%m-%dT%H:%M:%SZ)")
+          fi
+
+          git push origin "${COMMIT}:refs/heads/_config"
+          echo "✅ Config pushed to _config branch"

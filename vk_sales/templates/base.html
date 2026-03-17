@@ -81,8 +81,13 @@
       </a>
     </li>
     <li class="nav-item">
-      <a href="/settings" class="nav-link {% if '/settings' in request.path %}active{% endif %}">
+      <a href="/settings" class="nav-link {% if request.path=='/settings' %}active{% endif %}">
         <i class="bi bi-gear"></i> Настройки
+      </a>
+    </li>
+    <li class="nav-item">
+      <a href="/settings/ai" class="nav-link {% if '/settings/ai' in request.path %}active{% endif %}">
+        <i class="bi bi-chat-square-text"></i> AI Промпт
       </a>
     </li>
     <li class="nav-item">
