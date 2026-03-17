@@ -213,7 +213,9 @@ function renderProviders() {
     const keyId = `pkey_${p.provider}`;
     const eyeId = `peye_${p.provider}`;
     const row = document.createElement('div');
-    row.className = `card px-3 py-2 ${p.enabled ? '' : 'opacity-50'}`;
+    row.className = 'card px-3 py-2';
+    row.style.borderLeftWidth = '3px';
+    row.style.borderLeftColor = p.enabled ? 'var(--bs-success)' : '#dee2e6';
     row.dataset.provider = p.provider;
     row.innerHTML = `
       <div class="d-flex align-items-center gap-2">
@@ -227,7 +229,7 @@ function renderProviders() {
           </button>
         </div>
         <!-- priority badge -->
-        <span class="badge bg-light text-muted border" style="min-width:22px;text-align:center">${p.enabled ? idx+1 : '—'}</span>
+        <span class="badge ${p.enabled ? 'bg-success' : 'bg-light text-muted border'}" style="min-width:22px;text-align:center">${p.enabled ? idx+1 : '—'}</span>
         <!-- enable toggle -->
         <div class="form-check form-switch mb-0 me-1">
           <input class="form-check-input" type="checkbox" id="pen_${p.provider}"
@@ -236,7 +238,7 @@ function renderProviders() {
         <!-- name + model -->
         <div class="flex-grow-1">
           <span class="badge bg-${meta.color} me-1">${meta.label}</span>
-          <span class="text-muted small">${p.model || meta.model}</span>
+          <span class="${p.enabled ? 'text-muted' : 'text-muted'} small">${p.model || meta.model}</span>
         </div>
         <!-- key input -->
         <div class="input-group input-group-sm" style="max-width:280px">
