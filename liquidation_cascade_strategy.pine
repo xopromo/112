@@ -16,7 +16,7 @@
 // ═══════════════════════════════════════════════════════════════════
 strategy(
      title             = 'Liquidation Cascade Signals',
-     shorttitle        = 'Liq Cascade',
+     shorttitle        = 'LiqCascade',
      overlay           = true,
      max_lines_count   = 500,
      default_qty_type  = strategy.percent_of_equity,
@@ -65,10 +65,7 @@ float slPct  = input.float(0.5, 'Stop Loss %',   minval=0.01, step=0.1, group=g_
 int   maxAge = input.int  (30,  'Level Expiry (bars)', minval=1, maxval=500, group=g_s,
      tooltip='Liquidation level is removed after this many bars without being triggered')
 
-float levMult = levInput == '5x'  ? 0.20 :
-                levInput == '10x' ? 0.10 :
-                levInput == '25x' ? 0.04 :
-                levInput == '50x' ? 0.02 : 0.01
+float levMult = levInput == '5x' ? 0.20 : levInput == '10x' ? 0.10 : levInput == '25x' ? 0.04 : levInput == '50x' ? 0.02 : 0.01
 
 // ─── Liquidation Level Tracking ──────────────────────────────────────────────
 var float[] lvlPrices = array.new_float()
