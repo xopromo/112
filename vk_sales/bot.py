@@ -34,6 +34,7 @@ class VKSalesBot:
         self.dry_run   = self.cfg.get("dry_run", False)
         self.use_ai    = self.cfg.get("use_ai", False)
         self.ai_product = self.cfg.get("ai_product", "")
+        self._cfg_path  = cfg_path
 
         # Поддержка нового формата ai_models и старого groq_key (для совместимости)
         if "ai_models" in self.cfg:
@@ -63,6 +64,27 @@ class VKSalesBot:
         db.init_db()
         logger.info("Bot initialized. group_id=%s dry_run=%s",
                     self.group_id, self.dry_run)
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # ДИНАМИЧЕСКАЯ ЗАГРУЗКА AI-КОНФИГА
+    # ─────────────────────────────────────────────────────────────────────────
+
+    def _reload_ai_cfg(self):
+        """Re-read config.json to pick up provider/key/product changes without restart."""
+        try:
+            with open(self._cfg_path, encoding="utf-8") as f:
+                cfg = json.load(f)
+        except Exception as e:
+            logger.warning("Failed to reload config: %s", e)
+            return
+        self.use_ai     = cfg.get("use_ai", False)
+        self.ai_product = cfg.get("ai_product", "")
+        if "ai_models" in cfg:
+            self.ai_models = cfg["ai_models"]
+        elif cfg.get("groq_key"):
+            self.ai_models = [{"provider": "groq", "key": cfg["groq_key"]}]
+        else:
+            self.ai_models = []
 
     # ─────────────────────────────────────────────────────────────────────────
     # ОТПРАВКА
@@ -196,6 +218,7 @@ class VKSalesBot:
 
     def handle_incoming(self, user_id: int, text: str):
         """Обработать входящее сообщение от пользователя."""
+        self._reload_ai_cfg()
         dialog = db.get_dialog(user_id)
         if not dialog:
             # Незнакомый пользователь — добавить и начать диалог
