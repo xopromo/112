@@ -438,9 +438,9 @@ def api_test_image():
         if not gemini_key:
             return jsonify({"ok": False, "error": "Ключ Gemini не найден в настройках провайдеров"})
 
-    img_bytes = generate(prompt, provider, gemini_key)
+    img_bytes, err = generate(prompt, provider, gemini_key)
     if not img_bytes:
-        return jsonify({"ok": False, "error": "Провайдер не вернул изображение"})
+        return jsonify({"ok": False, "error": err or "Провайдер не вернул изображение"})
 
     mime = "image/png" if provider == "gemini" else "image/jpeg"
     b64  = base64.b64encode(img_bytes).decode()

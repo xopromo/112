@@ -1,6 +1,6 @@
 """
 Image generation: Pollinations.ai (free, no key) + Gemini 2.0 Flash Exp (needs Gemini key).
-Returns raw image bytes (JPEG/PNG) or None on failure.
+Returns (image_bytes, "") on success or (None, error_message) on failure.
 """
 import base64
 import json
@@ -8,7 +8,7 @@ import logging
 import urllib.parse
 import urllib.request
 import urllib.error
-from typing import Optional
+from typing import Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -16,26 +16,24 @@ TIMEOUT = 90  # Pollinations может генерировать до ~60 сек
 
 
 def generate(prompt: str, provider: str = "pollinations",
-             gemini_key: str = "") -> Optional[bytes]:
+             gemini_key: str = "") -> Tuple[Optional[bytes], str]:
     """
     Generate image from text prompt.
 
     provider: "pollinations" (free, no key) | "gemini" (needs key)
-    Returns image bytes or None on failure.
+    Returns (image_bytes, "") on success or (None, error_message) on failure.
     """
     if provider == "pollinations":
         return _pollinations(prompt)
     elif provider == "gemini":
         if not gemini_key:
-            logger.error("[image_gen] gemini_key not set")
-            return None
+            return None, "Ключ Gemini не задан"
         return _gemini(prompt, gemini_key)
     else:
-        logger.error("[image_gen] unknown provider: %s", provider)
-        return None
+        return None, f"Неизвестный провайдер: {provider}"
 
 
-def _pollinations(prompt: str) -> Optional[bytes]:
+def _pollinations(prompt: str) -> Tuple[Optional[bytes], str]:
     """GET https://image.pollinations.ai/prompt/{prompt} — returns JPEG bytes."""
     encoded = urllib.parse.quote(prompt, safe="")
     url = (
@@ -47,18 +45,29 @@ def _pollinations(prompt: str) -> Optional[bytes]:
             url, headers={"User-Agent": "VKSalesBot/1.0"}
         )
         with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
+            content_type = resp.headers.get("Content-Type", "")
             data = resp.read()
+        if not data:
+            logger.error("[pollinations] empty response")
+            return None, "Pollinations вернул пустой ответ"
+        if "text/html" in content_type or (data[:5] == b"<html" or data[:9] == b"<!DOCTYPE"):
+            preview = data[:200].decode(errors="replace")
+            logger.error("[pollinations] got HTML instead of image: %s", preview)
+            return None, f"Pollinations вернул HTML вместо картинки: {preview[:100]}"
         logger.info("[pollinations] generated %d bytes for prompt: %r", len(data), prompt[:60])
-        return data
+        return data, ""
     except urllib.error.HTTPError as e:
-        logger.error("[pollinations] HTTP %s: %s", e.code, e.read()[:200])
-        return None
+        body = e.read()[:200].decode(errors="replace")
+        msg = f"Pollinations HTTP {e.code}: {body}"
+        logger.error("[pollinations] %s", msg)
+        return None, msg
     except Exception as e:
+        msg = f"Pollinations ошибка: {e}"
         logger.error("[pollinations] error: %s", e)
-        return None
+        return None, msg
 
 
-def _gemini(prompt: str, api_key: str) -> Optional[bytes]:
+def _gemini(prompt: str, api_key: str) -> Tuple[Optional[bytes], str]:
     """POST gemini-2.0-flash-exp with responseModalities IMAGE — returns PNG bytes."""
     url = (
         "https://generativelanguage.googleapis.com/v1beta/models/"
@@ -80,14 +89,16 @@ def _gemini(prompt: str, api_key: str) -> Optional[bytes]:
             if "inlineData" in part:
                 img_bytes = base64.b64decode(part["inlineData"]["data"])
                 logger.info("[gemini-img] generated %d bytes", len(img_bytes))
-                return img_bytes
-        logger.error("[gemini-img] no image in response: %s",
-                     json.dumps(result)[:300])
-        return None
+                return img_bytes, ""
+        preview = json.dumps(result)[:300]
+        logger.error("[gemini-img] no image in response: %s", preview)
+        return None, f"Gemini не вернул картинку в ответе: {preview}"
     except urllib.error.HTTPError as e:
         body = e.read().decode(errors="replace")
-        logger.error("[gemini-img] HTTP %s: %s", e.code, body[:300])
-        return None
+        msg = f"Gemini HTTP {e.code}: {body[:300]}"
+        logger.error("[gemini-img] %s", msg)
+        return None, msg
     except Exception as e:
+        msg = f"Gemini ошибка: {e}"
         logger.error("[gemini-img] error: %s", e)
-        return None
+        return None, msg

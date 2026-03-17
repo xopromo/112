@@ -167,9 +167,9 @@ class VKSalesBot:
                     gemini_key = m.get("key", "")
                     break
 
-        img_bytes = image_gen.generate(prompt, provider, gemini_key)
+        img_bytes, err = image_gen.generate(prompt, provider, gemini_key)
         if not img_bytes:
-            logger.error("[image] generation failed for user %s", user_id)
+            logger.error("[image] generation failed for user %s: %s", user_id, err)
             return
 
         if self.dry_run:
