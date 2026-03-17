@@ -5,6 +5,7 @@ Returns (image_bytes, "") on success or (None, error_message) on failure.
 import base64
 import json
 import logging
+import random
 import urllib.parse
 import urllib.request
 import urllib.error
@@ -36,10 +37,12 @@ def generate(prompt: str, provider: str = "pollinations",
 def _pollinations(prompt: str) -> Tuple[Optional[bytes], str]:
     """GET https://image.pollinations.ai/prompt/{prompt} — returns JPEG bytes."""
     encoded = urllib.parse.quote(prompt, safe="")
+    seed = random.randint(1, 2**31)
     url = (
         f"https://image.pollinations.ai/prompt/{encoded}"
-        "?model=flux&width=1024&height=1024&nologo=true&nofeed=true"
+        f"?model=flux&width=1024&height=1024&nologo=true&nofeed=true&seed={seed}"
     )
+    logger.info("[pollinations] requesting seed=%d prompt=%r", seed, prompt[:80])
     try:
         req = urllib.request.Request(
             url, headers={"User-Agent": "VKSalesBot/1.0"}
