@@ -18,7 +18,7 @@ from .states import (
     transition, on_enter, followup_dt,
     get_followup_message, FINAL_STATES
 )
-from .ai_responder import ask_groq
+from .ai_responder import ask_ai
 
 logger = logging.getLogger(__name__)
 
@@ -33,8 +33,15 @@ class VKSalesBot:
         self.group_id = self.cfg["group_id"]
         self.dry_run   = self.cfg.get("dry_run", False)
         self.use_ai    = self.cfg.get("use_ai", False)
-        self.groq_key  = self.cfg.get("groq_key", "")
         self.ai_product = self.cfg.get("ai_product", "")
+
+        # Поддержка нового формата ai_models и старого groq_key (для совместимости)
+        if "ai_models" in self.cfg:
+            self.ai_models = self.cfg["ai_models"]
+        elif self.cfg.get("groq_key"):
+            self.ai_models = [{"provider": "groq", "key": self.cfg["groq_key"]}]
+        else:
+            self.ai_models = []
 
         # Задержки между сообщениями (защита от спам-фильтра VK)
         self.send_delay_min = self.cfg.get("send_delay_min", 2)   # сек
@@ -220,10 +227,10 @@ class VKSalesBot:
             return
 
         # ── AI или скрипт ────────────────────────────────────────────────────
-        if self.use_ai and self.groq_key and state not in FINAL_STATES:
+        if self.use_ai and self.ai_models and state not in FINAL_STATES:
             history = db.get_messages(user_id, limit=20)
-            ai_reply = ask_groq(
-                api_key=self.groq_key,
+            ai_reply = ask_ai(
+                providers_config=self.ai_models,
                 history_rows=history,
                 user_text=text,
                 state=state,
