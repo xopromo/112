@@ -71,10 +71,10 @@ def _pollinations(prompt: str) -> Tuple[Optional[bytes], str]:
 
 
 def _gemini(prompt: str, api_key: str) -> Tuple[Optional[bytes], str]:
-    """POST gemini-2.0-flash-exp with responseModalities IMAGE — returns PNG bytes."""
+    """POST gemini-2.0-flash-preview-image-generation with responseModalities IMAGE — returns PNG bytes."""
     url = (
         "https://generativelanguage.googleapis.com/v1beta/models/"
-        f"gemini-2.0-flash-exp:generateContent?key={api_key}"
+        f"gemini-2.0-flash-preview-image-generation:generateContent?key={api_key}"
     )
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
