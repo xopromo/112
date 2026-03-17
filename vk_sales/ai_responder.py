@@ -11,6 +11,7 @@ import threading
 import urllib.request
 import urllib.error
 from collections import deque
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -86,6 +87,30 @@ class _RateLimiter:
 
 
 _limiter = _RateLimiter(rpm=RPM_LIMIT)
+
+# Если TPD исчерпан — блокируем до следующего сброса (полночь UTC)
+_tpd_blocked_until: float = 0.0
+_tpd_lock = threading.Lock()
+
+
+def _seconds_until_utc_midnight() -> float:
+    now = datetime.now(timezone.utc)
+    tomorrow = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    from datetime import timedelta
+    tomorrow += timedelta(days=1)
+    return (tomorrow - now).total_seconds()
+
+
+def _classify_429(body: str) -> str:
+    """Вернуть 'tpd' | 'tpm' | 'rpm' | 'unknown' по телу ошибки Groq 429."""
+    b = body.lower()
+    if "tokens per day" in b or "tpd" in b:
+        return "tpd"
+    if "tokens per minute" in b or "tpm" in b:
+        return "tpm"
+    if "requests per minute" in b or "rpm" in b:
+        return "rpm"
+    return "unknown"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -179,6 +204,18 @@ def ask_groq(api_key: str, history_rows, user_text: str,
 
     def _call(system_override: str = None) -> Optional[tuple[str, str]]:
         """Один HTTP-вызов. Возвращает (text, finish_reason) или None."""
+        global _tpd_blocked_until
+
+        # Проверяем TPD-блок (дневной лимит исчерпан)
+        with _tpd_lock:
+            remaining = _tpd_blocked_until - time.monotonic()
+        if remaining > 0:
+            reset_in = int(remaining // 60)
+            logger.warning(
+                "Groq TPD daily limit active — AI unavailable for ~%d min", reset_in
+            )
+            return None
+
         payload = {
             "model":       MODEL,
             "messages":    [{"role": "system", "content": system_override or base_system}] + messages,
@@ -205,18 +242,33 @@ def ask_groq(api_key: str, history_rows, user_text: str,
             except urllib.error.HTTPError as e:
                 body = e.read().decode(errors="replace")
                 if e.code == 429:
+                    limit_type = _classify_429(body)
+                    if limit_type == "tpd":
+                        # Дневной лимит — ждать до полуночи UTC, не ретраить
+                        secs = _seconds_until_utc_midnight()
+                        with _tpd_lock:
+                            _tpd_blocked_until = time.monotonic() + secs
+                        logger.error(
+                            "Groq TPD (tokens/day) limit exhausted. "
+                            "AI disabled for %.0f min (until UTC midnight). "
+                            "Fallback to scripted replies.",
+                            secs / 60,
+                        )
+                        return None
+
+                    # RPM / TPM — ретраить с задержкой
                     retry_after = _parse_retry_after(
                         e.headers.get("retry-after"),
                         fallback=RETRY_DELAYS[attempt] if attempt < len(RETRY_DELAYS) else 30,
                     )
                     if attempt < MAX_RETRIES:
                         logger.warning(
-                            "Groq 429. Retry %d/%d after %.0fs (RPM=%d)",
-                            attempt + 1, MAX_RETRIES, retry_after, _limiter.current_rpm(),
+                            "Groq 429 (%s). Retry %d/%d after %.0fs",
+                            limit_type, attempt + 1, MAX_RETRIES, retry_after,
                         )
                         time.sleep(retry_after)
                         continue
-                    logger.error("Groq 429 — all retries exhausted.")
+                    logger.error("Groq 429 (%s) — all retries exhausted.", limit_type)
                 else:
                     logger.error("Groq HTTP %s: %s", e.code, body[:200])
                 break
