@@ -3,6 +3,7 @@ VK Sales Bot — основная логика.
 Использует VK Long Poll для получения входящих сообщений.
 Группа должна иметь включённые сообщения (messages.send с group_id).
 """
+import re
 import time
 import logging
 import json
@@ -19,6 +20,19 @@ from .states import (
     get_followup_message, FINAL_STATES
 )
 from .ai_responder import ask_ai
+from .audit import run_audit
+
+_URL_RE = re.compile(r'https?://[^\s]+|www\.[^\s]+')
+
+
+def _extract_url(text: str) -> Optional[str]:
+    m = _URL_RE.search(text)
+    if not m:
+        return None
+    url = m.group(0).rstrip(".,!?)")
+    if not url.startswith("http"):
+        url = "https://" + url
+    return url
 
 logger = logging.getLogger(__name__)
 
@@ -248,6 +262,19 @@ class VKSalesBot:
             # CLOSED_WON / CLOSED_LOST — просто логируем
             logger.info("Message from closed dialog user=%s", user_id)
             return
+
+        # ── Аудит сайта если прислали URL ────────────────────────────────────
+        url = _extract_url(text)
+        if url:
+            logger.info("URL detected for user=%s: %s — running audit", user_id, url)
+            self._send(user_id, "Сейчас проверю ваш сайт, подождите 10-15 секунд... 🔍", state)
+            api_key = self.cfg.get("pagespeed_key")
+            report = run_audit(url, api_key)
+            if report:
+                self._send(user_id, report, state)
+                return
+            else:
+                logger.warning("Audit failed for url=%s, falling through to normal flow", url)
 
         # ── AI или скрипт ────────────────────────────────────────────────────
         if self.use_ai and self.ai_models and state not in FINAL_STATES:
