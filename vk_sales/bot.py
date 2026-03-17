@@ -127,16 +127,24 @@ class VKSalesBot:
         self._typing_delay(text)
         delay = random.uniform(self.send_delay_min, self.send_delay_max)
         time.sleep(delay)
-        try:
-            self.vk.messages.send(
-                user_id=user_id,
-                message=text,
-                random_id=random.randint(1, 2**31),
-            )
-            db.log_message(user_id, "out", text, state)
-            logger.info("→ user %s | state=%s", user_id, state)
-        except vk_api.exceptions.ApiError as e:
-            logger.error("send error user=%s: %s", user_id, e)
+
+        rid = random.randint(1, 2**31)
+        for attempt in range(3):
+            try:
+                self.vk.messages.send(user_id=user_id, message=text, random_id=rid)
+                db.log_message(user_id, "out", text, state)
+                logger.info("→ user %s | state=%s", user_id, state)
+                return
+            except vk_api.exceptions.ApiError as e:
+                logger.error("send error user=%s: %s", user_id, e)
+                return  # API ошибка (например, нет прав) — ретрай не поможет
+            except Exception as e:
+                wait = 2 ** attempt  # 1s, 2s, 4s
+                logger.warning("send network error user=%s (attempt %d/3): %s — retry in %ds",
+                               user_id, attempt + 1, e, wait)
+                if attempt < 2:
+                    time.sleep(wait)
+        logger.error("send failed after 3 attempts, user=%s", user_id)
 
     # ─────────────────────────────────────────────────────────────────────────
     # ОБОГАЩЕНИЕ ПРОФИЛЯ
