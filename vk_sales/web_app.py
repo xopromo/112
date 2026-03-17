@@ -371,9 +371,12 @@ def settings_save():
             "dry_run":        "dry_run" in request.form,
             "send_delay_min": _int(request.form.get("send_delay_min"), 2),
             "send_delay_max": _int(request.form.get("send_delay_max"), 8),
-            "use_ai":         "use_ai" in request.form,
-            "ai_models":      ai_models,
-            "ai_product":     request.form.get("ai_product", "").strip(),
+            "use_ai":             "use_ai" in request.form,
+            "ai_models":          ai_models,
+            "ai_product":         request.form.get("ai_product", "").strip(),
+            "use_image_gen":      "use_image_gen" in request.form,
+            "image_gen_provider": request.form.get("image_gen_provider", "pollinations"),
+            "image_gen_prompt":   request.form.get("image_gen_prompt", "").strip(),
         })
         flash("Настройки сохранены!", "success")
     except Exception as e:
@@ -411,6 +414,39 @@ def settings_ai_save():
 @app.route("/api/ai_status")
 def api_ai_status():
     return jsonify(load_ai_status())
+
+
+@app.route("/api/test_image", methods=["POST"])
+def api_test_image():
+    """Генерирует тестовое изображение и возвращает base64 для предпросмотра."""
+    import base64
+    from .image_gen import generate
+
+    data = request.get_json(force=True, silent=True) or {}
+    provider = data.get("provider", "pollinations")
+    prompt   = (data.get("prompt") or "").strip()
+    if not prompt:
+        return jsonify({"ok": False, "error": "Промпт не задан"})
+
+    gemini_key = ""
+    if provider == "gemini":
+        cfg = load_config()
+        for m in cfg.get("ai_models", []):
+            if m.get("provider") == "gemini":
+                gemini_key = m.get("key", "")
+                break
+        if not gemini_key:
+            return jsonify({"ok": False, "error": "Ключ Gemini не найден в настройках провайдеров"})
+
+    img_bytes = generate(prompt, provider, gemini_key)
+    if not img_bytes:
+        return jsonify({"ok": False, "error": "Провайдер не вернул изображение"})
+
+    mime = "image/png" if provider == "gemini" else "image/jpeg"
+    b64  = base64.b64encode(img_bytes).decode()
+    return jsonify({"ok": True, "data_url": f"data:{mime};base64,{b64}",
+                    "size": len(img_bytes)})
+
 
 
 @app.route("/api/messages/<int:user_id>")

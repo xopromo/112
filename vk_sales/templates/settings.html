@@ -107,6 +107,50 @@
           </div>
         </div>
 
+        <hr>
+        <h6 class="fw-bold mb-3"><i class="bi bi-image me-2 text-info"></i>Генерация изображений</h6>
+
+        <div class="mb-3">
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" name="use_image_gen" id="useImageGen"
+                   {% if cfg.use_image_gen %}checked{% endif %}>
+            <label class="form-check-label" for="useImageGen">
+              <strong>Отправлять изображение на этапе Питча</strong>
+            </label>
+          </div>
+          <div class="form-text">Картинка генерируется и отправляется вслед за AI-ответом когда диалог достигает этапа <strong>PITCH</strong>.</div>
+        </div>
+
+        <div class="mb-2">
+          <label class="form-label mb-1">Провайдер</label>
+          <select name="image_gen_provider" id="imageGenProvider" class="form-select form-select-sm w-auto">
+            <option value="pollinations" {% if cfg.image_gen_provider != 'gemini' %}selected{% endif %}>
+              Pollinations.ai — Flux (бесплатно, без ключа)
+            </option>
+            <option value="gemini" {% if cfg.image_gen_provider == 'gemini' %}selected{% endif %}>
+              Gemini 2.0 Flash Exp (ключ из провайдеров выше)
+            </option>
+          </select>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Промпт для изображения</label>
+          <input type="text" name="image_gen_prompt" class="form-control"
+                 value="{{ cfg.image_gen_prompt or '' }}"
+                 placeholder="Professional product photo: {product}">
+          <div class="form-text"><code>{product}</code> заменяется на описание продукта выше.</div>
+        </div>
+
+        <div class="mb-3">
+          <button type="button" class="btn btn-outline-info btn-sm" onclick="testImage()">
+            <i class="bi bi-image me-1"></i>Сгенерировать тест
+          </button>
+          <div id="imgTestWrap" class="mt-2" style="display:none">
+            <div id="imgTestStatus" class="text-muted small mb-1"></div>
+            <img id="imgTestResult" src="" style="max-width:320px;border-radius:8px;display:none">
+          </div>
+        </div>
+
         <button type="submit" class="btn btn-primary">
           <i class="bi bi-check2 me-1"></i>Сохранить
         </button>
@@ -329,6 +373,36 @@ function testConnection() {
         alert.innerHTML = `<i class="bi bi-x-circle me-2"></i>Ошибка: ${data.error}`;
       }
     });
+}
+
+function testImage() {
+  const provider = document.getElementById('imageGenProvider').value;
+  const prompt   = document.querySelector('[name="image_gen_prompt"]').value.trim();
+  if (!prompt) { alert('Введи промпт для изображения'); return; }
+
+  const wrap = document.getElementById('imgTestWrap');
+  const status = document.getElementById('imgTestStatus');
+  const img    = document.getElementById('imgTestResult');
+  wrap.style.display = 'block';
+  img.style.display  = 'none';
+  status.textContent = 'Генерирую... (~30-60 сек)';
+
+  fetch('/api/test_image', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ provider, prompt }),
+  })
+    .then(r => r.json())
+    .then(d => {
+      if (d.ok) {
+        img.src = d.data_url;
+        img.style.display = 'block';
+        status.textContent = `Готово (${Math.round(d.size/1024)} КБ, провайдер: ${provider})`;
+      } else {
+        status.textContent = 'Ошибка: ' + d.error;
+      }
+    })
+    .catch(e => { status.textContent = 'Сетевая ошибка: ' + e; });
 }
 </script>
 {% endblock %}

@@ -146,6 +146,62 @@ class VKSalesBot:
                     time.sleep(wait)
         logger.error("send failed after 3 attempts, user=%s", user_id)
 
+    def _send_image(self, user_id: int, prompt: str, state: str = None):
+        """Генерирует изображение и отправляет его пользователю как вложение VK."""
+        from . import image_gen
+        import os
+        import tempfile
+
+        try:
+            with open(self._cfg_path, encoding="utf-8") as f:
+                cfg = json.load(f)
+        except Exception:
+            cfg = self.cfg
+
+        provider = cfg.get("image_gen_provider", "pollinations")
+
+        gemini_key = ""
+        if provider == "gemini":
+            for m in cfg.get("ai_models", []):
+                if m.get("provider") == "gemini":
+                    gemini_key = m.get("key", "")
+                    break
+
+        img_bytes = image_gen.generate(prompt, provider, gemini_key)
+        if not img_bytes:
+            logger.error("[image] generation failed for user %s", user_id)
+            return
+
+        if self.dry_run:
+            logger.info("[DRY RUN] Would send image to user %s (provider=%s, prompt=%r)",
+                        user_id, provider, prompt[:60])
+            db.log_message(user_id, "out", f"[image: {prompt[:60]}]", state)
+            return
+
+        tmp_path = None
+        try:
+            suffix = ".png" if provider == "gemini" else ".jpg"
+            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as f:
+                f.write(img_bytes)
+                tmp_path = f.name
+
+            upload = vk_api.VkUpload(self.vk_session)
+            photo = upload.photo_messages(photos=tmp_path, peer_id=user_id)
+            attachment = f"photo{photo[0]['owner_id']}_{photo[0]['id']}"
+
+            rid = random.randint(1, 2**31)
+            self.vk.messages.send(user_id=user_id, attachment=attachment, random_id=rid)
+            db.log_message(user_id, "out", f"[image: {prompt[:60]}]", state)
+            logger.info("[image] sent to user %s via %s", user_id, provider)
+        except Exception as e:
+            logger.error("[image] send error user=%s: %s", user_id, e)
+        finally:
+            if tmp_path:
+                try:
+                    os.unlink(tmp_path)
+                except OSError:
+                    pass
+
     # ─────────────────────────────────────────────────────────────────────────
     # ОБОГАЩЕНИЕ ПРОФИЛЯ
     # ─────────────────────────────────────────────────────────────────────────
@@ -298,6 +354,14 @@ class VKSalesBot:
             if ai_reply:
                 # состояние не меняем — AI сам ведёт диалог
                 self._send(user_id, ai_reply, state)
+                # Генерация изображения на этапе питча (если включено)
+                if (state == "PITCH"
+                        and self.cfg.get("use_image_gen")
+                        and self.cfg.get("image_gen_prompt")):
+                    img_prompt = self.cfg["image_gen_prompt"].replace(
+                        "{product}", self.ai_product or "product"
+                    )
+                    self._send_image(user_id, img_prompt, state)
                 return
             logger.warning("AI fallback to script for user=%s", user_id)
 
