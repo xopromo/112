@@ -169,4 +169,4 @@ bgcolor(strategy.position_size > 0 ? color.new(color.green, 90) : na, title='In 
 bgcolor(strategy.position_size < 0 ? color.new(color.red,   90) : na, title='In Short')
 
 // Active level count (data window)
-plot(array.size(lvlPrices), title='Active Liq Levels', display=display.data_window, color=color.na)
+plot(array.size(lvlPrices), title='Active Liq Levels', display=display.data_window)
