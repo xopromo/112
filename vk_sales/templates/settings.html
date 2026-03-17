@@ -42,34 +42,27 @@
         </div>
 
         <hr>
-        <h6 class="fw-bold mb-3"><i class="bi bi-cpu me-2 text-success"></i>AI-ответы (Groq, бесплатно)</h6>
+        <h6 class="fw-bold mb-3"><i class="bi bi-cpu me-2 text-success"></i>AI-ответы</h6>
 
         <div class="mb-3">
           <div class="form-check form-switch">
             <input class="form-check-input" type="checkbox" name="use_ai" id="useAI"
                    {% if cfg.use_ai %}checked{% endif %}>
             <label class="form-check-label" for="useAI">
-              <strong>Включить нейросеть (llama-3.3-70b)</strong>
+              <strong>Включить AI-ответы</strong>
             </label>
           </div>
-          <div class="form-text">Когда включено — бот отвечает через Groq AI, а не по скриптам. При ошибке AI автоматически переключается на скрипт.</div>
+          <div class="form-text">Когда включено — бот отвечает через AI, а не по скриптам. Провайдеры пробуются по порядку при ошибке.</div>
         </div>
 
-        <div class="mb-3">
-          <label class="form-label">Groq API ключ</label>
-          <div class="input-group">
-            <input type="text" name="groq_key" id="groqKeyField"
-                   class="form-control font-monospace"
-                   style="letter-spacing: {{ '0.15em' if cfg.groq_key else 'normal' }}"
-                   autocomplete="off"
-                   value="{{ cfg.groq_key or '' }}"
-                   placeholder="gsk_xxxxxxxxxxxxxxxxxx">
-            <button type="button" class="btn btn-outline-secondary" onclick="toggleGroqKey()">
-              <i class="bi bi-eye" id="groqEyeIcon"></i>
-            </button>
-          </div>
-          <div class="form-text">
-            Получить бесплатно: <strong>console.groq.com</strong> → API Keys → Create new
+        <div class="mb-2">
+          <label class="form-label mb-1">Провайдеры <span class="text-muted small">(порядок = приоритет)</span></label>
+          <div id="providerList" class="d-flex flex-column gap-2"></div>
+          <input type="hidden" name="ai_models_json" id="aiModelsJson">
+          <div class="form-text mt-1">
+            Включённые провайдеры используются по очереди сверху вниз.
+            <br>
+            <span class="text-muted">Groq / Cerebras — бесплатно. Gemini — бесплатно (15 req/min). Mistral — платный.</span>
           </div>
         </div>
 
@@ -179,19 +172,140 @@ function toggleToken() {
     i.className = 'bi bi-eye';
   }
 }
-function toggleGroqKey() {
-  const f = document.getElementById('groqKeyField');
-  const i = document.getElementById('groqEyeIcon');
-  if(f.style.webkitTextSecurity !== 'disc') {
+
+// ─── Provider list ────────────────────────────────────────────────────────────
+
+const PROVIDER_META = {
+  groq:      { label: "Groq",     model: "llama-3.3-70b-versatile", color: "success",  link: "console.groq.com → API Keys", placeholder: "gsk_xxxxxxxxxxxx" },
+  cerebras:  { label: "Cerebras", model: "llama-3.3-70b",           color: "primary",  link: "cloud.cerebras.ai → API Keys", placeholder: "csk-xxxxxxxxxxxx" },
+  gemini:    { label: "Gemini",   model: "gemini-2.0-flash",        color: "warning",  link: "aistudio.google.com → Get API key", placeholder: "AIzaxxxxxxxxxx" },
+  mistral:   { label: "Mistral",  model: "mistral-small-latest",    color: "secondary",link: "console.mistral.ai → API Keys", placeholder: "xxxxxxxxxxxx" },
+};
+const PROVIDER_ORDER = ["groq", "cerebras", "gemini", "mistral"];
+
+// Build initial state from server config
+const _cfgModels = {{ (cfg.ai_models or []) | tojson }};
+const _cfgGroqKey = {{ (cfg.groq_key or '') | tojson }};
+
+// Merge: start with ai_models order, then append missing providers disabled
+let _providers = [];
+const _seen = new Set();
+for (const m of _cfgModels) {
+  if (!PROVIDER_META[m.provider]) continue;
+  _providers.push({ provider: m.provider, key: m.key || "", model: m.model || "", enabled: true });
+  _seen.add(m.provider);
+}
+// backward compat: if only groq_key was set (no ai_models)
+if (_providers.length === 0 && _cfgGroqKey) {
+  _providers.push({ provider: "groq", key: _cfgGroqKey, model: "", enabled: true });
+  _seen.add("groq");
+}
+for (const p of PROVIDER_ORDER) {
+  if (!_seen.has(p)) _providers.push({ provider: p, key: "", model: "", enabled: false });
+}
+
+function renderProviders() {
+  const list = document.getElementById('providerList');
+  list.innerHTML = '';
+  _providers.forEach((p, idx) => {
+    const meta = PROVIDER_META[p.provider];
+    const isFirst = idx === 0, isLast = idx === _providers.length - 1;
+    const keyId = `pkey_${p.provider}`;
+    const eyeId = `peye_${p.provider}`;
+    const row = document.createElement('div');
+    row.className = `card px-3 py-2 ${p.enabled ? '' : 'opacity-50'}`;
+    row.dataset.provider = p.provider;
+    row.innerHTML = `
+      <div class="d-flex align-items-center gap-2">
+        <!-- reorder -->
+        <div class="d-flex flex-column" style="gap:1px">
+          <button type="button" class="btn btn-sm btn-link p-0 lh-1 text-muted" onclick="moveProvider(${idx},-1)" ${isFirst ? 'disabled' : ''} title="Выше">
+            <i class="bi bi-chevron-up"></i>
+          </button>
+          <button type="button" class="btn btn-sm btn-link p-0 lh-1 text-muted" onclick="moveProvider(${idx},1)" ${isLast ? 'disabled' : ''} title="Ниже">
+            <i class="bi bi-chevron-down"></i>
+          </button>
+        </div>
+        <!-- priority badge -->
+        <span class="badge bg-light text-muted border" style="min-width:22px;text-align:center">${p.enabled ? idx+1 : '—'}</span>
+        <!-- enable toggle -->
+        <div class="form-check form-switch mb-0 me-1">
+          <input class="form-check-input" type="checkbox" id="pen_${p.provider}"
+                 ${p.enabled ? 'checked' : ''} onchange="toggleProvider(${idx})">
+        </div>
+        <!-- name + model -->
+        <div class="flex-grow-1">
+          <span class="badge bg-${meta.color} me-1">${meta.label}</span>
+          <span class="text-muted small">${p.model || meta.model}</span>
+        </div>
+        <!-- key input -->
+        <div class="input-group input-group-sm" style="max-width:280px">
+          <input type="text" id="${keyId}" class="form-control font-monospace"
+                 autocomplete="off"
+                 placeholder="${meta.placeholder}"
+                 value="${escHtml(p.key)}"
+                 oninput="updateKey(${idx}, this.value)"
+                 style="${p.key ? 'letter-spacing:0.12em' : ''}">
+          <button type="button" class="btn btn-outline-secondary" onclick="toggleKeyVis('${keyId}','${eyeId}')" tabindex="-1">
+            <i id="${eyeId}" class="bi bi-eye"></i>
+          </button>
+        </div>
+      </div>
+      ${p.enabled && meta.link ? `<div class="form-text ps-5 mt-1" style="font-size:0.75rem">Получить: <strong>${meta.link}</strong></div>` : ''}
+    `;
+    list.appendChild(row);
+  });
+  serializeProviders();
+}
+
+function moveProvider(idx, dir) {
+  const other = idx + dir;
+  if (other < 0 || other >= _providers.length) return;
+  [_providers[idx], _providers[other]] = [_providers[other], _providers[idx]];
+  renderProviders();
+}
+function toggleProvider(idx) {
+  _providers[idx].enabled = !_providers[idx].enabled;
+  renderProviders();
+}
+function updateKey(idx, val) {
+  _providers[idx].key = val;
+  serializeProviders();
+}
+function toggleKeyVis(fieldId, eyeId) {
+  const f = document.getElementById(fieldId);
+  const i = document.getElementById(eyeId);
+  if (f.style.webkitTextSecurity !== 'disc') {
     f.style.webkitTextSecurity = 'disc';
-    f.style.letterSpacing = '0.15em';
+    f.style.letterSpacing = '0.12em';
     i.className = 'bi bi-eye-slash';
   } else {
     f.style.webkitTextSecurity = '';
-    f.style.letterSpacing = 'normal';
+    f.style.letterSpacing = f.value ? '0.12em' : 'normal';
     i.className = 'bi bi-eye';
   }
 }
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function serializeProviders() {
+  const active = _providers.filter(p => p.enabled && p.key).map(p => ({
+    provider: p.provider,
+    key: p.key,
+    ...(p.model ? { model: p.model } : {})
+  }));
+  document.getElementById('aiModelsJson').value = JSON.stringify(active);
+}
+
+document.addEventListener('DOMContentLoaded', renderProviders);
+// serialize before form submit (keys may not have triggered oninput)
+document.querySelector('form[action="/settings/save"]').addEventListener('submit', () => {
+  _providers.forEach((p, idx) => {
+    const el = document.getElementById(`pkey_${p.provider}`);
+    if (el) p.key = el.value;
+  });
+  serializeProviders();
+});
 
 function testConnection() {
   fetch('/api/test_connection')
