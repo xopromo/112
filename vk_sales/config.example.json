@@ -41,5 +41,24 @@
     {"provider": "cerebras", "key": ""},
     {"provider": "mistral",  "key": ""},
     {"provider": "gemini",   "key": ""}
-  ]
+  ],
+
+  "_comment_image_gen": [
+    "Генерация изображений — отправляется на этапе PITCH вслед за AI-ответом.",
+    "use_image_gen: true/false",
+    "image_gen_provider: 'pollinations' (бесплатно, без ключа) | 'gemini' (ключ из ai_models)",
+    "image_gen_prompt: промпт для генерации. {product} заменяется на ai_product."
+  ],
+  "use_image_gen":      false,
+  "image_gen_provider": "pollinations",
+  "image_gen_prompt":   "Professional product photo: {product}",
+
+  "_comment_audit": [
+    "Аудит сайта через Google PageSpeed Insights.",
+    "Если пользователь присылает URL — бот автоматически делает аудит и отправляет отчёт.",
+    "pagespeed_key — опционально. Без ключа: 100 запросов/день (бесплатно).",
+    "С бесплатным ключом Google Cloud: 25 000 запросов/день.",
+    "Получить ключ: https://console.cloud.google.com/ → APIs → PageSpeed Insights API"
+  ],
+  "pagespeed_key": ""
 }

@@ -3,6 +3,7 @@ VK Sales Bot — основная логика.
 Использует VK Long Poll для получения входящих сообщений.
 Группа должна иметь включённые сообщения (messages.send с group_id).
 """
+import re
 import time
 import logging
 import json
@@ -19,6 +20,19 @@ from .states import (
     get_followup_message, FINAL_STATES
 )
 from .ai_responder import ask_ai
+from .audit import run_audit
+
+_URL_RE = re.compile(r'https?://[^\s]+|www\.[^\s]+')
+
+
+def _extract_url(text: str) -> Optional[str]:
+    m = _URL_RE.search(text)
+    if not m:
+        return None
+    url = m.group(0).rstrip(".,!?)")
+    if not url.startswith("http"):
+        url = "https://" + url
+    return url
 
 logger = logging.getLogger(__name__)
 
@@ -113,16 +127,80 @@ class VKSalesBot:
         self._typing_delay(text)
         delay = random.uniform(self.send_delay_min, self.send_delay_max)
         time.sleep(delay)
+
+        rid = random.randint(1, 2**31)
+        for attempt in range(3):
+            try:
+                self.vk.messages.send(user_id=user_id, message=text, random_id=rid)
+                db.log_message(user_id, "out", text, state)
+                logger.info("→ user %s | state=%s", user_id, state)
+                return
+            except vk_api.exceptions.ApiError as e:
+                logger.error("send error user=%s: %s", user_id, e)
+                return  # API ошибка (например, нет прав) — ретрай не поможет
+            except Exception as e:
+                wait = 2 ** attempt  # 1s, 2s, 4s
+                logger.warning("send network error user=%s (attempt %d/3): %s — retry in %ds",
+                               user_id, attempt + 1, e, wait)
+                if attempt < 2:
+                    time.sleep(wait)
+        logger.error("send failed after 3 attempts, user=%s", user_id)
+
+    def _send_image(self, user_id: int, prompt: str, state: str = None):
+        """Генерирует изображение и отправляет его пользователю как вложение VK."""
+        from . import image_gen
+        import os
+        import tempfile
+
         try:
-            self.vk.messages.send(
-                user_id=user_id,
-                message=text,
-                random_id=random.randint(1, 2**31),
-            )
-            db.log_message(user_id, "out", text, state)
-            logger.info("→ user %s | state=%s", user_id, state)
-        except vk_api.exceptions.ApiError as e:
-            logger.error("send error user=%s: %s", user_id, e)
+            with open(self._cfg_path, encoding="utf-8") as f:
+                cfg = json.load(f)
+        except Exception:
+            cfg = self.cfg
+
+        provider = cfg.get("image_gen_provider", "pollinations")
+
+        gemini_key = ""
+        if provider == "gemini":
+            for m in cfg.get("ai_models", []):
+                if m.get("provider") == "gemini":
+                    gemini_key = m.get("key", "")
+                    break
+
+        img_bytes = image_gen.generate(prompt, provider, gemini_key)
+        if not img_bytes:
+            logger.error("[image] generation failed for user %s", user_id)
+            return
+
+        if self.dry_run:
+            logger.info("[DRY RUN] Would send image to user %s (provider=%s, prompt=%r)",
+                        user_id, provider, prompt[:60])
+            db.log_message(user_id, "out", f"[image: {prompt[:60]}]", state)
+            return
+
+        tmp_path = None
+        try:
+            suffix = ".png" if provider == "gemini" else ".jpg"
+            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as f:
+                f.write(img_bytes)
+                tmp_path = f.name
+
+            upload = vk_api.VkUpload(self.vk_session)
+            photo = upload.photo_messages(photos=tmp_path, peer_id=user_id)
+            attachment = f"photo{photo[0]['owner_id']}_{photo[0]['id']}"
+
+            rid = random.randint(1, 2**31)
+            self.vk.messages.send(user_id=user_id, attachment=attachment, random_id=rid)
+            db.log_message(user_id, "out", f"[image: {prompt[:60]}]", state)
+            logger.info("[image] sent to user %s via %s", user_id, provider)
+        except Exception as e:
+            logger.error("[image] send error user=%s: %s", user_id, e)
+        finally:
+            if tmp_path:
+                try:
+                    os.unlink(tmp_path)
+                except OSError:
+                    pass
 
     # ─────────────────────────────────────────────────────────────────────────
     # ОБОГАЩЕНИЕ ПРОФИЛЯ
@@ -249,6 +327,19 @@ class VKSalesBot:
             logger.info("Message from closed dialog user=%s", user_id)
             return
 
+        # ── Аудит сайта если прислали URL ────────────────────────────────────
+        url = _extract_url(text)
+        if url:
+            logger.info("URL detected for user=%s: %s — running audit", user_id, url)
+            self._send(user_id, "Сейчас проверю ваш сайт, подождите 10-15 секунд... 🔍", state)
+            api_key = self.cfg.get("pagespeed_key")
+            report = run_audit(url, api_key)
+            if report:
+                self._send(user_id, report, state)
+                return
+            else:
+                logger.warning("Audit failed for url=%s, falling through to normal flow", url)
+
         # ── AI или скрипт ────────────────────────────────────────────────────
         if self.use_ai and self.ai_models and state not in FINAL_STATES:
             history = db.get_messages(user_id, limit=20)
@@ -263,6 +354,14 @@ class VKSalesBot:
             if ai_reply:
                 # состояние не меняем — AI сам ведёт диалог
                 self._send(user_id, ai_reply, state)
+                # Генерация изображения на этапе питча (если включено)
+                if (state == "PITCH"
+                        and self.cfg.get("use_image_gen")
+                        and self.cfg.get("image_gen_prompt")):
+                    img_prompt = self.cfg["image_gen_prompt"].replace(
+                        "{product}", self.ai_product or "product"
+                    )
+                    self._send_image(user_id, img_prompt, state)
                 return
             logger.warning("AI fallback to script for user=%s", user_id)
 
