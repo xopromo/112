@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 _BASE_DIR   = Path(__file__).parent
 PROMPT_FILE = _BASE_DIR / "system_prompt.txt"
 KB_FILE     = _BASE_DIR / "knowledge_base.txt"
+STATUS_FILE = _BASE_DIR / "provider_status.json"
 
 MAX_RETRIES  = 4
 RETRY_DELAYS = [2, 4, 8, 16]
@@ -102,8 +103,16 @@ class _RateLimiter:
 class _ProviderState:
     def __init__(self, rpm: int):
         self.limiter = _RateLimiter(rpm)
-        self.blocked_until: float = 0.0
+        self.blocked_until: float = 0.0      # monotonic, for is_blocked()
+        self.blocked_until_utc: Optional[str] = None  # ISO UTC, for display
         self._lock = threading.Lock()
+        # Populated from response headers
+        self.remaining_tokens:   Optional[int] = None
+        self.limit_tokens:       Optional[int] = None
+        self.reset_tokens_at:    Optional[str] = None
+        self.remaining_requests: Optional[int] = None
+        self.last_model:         Optional[str] = None
+        self.last_updated:       Optional[str] = None
 
     def is_blocked(self) -> bool:
         with self._lock:
@@ -114,7 +123,9 @@ class _ProviderState:
         tomorrow = now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
         secs = (tomorrow - now).total_seconds()
         with self._lock:
-            self.blocked_until = time.monotonic() + secs
+            self.blocked_until     = time.monotonic() + secs
+            self.blocked_until_utc = tomorrow.isoformat()
+        _save_status_file()
         return secs
 
 
@@ -128,6 +139,61 @@ def _get_state(provider: str) -> _ProviderState:
             rpm = PROVIDER_CONFIGS.get(provider, {}).get("rpm_limit", 30)
             _provider_states[provider] = _ProviderState(rpm)
         return _provider_states[provider]
+
+
+# ─── Provider status helpers ──────────────────────────────────────────────────
+
+def _save_status_file():
+    """Snapshot current provider states to JSON file (readable by web process)."""
+    snapshot = {}
+    with _states_lock:
+        for prov, state in _provider_states.items():
+            with state._lock:
+                snapshot[prov] = {
+                    "last_updated":       state.last_updated,
+                    "last_model":         state.last_model,
+                    "remaining_tokens":   state.remaining_tokens,
+                    "limit_tokens":       state.limit_tokens,
+                    "reset_tokens_at":    state.reset_tokens_at,
+                    "remaining_requests": state.remaining_requests,
+                    "blocked_until_utc":  state.blocked_until_utc,
+                }
+    try:
+        STATUS_FILE.write_text(
+            json.dumps(snapshot, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
+    except Exception as e:
+        logger.warning("Failed to save provider status: %s", e)
+
+
+def _update_state_from_headers(provider: str, headers, model: str):
+    """Read rate-limit headers from API response and persist to status file."""
+    def _int(key):
+        v = headers.get(key)
+        try:
+            return int(v) if v else None
+        except (TypeError, ValueError):
+            return None
+
+    state = _get_state(provider)
+    with state._lock:
+        state.remaining_tokens   = _int("x-ratelimit-remaining-tokens")
+        state.limit_tokens       = _int("x-ratelimit-limit-tokens")
+        state.reset_tokens_at    = headers.get("x-ratelimit-reset-tokens")
+        state.remaining_requests = _int("x-ratelimit-remaining-requests")
+        state.last_model         = model
+        state.last_updated       = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    _save_status_file()
+
+
+def get_providers_status() -> dict:
+    """Read persisted provider status. Safe to call from any process."""
+    if STATUS_FILE.exists():
+        try:
+            return json.loads(STATUS_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    return {}
 
 
 # ─── Prompts ──────────────────────────────────────────────────────────────────
@@ -229,6 +295,7 @@ def _call_openai_provider(provider: str, api_key: str, model: str,
         try:
             with urllib.request.urlopen(req, timeout=15) as resp:
                 result = json.loads(resp.read())
+                _update_state_from_headers(provider, resp.headers, model)
                 choice = result["choices"][0]
                 text   = choice["message"]["content"].strip()
                 finish = choice.get("finish_reason", "")

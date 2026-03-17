@@ -160,6 +160,16 @@ def inject_globals():
 # Маршруты: дашборд
 # ─────────────────────────────────────────────────────────────────────────────
 
+def load_ai_status() -> dict:
+    status_file = BASE_DIR / "provider_status.json"
+    if not status_file.exists():
+        return {}
+    try:
+        return json.loads(status_file.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
 @app.route("/")
 def index():
     db.init_db()
@@ -177,6 +187,7 @@ def index():
         ab_stats=ab_stats,
         pending_followups=pending_followups,
         recent_dialogs=recent,
+        ai_status=load_ai_status(),
     )
 
 
@@ -388,6 +399,11 @@ def settings_ai_save():
     except Exception as e:
         flash(f"Ошибка: {e}", "danger")
     return redirect(url_for("settings_ai"))
+
+
+@app.route("/api/ai_status")
+def api_ai_status():
+    return jsonify(load_ai_status())
 
 
 @app.route("/api/messages/<int:user_id>")
