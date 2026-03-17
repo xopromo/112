@@ -277,7 +277,7 @@ def _call_openai_provider(provider: str, api_key: str, model: str,
     payload = {
         "model":       model,
         "messages":    [{"role": "system", "content": system}] + messages,
-        "max_tokens":  450,
+        "max_tokens":  1600,
         "temperature": 0.75,
     }
     data = json.dumps(payload).encode("utf-8")
@@ -351,7 +351,7 @@ def _call_gemini_provider(api_key: str, model: str,
     payload = {
         "contents":           contents,
         "systemInstruction":  {"parts": [{"text": system}]},
-        "generationConfig":   {"maxOutputTokens": 450, "temperature": 0.75},
+        "generationConfig":   {"maxOutputTokens": 1600, "temperature": 0.75},
     }
     data = json.dumps(payload).encode("utf-8")
 
