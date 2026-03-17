@@ -5,6 +5,7 @@ Groq AI responder — заменяет скриптовые ответы ней�
 """
 import json
 import logging
+import re
 import time
 import threading
 import urllib.request
@@ -22,6 +23,11 @@ RPM_LIMIT   = 30    # запросов в минуту
 RPM_WARN_AT = 0.8   # начало замедления (80% лимита)
 MAX_RETRIES = 4
 RETRY_DELAYS = [2, 4, 8, 16]  # секунды, exponential backoff
+
+# Детектор английских слов: минимум 3 латинских символа подряд,
+# игнорируем URL и числа с единицами (50px, v6, ...)
+_EN_WORD_RE = re.compile(r'(?<![/\w])([A-Za-z]{3,})(?!\w*[0-9])')
+_URL_RE = re.compile(r'https?://\S+|www\.\S+')
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -149,14 +155,16 @@ def ask_groq(api_key: str, history_rows, user_text: str,
              state: str, name: str, product: str) -> Optional[str]:
     """
     Вызвать Groq API. Возвращает текст ответа или None при ошибке.
-    Автоматически throttle при приближении к RPM-лимиту и retry при 429.
+    - Throttle при приближении к RPM-лимиту, retry при 429.
+    - При наличии английских слов в ответе делает 1 повторный запрос
+      с явным напоминанием писать только по-русски.
     """
     if not api_key:
         return None
 
     stage  = STATE_NAMES.get(state, state)
     goal   = STAGE_GOALS.get(state, "продолжить диалог")
-    system = SYSTEM_TEMPLATE.format(
+    base_system = SYSTEM_TEMPLATE.format(
         product=product or "ваш продукт/услуга",
         stage=stage,
         name=name or "клиент",
@@ -165,67 +173,89 @@ def ask_groq(api_key: str, history_rows, user_text: str,
 
     messages = build_messages(history_rows, user_text)
 
-    payload = {
-        "model":       MODEL,
-        "messages":    [{"role": "system", "content": system}] + messages,
-        "max_tokens":  450,   # было 220 — ИИ обрезал ответы на середине
-        "temperature": 0.75,
-    }
-    data = json.dumps(payload).encode("utf-8")
+    def _call(system_override: str = None) -> Optional[tuple[str, str]]:
+        """Один HTTP-вызов. Возвращает (text, finish_reason) или None."""
+        payload = {
+            "model":       MODEL,
+            "messages":    [{"role": "system", "content": system_override or base_system}] + messages,
+            "max_tokens":  450,
+            "temperature": 0.75,
+        }
+        data = json.dumps(payload).encode("utf-8")
 
-    for attempt in range(MAX_RETRIES + 1):
-        _limiter.acquire()
-
-        req = urllib.request.Request(
-            GROQ_URL, data=data,
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type":  "application/json",
-                "User-Agent":    "Mozilla/5.0 (compatible; VKSalesBot/1.0)",
-            },
-        )
-        try:
-            with urllib.request.urlopen(req, timeout=15) as resp:
-                result = json.loads(resp.read())
-                choice = result["choices"][0]
-                text   = choice["message"]["content"].strip()
-                finish = choice.get("finish_reason", "")
-
-                if finish == "length":
-                    logger.warning(
-                        "Groq response truncated (finish_reason=length, len=%d). "
-                        "Consider raising max_tokens.", len(text),
+        for attempt in range(MAX_RETRIES + 1):
+            _limiter.acquire()
+            req = urllib.request.Request(
+                GROQ_URL, data=data,
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type":  "application/json",
+                    "User-Agent":    "Mozilla/5.0 (compatible; VKSalesBot/1.0)",
+                },
+            )
+            try:
+                with urllib.request.urlopen(req, timeout=15) as resp:
+                    result = json.loads(resp.read())
+                    choice = result["choices"][0]
+                    return choice["message"]["content"].strip(), choice.get("finish_reason", "")
+            except urllib.error.HTTPError as e:
+                body = e.read().decode(errors="replace")
+                if e.code == 429:
+                    retry_after = _parse_retry_after(
+                        e.headers.get("retry-after"),
+                        fallback=RETRY_DELAYS[attempt] if attempt < len(RETRY_DELAYS) else 30,
                     )
-
-                logger.info("AI reply (state=%s, len=%d, finish=%s)", state, len(text), finish)
-                return text
-
-        except urllib.error.HTTPError as e:
-            body = e.read().decode(errors="replace")
-            if e.code == 429:
-                # Читаем Retry-After если есть
-                retry_after = _parse_retry_after(
-                    e.headers.get("retry-after"),
-                    fallback=RETRY_DELAYS[attempt] if attempt < len(RETRY_DELAYS) else 30,
-                )
-                if attempt < MAX_RETRIES:
-                    logger.warning(
-                        "Groq 429. Retry %d/%d after %.0fs (RPM now=%d)",
-                        attempt + 1, MAX_RETRIES, retry_after, _limiter.current_rpm(),
-                    )
-                    time.sleep(retry_after)
-                    continue
+                    if attempt < MAX_RETRIES:
+                        logger.warning(
+                            "Groq 429. Retry %d/%d after %.0fs (RPM=%d)",
+                            attempt + 1, MAX_RETRIES, retry_after, _limiter.current_rpm(),
+                        )
+                        time.sleep(retry_after)
+                        continue
+                    logger.error("Groq 429 — all retries exhausted.")
                 else:
-                    logger.error("Groq 429 — all %d retries exhausted.", MAX_RETRIES)
+                    logger.error("Groq HTTP %s: %s", e.code, body[:200])
+                break
+            except Exception as e:
+                logger.error("Groq error: %s", e)
+                break
+        return None
+
+    # Первый запрос
+    result = _call()
+    if result is None:
+        return None
+
+    text, finish = result
+
+    if finish == "length":
+        logger.warning("Groq response truncated (len=%d)", len(text))
+
+    # Проверка на английские слова → 1 retry с усиленным напоминанием
+    en_words = _find_english_words(text)
+    if en_words:
+        logger.warning(
+            "English words in AI reply: %s — retrying with lang reminder",
+            en_words[:5],
+        )
+        strict_system = (
+            base_system
+            + "\n⚠️ КРИТИЧНО: В предыдущем ответе были английские слова: "
+            + ", ".join(en_words[:5])
+            + ". Перепиши ПОЛНОСТЬЮ на русском языке. НИ ОДНОГО латинского слова."
+        )
+        result2 = _call(system_override=strict_system)
+        if result2:
+            text2, finish2 = result2
+            en_words2 = _find_english_words(text2)
+            if en_words2:
+                logger.warning("English words still present after retry: %s", en_words2[:5])
             else:
-                logger.error("Groq HTTP %s: %s", e.code, body[:200])
-            break
+                logger.info("Language retry succeeded.")
+            text = text2
 
-        except Exception as e:
-            logger.error("Groq error: %s", e)
-            break
-
-    return None
+    logger.info("AI reply (state=%s, len=%d, finish=%s)", state, len(text), finish)
+    return text
 
 
 def _parse_retry_after(header_value, fallback: float) -> float:
@@ -233,3 +263,9 @@ def _parse_retry_after(header_value, fallback: float) -> float:
         return float(header_value)
     except (TypeError, ValueError):
         return fallback
+
+
+def _find_english_words(text: str) -> list[str]:
+    """Найти английские слова в тексте (игнорируем URL)."""
+    clean = _URL_RE.sub("", text)
+    return _EN_WORD_RE.findall(clean)

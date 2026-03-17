@@ -36,9 +36,18 @@ class VKSalesBot:
         self.groq_key  = self.cfg.get("groq_key", "")
         self.ai_product = self.cfg.get("ai_product", "")
 
-        # Задержки между сообщениями (защита от спам-фильтра)
+        # Задержки между сообщениями (защита от спам-фильтра VK)
         self.send_delay_min = self.cfg.get("send_delay_min", 2)   # сек
         self.send_delay_max = self.cfg.get("send_delay_max", 8)
+
+        # Имитация набора текста
+        # Режимы: "none" | "normal" | "natural"
+        #   normal  — фиксированная задержка typing_delay_sec секунд
+        #   natural — задержка пропорциональна длине ответа (имитация живого человека)
+        self.typing_delay_mode    = self.cfg.get("typing_delay_mode", "none")
+        self.typing_delay_sec     = self.cfg.get("typing_delay_sec", 4)      # для normal
+        self.typing_speed_cpm     = self.cfg.get("typing_speed_cpm", 280)    # символов/мин для natural
+        self.typing_delay_max_sec = self.cfg.get("typing_delay_max_sec", 20) # потолок для natural
 
         # Инициализация VK API
         self.vk_session = vk_api.VkApi(token=self.token)
@@ -52,6 +61,19 @@ class VKSalesBot:
     # ОТПРАВКА
     # ─────────────────────────────────────────────────────────────────────────
 
+    def _typing_delay(self, text: str):
+        """Сделать паузу перед отправкой — имитация набора текста."""
+        mode = self.typing_delay_mode
+        if mode == "normal":
+            time.sleep(self.typing_delay_sec)
+        elif mode == "natural":
+            # ~280 символов/мин = 4.67 сим/сек; потолок typing_delay_max_sec
+            delay = len(text) / (self.typing_speed_cpm / 60.0)
+            delay = min(delay, self.typing_delay_max_sec)
+            logger.debug("Typing delay: %.1fs for %d chars", delay, len(text))
+            time.sleep(delay)
+        # "none" — не ждём
+
     def _send(self, user_id: int, text: str, state: str = None):
         """Отправить сообщение пользователю от имени группы."""
         if self.dry_run:
@@ -59,6 +81,7 @@ class VKSalesBot:
             db.log_message(user_id, "out", text, state)
             return
 
+        self._typing_delay(text)
         delay = random.uniform(self.send_delay_min, self.send_delay_max)
         time.sleep(delay)
         try:
