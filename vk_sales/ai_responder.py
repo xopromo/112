@@ -104,6 +104,7 @@ def ask_groq(api_key: str, history_rows, user_text: str,
         headers={
             "Authorization": f"Bearer {api_key}",
             "Content-Type":  "application/json",
+            "User-Agent":    "Mozilla/5.0 (compatible; VKSalesBot/1.0)",
         }
     )
     try:
