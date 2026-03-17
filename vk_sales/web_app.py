@@ -21,9 +21,11 @@ from . import db
 logger = logging.getLogger(__name__)
 
 BASE_DIR = Path(__file__).parent
-CONFIG_PATH = BASE_DIR / "config.json"
+CONFIG_PATH  = BASE_DIR / "config.json"
 BOT_PID_FILE = BASE_DIR / "bot.pid"
 BOT_LOG_FILE = BASE_DIR / "bot.log"
+PROMPT_FILE  = BASE_DIR / "system_prompt.txt"
+KB_FILE      = BASE_DIR / "knowledge_base.txt"
 
 app = Flask(__name__, template_folder="templates")
 app.secret_key = "vk-sales-secret-key-2024"
@@ -360,6 +362,32 @@ def settings_save():
         logger.error("settings_save error: %s", e)
         flash(f"Ошибка сохранения: {e}", "danger")
     return redirect(url_for("settings"))
+
+
+@app.route("/settings/ai", methods=["GET"])
+def settings_ai():
+    from .ai_responder import SYSTEM_TEMPLATE
+    prompt = PROMPT_FILE.read_text(encoding="utf-8") if PROMPT_FILE.exists() else SYSTEM_TEMPLATE
+    kb     = KB_FILE.read_text(encoding="utf-8") if KB_FILE.exists() else ""
+    return render_template("prompt_editor.html", prompt=prompt, kb=kb)
+
+
+@app.route("/settings/ai/save", methods=["POST"])
+def settings_ai_save():
+    try:
+        prompt = request.form.get("prompt", "").strip()
+        kb     = request.form.get("kb", "").strip()
+
+        if prompt:
+            PROMPT_FILE.write_text(prompt, encoding="utf-8")
+        elif PROMPT_FILE.exists():
+            PROMPT_FILE.unlink()  # пустой промпт → вернуть к встроенному
+
+        KB_FILE.write_text(kb, encoding="utf-8")
+        flash("Сохранено!", "success")
+    except Exception as e:
+        flash(f"Ошибка: {e}", "danger")
+    return redirect(url_for("settings_ai"))
 
 
 @app.route("/api/messages/<int:user_id>")

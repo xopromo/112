@@ -11,12 +11,16 @@ import threading
 import urllib.request
 import urllib.error
 from collections import deque
+from pathlib import Path
 from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
-MODEL    = "llama-3.3-70b-versatile"
+GROQ_URL    = "https://api.groq.com/openai/v1/chat/completions"
+MODEL       = "llama-3.3-70b-versatile"
+_BASE_DIR   = Path(__file__).parent
+PROMPT_FILE = _BASE_DIR / "system_prompt.txt"
+KB_FILE     = _BASE_DIR / "knowledge_base.txt"
 
 # Лимиты Groq free tier
 RPM_LIMIT   = 30    # запросов в минуту
@@ -164,12 +168,12 @@ def ask_groq(api_key: str, history_rows, user_text: str,
 
     stage  = STATE_NAMES.get(state, state)
     goal   = STAGE_GOALS.get(state, "продолжить диалог")
-    base_system = SYSTEM_TEMPLATE.format(
+    base_system = _load_prompt_template().format(
         product=product or "ваш продукт/услуга",
         stage=stage,
         name=name or "клиент",
         goal=goal,
-    )
+    ) + _load_knowledge_base()
 
     messages = build_messages(history_rows, user_text)
 
@@ -263,6 +267,28 @@ def _parse_retry_after(header_value, fallback: float) -> float:
         return float(header_value)
     except (TypeError, ValueError):
         return fallback
+
+
+def _load_prompt_template() -> str:
+    """Загрузить шаблон промпта из файла (если есть), иначе вернуть встроенный."""
+    if PROMPT_FILE.exists():
+        text = PROMPT_FILE.read_text(encoding="utf-8").strip()
+        if text:
+            return text
+    return SYSTEM_TEMPLATE
+
+
+def _load_knowledge_base() -> str:
+    """Загрузить базу знаний из файла. Строки с # — комментарии, игнорируются."""
+    if KB_FILE.exists():
+        lines = [
+            l for l in KB_FILE.read_text(encoding="utf-8").splitlines()
+            if l.strip() and not l.strip().startswith("#")
+        ]
+        text = "\n".join(lines).strip()
+        if text:
+            return "\n\nБАЗА ЗНАНИЙ (используй только эти факты когда отвечаешь на вопросы о продукте):\n" + text
+    return ""
 
 
 def _find_english_words(text: str) -> list[str]:
