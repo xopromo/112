@@ -105,6 +105,66 @@
   </div>
 </div>
 
+<!-- AI провайдеры -->
+{% if ai_status %}
+<div class="card p-4 mb-4">
+  <h6 class="fw-bold mb-3"><i class="bi bi-cpu me-2 text-info"></i>AI Провайдеры</h6>
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Провайдер</th>
+          <th>Модель</th>
+          <th>Токены (остаток)</th>
+          <th>Сброс</th>
+          <th>Обновлено</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for provider, info in ai_status.items() %}
+      {% set blocked = info.get('blocked_until_utc') %}
+      {% set rem = info.get('remaining_tokens') %}
+      {% set lim = info.get('limit_tokens') %}
+      <tr>
+        <td>
+          {% if blocked %}
+            <span class="badge bg-danger">🚫 {{ provider }}</span>
+          {% elif rem is not none and rem < 1000 %}
+            <span class="badge bg-warning text-dark">⚠️ {{ provider }}</span>
+          {% else %}
+            <span class="badge bg-success">✅ {{ provider }}</span>
+          {% endif %}
+        </td>
+        <td class="text-muted small">{{ info.get('last_model') or '—' }}</td>
+        <td>
+          {% if blocked %}
+            <span class="text-danger small">заблокирован до {{ blocked[11:16] }} UTC</span>
+          {% elif rem is not none %}
+            {% if lim %}
+              <div class="d-flex align-items-center gap-2">
+                <div class="progress flex-grow-1" style="height:6px;min-width:80px">
+                  <div class="progress-bar {% if rem / lim < 0.1 %}bg-danger{% elif rem / lim < 0.3 %}bg-warning{% else %}bg-success{% endif %}"
+                       style="width:{{ [(rem / lim * 100)|int, 100]|min }}%"></div>
+                </div>
+                <span class="small text-nowrap">{{ '{:,}'.format(rem).replace(',', ' ') }} / {{ '{:,}'.format(lim).replace(',', ' ') }}</span>
+              </div>
+            {% else %}
+              <span class="small">{{ '{:,}'.format(rem).replace(',', ' ') }}</span>
+            {% endif %}
+          {% else %}
+            <span class="text-muted small">—</span>
+          {% endif %}
+        </td>
+        <td class="text-muted small">{{ info.get('reset_tokens_at') or '—' }}</td>
+        <td class="text-muted small">{{ info.get('last_updated') or '—' }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
 <!-- Последние диалоги -->
 <div class="card p-4">
   <div class="d-flex justify-content-between align-items-center mb-3">
