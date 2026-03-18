@@ -124,9 +124,9 @@ m4 = nwsl[1] < 0.0 and nwsl >= 0.0 ?  1
 ssa   = ta.linreg(src, i_ssaL, 0)
 ssasl = ssa - ssa[1]
 
-m5 = ta.crossover(ssasl, 0.0)  ?  1
-   : ta.crossunder(ssasl, 0.0) ? -1
-   : 0
+bool m5_co = ta.crossover(ssasl,  0.0)
+bool m5_cu = ta.crossunder(ssasl, 0.0)
+m5 = m5_co ?  1 : m5_cu ? -1 : 0
 
 // ══════════════════════════════════════════════════════════════════════════
 // M6 — HILBERT TRANSFORM PHASE  (Ehlers discrete approximation)
@@ -140,9 +140,9 @@ float ph6     = i6 < 0.0                ? 180.0 - ph6_raw
               : ph6_raw
 float dph6    = ph6 - ph6[1]
 
-m6 = ta.crossover(dph6, 0.0)  ?  1
-   : ta.crossunder(dph6, 0.0) ? -1
-   : 0
+bool m6_co = ta.crossover(dph6,  0.0)
+bool m6_cu = ta.crossunder(dph6, 0.0)
+m6 = m6_co ?  1 : m6_cu ? -1 : 0
 
 // ══════════════════════════════════════════════════════════════════════════
 // M7 — TOPOLOGICAL PERSISTENCE  (ATR-filtered significant extrema)
@@ -206,14 +206,16 @@ plot(showSSA    ? ssa    : na, "SSA Trend",         color.new(color.fuchsia, 40)
 // ══════════════════════════════════════════════════════════════════════════
 // ENTRY / EXIT SIGNALS
 // ══════════════════════════════════════════════════════════════════════════
-// Label shows active method name in solo mode
-string lblL = i_mode == "Composite" ? "▲ LONG" : "▲"
-string lblS = i_mode == "Composite" ? "▼ SHORT" : "▼"
-
-plotshape(entL, "Long Entry",  shape.labelup,   location.belowbar,
-     color.lime, text=lblL, textcolor=color.black, size=size.normal)
-plotshape(entS, "Short Entry", shape.labeldown, location.abovebar,
-     color.red,  text=lblS, textcolor=color.white, size=size.normal)
+// plotshape requires const string for text — split into two calls per direction
+bool isComposite = i_mode == "Composite"
+plotshape(entL and isComposite,  "Long Entry",       shape.labelup,   location.belowbar,
+     color.lime, text="▲ LONG",  textcolor=color.black, size=size.normal)
+plotshape(entL and not isComposite, "Long Entry Solo",  shape.labelup,   location.belowbar,
+     color.lime, text="▲",       textcolor=color.black, size=size.normal)
+plotshape(entS and isComposite,  "Short Entry",      shape.labeldown, location.abovebar,
+     color.red,  text="▼ SHORT", textcolor=color.white, size=size.normal)
+plotshape(entS and not isComposite, "Short Entry Solo", shape.labeldown, location.abovebar,
+     color.red,  text="▼",       textcolor=color.white, size=size.normal)
 
 plotshape(exL, "Long Exit",  shape.xcross, location.abovebar,
      color.new(color.orange, 0), size=size.small)

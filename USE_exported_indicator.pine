@@ -1,0 +1,856 @@
+//@version=5
+// ============================================================
+// USE Strategy Engine — экспорт из оптимизатора
+// Конфиг: Pv(L4R9) ATR17 SL(ATR×9|OR|7%|Wick) TP(RR10|OR|TP×2ATR) RevSig(mb1)sk1cd2 Wait(b4) [ConfSMA35×6tf]
+// ============================================================
+indicator("USE [Pv(L4R9) + Wick SL]", shorttitle="USE_EXP", overlay=true, max_lines_count=500, max_labels_count=500, max_boxes_count=500)
+
+// ==========================================
+// 1. ВХОДНЫЕ ДАННЫЕ
+// ==========================================
+grp_entry = "🎯 ПАТТЕРНЫ ВХОДА"
+use_pivot    = input.bool(true,   "Pivot Points",       group=grp_entry)
+pivot_left   = input.int(4,  "Pivot — баров слева",  minval=1, maxval=20,  group=grp_entry, active=use_pivot)
+pivot_right  = input.int(9,  "Pivot — баров справа", minval=1, maxval=10,  group=grp_entry, active=use_pivot)
+use_engulf   = input.bool(false, "Engulfing",          group=grp_entry)
+use_pinbar   = input.bool(false, "Pin Bar",            group=grp_entry)
+pin_ratio    = input.float(2.0, "Pin Bar тень/тело",  step=0.5, group=grp_entry, active=use_pinbar)
+use_boll     = input.bool(false,   "Пробой Боллинджера", group=grp_entry)
+boll_len     = input.int(20, "Боллинджер период",  minval=5, maxval=200, group=grp_entry, active=use_boll)
+boll_mult    = input.float(2.0, "Боллинджер σ",       step=0.1, group=grp_entry, active=use_boll)
+use_donch    = input.bool(false,  "Пробой Дончиана",    group=grp_entry)
+donch_len    = input.int(10, "Дончиан период",     minval=5, maxval=200, group=grp_entry, active=use_donch)
+use_atr_bo   = input.bool(false,  "Пробой ATR-канала",  group=grp_entry)
+atr_bo_len   = input.int(14, "ATR-канал EMA",      minval=5, maxval=200, group=grp_entry, active=use_atr_bo)
+atr_bo_mult  = input.float(2.0, "ATR-канал множитель", step=0.1, group=grp_entry, active=use_atr_bo)
+use_ma_touch = input.bool(false, "Касание MA",         group=grp_entry)
+ma_touch_bars= input.int(3, "  Баров от касания", minval=1, maxval=10, group=grp_entry, active=use_ma_touch)
+use_supertrend = input.bool(false, "Supertrend смена тренда", group=grp_entry)
+st_atr_p       = input.int(10, "  ST ATR период", minval=1, maxval=200, group=grp_entry)
+st_mult        = input.float(3, "  ST множитель", minval=0.1, maxval=20, step=0.1, group=grp_entry)
+use_ma_cross  = input.bool(false, "МА кросс-овер", group=grp_entry)
+ma_cross_type = input.string("EMA", "  МА тип", options=["EMA","SMA","WMA"], group=grp_entry)
+ma_cross_p    = input.int(20, "  МА период", minval=2, maxval=500, group=grp_entry)
+use_free_entry = input.bool(false, "Свободный вход", group=grp_entry)
+use_rsi_exit  = input.bool(false, "RSI выход из зоны", group=grp_entry)
+rsi_exit_per  = input.int(14, "  RSI период", minval=2, maxval=50, group=grp_entry)
+rsi_exit_os   = input.int(30, "  RSI OS уровень", minval=5, maxval=49, group=grp_entry)
+rsi_exit_ob   = input.int(70, "  RSI OB уровень", minval=51, maxval=95, group=grp_entry)
+
+grp_conf     = "🔍 CONFIRM MA"
+use_conf_ma  = input.bool(true, "Включить Confirm MA", group=grp_conf)
+conf_ma_type = input.string("SMA", "Тип", options=["SMA","EMA","WMA"], group=grp_conf)
+conf_ma_len  = input.int(35, "Период", group=grp_conf)
+conf_ma_htf  = input.int(6, "HTF ratio (1=текущий ТФ)", minval=1, maxval=1000, group=grp_conf)
+
+// ===== СТОП-ЛОССЫ =====
+grp_sl = "🛑 STOP LOSS"
+sl_logic   = input.string("ИЛИ (первый сработавший)", "Логика SL", options=["ИЛИ (первый сработавший)","И (оба нарушены)"], group=grp_sl)
+use_sl_atr = input.bool(true,  "✅ SL по ATR",              group=grp_sl)
+sl_atr_val = input.float(9.0,  "  ATR множитель",  step=0.1, group=grp_sl)
+use_sl_pct = input.bool(true,  "✅ SL по %",                group=grp_sl)
+sl_pct_val = input.float(7.0,  "  Процент %",      step=0.1, group=grp_sl)
+use_sl_wick = input.bool(false, "✅ SL за тенью свечи входа", group=grp_sl,
+     tooltip="SL размещается за тенью свечи, на которой произошёл вход.\nДля Long: low − отступ×ATR. Для Short: high + отступ×ATR.")
+sl_wick_off = input.float(0.3, "  Отступ ×ATR",    step=0.1, group=grp_sl, active=use_sl_wick)
+use_sl_piv = input.bool(false, "✅ SL pivot (динам)", group=grp_sl)
+sl_piv_off  = input.float(0.2, "  Отступ ×ATR",  step=0.1, group=grp_sl)
+sl_piv_max  = input.float(1.0, "  Макс ×ATR",    step=0.1, group=grp_sl)
+sl_piv_trail= input.bool(false, "  Подтягивать", group=grp_sl)
+sl_piv_look = input.int(1, "  Баров слева", minval=1, maxval=10, group=grp_sl)
+sl_piv_right_v = input.int(1, "  Баров справа", minval=1, maxval=5, group=grp_sl)
+
+// ===== ТЕЙК-ПРОФИТЫ =====
+grp_tp = "🎯 TAKE PROFIT"
+tp_logic   = input.string("ИЛИ (первый сработавший)", "Логика TP", options=["ИЛИ (первый сработавший)","И (оба достигнуты)"], group=grp_tp)
+use_tp_atr = input.bool(true,  "✅ TP по ATR",       group=grp_tp)
+tp_atr_val = input.float(2.0,  "  ATR множитель", step=0.1, group=grp_tp)
+use_tp_pct = input.bool(false, "✅ TP по %",         group=grp_tp)
+tp_pct_val = input.float(5.0,  "  Процент %",     step=0.1, group=grp_tp)
+use_tp_rr  = input.bool(true,  "✅ TP по R:R от SL", group=grp_tp)
+tp_rr_val  = input.float(10.0, "  R:R множитель", step=0.1, group=grp_tp)
+
+grp_be = "🔒 БЕЗУБЫТОК"
+use_be    = input.bool(false, "Безубыток", group=grp_be)
+be_trig   = input.float(0.5, "Триггер (×ATR)", step=0.1, group=grp_be)
+be_offset = input.float(0.0, "Оффсет (×ATR)", step=0.1, group=grp_be)
+
+grp_trail = "⛓️ TRAILING"
+use_trail  = input.bool(false, "Trailing stop", group=grp_trail)
+trail_trig = input.float(0.5, "Активация (×ATR)", step=0.1, group=grp_trail)
+trail_dist = input.float(0.5, "Дистанция (×ATR)", step=0.1, group=grp_trail)
+
+grp_exit = "🚪 ВЫХОД"
+use_sig_ex      = input.bool(true,  "Обратный сигнал",         group=grp_exit,
+     tooltip="Выход при появлении противоположного паттерна входа.\nИспользуй вместе с Supertrend/MA-кросс для выхода на смене тренда.")
+sig_ex_skip     = input.int(1, "Пропустить обратных", minval=0, maxval=50, group=grp_exit)
+sig_ex_cooldown = input.int(2, "Кулдаун баров",       minval=0, maxval=50, group=grp_exit)
+sig_ex_min_bars = input.int(1, "Мин баров в сделке",  minval=1, maxval=50, group=grp_exit)
+sig_ex_mode     = input.string("plus", "Режим выхода (any/plus/minus)", options=["any","plus","minus"], group=grp_exit)
+use_time_ex = input.bool(false, "Выход по времени", group=grp_exit)
+max_bars_in = input.int(50, "Макс баров в сделке", minval=2, maxval=500, group=grp_exit)
+use_st_exit = input.bool(false, "Supertrend-выход (смена тренда против позиции)", group=grp_exit,
+     tooltip="Выход когда Supertrend разворачивается против открытой позиции.\nВместе с use_supertrend даёт чистую систему: вход и выход на смене тренда.")
+
+grp_wait = "⏳ ОТЛОЖЕННЫЙ ВХОД"
+use_wait    = input.bool(true, "Ждать отката", group=grp_wait)
+wait_bars   = input.int(4, "Баров ожидания (Bars)", minval=0, maxval=20, group=grp_wait)
+wait_ret    = input.bool(false, "Требовать откат цены (Retrace)", group=grp_wait)
+wait_max_b  = input.int(5, "Отменить после N баров", minval=0, maxval=100, group=grp_wait)
+wait_catr   = input.float(2, "Отменить при уходе ×ATR", minval=0, step=0.1, group=grp_wait)
+
+grp_strat = "⚙️ КАПИТАЛ"
+start_cap  = input.float(1000.0, "Депозит $", group=grp_strat)
+comm_rate  = input.float(0.100, "Комиссия %", step=0.01, group=grp_strat)
+atr_len    = input.int(17, "Период ATR", group=grp_strat)
+atr_step   = input.int(2, "Шаг вариаций ATR", group=grp_strat)
+max_bars   = input.int(9788, "Глубина теста", minval=100, maxval=500000, group=grp_strat)
+
+grp_vis = "🎨 ВИЗУАЛИЗАЦИЯ"
+show_tr   = input.bool(true,  "Разметка сделок", group=grp_vis)
+show_eq   = input.bool(true,  "Equity",          group=grp_vis)
+eq_color  = input.color(color.new(color.yellow,20), "Цвет Equity", group=grp_vis)
+eq_width  = input.int(2, "Толщина Equity", minval=1, maxval=4, group=grp_vis)
+lbl_off_m = input.float(0.4, "Отступ ярлыков", step=0.1, group=grp_vis)
+lbl_size  = input.string(size.small, "Размер текста", options=[size.tiny,size.small,size.normal,size.large], group=grp_vis)
+c_win     = input.color(color.new(color.green,85), "Win",    group=grp_vis)
+c_loss    = input.color(color.new(color.red,85),   "Loss",   group=grp_vis)
+c_neu     = input.color(color.new(color.gray,90),  "Active", group=grp_vis)
+c_tp_line = input.color(color.lime, "TP линия", group=grp_vis)
+c_sl_line = input.color(color.red,  "SL линия", group=grp_vis)
+
+grp_tab = "📊 ТАБЛИЦА"
+pos_main  = input.string(position.top_right, "Позиция", group=grp_tab)
+table_sz  = input.string(size.small, "Размер", options=[size.tiny,size.small,size.normal], group=grp_tab)
+c_bg      = input.color(color.new(color.black,40), "Фон", group=grp_tab)
+
+// ==========================================
+// 2. ИНДИКАТОРЫ И ФИЛЬТРЫ
+// ==========================================
+float atr_v  = ta.atr(atr_len)
+float atr_m1 = ta.atr(math.max(1, atr_len - atr_step))
+float atr_p1 = ta.atr(atr_len + atr_step)
+float total_cost = comm_rate * 2
+float entry_price = close
+
+f_tf_str(int secs) =>
+    secs < 60 ? str.tostring(secs) + "S" : secs < 86400 ? str.tostring(math.round(secs / 60)) : str.tostring(math.round(secs / 86400)) + "D"
+
+string _conf_tf_str = conf_ma_htf <= 1 ? timeframe.period : f_tf_str(timeframe.in_seconds() * conf_ma_htf)
+calc_ma(t, s, l) =>
+    t == "SMA" ? ta.sma(s,l) : t == "EMA" ? ta.ema(s,l) : ta.wma(s,l)
+float conf_ma_val = request.security(syminfo.tickerid, _conf_tf_str, calc_ma(conf_ma_type, close, conf_ma_len)[1], barmerge.gaps_off, barmerge.lookahead_on)
+bool conf_ok_l = not use_conf_ma or (not na(conf_ma_val) and close[1] > conf_ma_val)
+bool conf_ok_s = not use_conf_ma or (not na(conf_ma_val) and close[1] < conf_ma_val)
+plot(use_conf_ma ? conf_ma_val : na, "Confirm MA", color=color.new(color.orange,50), linewidth=1)
+
+// Entry patterns
+pv_hi = ta.pivothigh(high, pivot_left, pivot_right)
+pv_lo = ta.pivotlow(low,   pivot_left, pivot_right)
+bool pivot_l = use_pivot and not na(pv_lo)
+bool pivot_s = use_pivot and not na(pv_hi)
+
+body_cur  = math.abs(close - open)
+body_prev = math.abs(close[1] - open[1])
+bull_engulf = close[1] < open[1] and close > open and body_cur >= body_prev * 0.7 and close >= open[1] and open <= close[1]
+bear_engulf = close[1] > open[1] and close < open and body_cur >= body_prev * 0.7 and close <= open[1] and open >= close[1]
+safe_body   = math.max(body_cur, syminfo.mintick)
+bull_pin = (math.min(close,open) - low)  > safe_body * pin_ratio and (high - math.max(close,open)) < safe_body
+bear_pin = (high - math.max(close,open)) > safe_body * pin_ratio and (math.min(close,open) - low)  < safe_body
+
+boll_basis = ta.sma(close, boll_len)
+boll_dev   = ta.stdev(close, boll_len) * boll_mult
+bool boll_l = use_boll and close[1] > (boll_basis + boll_dev)[1]
+bool boll_s = use_boll and close[1] < (boll_basis - boll_dev)[1]
+
+donch_hi = ta.highest(high, donch_len)[1]
+donch_lo = ta.lowest(low,   donch_len)[1]
+bool donch_l = use_donch and high[1] > donch_hi
+bool donch_s = use_donch and low[1]  < donch_lo
+
+atr_bo_ma  = ta.ema(close, atr_bo_len)
+atr_bo_atr = ta.atr(atr_bo_len)
+bool atr_bo_l = use_atr_bo and close[1] > (atr_bo_ma + atr_bo_atr * atr_bo_mult)[1]
+bool atr_bo_s = use_atr_bo and close[1] < (atr_bo_ma - atr_bo_atr * atr_bo_mult)[1]
+
+bool ma_touch_l = false
+bool ma_touch_s = false
+if use_ma_touch
+    bool crossed_up = close[1] > conf_ma_val and close[2] <= conf_ma_val[1]
+    if crossed_up
+        for i = 1 to ma_touch_bars
+            if low[i] <= conf_ma_val[i] * 1.002
+                ma_touch_l := true
+                break
+    bool crossed_dn = close[1] < conf_ma_val and close[2] >= conf_ma_val[1]
+    if crossed_dn
+        for i = 1 to ma_touch_bars
+            if high[i] >= conf_ma_val[i] * 0.998
+                ma_touch_s := true
+                break
+
+float rsi_exit_val = ta.rsi(close, rsi_exit_per)
+bool rsix_l = use_rsi_exit and rsi_exit_val[2] < rsi_exit_os and rsi_exit_val[1] >= rsi_exit_os
+bool rsix_s = use_rsi_exit and rsi_exit_val[2] > rsi_exit_ob and rsi_exit_val[1] <= rsi_exit_ob
+
+float ma_cross_val = ma_cross_type == "EMA" ? ta.ema(close, ma_cross_p) : ma_cross_type == "SMA" ? ta.sma(close, ma_cross_p) : ta.wma(close, ma_cross_p)
+bool macr_l_raw = close[2] <= ma_cross_val[2] and close[1] > ma_cross_val[1]
+bool macr_s_raw = close[2] >= ma_cross_val[2] and close[1] < ma_cross_val[1]
+bool macr_l = use_ma_cross and macr_l_raw
+bool macr_s = use_ma_cross and macr_s_raw
+
+[st_val, st_dir_raw] = ta.supertrend(st_mult, st_atr_p)
+bool st_bull      = st_dir_raw < 0
+bool st_flip_bull = st_bull[1] and not st_bull[2]
+bool st_flip_bear = not st_bull[1] and st_bull[2]
+bool st_l = use_supertrend and st_flip_bull
+bool st_s = use_supertrend and st_flip_bear
+
+bool free_l = use_free_entry
+bool free_s = use_free_entry
+
+bool pat_l = pivot_l or (use_engulf and bull_engulf[1]) or (use_pinbar and bull_pin[1]) or donch_l or boll_l or atr_bo_l or (use_ma_touch and ma_touch_l) or rsix_l or macr_l or free_l or st_l
+bool pat_s = pivot_s or (use_engulf and bear_engulf[1]) or (use_pinbar and bear_pin[1]) or donch_s or boll_s or atr_bo_s or (use_ma_touch and ma_touch_s) or rsix_s or macr_s or free_s or st_s
+
+// SL pivot dynamic
+sl_pv_lo = ta.pivotlow(low,  sl_piv_look, sl_piv_right_v)
+sl_pv_hi = ta.pivothigh(high, sl_piv_look, sl_piv_right_v)
+var float last_pv_lo = na
+var float last_pv_hi = na
+var int last_pv_lo_bar = 0
+var int last_pv_hi_bar = 0
+if not na(sl_pv_lo)
+    last_pv_lo := low[sl_piv_right_v]
+    last_pv_lo_bar := bar_index - sl_piv_right_v
+if not na(sl_pv_hi)
+    last_pv_hi := high[sl_piv_right_v]
+    last_pv_hi_bar := bar_index - sl_piv_right_v
+float dyn_sl_long_raw  = use_sl_piv and not na(last_pv_lo) and (bar_index - last_pv_lo_bar) <= 30 ? last_pv_lo - atr_v * sl_piv_off : na
+float dyn_sl_short_raw = use_sl_piv and not na(last_pv_hi) and (bar_index - last_pv_hi_bar) <= 30 ? last_pv_hi + atr_v * sl_piv_off : na
+
+bool all_filt_l = conf_ok_l
+bool all_filt_s = conf_ok_s
+
+bool confirmed  = barstate.isconfirmed
+bool sig_l = pat_l and all_filt_l and confirmed
+bool sig_s = pat_s and all_filt_s and confirmed
+
+// ==========================================
+// 3. РАСЧЁТ SL / TP
+// ==========================================
+bool sl_is_or = sl_logic == "ИЛИ (первый сработавший)"
+bool tp_is_or = tp_logic == "ИЛИ (первый сработавший)"
+
+// entry_low / entry_high передаются явно — значения свечи входа
+calc_sl_level(int dir, float ep, float ac, float e_low, float e_high) =>
+    float sl_atr_lvl  = na
+    float sl_pct_lvl  = na
+    float sl_piv_lvl  = na
+    float sl_wick_lvl = na
+    int cnt = 0
+    if use_sl_atr
+        cnt += 1
+        sl_atr_lvl := dir == 1 ? ep - ac * sl_atr_val : ep + ac * sl_atr_val
+    if use_sl_pct
+        cnt += 1
+        sl_pct_lvl := dir == 1 ? ep * (1 - sl_pct_val/100) : ep * (1 + sl_pct_val/100)
+    if use_sl_piv
+        cnt += 1
+        float raw   = dir == 1 ? dyn_sl_long_raw : dyn_sl_short_raw
+        float max_d = ac * sl_piv_max
+        if not na(raw)
+            float dist = math.abs(ep - raw)
+            if dist > max_d
+                raw := dir == 1 ? ep - max_d : ep + max_d
+            if (dir == 1 and raw < ep) or (dir == -1 and raw > ep)
+                sl_piv_lvl := raw
+    if use_sl_wick
+        cnt += 1
+        // За тенью свечи входа + небольшой отступ
+        sl_wick_lvl := dir == 1 ? e_low - ac * sl_wick_off : e_high + ac * sl_wick_off
+    float result = na
+    if cnt == 0
+        result := na
+    else if cnt == 1
+        result := not na(sl_atr_lvl) ? sl_atr_lvl : not na(sl_pct_lvl) ? sl_pct_lvl : not na(sl_piv_lvl) ? sl_piv_lvl : sl_wick_lvl
+    else
+        float closest  = na
+        float farthest = na
+        for lv in array.from(sl_atr_lvl, sl_pct_lvl, sl_piv_lvl, sl_wick_lvl)
+            if not na(lv)
+                float d = math.abs(ep - lv)
+                if na(closest)  or d < math.abs(ep - closest)
+                    closest  := lv
+                if na(farthest) or d > math.abs(ep - farthest)
+                    farthest := lv
+        result := sl_is_or ? closest : farthest
+    result
+
+calc_tp_level(int dir, float ep, float ac, float sl_dist) =>
+    float tp_atr_lvl = na
+    float tp_pct_lvl = na
+    float tp_rr_lvl  = na
+    int cnt = 0
+    if use_tp_atr
+        cnt += 1
+        tp_atr_lvl := dir == 1 ? ep + ac * tp_atr_val : ep - ac * tp_atr_val
+    if use_tp_pct
+        cnt += 1
+        tp_pct_lvl := dir == 1 ? ep * (1 + tp_pct_val/100) : ep * (1 - tp_pct_val/100)
+    if use_tp_rr
+        cnt += 1
+        tp_rr_lvl := dir == 1 ? ep + sl_dist * tp_rr_val : ep - sl_dist * tp_rr_val
+    float result = na
+    if cnt == 0
+        result := na
+    else if cnt == 1
+        result := not na(tp_atr_lvl) ? tp_atr_lvl : not na(tp_pct_lvl) ? tp_pct_lvl : tp_rr_lvl
+    else
+        float closest  = na
+        float farthest = na
+        for lv in array.from(tp_atr_lvl, tp_pct_lvl, tp_rr_lvl)
+            if not na(lv)
+                float d = math.abs(lv - ep)
+                if na(closest)  or d < math.abs(closest - ep)
+                    closest  := lv
+                if na(farthest) or d > math.abs(farthest - ep)
+                    farthest := lv
+        result := tp_is_or ? closest : farthest
+    result
+
+// ==========================================
+// 4. БЭКТЕСТ
+// ==========================================
+float base_sl = use_sl_atr ? sl_atr_val : 1.5
+float base_tp = use_tp_atr ? tp_atr_val : use_tp_rr ? tp_rr_val : 3.0
+
+solve_core(bool _b, bool _s, float _ac, float _sl_over, float _tp_over) =>
+    var bool  _in   = false
+    var int   _dir  = 0
+    var float _ep   = 0.0
+    var float _pnl  = 0.0
+    var int   _cnt  = 0
+    var int   _wins = 0
+    var float _dsl  = 0.0
+    var float _dtp  = 0.0
+    var bool  _tra  = false
+    var bool  _bea  = false
+    var int   _eb   = -1
+    var int   _xb   = -1
+    var float _mpnl = 0.0
+    var float _dd   = 0.0
+    var float _pnl1 = 0.0
+    var int   _cnt1 = 0
+    var int   _wins1 = 0
+    var float _pnl2 = 0.0
+    var int   _cnt2 = 0
+    var int   _wins2 = 0
+    int _eff   = math.min(max_bars, last_bar_index + 1)
+    int _split = last_bar_index - _eff + _eff / 2
+    var float _eq  = 0.0
+    var int  _sig_skip = 0
+    var int  _pd  = 0
+    var int  _pb  = -1
+    var float _psc = 0.0
+    var int  _cd_bar = -1
+    // сохраняем low/high свечи входа для wick SL
+    var float _entry_low  = na
+    var float _entry_high = na
+
+    if bar_index > (last_bar_index - max_bars)
+        if _in and bar_index > _eb
+            float _u    = _ac
+            float cpnl  = _dir == 1 ? (close - _ep) / _ep * 100 : (_ep - close) / _ep * 100
+            bool  frc   = false
+            bool  hsl   = false
+            bool  htp   = false
+            bool  htr   = false
+            float xp    = close
+            bool rev_sig     = use_sig_ex and ((_dir == 1 and pat_s) or (_dir == -1 and pat_l))
+            bool rev_bars_ok = (bar_index - _eb) >= sig_ex_min_bars
+            bool rev_mode_ok = sig_ex_mode == "any" or (sig_ex_mode == "plus" and cpnl > 0) or (sig_ex_mode == "minus" and cpnl < 0)
+            if use_sig_ex and rev_sig and rev_bars_ok
+                if sig_ex_cooldown > 0
+                    if _cd_bar < 0
+                        _cd_bar := bar_index
+                    if (bar_index - _cd_bar) >= sig_ex_cooldown
+                        if rev_mode_ok
+                            if _sig_skip >= sig_ex_skip
+                                frc := true
+                            else
+                                _sig_skip += 1
+                        _cd_bar := -1
+                else
+                    if rev_mode_ok
+                        if _sig_skip >= sig_ex_skip
+                            frc := true
+                        else
+                            _sig_skip += 1
+            if not rev_sig
+                _cd_bar := -1
+            if use_st_exit and not frc
+                if (_dir == 1 and st_flip_bear) or (_dir == -1 and st_flip_bull)
+                    frc := true
+            if use_be and not _bea and be_offset >= be_trig and not frc
+                if (_dir == 1 and high >= _ep + _u * be_trig) or (_dir == -1 and low <= _ep - _u * be_trig)
+                    hsl   := true
+                    xp    := _ep + _dir * _u * be_trig
+                    _bea  := true
+            if not hsl
+                if _dir == 1
+                    if not na(_dsl) and low  <= _dsl
+                        hsl := true
+                        xp  := _dsl
+                    else if not na(_dtp) and high >= _dtp
+                        htp := true
+                        xp  := _dtp
+                else
+                    if not na(_dsl) and high >= _dsl
+                        hsl := true
+                        xp  := _dsl
+                    else if not na(_dtp) and low  <= _dtp
+                        htp := true
+                        xp  := _dtp
+            if not hsl and not htp and use_trail and _in
+                if _dir == 1
+                    if high >= _ep + _u * trail_trig
+                        _tra := true
+                    if _tra
+                        float ns = high - _u * trail_dist
+                        if ns > _dsl
+                            if low <= ns
+                                htr := true
+                                xp  := ns
+                            _dsl := ns
+                else
+                    if low <= _ep - _u * trail_trig
+                        _tra := true
+                    if _tra
+                        float ns = low + _u * trail_dist
+                        if ns < _dsl
+                            if high >= ns
+                                htr := true
+                                xp  := ns
+                            _dsl := ns
+            if frc and not hsl and not htp and not htr
+                xp := close
+                if (_tra or _bea) and _dir == 1 and _dsl > _ep
+                    xp := math.max(_dsl, close)
+                if (_tra or _bea) and _dir == -1 and _dsl < _ep
+                    xp := math.min(_dsl, close)
+            if frc or hsl or htp or htr
+                float tr2 = ((_dir == 1 ? (xp-_ep)/_ep*100 : (_ep-xp)/_ep*100) - total_cost)
+                _pnl += tr2
+                _cnt += 1
+                _eq  := _pnl
+                if bar_index <= _split
+                    _pnl1 += tr2
+                    _cnt1 += 1
+                    if tr2 > 0
+                        _wins1 += 1
+                else
+                    _pnl2 += tr2
+                    _cnt2 += 1
+                    if tr2 > 0
+                        _wins2 += 1
+                _mpnl := math.max(_mpnl, _eq)
+                _dd   := math.max(_dd, _mpnl - _eq)
+                if tr2 > 0
+                    _wins += 1
+                _in      := false
+                _xb      := bar_index
+                _sig_skip := 0
+                _cd_bar  := -1
+            if _in and not htr and use_be and not _bea and be_offset < be_trig
+                if (_dir == 1 and high >= _ep + _u * be_trig) or (_dir == -1 and low <= _ep - _u * be_trig)
+                    float _be_sl = _ep + _dir * _u * be_offset
+                    _dsl := _dir == 1 ? math.max(_dsl, _be_sl) : math.min(_dsl, _be_sl)
+                    _bea := true
+            if _in and use_sl_piv and sl_piv_trail
+                if _dir == 1 and not na(sl_pv_lo)
+                    float new_sl = low[sl_piv_right_v] - _u * sl_piv_off
+                    if new_sl > _dsl and new_sl < close
+                        _dsl := new_sl
+                if _dir == -1 and not na(sl_pv_hi)
+                    float new_sl = high[sl_piv_right_v] + _u * sl_piv_off
+                    if new_sl < _dsl and new_sl > close
+                        _dsl := new_sl
+        _eq := _in ? _pnl + (_dir == 1 ? (close-_ep)/_ep*100 : (_ep-close)/_ep*100) : _pnl
+        if not _in and bar_index > _xb
+            float _sl_ov = _sl_over > 0 ? _sl_over : 0
+            bool  _do_enter = false
+            int   _do_dir   = 0
+            if use_wait and _pd != 0
+                int   _bw   = bar_index - _pb
+                bool  _cncl = (wait_max_b > 0 and _bw > wait_max_b) or (wait_catr > 0 and _pd * (close - _psc) > wait_catr * _ac)
+                if _cncl
+                    _pd := 0
+                else
+                    bool _bk = _bw >= wait_bars
+                    bool _rk = not wait_ret or (_pd == 1 and close < _psc) or (_pd == -1 and close > _psc)
+                    if _bk and _rk
+                        _do_enter := true
+                        _do_dir   := _pd
+                        _pd       := 0
+            if not _do_enter and _pd == 0
+                if _b or _s
+                    bool _use_delay = use_wait and (wait_bars > 0 or wait_ret)
+                    if _use_delay
+                        _pd  := _b ? 1 : -1
+                        _pb  := bar_index
+                        _psc := close
+                    else
+                        _do_enter := true
+                        _do_dir   := _b ? 1 : -1
+            if _do_enter
+                if _do_dir == 1
+                    _in          := true
+                    _dir         := 1
+                    _ep          := entry_price
+                    _entry_low   := low
+                    _entry_high  := high
+                    _tra         := false
+                    _bea         := false
+                    _sig_skip    := 0
+                    _cd_bar      := -1
+                    _dsl := _sl_ov > 0 ? (entry_price - _ac * _sl_ov) : calc_sl_level(1,  entry_price, _ac, _entry_low,  _entry_high)
+                    float sl_d   = math.abs(entry_price - _dsl)
+                    _dtp := _tp_over > 0 ? (entry_price + _ac * _tp_over) : calc_tp_level(1,  entry_price, _ac, sl_d)
+                    _eb  := bar_index
+                else if _do_dir == -1
+                    _in          := true
+                    _dir         := -1
+                    _ep          := entry_price
+                    _entry_low   := low
+                    _entry_high  := high
+                    _tra         := false
+                    _bea         := false
+                    _sig_skip    := 0
+                    _cd_bar      := -1
+                    _dsl := _sl_ov > 0 ? (entry_price + _ac * _sl_ov) : calc_sl_level(-1, entry_price, _ac, _entry_low,  _entry_high)
+                    float sl_d   = math.abs(entry_price - _dsl)
+                    _dtp := _tp_over > 0 ? (entry_price - _ac * _tp_over) : calc_tp_level(-1, entry_price, _ac, sl_d)
+                    _eb  := bar_index
+    float _wr1 = _cnt1 > 0 ? _wins1 * 100.0 / _cnt1 : 0.0
+    float _wr2 = _cnt2 > 0 ? _wins2 * 100.0 / _cnt2 : 0.0
+    [_pnl, _cnt > 0 ? _wins * 100.0 / _cnt : 0.0, _cnt, _dd, _eq, _pnl1, _wr1, _cnt1, _pnl2, _wr2, _cnt2]
+
+[p_m, w_m, c_m, dd_m, eq_m, sp_pnl1, sp_wr1, sp_c1, sp_pnl2, sp_wr2, sp_c2] = solve_core(sig_l, sig_s, atr_v[1],  0, 0)
+[p_a1, w_a1, c_a1, dd_a1, _z1, _x1,_x2,_x3,_x4,_x5,_x6]   = solve_core(sig_l, sig_s, atr_m1[1], 0, 0)
+[p_a2, w_a2, c_a2, dd_a2, _z2, _x7,_x8,_x9,_x10,_x11,_x12] = solve_core(sig_l, sig_s, atr_p1[1], 0, 0)
+[p_t1, w_t1, c_t1, dd_t1, _z3, _x13,_x14,_x15,_x16,_x17,_x18] = solve_core(sig_l, sig_s, atr_v[1], 0, base_tp - 0.5)
+[p_t2, w_t2, c_t2, dd_t2, _z4, _x19,_x20,_x21,_x22,_x23,_x24] = solve_core(sig_l, sig_s, atr_v[1], 0, base_tp + 0.5)
+[p_l1, w_l1, c_l1, dd_l1, _z6, _x25,_x26,_x27,_x28,_x29,_x30] = solve_core(sig_l, sig_s, atr_v[1], base_sl - 0.2, 0)
+[p_l2, w_l2, c_l2, dd_l2, _z7, _x31,_x32,_x33,_x34,_x35,_x36] = solve_core(sig_l, sig_s, atr_v[1], base_sl + 0.2, 0)
+
+// ==========================================
+// 5. EQUITY
+// ==========================================
+plot(show_eq ? eq_m : na, "Equity %", color=eq_m >= 0 ? eq_color : color.new(color.red,30), linewidth=eq_width, display=display.pane)
+plot(0, "Zero", color=color.new(color.gray,70), style=plot.style_circles, display=display.pane)
+
+// ==========================================
+// 6. ВИЗУАЛИЗАЦИЯ СДЕЛОК
+// ==========================================
+var bool  v_in   = false
+var int   v_dir  = 0
+var float v_ep   = 0.0
+var float v_sl   = 0.0
+var float v_tp   = 0.0
+var bool  v_tra  = false
+var bool  v_bea  = false
+var int   v_sig_skip = 0
+var int   v_cd_bar   = -1
+var box   b_trade    = na
+var line  l_tp   = na
+var line  l_sl   = na
+var int   v_eb   = -1
+var int   v_xb   = -1
+var int   v_pd   = 0
+var int   v_pb   = -1
+var float v_psc  = 0.0
+var float v_entry_low  = na
+var float v_entry_high = na
+bool a_le = false
+bool a_se = false
+bool a_lx = false
+bool a_sx = false
+
+if bar_index > (last_bar_index - max_bars) and confirmed
+    if v_in and bar_index > v_eb
+        float _u    = atr_v[1]
+        float cpnl  = v_dir == 1 ? (close - v_ep) / v_ep * 100 : (v_ep - close) / v_ep * 100
+        bool  frc   = false
+        bool  hsl   = false
+        bool  htp   = false
+        bool  htr   = false
+        float vxp   = close
+        string vxt  = ""
+        bool rev_sig     = use_sig_ex and ((v_dir == 1 and pat_s) or (v_dir == -1 and pat_l))
+        bool rev_bars_ok = (bar_index - v_eb) >= sig_ex_min_bars
+        bool rev_mode_ok = sig_ex_mode == "any" or (sig_ex_mode == "plus" and cpnl > 0) or (sig_ex_mode == "minus" and cpnl < 0)
+        if use_sig_ex and rev_sig and rev_bars_ok
+            if sig_ex_cooldown > 0
+                if v_cd_bar < 0
+                    v_cd_bar := bar_index
+                if (bar_index - v_cd_bar) >= sig_ex_cooldown
+                    if rev_mode_ok
+                        if v_sig_skip >= sig_ex_skip
+                            frc := true
+                            vxt := "SIG"
+                        else
+                            v_sig_skip += 1
+                    v_cd_bar := -1
+            else
+                if rev_mode_ok
+                    if v_sig_skip >= sig_ex_skip
+                        frc := true
+                        vxt := "SIG"
+                    else
+                        v_sig_skip += 1
+        if not rev_sig
+            v_cd_bar := -1
+        if use_st_exit and not frc
+            if (v_dir == 1 and st_flip_bear) or (v_dir == -1 and st_flip_bull)
+                frc := true
+                vxt := "ST"
+        if use_time_ex and (bar_index - v_eb) >= max_bars_in and not frc
+            frc := true
+            vxt := "TIME"
+        if use_be and not v_bea and be_offset >= be_trig and not frc
+            if (v_dir == 1 and high >= v_ep + _u * be_trig) or (v_dir == -1 and low <= v_ep - _u * be_trig)
+                hsl   := true
+                vxp   := v_ep + v_dir * _u * be_trig
+                v_bea := true
+                vxt   := "BE"
+        if not hsl
+            if v_dir == 1
+                if not na(v_sl) and low  <= v_sl
+                    hsl := true
+                    vxp := v_sl
+                    vxt := "SL"
+                else if not na(v_tp) and high >= v_tp
+                    htp := true
+                    vxp := v_tp
+                    vxt := "TP"
+            else
+                if not na(v_sl) and high >= v_sl
+                    hsl := true
+                    vxp := v_sl
+                    vxt := "SL"
+                else if not na(v_tp) and low  <= v_tp
+                    htp := true
+                    vxp := v_tp
+                    vxt := "TP"
+        if not hsl and not htp and use_trail and v_in
+            if v_dir == 1
+                if high >= v_ep + _u * trail_trig
+                    v_tra := true
+                if v_tra
+                    float ns = high - _u * trail_dist
+                    if ns > v_sl
+                        if low <= ns
+                            htr := true
+                            vxp := ns
+                            vxt := "TRAIL"
+                        v_sl := ns
+            else
+                if low <= v_ep - _u * trail_trig
+                    v_tra := true
+                if v_tra
+                    float ns = low + _u * trail_dist
+                    if ns < v_sl
+                        if high >= ns
+                            htr := true
+                            vxp := ns
+                            vxt := "TRAIL"
+                        v_sl := ns
+        if frc and not hsl and not htp and not htr
+            vxp := close
+            if (v_tra or v_bea) and v_dir == 1 and v_sl > v_ep
+                vxp := math.max(v_sl, close)
+            if (v_tra or v_bea) and v_dir == -1 and v_sl < v_ep
+                vxp := math.min(v_sl, close)
+        if show_tr
+            if not na(l_tp)
+                line.set_x2(l_tp, bar_index)
+            if not na(l_sl)
+                line.set_x2(l_sl, bar_index)
+                line.set_y1(l_sl, v_sl)
+                line.set_y2(l_sl, v_sl)
+            if not na(b_trade)
+                box.set_right(b_trade, bar_index)
+                box.set_top(b_trade, math.max(v_ep, close))
+                box.set_bottom(b_trade, math.min(v_ep, close))
+        if frc or hsl or htp or htr
+            float vtr = (v_dir == 1 ? (vxp - v_ep)/v_ep*100 : (v_ep - vxp)/v_ep*100) - total_cost
+            if v_dir == 1
+                a_lx := true
+                alert("XL " + vxt + " @" + str.tostring(vxp,"#.####"), alert.freq_once_per_bar)
+            else
+                a_sx := true
+                alert("XS " + vxt + " @" + str.tostring(vxp,"#.####"), alert.freq_once_per_bar)
+            if show_tr
+                bool win = v_dir == 1 ? vxp > v_ep : vxp < v_ep
+                box.set_top(b_trade,    math.max(v_ep, vxp))
+                box.set_bottom(b_trade, math.min(v_ep, vxp))
+                box.set_right(b_trade,  bar_index)
+                box.set_bgcolor(b_trade, win ? c_win : c_loss)
+                float vpct = v_dir == 1 ? (vxp - v_ep)/v_ep*100 : (v_ep - vxp)/v_ep*100
+                label.new(
+                    bar_index,
+                    v_dir == 1 ? high + atr_v[1] * lbl_off_m : low - atr_v[1] * lbl_off_m,
+                    vxt + " " + str.tostring(vpct, "#.#") + "%",
+                    color=win ? color.green : color.red,
+                    style=v_dir == 1 ? label.style_label_down : label.style_label_up,
+                    size=size.tiny,
+                    textcolor=color.white)
+            v_in       := false
+            v_xb       := bar_index
+            v_sig_skip := 0
+            v_cd_bar   := -1
+        if v_in and not htr and use_be and not v_bea and be_offset < be_trig
+            if (v_dir == 1 and high >= v_ep + _u * be_trig) or (v_dir == -1 and low <= v_ep - _u * be_trig)
+                float v_be_sl = v_ep + v_dir * _u * be_offset
+                v_sl := v_dir == 1 ? math.max(v_sl, v_be_sl) : math.min(v_sl, v_be_sl)
+                v_bea := true
+        if v_in and use_sl_piv and sl_piv_trail
+            if v_dir == 1 and not na(sl_pv_lo)
+                float new_sl = low[sl_piv_right_v] - _u * sl_piv_off
+                if new_sl > v_sl and new_sl < close
+                    v_sl := new_sl
+            if v_dir == -1 and not na(sl_pv_hi)
+                float new_sl = high[sl_piv_right_v] + _u * sl_piv_off
+                if new_sl < v_sl and new_sl > close
+                    v_sl := new_sl
+    if not v_in and bar_index > v_xb
+        bool v_do_enter = false
+        int  v_do_dir   = 0
+        if use_wait and v_pd != 0
+            int  _bw   = bar_index - v_pb
+            bool _cncl = (wait_max_b > 0 and _bw > wait_max_b) or (wait_catr > 0 and v_pd * (close - v_psc) > wait_catr * atr_v[1])
+            if _cncl
+                v_pd := 0
+            else
+                bool _bk = _bw >= wait_bars
+                bool _rk = not wait_ret or (v_pd == 1 and close < v_psc) or (v_pd == -1 and close > v_psc)
+                if _bk and _rk
+                    v_do_enter := true
+                    v_do_dir   := v_pd
+                    v_pd       := 0
+        if not v_do_enter and v_pd == 0
+            if sig_l or sig_s
+                bool _use_delay = use_wait and (wait_bars > 0 or wait_ret)
+                if _use_delay
+                    v_pd  := sig_l ? 1 : -1
+                    v_pb  := bar_index
+                    v_psc := close
+                else
+                    v_do_enter := true
+                    v_do_dir   := sig_l ? 1 : -1
+        if v_do_enter
+            v_in   := true
+            v_dir  := v_do_dir
+            v_ep   := entry_price
+            v_entry_low  := low
+            v_entry_high := high
+            v_tra  := false
+            v_bea  := false
+            v_sig_skip := 0
+            v_cd_bar := -1
+            float _u = atr_v[1]
+            v_sl := calc_sl_level(v_dir, entry_price, _u, v_entry_low, v_entry_high)
+            float sl_d = math.abs(entry_price - v_sl)
+            v_tp := calc_tp_level(v_dir, entry_price, _u, sl_d)
+            v_eb := bar_index
+            if v_dir == 1
+                a_le := true
+                alert("LONG @" + str.tostring(entry_price,"#.####") + " SL:" + str.tostring(v_sl,"#.####") + " TP:" + str.tostring(v_tp,"#.####"), alert.freq_once_per_bar)
+            else
+                a_se := true
+                alert("SHORT @" + str.tostring(entry_price,"#.####") + " SL:" + str.tostring(v_sl,"#.####") + " TP:" + str.tostring(v_tp,"#.####"), alert.freq_once_per_bar)
+            if show_tr
+                bool is_pv = (v_dir == 1 and pivot_l) or (v_dir == -1 and pivot_s)
+                string elbl = is_pv ? (v_dir == 1 ? "PvL" : "PvS") : (v_dir == 1 ? "L" : "S")
+                color  ecol = is_pv ? (v_dir == 1 ? color.teal : color.maroon) : (v_dir == 1 ? color.green : color.red)
+                label.new(
+                    bar_index,
+                    v_dir == 1 ? low - _u * lbl_off_m : high + _u * lbl_off_m,
+                    elbl,
+                    color=ecol,
+                    style=v_dir == 1 ? label.style_label_up : label.style_label_down,
+                    textcolor=color.white,
+                    size=lbl_size)
+                l_tp := line.new(bar_index, v_tp, bar_index, v_tp, color=color.new(c_tp_line,40), style=line.style_dotted, width=1)
+                l_sl := line.new(bar_index, v_sl, bar_index, v_sl, color=color.new(c_sl_line,40), style=line.style_dotted, width=1)
+                b_trade := box.new(bar_index, v_ep, bar_index, v_ep, bgcolor=c_neu, border_width=0)
+
+// ==========================================
+// 7. ТАБЛИЦА СТАТИСТИКИ
+// ==========================================
+var table t = table.new(pos_main, 6, 20, bgcolor=c_bg, border_width=1, force_overlay=true)
+d(r, l, v, p, w, c, dd, b) =>
+    cl = b ? color.new(color.yellow,30) : c_bg
+    table.cell(t, 0, r, l,                          bgcolor=cl, text_color=color.white,  text_size=table_sz)
+    table.cell(t, 1, r, str.tostring(v,"#.##"),     bgcolor=cl, text_color=color.yellow, text_size=table_sz)
+    table.cell(t, 2, r, str.tostring(p,"#.##")+"%", bgcolor=cl, text_color=p>0?color.green:color.red, text_size=table_sz)
+    table.cell(t, 3, r, str.tostring(w,"#.#")+"%",  bgcolor=cl, text_color=w>50?color.green:color.orange, text_size=table_sz)
+    table.cell(t, 4, r, str.tostring(c),            bgcolor=cl, text_color=color.gray,   text_size=table_sz)
+    table.cell(t, 5, r, str.tostring(dd,"#.#")+"%", bgcolor=cl, text_color=dd<10?color.green:dd<25?color.orange:color.red, text_size=table_sz)
+
+if barstate.islast
+    best = math.max(p_m, p_a1, p_a2, p_t1, p_t2, p_l1, p_l2)
+    cpnl = start_cap * math.pow(1 + p_m/100/math.max(1,c_m), c_m) - start_cap
+    rf2  = dd_m > 0 ? p_m / dd_m : 0
+    string hdr = "💰 " + str.tostring(cpnl,"#") + "$ | " + str.tostring(p_m,"#.##") + "% DD:" + str.tostring(dd_m,"#.#") + "% RF:" + str.tostring(rf2,"#.##")
+    table.cell(t, 0, 1, hdr, bgcolor=color.blue, text_color=color.white, text_size=size.normal)
+    table.merge_cells(t, 0, 1, 5, 1)
+    table.cell(t, 0, 2, "Параметр", bgcolor=color.new(color.gray,60), text_color=color.white, text_size=table_sz)
+    table.cell(t, 1, 2, "Значение", bgcolor=color.new(color.gray,60), text_color=color.white, text_size=table_sz)
+    table.cell(t, 2, 2, "PnL%",     bgcolor=color.new(color.gray,60), text_color=color.white, text_size=table_sz)
+    table.cell(t, 3, 2, "WR",       bgcolor=color.new(color.gray,60), text_color=color.white, text_size=table_sz)
+    table.cell(t, 4, 2, "#",        bgcolor=color.new(color.gray,60), text_color=color.white, text_size=table_sz)
+    table.cell(t, 5, 2, "DD",       bgcolor=color.new(color.gray,60), text_color=color.white, text_size=table_sz)
+    d(3,  "ATR",  atr_len - atr_step, p_a1, w_a1, c_a1, dd_a1, p_a1 == best)
+    d(4,  "ATR◀", atr_len,            p_m,  w_m,  c_m,  dd_m,  p_m  == best)
+    d(5,  "ATR",  atr_len + atr_step, p_a2, w_a2, c_a2, dd_a2, p_a2 == best)
+    table.cell(t, 0, 6, "─────", bgcolor=c_bg, text_color=color.gray, text_size=table_sz)
+    table.merge_cells(t, 0, 6, 5, 6)
+    d(7,  "TP",   base_tp - 0.5, p_t1, w_t1, c_t1, dd_t1, p_t1 == best)
+    d(8,  "TP◀",  base_tp,       p_m,  w_m,  c_m,  dd_m,  p_m  == best)
+    d(9,  "TP",   base_tp + 0.5, p_t2, w_t2, c_t2, dd_t2, p_t2 == best)
+    table.cell(t, 0, 10, "─────", bgcolor=c_bg, text_color=color.gray, text_size=table_sz)
+    table.merge_cells(t, 0, 10, 5, 10)
+    d(11, "SL",   base_sl - 0.2, p_l1, w_l1, c_l1, dd_l1, p_l1 == best)
+    d(12, "SL◀",  base_sl,       p_m,  w_m,  c_m,  dd_m,  p_m  == best)
+    d(13, "SL",   base_sl + 0.2, p_l2, w_l2, c_l2, dd_l2, p_l2 == best)
+    table.cell(t, 0, 14, "─────", bgcolor=c_bg, text_color=color.gray, text_size=table_sz)
+    table.merge_cells(t, 0, 14, 5, 14)
+    float sl_ref = use_sl_atr ? sl_atr_val : use_sl_pct ? sl_pct_val : 1.5
+    float tp_ref = use_tp_atr ? tp_atr_val : use_tp_rr ? tp_rr_val : 3.0
+    float ev     = w_m/100 * tp_ref - (1-w_m/100) * sl_ref
+    float avg_t  = c_m > 0 ? p_m / c_m : 0
+    float pf     = ((1-w_m/100)*sl_ref) > 0 ? (w_m/100*tp_ref) / ((1-w_m/100)*sl_ref) : 0
+    table.cell(t, 0, 15, "EV:" + str.tostring(ev,"#.##") + " Avg:" + str.tostring(avg_t,"#.##") + "% PF:" + str.tostring(pf,"#.##") + " RF:" + str.tostring(rf2,"#.##"), bgcolor=color.new(ev>0?color.green:color.red,70), text_color=color.white, text_size=table_sz)
+    table.merge_cells(t, 0, 15, 5, 15)
+    if sp_c1 > 0 and sp_c2 > 0
+        float sp_diff = math.abs(sp_wr1 - sp_wr2)
+        color sp_col  = sp_diff < 10 ? color.green : sp_diff < 20 ? color.orange : color.red
+        string sp_gr  = sp_diff < 10 ? "Устойч" : sp_diff < 20 ? "Слабо" : "Overfit"
+        table.cell(t, 0, 16, "1п:" + str.tostring(sp_pnl1,"#.#") + "% WR:" + str.tostring(sp_wr1,"#") + "% n=" + str.tostring(sp_c1) + " | 2п:" + str.tostring(sp_pnl2,"#.#") + "% WR:" + str.tostring(sp_wr2,"#") + "% n=" + str.tostring(sp_c2) + " " + sp_gr, bgcolor=color.new(sp_col,60), text_color=color.white, text_size=table_sz)
+        table.merge_cells(t, 0, 16, 5, 16)
+    if c_m == 0
+        table.cell(t, 0, 17, "0 сделок — проверь настройки", bgcolor=color.red, text_color=color.white, text_size=size.normal)
+        table.merge_cells(t, 0, 17, 5, 17)
+
+// ==========================================
+// 8. АЛЕРТЫ
+// ==========================================
+alertcondition(a_le, "Long Entry",  "Long Entry")
+alertcondition(a_se, "Short Entry", "Short Entry")
+alertcondition(a_lx, "Exit Long",   "Exit Long")
+alertcondition(a_sx, "Exit Short",  "Exit Short")
+plotshape(a_lx, "XL", shape.xcross,       location.abovebar, color.new(color.red,0),     size=size.tiny)
+plotshape(a_sx, "XS", shape.xcross,       location.belowbar, color.new(color.blue,0),    size=size.tiny)
+plotshape(a_le, "EL", shape.triangleup,   location.belowbar, color.new(color.green,0),   size=size.tiny)
+plotshape(a_se, "ES", shape.triangledown, location.abovebar, color.new(color.fuchsia,0), size=size.tiny)
