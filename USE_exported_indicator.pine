@@ -697,13 +697,7 @@ if bar_index > (last_bar_index - max_bars) and confirmed
                 box.set_right(b_trade,  bar_index)
                 box.set_bgcolor(b_trade, win ? c_win : c_loss)
                 float vpct = v_dir == 1 ? (vxp - v_ep)/v_ep*100 : (v_ep - vxp)/v_ep*100
-                label.new(bar_index,
-                    v_dir == 1 ? high + atr_v[1] * lbl_off_m : low - atr_v[1] * lbl_off_m,
-                    vxt + " " + str.tostring(vpct, "#.#") + "%",
-                    color=win ? color.green : color.red,
-                    style=v_dir == 1 ? label.style_label_down : label.style_label_up,
-                    size=size.tiny,
-                    textcolor=color.white)
+                label.new(bar_index, v_dir == 1 ? high + atr_v[1] * lbl_off_m : low - atr_v[1] * lbl_off_m, vxt + " " + str.tostring(vpct, "#.#") + "%", color=win ? color.green : color.red, style=v_dir == 1 ? label.style_label_down : label.style_label_up, size=size.tiny, textcolor=color.white)
             v_in       := false
             v_xb       := bar_index
             v_sig_skip := 0
@@ -772,13 +766,7 @@ if bar_index > (last_bar_index - max_bars) and confirmed
                 bool is_pv = (v_dir == 1 and pivot_l) or (v_dir == -1 and pivot_s)
                 string elbl = is_pv ? (v_dir == 1 ? "PvL" : "PvS") : (v_dir == 1 ? "L" : "S")
                 color  ecol = is_pv ? (v_dir == 1 ? color.teal : color.maroon) : (v_dir == 1 ? color.green : color.red)
-                label.new(bar_index,
-                    v_dir == 1 ? low - _u * lbl_off_m : high + _u * lbl_off_m,
-                    elbl,
-                    color=ecol,
-                    style=v_dir == 1 ? label.style_label_up : label.style_label_down,
-                    textcolor=color.white,
-                    size=lbl_size)
+                label.new(bar_index, v_dir == 1 ? low - _u * lbl_off_m : high + _u * lbl_off_m, elbl, color=ecol, style=v_dir == 1 ? label.style_label_up : label.style_label_down, textcolor=color.white, size=lbl_size)
                 l_tp := line.new(bar_index, v_tp, bar_index, v_tp, color=color.new(c_tp_line,40), style=line.style_dotted, width=1)
                 l_sl := line.new(bar_index, v_sl, bar_index, v_sl, color=color.new(c_sl_line,40), style=line.style_dotted, width=1)
                 b_trade := box.new(bar_index, v_ep, bar_index, v_ep, bgcolor=c_neu, border_width=0)
