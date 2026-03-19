@@ -1,0 +1,91 @@
+// @version=6
+// DiverX Hypothesis — MACD divergence detector (inspired by SrgArt DiverX)
+// Bullish div: price lower low + MACD higher low  → long entry
+// Bearish div: price higher high + MACD lower high → short entry
+
+indicator("DiverX Hypothesis", overlay=true, max_lines_count=200, max_labels_count=200)
+
+// ─── INPUTS ────────────────────────────────────────────────────────────────
+pivot_left   = input.int(5,  "Pivot Left Bars",  minval=1, maxval=50, group="Divergence")
+pivot_right  = input.int(5,  "Pivot Right Bars", minval=1, maxval=50, group="Divergence")
+
+macd_fast    = input.int(12, "MACD Fast",  minval=2, group="MACD")
+macd_slow    = input.int(26, "MACD Slow",  minval=2, group="MACD")
+macd_signal  = input.int(9,  "MACD Signal",minval=1, group="MACD")
+macd_source  = input.source(close, "MACD Source", group="MACD")
+
+show_div_lines = input.bool(true, "Show divergence lines", group="Display")
+show_labels    = input.bool(true, "Show labels",           group="Display")
+
+// ─── MACD ───────────────────────────────────────────────────────────────────
+[macd_line, _signal_line, _hist] = ta.macd(macd_source, macd_fast, macd_slow, macd_signal)
+
+// ─── PIVOTS ─────────────────────────────────────────────────────────────────
+// Price pivots
+ph = ta.pivothigh(high,  pivot_left, pivot_right)
+pl = ta.pivotlow (low,   pivot_left, pivot_right)
+
+// MACD pivots (same pivot bars applied to MACD line)
+mph = ta.pivothigh(macd_line, pivot_left, pivot_right)
+mpl = ta.pivotlow (macd_line, pivot_left, pivot_right)
+
+// Bar index at pivot (pivot_right bars ago)
+pivot_bar = bar_index - pivot_right
+
+// ─── DIVERGENCE DETECTION ───────────────────────────────────────────────────
+// We compare the CURRENT pivot with the PREVIOUS pivot of the same type
+
+// Store previous pivot values
+var float prev_pl    = na
+var float prev_mpl   = na
+var int   prev_pl_bar = na
+
+var float prev_ph    = na
+var float prev_mph   = na
+var int   prev_ph_bar = na
+
+// ── Bearish divergence (at pivot highs) ─────────────────────────────────────
+bearish_div = false
+if not na(ph) and not na(mph)
+    if not na(prev_ph) and not na(prev_mph)
+        // Price: higher high — MACD: lower high → bearish divergence
+        if ph > prev_ph and mph < prev_mph
+            bearish_div := true
+            if show_div_lines
+                line.new(prev_ph_bar, prev_ph, pivot_bar, ph,
+                     color=color.red, width=2, extend=extend.none)
+                line.new(prev_ph_bar, prev_mph + 0, pivot_bar, mph + 0,
+                     color=color.red, width=1, style=line.style_dotted, extend=extend.none)
+            if show_labels
+                label.new(pivot_bar, ph, "▼", style=label.style_label_down,
+                     color=color.red, textcolor=color.white, size=size.normal)
+    prev_ph     := ph
+    prev_mph    := mph
+    prev_ph_bar := pivot_bar
+
+// ── Bullish divergence (at pivot lows) ──────────────────────────────────────
+bullish_div = false
+if not na(pl) and not na(mpl)
+    if not na(prev_pl) and not na(prev_mpl)
+        // Price: lower low — MACD: higher low → bullish divergence
+        if pl < prev_pl and mpl > prev_mpl
+            bullish_div := true
+            if show_div_lines
+                line.new(prev_pl_bar, prev_pl, pivot_bar, pl,
+                     color=color.blue, width=2, extend=extend.none)
+                line.new(prev_pl_bar, prev_mpl + 0, pivot_bar, mpl + 0,
+                     color=color.blue, width=1, style=line.style_dotted, extend=extend.none)
+            if show_labels
+                label.new(pivot_bar, pl, "▲", style=label.style_label_up,
+                     color=color.blue, textcolor=color.white, size=size.normal)
+    prev_pl     := pl
+    prev_mpl    := mpl
+    prev_pl_bar := pivot_bar
+
+// ─── SIGNALS (for strategy testing) ─────────────────────────────────────────
+plotshape(bullish_div, "Bull Div", shape.triangleup,   location.belowbar, color.blue, size=size.small)
+plotshape(bearish_div, "Bear Div", shape.triangledown, location.abovebar, color.red,  size=size.small)
+
+// Alerts
+alertcondition(bullish_div, "Bullish Divergence", "MACD bullish divergence detected")
+alertcondition(bearish_div, "Bearish Divergence", "MACD bearish divergence detected")
