@@ -144,7 +144,7 @@ const ENTRY_REGISTRY = [
     id:        'matouch',
     flag:      'useMaTouch',
     htmlId:    'e_mat',
-    shortName: () => 'MAToch',
+    shortName: c => `MAToch${c.matPeriod||20}`,
     detectL: (cfg, i) => {
       if (!cfg.matMA || i < 3) return false;
       const crossUp = DATA[i-1].c > cfg.matMA[i-1] && DATA[i-2].c <= cfg.matMA[i-2];
