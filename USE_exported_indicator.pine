@@ -1,4 +1,4 @@
-//@version=5
+//@version=6
 // ============================================================
 // USE Strategy Engine — экспорт из оптимизатора
 // Конфиг: Pv(L4R9) ATR17 SL(ATR×9|OR|7%|Wick) TP(RR10|OR|TP×2ATR) RevSig(mb1)sk1cd2 Wait(b4) [ConfSMA35×6tf]
