@@ -5909,7 +5909,7 @@ const FILTER_REGISTRY = [
     flag:     'useStruct',
     blocksL:  (cfg, i) => cfg.structBull && !cfg.structBull[i],
     blocksS:  (cfg, i) => cfg.structBear && !cfg.structBear[i],
-    nameLabel: () => 'Struct',
+    nameLabel: (cfg) => `Struct(L${cfg.strPvL||5}R${cfg.strPvR||2})`,
   },
 
   // ── MA Distance ───────────────────────────────────────────
@@ -8436,9 +8436,9 @@ async function runOpt() {
     // Вычисляем pivot high и low
     for(let i=pvL;i<N2-pvR;i++) {
       let isH=true, isL=true;
-      for(let j=1;j<=pvL;j++) { if(DATA[i].h<=DATA[i-j].h){isH=false;break;} }
+      for(let j=1;j<=pvL;j++) { if(DATA[i-j].h>DATA[i].h){isH=false;break;} }
       if(isH) for(let j=1;j<=pvR;j++) { if(DATA[i].h<=DATA[i+j].h){isH=false;break;} }
-      for(let j=1;j<=pvL;j++) { if(DATA[i].l>=DATA[i-j].l){isL=false;break;} }
+      for(let j=1;j<=pvL;j++) { if(DATA[i-j].l<DATA[i].l){isL=false;break;} }
       if(isL) for(let j=1;j<=pvR;j++) { if(DATA[i].l>=DATA[i+j].l){isL=false;break;} }
       if(isH) pvHiArr.push({idx:i,v:DATA[i].h});
       if(isL) pvLoArr.push({idx:i,v:DATA[i].l});
@@ -10386,9 +10386,9 @@ function _calcIndicators(cfg) {
     let pvHiArr = [], pvLoArr = [];
     for (let i = spvL; i < N - spvR; i++) {
       let isH = true, isL = true;
-      for (let j = 1; j <= spvL; j++) { if (DATA[i].h <= DATA[i-j].h) { isH = false; break; } }
+      for (let j = 1; j <= spvL; j++) { if (DATA[i-j].h > DATA[i].h) { isH = false; break; } }
       if (isH) for (let j = 1; j <= spvR; j++) { if (DATA[i].h <= DATA[i+j].h) { isH = false; break; } }
-      for (let j = 1; j <= spvL; j++) { if (DATA[i].l >= DATA[i-j].l) { isL = false; break; } }
+      for (let j = 1; j <= spvL; j++) { if (DATA[i-j].l < DATA[i].l) { isL = false; break; } }
       if (isL) for (let j = 1; j <= spvR; j++) { if (DATA[i].l >= DATA[i+j].l) { isL = false; break; } }
       if (isH) pvHiArr.push({ idx: i, v: DATA[i].h });
       if (isL) pvLoArr.push({ idx: i, v: DATA[i].l });
@@ -11616,7 +11616,7 @@ function showDetail(r) {
   filt += row('ATR расширяется',   c.useAtrExp  ? `ВКЛ · ATR > ${c.atrExpMult??1}× среднего (антифлет)` : 'ВЫКЛ',  c.useAtrExp?'on':'off');
   filt += row('RSI перекуп/перепрод', c.useRSI   ? `ВКЛ · лонг если RSI < ${c.rsiOS??0}, шорт если RSI > ${c.rsiOB??0}` : 'ВЫКЛ', c.useRSI?'on':'off');
   filt += row('Простой тренд MA',   c.useSTrend  ? `ВКЛ · окно ${c.sTrendWin??0} баров` : 'ВЫКЛ',                  c.useSTrend?'on':'off');
-  filt += row('Структура рынка HH/LL', c.useStruct ? `ВКЛ · lookback ${c.structLen??0} баров` : 'ВЫКЛ',            c.useStruct?'on':'off');
+  filt += row('Структура рынка HH/LL', c.useStruct ? `ВКЛ · L${c.strPvL||5} R${c.strPvR||2}` : 'ВЫКЛ',            c.useStruct?'on':'off');
   filt += row('Свежесть тренда',    c.useFresh   ? `ВКЛ · макс ${c.freshMax??0} баров от пересечения MA` : 'ВЫКЛ', c.useFresh?'on':'off');
   filt += row('Волатильность ATR',  c.useVolF    ? `ВКЛ · ATR < ${c.volFMult??0}× среднего` : 'ВЫКЛ',              c.useVolF?'on':'off');
   filt += row('Дистанция от MA',    c.useMaDist  ? `ВКЛ · не дальше ${c.maDistMax??0}×ATR от MA` : 'ВЫКЛ',         c.useMaDist?'on':'off');
@@ -11883,7 +11883,7 @@ function buildCopyText(r, c, slName, tpName) {
   lines.push('ATR расширяется:  ' + on(c.useAtrExp,  'ATR>' + (c.atrExpMult||1.0) + 'x среднего'));
   lines.push('RSI:              ' + on(c.useRSI,     'лонг<' + (c.rsiOS??0) + ', шорт>' + (c.rsiOB??0)));
   lines.push('Простой тренд:    ' + on(c.useSTrend,  'окно=' + (c.sTrendWin??0) + ' баров'));
-  lines.push('Структура рынка:  ' + on(c.useStruct,  'lookback=' + (c.structLen??0)));
+  lines.push('Структура рынка:  ' + on(c.useStruct,  'pvl=' + (c.strPvL||5) + ' pvr=' + (c.strPvR||2)));
   lines.push('Свежесть тренда:  ' + on(c.useFresh,   'макс=' + (c.freshMax??0) + ' баров'));
   lines.push('Волатильность ATR:' + on(c.useVolF,    'ATR<' + (c.volFMult??0) + 'x среднего'));
   lines.push('Дистанция от MA:  ' + on(c.useMaDist,  'макс=' + (c.maDistMax??0) + 'xATR'));
@@ -13080,7 +13080,12 @@ function parseTextToSettings(text) {
     if (parseStruct !== null) {
       const isOn = parseStruct.startsWith('ВКЛ');
       set('f_struct', isOn, 'chk', `Struct: ${isOn?'ВКЛ':'ВЫКЛ'}`);
-      if (isOn) { const m=parseStruct.match(/lookback=(\d+)/); if(m) set('f_strl', m[1], 'val', `Struct lookback=${m[1]}`); }
+      if (isOn) {
+        const ml=parseStruct.match(/pvl=(\d+)/), mr=parseStruct.match(/pvr=(\d+)/);
+        if(ml) set('f_strpvl', ml[1], 'val', `Struct pvl=${ml[1]}`);
+        if(mr) set('f_strpvr', mr[1], 'val', `Struct pvr=${mr[1]}`);
+        const mOld=parseStruct.match(/lookback=(\d+)/); if(mOld) set('f_strl', mOld[1], 'val', `Struct lookback=${mOld[1]}`);
+      }
     }
     const parseFresh = getVal('Свежесть тренда:');
     if (parseFresh !== null) {
@@ -18132,7 +18137,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774107591025;
+window._BUILD_TS = 1774267445005;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;

@@ -1291,9 +1291,9 @@ async function runOpt() {
     // Вычисляем pivot high и low
     for(let i=pvL;i<N2-pvR;i++) {
       let isH=true, isL=true;
-      for(let j=1;j<=pvL;j++) { if(DATA[i].h<=DATA[i-j].h){isH=false;break;} }
+      for(let j=1;j<=pvL;j++) { if(DATA[i-j].h>DATA[i].h){isH=false;break;} }
       if(isH) for(let j=1;j<=pvR;j++) { if(DATA[i].h<=DATA[i+j].h){isH=false;break;} }
-      for(let j=1;j<=pvL;j++) { if(DATA[i].l>=DATA[i-j].l){isL=false;break;} }
+      for(let j=1;j<=pvL;j++) { if(DATA[i-j].l<DATA[i].l){isL=false;break;} }
       if(isL) for(let j=1;j<=pvR;j++) { if(DATA[i].l>=DATA[i+j].l){isL=false;break;} }
       if(isH) pvHiArr.push({idx:i,v:DATA[i].h});
       if(isL) pvLoArr.push({idx:i,v:DATA[i].l});
@@ -3241,9 +3241,9 @@ function _calcIndicators(cfg) {
     let pvHiArr = [], pvLoArr = [];
     for (let i = spvL; i < N - spvR; i++) {
       let isH = true, isL = true;
-      for (let j = 1; j <= spvL; j++) { if (DATA[i].h <= DATA[i-j].h) { isH = false; break; } }
+      for (let j = 1; j <= spvL; j++) { if (DATA[i-j].h > DATA[i].h) { isH = false; break; } }
       if (isH) for (let j = 1; j <= spvR; j++) { if (DATA[i].h <= DATA[i+j].h) { isH = false; break; } }
-      for (let j = 1; j <= spvL; j++) { if (DATA[i].l >= DATA[i-j].l) { isL = false; break; } }
+      for (let j = 1; j <= spvL; j++) { if (DATA[i-j].l < DATA[i].l) { isL = false; break; } }
       if (isL) for (let j = 1; j <= spvR; j++) { if (DATA[i].l >= DATA[i+j].l) { isL = false; break; } }
       if (isH) pvHiArr.push({ idx: i, v: DATA[i].h });
       if (isL) pvLoArr.push({ idx: i, v: DATA[i].l });
