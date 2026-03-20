@@ -1232,7 +1232,7 @@ function startArena() {
   R.wires = JSON.parse(JSON.stringify(Assembly.wires));
 
   // Calculate stats from parts
-  let hp = 0, mass = 0, speed = 2.5, turn = 0.045, energy = 4;
+  let hp = 0, mass = 0, speed = 3.0, turn = 0.055, energy = 4;
   let shield = 0, shieldRegen = 0;
   R.weapons = [];
   R.sensors = [];
@@ -1344,7 +1344,7 @@ function updateBullets() {
     for (let j = Arena.enemies.length-1; j >= 0; j--) {
       const e = Arena.enemies[j];
       if (Math.hypot(b.x-e.x, b.y-e.y) < e.radius + b.r) {
-        damageEnemy(j, b.damage);
+        damageEnemy(j, b.damage, b.vx, b.vy);
         spawnParticles(b.x, b.y, '#ff8844', 5, 2);
         Arena.bullets.splice(i,1);
         hit = true; break;
@@ -1385,9 +1385,16 @@ function damageRobot(dmg) {
   updateHUD();
 }
 
-function damageEnemy(idx, dmg) {
+function damageEnemy(idx, dmg, bvx=0, bvy=0) {
   const e = Arena.enemies[idx];
   e.hp -= dmg;
+  // Knockback from bullet velocity
+  const bspd = Math.hypot(bvx, bvy);
+  if (bspd > 0) {
+    const kb = (dmg / 20) * 2.5;
+    e.vx += (bvx / bspd) * kb;
+    e.vy += (bvy / bspd) * kb;
+  }
   if (e.hp <= 0) killEnemy(idx);
 }
 
@@ -1525,8 +1532,11 @@ function fireWeapon(wi, R) {
   }
   if (nearest) angle = Math.atan2(nearest.y - R.y, nearest.x - R.x);
 
-  const bx = R.x + Math.cos(angle) * (R.radius + 8);
-  const by = R.y + Math.sin(angle) * (R.radius + 8);
+  // Spawn bullet: offset capped so it never passes through a close enemy
+  const nearDist2 = nearest ? Math.hypot(nearest.x-R.x, nearest.y-R.y) : 999;
+  const spawnOffset = Math.min(R.radius + 6, nearDist2 * 0.4 + 4);
+  const bx = R.x + Math.cos(angle) * spawnOffset;
+  const by = R.y + Math.sin(angle) * spawnOffset;
   spawnBullet(bx, by, angle, w.def, true);
   spawnParticles(bx, by, '#ffcc44', 3, 2, 10);
 }
@@ -1793,7 +1803,7 @@ function drawArenaResult() {
 const ENEMY_DEFS = {
   scout: {
     label: 'РАЗВЕДЧИК', color: '#cc4422', borderColor: '#ff6644',
-    radius: 14, speed: 2.2, hp: 40, damage: 8,
+    radius: 14, speed: 1.8, hp: 40, damage: 8,
     fireRate: 70, bulletSpeed: 5, range: 260, shootRange: 220,
     scrapDrop: 5, dropPart: 'gun_basic',
     ai: 'chase',
@@ -1817,7 +1827,7 @@ const ENEMY_DEFS = {
   },
   swarm: {
     label: 'РОЙ', color: '#446622', borderColor: '#88cc44',
-    radius: 9, speed: 3.0, hp: 20, damage: 5,
+    radius: 9, speed: 2.2, hp: 20, damage: 5,
     fireRate: 120, bulletSpeed: 4, range: 200, shootRange: 140,
     scrapDrop: 2, dropPart: null,
     ai: 'swarm',
@@ -1987,12 +1997,29 @@ function updateEnemies() {
     e.x = Math.max(e.radius, Math.min(aw-e.radius, e.x));
     e.y = Math.max(ay+e.radius, Math.min(ay+ah-e.radius, e.y));
 
+    // ── Robot-enemy hard separation (enemies can't enter robot)
+    const sepDist = e.radius + R.radius + 4;
+    if (dist < sepDist && dist > 0.1) {
+      const overlap = sepDist - dist;
+      const nx = dx / dist, ny = dy / dist;
+      // Push enemy away from robot
+      e.x -= nx * overlap * 0.7;
+      e.y -= ny * overlap * 0.7;
+      e.vx -= nx * 0.5;
+      e.vy -= ny * 0.5;
+      // Push robot away a little (unless tank)
+      if (!R.knockbackImmune) {
+        R.x += nx * overlap * 0.3;
+        R.y += ny * overlap * 0.3;
+      }
+    }
+
     // Enemy-enemy separation
     for (const o of Arena.enemies) {
       if (o===e) continue;
       const ddx=e.x-o.x, ddy=e.y-o.y, dd=Math.hypot(ddx,ddy);
       if (dd < e.radius+o.radius+2 && dd>0.1) {
-        const push = (e.radius+o.radius+2-dd)*0.3/dd;
+        const push = (e.radius+o.radius+2-dd)*0.35/dd;
         e.x += ddx*push; e.y += ddy*push;
       }
     }
