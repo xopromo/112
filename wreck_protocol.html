@@ -53,10 +53,10 @@ body {
 <canvas id="gameCanvas"></canvas>
 <div id="ui">
   <div id="hud" style="display:none">
-    <div class="hud-item">ROUND <span id="hud-round">1</span>/7</div>
-    <div class="hud-item">HP <span id="hud-hp">100</span></div>
-    <div class="hud-item">ENERGY <span id="hud-energy">10</span>/<span id="hud-energy-max">10</span></div>
-    <div class="hud-item">SCRAP <span id="hud-scrap">0</span></div>
+    <div class="hud-item">РАУНД <span id="hud-round">1</span>/7</div>
+    <div class="hud-item">ПЗ <span id="hud-hp">100</span></div>
+    <div class="hud-item">МАССА <span id="hud-energy">10</span> / МП <span id="hud-energy-max">10</span></div>
+    <div class="hud-item">ЛОМ <span id="hud-scrap">0</span></div>
   </div>
   <div id="tooltip"></div>
   <div id="instructions"></div>
@@ -338,14 +338,14 @@ function updateMenu() {
   ctx.fillStyle = C.textDim;
   ctx.font = '13px "Courier New",monospace';
   ctx.textAlign = 'center';
-  ctx.fillText('build · wire · fight · scavenge', W/2, H/2 + 18);
+  ctx.fillText('собирай · подключай · сражайся · мародёрствуй', W/2, H/2 + 18);
 
   // Buttons
   const btnW = 200, btnH = 38;
   const bx = W/2 - btnW/2;
 
   const startHover = isHover(bx, H/2+40, btnW, btnH);
-  drawButton('[ START RUN ]', bx, H/2+40, btnW, btnH, startHover);
+  drawButton('[ НАЧАТЬ ЗАБЕГ ]', bx, H/2+40, btnW, btnH, startHover);
   if (isClick(bx, H/2+40, btnW, btnH)) {
     startNewGame();
     setState(STATE.ASSEMBLY);
@@ -355,8 +355,8 @@ function updateMenu() {
   ctx.fillStyle = C.textDim;
   ctx.font = '11px "Courier New",monospace';
   ctx.textAlign = 'center';
-  ctx.fillText('assemble your robot · connect wires · survive 7 rounds', W/2, H/2+120);
-  ctx.fillText('collect parts from defeated enemies', W/2, H/2+138);
+  ctx.fillText('собери робота · подключи провода · выживи в 7 раундах', W/2, H/2+120);
+  ctx.fillText('собирай детали с побеждённых врагов', W/2, H/2+138);
 
   // Version
   ctx.fillStyle = '#1a2a1a';
@@ -398,11 +398,11 @@ function onStateEnter(s) {
     initMenu();
     instr.textContent = '';
   } else if (s === STATE.ASSEMBLY) {
-    instr.textContent = 'ASSEMBLY: place parts · R rotate · right-click remove · DONE to fight';
+    instr.textContent = 'СБОРКА: тащи детали на сетку · R вращение · ПКМ убрать деталь · нажми СРАЖАТЬСЯ';
   } else if (s === STATE.ARENA) {
-    instr.textContent = 'WASD/Arrows move · SPACE shoot · survive!';
+    instr.textContent = 'WASD/стрелки — движение · ПРОБЕЛ — огонь · уничтожь всех врагов!';
   } else if (s === STATE.LOOT) {
-    instr.textContent = 'Pick 3 parts · rest becomes scrap';
+    instr.textContent = 'Выбери до 3 деталей · остальное уйдёт в металлолом';
   } else if (s === STATE.GAMEOVER) {
     instr.textContent = '';
   } else if (s === STATE.WIN) {
@@ -431,8 +431,8 @@ function drawEndScreen(win) {
   drawGrid(0, 0, W, H, 40, '#0c120c');
 
   const mainColor = win ? C.accent : C.danger;
-  const mainText  = win ? 'CHAMPION' : 'DESTROYED';
-  const subText   = win ? 'The arena is yours.' : 'Your scrap feeds the next one.';
+  const mainText  = win ? 'ЧЕМПИОН' : 'УНИЧТОЖЕН';
+  const subText   = win ? 'Арена твоя.' : 'Твой металлолом питает следующего.';
 
   ctx.save();
   ctx.globalAlpha = Math.min(1, endAnim / 40);
@@ -448,11 +448,11 @@ function drawEndScreen(win) {
   ctx.font = '16px "Courier New",monospace';
   ctx.textAlign = 'center';
   ctx.fillText(subText, W/2, H/2 + 10);
-  ctx.fillText(`Rounds survived: ${Game.round - 1} / ${Game.maxRounds}`, W/2, H/2 + 40);
+  ctx.fillText(`Пройдено раундов: ${Game.round - 1} / ${Game.maxRounds}`, W/2, H/2 + 40);
 
   const btnW = 200, btnH = 38, bx = W/2 - 100;
   const restart = isHover(bx, H/2+80, btnW, btnH);
-  drawButton('[ PLAY AGAIN ]', bx, H/2+80, btnW, btnH, restart);
+  drawButton('[ ИГРАТЬ СНОВА ]', bx, H/2+80, btnW, btnH, restart);
   if (isClick(bx, H/2+80, btnW, btnH)) {
     endAnim = 0;
     setState(STATE.MENU);
@@ -510,7 +510,7 @@ requestAnimationFrame(loop);
 const PART_DEFS = {
   // ── CHASSIS (required, always placed at center)
   chassis: {
-    label: 'CHASSIS', cat: 'chassis', color: '#2a4a2a', border: '#4eff91',
+    label: 'ШАССИ', cat: 'chassis', color: '#2a4a2a', border: '#4eff91',
     w: 2, h: 2, mass: 4, energy: 0, maxHP: 60,
     ports: [
       { side:'top',    type:'OUT', ox: 0,  oy:-1 },
@@ -518,67 +518,67 @@ const PART_DEFS = {
       { side:'bottom', type:'OUT', ox: 0,  oy: 1 },
       { side:'left',   type:'OUT', ox:-1,  oy: 0 },
     ],
-    desc: 'Core unit. Destroying this = defeat.',
+    desc: 'Ядро робота. Уничтожат это — ты проиграл.',
     icon: '⬛',
   },
 
   // ── WEAPONS
   gun_basic: {
-    label: 'GUN MK.I', cat: 'weapon', color: '#3a2a1a', border: '#ff6b35',
+    label: 'ПУШКА МК.I', cat: 'weapon', color: '#3a2a1a', border: '#ff6b35',
     w: 1, h: 2, mass: 2, energy: 1, maxHP: 20,
     damage: 12, fireRate: 45, bulletSpeed: 6, range: 300,
     ports: [
       { side:'left', type:'IN', ox:-1, oy:0 },
     ],
-    desc: 'Basic cannon. Fires when triggered via wire.',
+    desc: 'Базовая пушка. ПРОБЕЛ для стрельбы.',
     icon: '🔫',
   },
   gun_rapid: {
-    label: 'RAPID GUN', cat: 'weapon', color: '#4a2a1a', border: '#ff8855',
+    label: 'СКОРОСТРЕЛ', cat: 'weapon', color: '#4a2a1a', border: '#ff8855',
     w: 1, h: 1, mass: 1, energy: 2, maxHP: 15,
     damage: 6, fireRate: 15, bulletSpeed: 7, range: 250,
     ports: [
       { side:'left', type:'IN', ox:-1, oy:0 },
     ],
-    desc: 'Fast fire, lower damage per shot.',
+    desc: 'Высокая скорострельность, низкий урон за выстрел.',
     icon: '🔫',
   },
   gun_heavy: {
-    label: 'HEAVY GUN', cat: 'weapon', color: '#2a1a0a', border: '#ff4411',
+    label: 'ТЯЖЁЛАЯ ПУШКА', cat: 'weapon', color: '#2a1a0a', border: '#ff4411',
     w: 2, h: 1, mass: 4, energy: 3, maxHP: 30,
     damage: 35, fireRate: 90, bulletSpeed: 8, range: 400,
     ports: [
       { side:'left', type:'IN', ox:-1, oy:0 },
     ],
-    desc: 'Slow but devastating. Big knockback.',
+    desc: 'Медленная, но разрушительная. Сильный откат.',
     icon: '💥',
   },
   laser: {
-    label: 'LASER', cat: 'weapon', color: '#1a1a3a', border: '#35c5ff',
+    label: 'ЛАЗЕР', cat: 'weapon', color: '#1a1a3a', border: '#35c5ff',
     w: 1, h: 1, mass: 1, energy: 3, maxHP: 15,
     damage: 25, fireRate: 60, bulletSpeed: 12, range: 500,
     isLaser: true,
     ports: [
       { side:'left', type:'IN', ox:-1, oy:0 },
     ],
-    desc: 'Instant hit beam. High energy cost.',
+    desc: 'Мгновенный луч. Высокое потребление энергии.',
     icon: '⚡',
   },
 
   // ── SENSORS (OUT triggers)
   sensor_auto: {
-    label: 'AUTO SENSOR', cat: 'sensor', color: '#1a2a1a', border: '#4eff91',
+    label: 'АВТОСЕНСОР', cat: 'sensor', color: '#1a2a1a', border: '#4eff91',
     w: 1, h: 1, mass: 1, energy: 1, maxHP: 10,
     sensorRange: 220, triggerRate: 30,
     ports: [
       { side:'right', type:'OUT', ox:1, oy:0 },
       { side:'top',   type:'OUT', ox:0, oy:-1 },
     ],
-    desc: 'Detects enemies in range. Auto-triggers wired weapons.',
+    desc: 'Обнаруживает врагов. Сам стреляет подключёнными орудиями.',
     icon: '📡',
   },
   sensor_manual: {
-    label: 'TRIGGER', cat: 'sensor', color: '#1a1a2a', border: '#8888ff',
+    label: 'ТРИГГЕР', cat: 'sensor', color: '#1a1a2a', border: '#8888ff',
     w: 1, h: 1, mass: 0, energy: 0, maxHP: 10,
     manualKey: 'Space',
     ports: [
@@ -586,82 +586,82 @@ const PART_DEFS = {
       { side:'top',   type:'OUT', ox:0, oy:-1 },
       { side:'bottom',type:'OUT', ox:0, oy:1 },
     ],
-    desc: 'Manual trigger. Press SPACE to fire wired weapons.',
+    desc: 'Ручной триггер. Соедини проводом с оружием.',
     icon: '🎮',
   },
   timer_fast: {
-    label: 'TIMER 1s', cat: 'sensor', color: '#2a2a1a', border: '#cccc44',
+    label: 'ТАЙМЕР 1с', cat: 'sensor', color: '#2a2a1a', border: '#cccc44',
     w: 1, h: 1, mass: 0, energy: 1, maxHP: 10,
     timerRate: 60,
     ports: [
       { side:'right', type:'OUT', ox:1, oy:0 },
     ],
-    desc: 'Pulses every second. Auto-fires wired weapons.',
+    desc: 'Импульс раз в секунду. Подключи к оружию для автострельбы.',
     icon: '⏱',
   },
 
   // ── MOVEMENT
   wheel: {
-    label: 'WHEELS', cat: 'movement', color: '#1a2a2a', border: '#44aacc',
+    label: 'КОЛЁСА', cat: 'movement', color: '#1a2a2a', border: '#44aacc',
     w: 1, h: 1, mass: 1, energy: 0, maxHP: 15,
     controlType: 'wheel', speedMult: 1.0, turnMult: 1.0,
     ports: [],
-    desc: 'Standard wheels. Balanced speed & turning.',
+    desc: 'Стандартные колёса. Баланс скорости и поворота.',
     icon: '⚙',
   },
   tracks: {
-    label: 'TRACKS', cat: 'movement', color: '#1a1a2a', border: '#6644cc',
+    label: 'ГУСЕНИЦЫ', cat: 'movement', color: '#1a1a2a', border: '#6644cc',
     w: 2, h: 1, mass: 3, energy: 0, maxHP: 30,
     controlType: 'tank', speedMult: 0.7, turnMult: 0.6,
     ports: [],
-    desc: 'Tank movement. Hard to turn but cannot be knocked back.',
+    desc: 'Танковое управление. Нельзя откинуть назад.',
     icon: '🔩',
   },
   legs: {
-    label: 'SPIDER LEGS', cat: 'movement', color: '#2a1a2a', border: '#cc44cc',
+    label: 'ПАУЧЬИ НОГИ', cat: 'movement', color: '#2a1a2a', border: '#cc44cc',
     w: 2, h: 2, mass: 2, energy: 1, maxHP: 20,
     controlType: '8way', speedMult: 0.8, turnMult: 1.5,
     ports: [],
-    desc: 'Move in any direction instantly. High maneuverability.',
+    desc: 'Движение в любую сторону. Высокая манёвренность.',
     icon: '🕷',
   },
   jets: {
-    label: 'JETS', cat: 'movement', color: '#2a1a1a', border: '#ff6644',
+    label: 'РЕАКТИВЫ', cat: 'movement', color: '#2a1a1a', border: '#ff6644',
     w: 1, h: 1, mass: 1, energy: 2, maxHP: 10,
     controlType: 'jet', speedMult: 1.5, turnMult: 0.5,
     ports: [],
-    desc: 'High speed, poor turning. Momentum-based.',
+    desc: 'Высокая скорость, плохой поворот. Инерционное управление.',
     icon: '🚀',
   },
 
   // ── ARMOR / UTILITY
   armor_light: {
-    label: 'LIGHT ARMOR', cat: 'armor', color: '#2a2a2a', border: '#888888',
+    label: 'ЛЁГКАЯ БРОНЯ', cat: 'armor', color: '#2a2a2a', border: '#888888',
     w: 1, h: 1, mass: 2, energy: 0, maxHP: 40,
     ports: [],
-    desc: 'Absorbs damage. Low mass.',
+    desc: 'Поглощает урон. Низкая масса.',
     icon: '🛡',
   },
   armor_heavy: {
-    label: 'HEAVY ARMOR', cat: 'armor', color: '#1a1a1a', border: '#555555',
+    label: 'ТЯЖЁЛАЯ БРОНЯ', cat: 'armor', color: '#1a1a1a', border: '#555555',
     w: 2, h: 1, mass: 5, energy: 0, maxHP: 80,
     ports: [],
-    desc: 'High HP plate. Slows robot significantly.',
+    desc: 'Высокий запас прочности. Сильно замедляет робота.',
     icon: '🛡',
   },
   battery: {
-    label: 'BATTERY', cat: 'utility', color: '#1a3a1a', border: '#44ff88',
+    label: 'БАТАРЕЯ', cat: 'utility', color: '#1a3a1a', border: '#44ff88',
     w: 1, h: 1, mass: 1, energy: -3, maxHP: 15,
-    desc: '+3 energy capacity. Powers other parts.',
+    desc: '+3 к ёмкости энергии. Питает другие детали.',
     ports: [],
     icon: '🔋',
   },
   shield_gen: {
-    label: 'SHIELD GEN', cat: 'utility', color: '#1a2a3a', border: '#4488ff',
+    label: 'ЩИТ-ГЕНЕРАТОР', cat: 'utility', color: '#1a2a3a', border: '#4488ff',
     w: 1, h: 1, mass: 2, energy: 2, maxHP: 15,
     shieldHP: 40, shieldRegen: 0.3,
     ports: [{ side:'left', type:'IN', ox:-1, oy:0 }],
-    desc: 'Generates shield. Auto-regens. Wire IN to activate.',
+    desc: 'Генерирует щит с авторегенерацией.',
     icon: '💠',
   },
 };
@@ -882,7 +882,7 @@ const PAL_H = H - 10;
 const PAL_ITEM_H = 52;
 
 function drawPalette() {
-  drawPanel(PAL_X, 5, PAL_W, PAL_H, 'INVENTORY');
+  drawPanel(PAL_X, 5, PAL_W, PAL_H, 'ИНВЕНТАРЬ');
 
   const items = Game.inventory;
   const startY = 35;
@@ -912,7 +912,8 @@ function drawPalette() {
 
     ctx.fillStyle = C.textDim;
     ctx.font = '9px "Courier New",monospace';
-    ctx.fillText(`${def.w}×${def.h} | ${def.mass}kg | ${def.energy}E | ${def.cat}`, PAL_X+10, iy+30);
+    const CAT_RU = {chassis:'шасси',weapon:'оружие',sensor:'сенсор',movement:'движение',armor:'броня',utility:'утилита'};
+    ctx.fillText(`${def.w}×${def.h} | ${def.mass}кг | ${def.energy}Э | ${CAT_RU[def.cat]||def.cat}`, PAL_X+10, iy+30);
     ctx.fillText(def.desc.slice(0,36)+(def.desc.length>36?'…':''), PAL_X+10, iy+42);
 
     // Drag start
@@ -929,11 +930,11 @@ function drawPalette() {
   ctx.fillStyle = C.textDim; ctx.font = '10px "Courier New",monospace'; ctx.textAlign = 'left';
   const energyColor = Assembly.usedEnergy > Assembly.totalEnergy ? C.danger : C.accent;
   ctx.fillStyle = C.text;
-  ctx.fillText(`MASS: ${Assembly.totalMass} kg`, PAL_X+8, sy2+15);
+  ctx.fillText(`МАССА: ${Assembly.totalMass} кг`, PAL_X+8, sy2+15);
   ctx.fillStyle = energyColor;
-  ctx.fillText(`ENERGY: used ${Assembly.usedEnergy} / cap ${Assembly.totalEnergy+4}`, PAL_X+8, sy2+30);
+  ctx.fillText(`ЭНЕРГИЯ: ${Assembly.usedEnergy} / ${Assembly.totalEnergy+4}`, PAL_X+8, sy2+30);
   ctx.fillStyle = C.textDim;
-  ctx.fillText(`SCRAP: ${Game.scrap}`, PAL_X+8, sy2+45);
+  ctx.fillText(`МЕТАЛЛОЛОМ: ${Game.scrap}`, PAL_X+8, sy2+45);
 }
 
 // ── DONE button
@@ -945,13 +946,13 @@ function drawDoneButton() {
   const ok = hasMovement && hasWeapon;
   const hov = isHover(bx, by, bw, bh);
 
-  drawButton(ok ? `[ FIGHT — ROUND ${Game.round} ]` : '[ NEED: movement + weapon ]',
+  drawButton(ok ? `[ СРАЖАТЬСЯ — РАУНД ${Game.round} ]` : '[ НУЖНО: движение + оружие ]',
     bx, by, bw, bh, hov && ok, false);
 
   if (!ok) {
     ctx.fillStyle = C.danger; ctx.font = '10px "Courier New",monospace'; ctx.textAlign = 'center';
-    if (!hasMovement) ctx.fillText('⚠ add movement part', bx+bw/2, by-12);
-    if (!hasWeapon)   ctx.fillText('⚠ add weapon part',   bx+bw/2, by-(hasMovement?12:24));
+    if (!hasMovement) ctx.fillText('⚠ добавь деталь движения', bx+bw/2, by-12);
+    if (!hasWeapon)   ctx.fillText('⚠ добавь оружие',          bx+bw/2, by-(hasMovement?12:24));
   }
 
   if (hov && ok && Mouse.clicked) {
@@ -1023,7 +1024,7 @@ function updateAssembly() {
 
   // Title
   ctx.fillStyle = C.accent; ctx.font = '14px "Courier New",monospace'; ctx.textAlign = 'left';
-  ctx.fillText(`ASSEMBLY — ROUND ${Game.round}`, gx0, gy0-10);
+  ctx.fillText(`СБОРКА — РАУНД ${Game.round}`, gx0, gy0-10);
 
   // Draw placed parts
   for (const part of Assembly.placed) drawPlacedPart(part);
@@ -1164,11 +1165,16 @@ function updateAssembly() {
         tip.style.left = (Mouse.cx+12)+'px';
         tip.style.top  = (Mouse.cy-10)+'px';
         tip.innerHTML = `<b style="color:${def.border}">${def.label}</b><br>${def.desc}<br>
-          <span style="color:#888">${def.mass}kg · ${def.energy}E · HP:${def.maxHP}</span>`;
+          <span style="color:#888">${def.mass}кг · ${def.energy}Э · ПЗ:${def.maxHP}</span>`;
         shown = true; break;
       }
     }
-    if (!shown) tip.style.display = 'none';
+    // Hint when wiring is active
+  if (Assembly.wiringFrom) {
+    ctx.fillStyle = '#ffff88'; ctx.font='11px "Courier New",monospace'; ctx.textAlign='center';
+    ctx.fillText('Кликни на порт другой детали для подключения · ПКМ отмена', W/2, Assembly.gridOriginY - 4);
+  }
+  if (!shown) { tip.style.display = 'none'; }
   }
 
   drawPalette();
@@ -1469,12 +1475,18 @@ function updateWeapons() {
   const R = Arena.robot;
   const triggers = R._wireTriggers || {};
 
-  // Update sensors
+  // SPACE = ручной огонь по всем оружиям (всегда работает)
+  if (Keys['Space_pressed'] || Keys['Space']) {
+    for (let wi = 0; wi < R.weapons.length; wi++) fireWeapon(wi, R);
+    Keys['Space_pressed'] = false;
+  }
+
+  // Автоматика сенсоров (дополнительно к ручному огню)
   for (const sensor of R.sensors) {
     const def = sensor.def;
     sensor.timer++;
 
-    // Auto sensor: fire when enemy in range
+    // Автосенсор: враг в зоне обнаружения
     if (def.sensorRange) {
       const inRange = Arena.enemies.some(e => Math.hypot(e.x-R.x, e.y-R.y) < def.sensorRange);
       if (inRange && sensor.timer >= (def.triggerRate || 30)) {
@@ -1482,22 +1494,11 @@ function updateWeapons() {
         fireSensorWires(sensor, triggers, R);
       }
     }
-    // Timer sensor: pulse on interval
+    // Таймер: импульс по расписанию
     if (def.timerRate && sensor.timer >= def.timerRate) {
       sensor.timer = 0;
       fireSensorWires(sensor, triggers, R);
     }
-    // Manual trigger
-    if (def.manualKey && (Keys['Space'] || Keys['Space_pressed'])) {
-      fireSensorWires(sensor, triggers, R);
-      Keys['Space_pressed'] = false;
-    }
-  }
-
-  // Direct manual fire if no sensor_manual but SPACE pressed
-  if (R.sensors.length === 0 && (Keys['Space_pressed'] || Keys['Space'])) {
-    for (let wi = 0; wi < R.weapons.length; wi++) fireWeapon(wi, R);
-    Keys['Space_pressed'] = false;
   }
 
   // Cooldown weapons
@@ -1700,12 +1701,12 @@ function drawArenaBackground() {
   // Round indicator
   ctx.fillStyle = '#1a3a1a';
   ctx.font = '11px "Courier New",monospace'; ctx.textAlign = 'right';
-  ctx.fillText(`ROUND ${Game.round} / ${Game.maxRounds}`, aw-8, ay+18);
+  ctx.fillText(`РАУНД ${Game.round} / ${Game.maxRounds}`, aw-8, ay+18);
 
   // Enemy count
   ctx.fillStyle = Arena.enemies.length > 0 ? C.danger : C.accent;
   ctx.textAlign = 'left';
-  ctx.fillText(`ENEMIES: ${Arena.enemies.length}`, 8, ay+18);
+  ctx.fillText(`ВРАГОВ: ${Arena.enemies.length}`, 8, ay+18);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1758,17 +1759,17 @@ function drawArenaResult() {
   ctx.fillStyle = color;
   ctx.font = 'bold 40px "Courier New",monospace'; ctx.textAlign = 'center';
   ctx.shadowColor = color; ctx.shadowBlur = 20;
-  ctx.fillText(win ? 'ROUND CLEAR' : 'DESTROYED', W/2, H/2 - 30);
+  ctx.fillText(win ? 'РАУНД ПРОЙДЕН' : 'УНИЧТОЖЕН', W/2, H/2 - 30);
   ctx.shadowBlur = 0;
 
   ctx.fillStyle = C.textDim; ctx.font = '14px "Courier New",monospace';
-  if (win) ctx.fillText('Scrap collected. Choose your spoils.', W/2, H/2+10);
-  else     ctx.fillText('Your chassis was reduced to rubble.', W/2, H/2+10);
+  if (win) ctx.fillText('Металлолом собран. Выбери трофеи.', W/2, H/2+10);
+  else     ctx.fillText('Твоё шасси разнесено в труху.', W/2, H/2+10);
 
-  const btnW = 200, btnH = 38;
-  const bx = W/2 - 100, by = H/2+40;
+  const btnW = 220, btnH = 38;
+  const bx = W/2 - 110, by = H/2+40;
   const hov = isHover(bx, by, btnW, btnH);
-  drawButton(win ? '[ COLLECT LOOT ]' : '[ GAME OVER ]', bx, by, btnW, btnH, hov, !win);
+  drawButton(win ? '[ ЗАБРАТЬ ТРОФЕИ ]' : '[ ИГРА ОКОНЧЕНА ]', bx, by, btnW, btnH, hov, !win);
 
   if (isClick(bx, by, btnW, btnH)) {
     ctx.shadowBlur = 0;
@@ -1791,52 +1792,52 @@ function drawArenaResult() {
 // ═══════════════════════════════════════════════════════════
 const ENEMY_DEFS = {
   scout: {
-    label: 'SCOUT', color: '#cc4422', borderColor: '#ff6644',
+    label: 'РАЗВЕДЧИК', color: '#cc4422', borderColor: '#ff6644',
     radius: 14, speed: 2.2, hp: 40, damage: 8,
     fireRate: 70, bulletSpeed: 5, range: 260, shootRange: 220,
     scrapDrop: 5, dropPart: 'gun_basic',
     ai: 'chase',
-    desc: 'Fast, low HP. Rushes you.'
+    desc: 'Быстрый, мало HP. Летит прямо на тебя.'
   },
   gunner: {
-    label: 'GUNNER', color: '#aa3366', borderColor: '#ff55aa',
+    label: 'СТРЕЛОК', color: '#aa3366', borderColor: '#ff55aa',
     radius: 18, speed: 1.3, hp: 80, damage: 14,
     fireRate: 50, bulletSpeed: 4.5, range: 300, shootRange: 280,
     scrapDrop: 8, dropPart: 'sensor_auto',
     ai: 'strafe',
-    desc: 'Keeps distance, strafe-shoots.'
+    desc: 'Держит дистанцию, стреляет с флангов.'
   },
   tank_enemy: {
-    label: 'TANK', color: '#223366', borderColor: '#4488ff',
+    label: 'ТАНК', color: '#223366', borderColor: '#4488ff',
     radius: 26, speed: 0.9, hp: 180, damage: 28,
     fireRate: 100, bulletSpeed: 6.5, range: 380, shootRange: 350,
     scrapDrop: 15, dropPart: 'armor_heavy',
     ai: 'charge',
-    desc: 'Slow, armored, devastating shots.'
+    desc: 'Медленный, бронированный, опустошительный.'
   },
   swarm: {
-    label: 'SWARM', color: '#446622', borderColor: '#88cc44',
+    label: 'РОЙ', color: '#446622', borderColor: '#88cc44',
     radius: 9, speed: 3.0, hp: 20, damage: 5,
     fireRate: 120, bulletSpeed: 4, range: 200, shootRange: 140,
     scrapDrop: 2, dropPart: null,
     ai: 'swarm',
-    desc: 'Tiny, fast. Dangerous in numbers.'
+    desc: 'Крошечные, быстрые. Опасны толпой.'
   },
   sniper: {
-    label: 'SNIPER', color: '#333322', borderColor: '#cccc44',
+    label: 'СНАЙПЕР', color: '#333322', borderColor: '#cccc44',
     radius: 15, speed: 1.0, hp: 55, damage: 35,
     fireRate: 140, bulletSpeed: 9, range: 600, shootRange: 500,
     scrapDrop: 10, dropPart: 'laser',
     ai: 'sniper',
-    desc: 'Stays far, slow but deadly shots.'
+    desc: 'Держится далеко, редкие смертоносные выстрелы.'
   },
   bomber: {
-    label: 'BOMBER', color: '#553311', borderColor: '#ff8800',
+    label: 'БОМБАРДИР', color: '#553311', borderColor: '#ff8800',
     radius: 20, speed: 1.8, hp: 100, damage: 45,
     fireRate: 180, bulletSpeed: 3.5, range: 220, shootRange: 200,
     scrapDrop: 12, dropPart: 'shield_gen',
     ai: 'kamikaze',
-    desc: 'Rushes in, fires explosive bursts.'
+    desc: 'Врывается в упор и выстреливает очередями.'
   },
 };
 
@@ -2116,11 +2117,11 @@ function updateLoot() {
 
   // Title
   ctx.fillStyle = C.accent; ctx.font='bold 20px "Courier New",monospace'; ctx.textAlign='center';
-  ctx.fillText('SPOILS OF WAR', W/2, 35);
+  ctx.fillText('ТРОФЕИ ВОЙНЫ', W/2, 35);
   ctx.fillStyle = C.textDim; ctx.font='12px "Courier New",monospace';
-  ctx.fillText(`Pick up to ${Loot.maxPick} parts to keep  ·  rest becomes scrap`, W/2, 56);
+  ctx.fillText(`Выбери до ${Loot.maxPick} деталей · остальное уйдёт в металлолом`, W/2, 56);
   ctx.fillStyle = C.warn;
-  ctx.fillText(`SCRAP: ${Game.scrap}`, W/2, 72);
+  ctx.fillText(`МЕТАЛЛОЛОМ: ${Game.scrap}`, W/2, 72);
 
   // Part cards in grid
   const cols = 4, cardW = 180, cardH = 110;
@@ -2156,13 +2157,14 @@ function updateLoot() {
     ctx.fillStyle = def.border; ctx.font='bold 11px "Courier New",monospace';
     ctx.textAlign='left';
     ctx.fillText(def.label, cx2+44, cy2+22);
+    const CAT_RU2 = {chassis:'ШАССИ',weapon:'ОРУЖИЕ',sensor:'СЕНСОР',movement:'ДВИЖЕНИЕ',armor:'БРОНЯ',utility:'УТИЛИТА'};
     ctx.fillStyle = C.textDim; ctx.font='9px "Courier New",monospace';
-    ctx.fillText(def.cat.toUpperCase(), cx2+44, cy2+34);
+    ctx.fillText(CAT_RU2[def.cat]||def.cat.toUpperCase(), cx2+44, cy2+34);
 
     // Stats
     ctx.fillStyle = C.text; ctx.font='10px "Courier New",monospace';
-    ctx.fillText(`${def.w}×${def.h}  ${def.mass}kg  ${def.energy>0?'-':'+'}${Math.abs(def.energy)}E`, cx2+8, cy2+55);
-    ctx.fillText(`HP: ${def.maxHP}`, cx2+8, cy2+68);
+    ctx.fillText(`${def.w}×${def.h}  ${def.mass}кг  ${def.energy>0?'-':'+'}${Math.abs(def.energy)}Э`, cx2+8, cy2+55);
+    ctx.fillText(`ПЗ: ${def.maxHP}`, cx2+8, cy2+68);
 
     // Desc
     ctx.fillStyle = C.textDim; ctx.font='9px "Courier New",monospace';
@@ -2186,21 +2188,21 @@ function updateLoot() {
 
   // Counter
   ctx.fillStyle = C.text; ctx.font='13px "Courier New",monospace'; ctx.textAlign='center';
-  ctx.fillText(`Selected: ${Loot.selected.length} / ${Loot.maxPick}`, W/2, H-60);
+  ctx.fillText(`Выбрано: ${Loot.selected.length} / ${Loot.maxPick}`, W/2, H-60);
 
   // Scrap value of unselected
   const unselected = Loot.offered.filter(p => p && !Loot.selected.includes(p.id));
   const scrapVal = unselected.reduce((sum, p) => sum + PART_DEFS[p.type].mass*2, 0);
   ctx.fillStyle = C.textDim; ctx.font='11px "Courier New",monospace';
-  ctx.fillText(`Discarded → +${scrapVal} scrap`, W/2, H-44);
+  ctx.fillText(`Отброшено → +${scrapVal} металлолома`, W/2, H-44);
 
   // Confirm button
-  const bx = W/2-100, by = H-34;
-  const hov = isHover(bx, by, 200, 28);
-  const nextLabel = Game.round > Game.maxRounds ? '[ FINAL VICTORY ]' : `[ CONTINUE → ROUND ${Game.round} ]`;
-  drawButton(nextLabel, bx, by, 200, 28, hov);
+  const bx = W/2-110, by = H-34;
+  const hov = isHover(bx, by, 220, 28);
+  const nextLabel = Game.round > Game.maxRounds ? '[ ФИНАЛЬНАЯ ПОБЕДА ]' : `[ ПРОДОЛЖИТЬ → РАУНД ${Game.round} ]`;
+  drawButton(nextLabel, bx, by, 220, 28, hov);
 
-  if (isClick(bx, by, 200, 28)) {
+  if (isClick(bx, by, 220, 28)) {
     // Add selected parts to inventory
     for (const part of Loot.offered) {
       if (!part) continue;
