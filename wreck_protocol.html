@@ -85,7 +85,7 @@ window.addEventListener('resize', resizeCanvas);
 // ═══════════════════════════════════════════════════════════
 //  GAME STATES
 // ═══════════════════════════════════════════════════════════
-const STATE = { MENU: 0, ASSEMBLY: 1, ARENA: 2, LOOT: 3, GAMEOVER: 4, WIN: 5 };
+const STATE = { MENU: 0, ASSEMBLY: 1, ARENA: 2, LOOT: 3, GAMEOVER: 4, WIN: 5, MUTATION: 6 };
 let gameState = STATE.MENU;
 
 function setState(s) {
@@ -374,6 +374,7 @@ function updateMenu() {
 function startNewGame() {
   Game.round = 1;
   Game.scrap = 10;
+  Game.mutations = [];
 
   // Starting parts
   Game.inventory = [
@@ -401,6 +402,8 @@ function onStateEnter(s) {
     instr.textContent = 'СБОРКА: тащи детали на сетку · R вращение · ПКМ убрать деталь · нажми СРАЖАТЬСЯ';
   } else if (s === STATE.ARENA) {
     instr.textContent = 'WASD/стрелки — движение · ПРОБЕЛ — огонь · уничтожь всех врагов!';
+  } else if (s === STATE.MUTATION) {
+    instr.textContent = 'Выбери мутацию · она останется навсегда';
   } else if (s === STATE.LOOT) {
     instr.textContent = 'Выбери до 3 деталей · остальное уйдёт в металлолом';
   } else if (s === STATE.GAMEOVER) {
@@ -479,6 +482,7 @@ function loop(timestamp) {
     case STATE.LOOT:     updateLoot();             break;
     case STATE.GAMEOVER: drawEndScreen(false);     break;
     case STATE.WIN:      drawEndScreen(true);      break;
+    case STATE.MUTATION: updateMutation();         break;
   }
 
   updateParticles();
@@ -708,9 +712,9 @@ function getRotatedPorts(part) {
 // ═══════════════════════════════════════════════════════════
 //  ASSEMBLY SYSTEM
 // ═══════════════════════════════════════════════════════════
-const GRID_SIZE = 36;  // pixels per cell
-const GRID_COLS = 9;
-const GRID_ROWS = 9;
+const GRID_SIZE = 54;  // было 36, теперь 1.5×
+const GRID_COLS = 8;
+const GRID_ROWS = 8;
 
 const Assembly = {
   // Grid: array of {part, gx, gy} placements
@@ -876,10 +880,10 @@ function drawPlacedPart(part, alpha=1) {
 }
 
 // ── Palette panel (right side)
-const PAL_X = 60 + GRID_COLS * GRID_SIZE + 20;
-const PAL_W = W - PAL_X - 10;
+const PAL_X = 60 + GRID_COLS * GRID_SIZE + 16;
+const PAL_W = W - PAL_X - 8;
 const PAL_H = H - 10;
-const PAL_ITEM_H = 52;
+const PAL_ITEM_H = 66;
 
 function drawPalette() {
   drawPanel(PAL_X, 5, PAL_W, PAL_H, 'ИНВЕНТАРЬ');
@@ -906,15 +910,24 @@ function drawPalette() {
     strokeRect(PAL_X+4, iy, PAL_W-8, PAL_ITEM_H-4, def.border, 1);
 
     ctx.fillStyle = def.border;
-    ctx.font = '11px "Courier New",monospace';
+    ctx.font = 'bold 13px "Courier New",monospace';
     ctx.textAlign = 'left';
-    ctx.fillText(def.icon + ' ' + def.label, PAL_X+10, iy+16);
+    ctx.fillText(def.icon + ' ' + def.label, PAL_X+8, iy+18);
 
     ctx.fillStyle = C.textDim;
-    ctx.font = '9px "Courier New",monospace';
+    ctx.font = '11px "Courier New",monospace';
     const CAT_RU = {chassis:'шасси',weapon:'оружие',sensor:'сенсор',movement:'движение',armor:'броня',utility:'утилита'};
-    ctx.fillText(`${def.w}×${def.h} | ${def.mass}кг | ${def.energy}Э | ${CAT_RU[def.cat]||def.cat}`, PAL_X+10, iy+30);
-    ctx.fillText(def.desc.slice(0,36)+(def.desc.length>36?'…':''), PAL_X+10, iy+42);
+    ctx.fillText(`${def.w}×${def.h} · ${def.mass}кг · ${CAT_RU[def.cat]||def.cat}`, PAL_X+8, iy+33);
+    ctx.fillStyle = C.text;
+    ctx.font = '11px "Courier New",monospace';
+    const words = def.desc.split(' ');
+    let ln='', ly=iy+48;
+    for (const w of words) {
+      const test = ln ? ln+' '+w : w;
+      if (test.length > 28 && ln) { ctx.fillText(ln, PAL_X+8, ly); ln=w; ly+=13; }
+      else ln=test;
+    }
+    ctx.fillText(ln, PAL_X+8, ly);
 
     // Drag start
     if (hov && Mouse.clicked) {
@@ -926,15 +939,65 @@ function drawPalette() {
   ctx.restore();
 
   // Stats
-  const sy2 = 5 + PAL_H - 70;
-  ctx.fillStyle = C.textDim; ctx.font = '10px "Courier New",monospace'; ctx.textAlign = 'left';
+  const sy2 = 5 + PAL_H - 80;
   const energyColor = Assembly.usedEnergy > Assembly.totalEnergy ? C.danger : C.accent;
-  ctx.fillStyle = C.text;
-  ctx.fillText(`МАССА: ${Assembly.totalMass} кг`, PAL_X+8, sy2+15);
+  ctx.fillStyle = C.text; ctx.font = '12px "Courier New",monospace'; ctx.textAlign = 'left';
+  ctx.fillText(`МАССА: ${Assembly.totalMass} кг`, PAL_X+8, sy2+16);
   ctx.fillStyle = energyColor;
-  ctx.fillText(`ЭНЕРГИЯ: ${Assembly.usedEnergy} / ${Assembly.totalEnergy+4}`, PAL_X+8, sy2+30);
-  ctx.fillStyle = C.textDim;
-  ctx.fillText(`МЕТАЛЛОЛОМ: ${Game.scrap}`, PAL_X+8, sy2+45);
+  ctx.fillText(`ЭНЕРГИЯ: ${Assembly.usedEnergy} / ${Assembly.totalEnergy+4}`, PAL_X+8, sy2+32);
+  ctx.fillStyle = C.warn; ctx.font = 'bold 13px "Courier New",monospace';
+  ctx.fillText(`ЛОМ: ${Game.scrap} ед.`, PAL_X+8, sy2+52);
+
+  // ── Scrap shop buttons
+  drawScrapShop();
+}
+
+// ── Loot tables (also used by shop random picks)
+const SHOP_WEAPON_POOL   = ['gun_basic','gun_rapid','gun_heavy','laser'];
+const SHOP_MOVEMENT_POOL = ['wheel','tracks','legs','jets'];
+const SHOP_UTIL_POOL     = ['armor_light','armor_heavy','battery','shield_gen','sensor_auto','timer_fast'];
+
+function drawScrapShop() {
+  const bw = PAL_W - 10, bx = PAL_X + 5;
+  const by0 = H - 166;
+  ctx.fillStyle = '#0a1a0a'; ctx.fillRect(bx, by0-2, bw, 162);
+  ctx.strokeStyle = '#1a3a1a'; ctx.lineWidth=1; ctx.strokeRect(bx, by0-2, bw, 162);
+  ctx.fillStyle = C.accent; ctx.font='bold 11px "Courier New",monospace'; ctx.textAlign='left';
+  ctx.fillText('МАГАЗИН ЛОМА', bx+6, by0+11);
+
+  const shops = [
+    { label:'⚙ РЕМОНТ ВСЕГО',      cost:15, action:'repair',   desc:'Починить все детали' },
+    { label:'🔫 РАН. ОРУЖИЕ',       cost:20, action:'weapon',   desc:'Случайное оружие' },
+    { label:'🚀 РАН. ДВИЖЕНИЕ',     cost:18, action:'movement', desc:'Случайная ходовая' },
+    { label:'🛡 РАН. УТИЛИТА',      cost:12, action:'util',     desc:'Броня / сенсор / бат.' },
+  ];
+  shops.forEach((s, i) => {
+    const by2 = by0 + 20 + i * 35;
+    const canAfford = Game.scrap >= s.cost;
+    const hov = isHover(bx+2, by2, bw-4, 30);
+    fillRect(bx+2, by2, bw-4, 30, hov && canAfford ? '#1a3a1a' : '#080e08');
+    strokeRect(bx+2, by2, bw-4, 30, canAfford ? '#2a5a2a' : '#1a2a1a', 1);
+    ctx.fillStyle = canAfford ? C.accent : C.textDim;
+    ctx.font='bold 11px "Courier New",monospace'; ctx.textAlign='left';
+    ctx.fillText(s.label, bx+8, by2+13);
+    ctx.fillStyle = canAfford ? C.warn : '#333';
+    ctx.font='11px "Courier New",monospace';
+    ctx.fillText(`-${s.cost} лом`, bx+8, by2+25);
+    ctx.fillStyle = canAfford ? C.textDim : '#222';
+    ctx.textAlign='right';
+    ctx.fillText(s.desc, bx+bw-8, by2+25);
+
+    if (hov && canAfford && Mouse.clicked) {
+      Game.scrap -= s.cost;
+      if (s.action === 'repair') {
+        Assembly.placed.forEach(p => { p.hp = PART_DEFS[p.type].maxHP; });
+      } else {
+        const pool = s.action==='weapon' ? SHOP_WEAPON_POOL
+                   : s.action==='movement' ? SHOP_MOVEMENT_POOL : SHOP_UTIL_POOL;
+        Game.inventory.push(createPart(pool[Math.floor(Math.random()*pool.length)]));
+      }
+    }
+  });
 }
 
 // ── DONE button
@@ -2298,6 +2361,449 @@ window.initAssembly = function() {
 // real definition in Part 2 redefines it. Nothing to patch here.
 
 console.log('[WRECK PROTOCOL] All systems loaded.');
+</script>
+
+<!-- PART 5: ARENA MODIFIERS + MUTATION SYSTEM -->
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════════════════════
+//  ARENA MODIFIERS
+// ═══════════════════════════════════════════════════════════
+const ARENA_MODIFIERS = {
+  none:      { label:'ОБЫЧНЫЙ БОЙ',      color:'#4eff91', desc:'Никаких сюрпризов. Бейся честно.' },
+  berserk:   { label:'БЕРСЕРК',           color:'#ff4444', desc:'Враги: ×1.5 урон, ×0.6 HP. Злее, слабее.' },
+  slippery:  { label:'СКОЛЬЗКАЯ АРЕНА',   color:'#44aaff', desc:'Трение уменьшено. Все носятся как безумные.' },
+  fog:       { label:'ТУМАН ВОЙНЫ',       color:'#888888', desc:'Видишь только ближних врагов.' },
+  airdrop:   { label:'ВОЗДУШНЫЙ ДЕСАНТ',  color:'#ffcc44', desc:'Каждые 8 сек ящик с бонусом падает в центр.' },
+  acid:      { label:'КИСЛОТНЫЕ ЛУЖИ',    color:'#88ff44', desc:'Зелёные зоны жгут всех кто в них стоит.' },
+  vampires:  { label:'ВАМПИРЫ',           color:'#ff44aa', desc:'Враги лечатся от урона по тебе. Добей быстро.' },
+  mirror:    { label:'ЗЕРКАЛО',           color:'#aaaaff', desc:'Твои пули рикошетят от стен 1 раз.' },
+};
+
+// Random modifier per round (round 1 always none)
+function pickModifier(round) {
+  if (round === 1) return 'none';
+  const keys = Object.keys(ARENA_MODIFIERS);
+  return keys[Math.floor(Math.random() * keys.length)];
+}
+
+// Acid puddle positions (generated per fight)
+let acidPuddles = [];
+function genAcidPuddles() {
+  acidPuddles = [];
+  for (let i = 0; i < 5; i++) {
+    acidPuddles.push({
+      x: 80 + Math.random() * (Arena.arenaW - 160),
+      y: Arena.arenaY + 60 + Math.random() * (Arena.arenaH - 120),
+      r: 35 + Math.random() * 25,
+    });
+  }
+}
+
+// Airdrop timer
+let airdropTimer = 0;
+const AIRDROP_INTERVAL = 480; // 8 sec
+
+function spawnAirdrop() {
+  const x = Arena.arenaW/2 + (Math.random()-0.5)*200;
+  const y = Arena.arenaY + Arena.arenaH/2 + (Math.random()-0.5)*150;
+  // Randomly either scrap or heal or weapon
+  const roll = Math.random();
+  if (roll < 0.4) {
+    Arena.pickups.push({ x, y, type:'scrap', value: 15+Math.floor(Math.random()*15) });
+  } else if (roll < 0.7) {
+    Arena.pickups.push({ x, y, type:'heal', value: 40 });
+  } else {
+    const pool = [...SHOP_WEAPON_POOL, ...SHOP_UTIL_POOL];
+    Arena.pickups.push({ x, y, type:'part', partType: pool[Math.floor(Math.random()*pool.length)] });
+  }
+  spawnParticles(x, Arena.arenaY+10, '#ffcc44', 15, 3, 60);
+}
+
+// Draw modifier banner (first 2 sec of fight)
+function drawModifierBanner() {
+  const mod = ARENA_MODIFIERS[Arena.modifier] || ARENA_MODIFIERS.none;
+  const alpha = Math.max(0, 1 - Arena.frame / 100);
+  if (alpha <= 0) return;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  fillRect(0, H/2-50, W, 100, 'rgba(0,0,0,0.85)');
+  ctx.fillStyle = mod.color;
+  ctx.font = 'bold 28px "Courier New",monospace'; ctx.textAlign = 'center';
+  ctx.shadowColor = mod.color; ctx.shadowBlur = 20;
+  ctx.fillText('⚠ ' + mod.label, W/2, H/2 - 8);
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = C.textDim; ctx.font = '14px "Courier New",monospace';
+  ctx.fillText(mod.desc, W/2, H/2 + 20);
+  ctx.restore();
+}
+
+function applyModifierToEnemies(enemies) {
+  const mod = Arena.modifier;
+  if (mod === 'berserk') {
+    enemies.forEach(e => { e.damage = Math.round(e.damage * 1.5); e.hp = Math.round(e.hp * 0.6); e.maxHP = e.hp; });
+  }
+  if (mod === 'vampires') {
+    enemies.forEach(e => { e.vampire = true; });
+  }
+}
+
+// Override startArena to inject modifier
+const _origStartArena = window.startArena || function(){};
+window.startArena = function() {
+  // Pick modifier before starting
+  Arena.modifier = pickModifier(Game.round);
+  airdropTimer = AIRDROP_INTERVAL;
+  acidPuddles = [];
+  if (Arena.modifier === 'acid') genAcidPuddles();
+  // Call original
+  _origStartArena();
+  // Apply to enemies after they spawn
+  applyModifierToEnemies(Arena.enemies);
+};
+
+// Draw acid puddles
+function drawAcidPuddles() {
+  if (Arena.modifier !== 'acid') return;
+  for (const p of acidPuddles) {
+    ctx.save();
+    ctx.globalAlpha = 0.35;
+    ctx.fillStyle = '#44ff44';
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI*2); ctx.fill();
+    ctx.globalAlpha = 0.6;
+    ctx.strokeStyle = '#88ff44'; ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function updateModifierEffects() {
+  const R = Arena.robot;
+  const mod = Arena.modifier;
+
+  // Slippery: increase robot friction (less deceleration = more slide)
+  if (mod === 'slippery') {
+    R.vx *= 1.04; R.vy *= 1.04; // counteract movement deceleration a bit
+    for (const e of Arena.enemies) { e.vx *= 1.04; e.vy *= 1.04; }
+  }
+
+  // Fog: no gameplay effect here, handled in draw
+  // Acid: damage in puddles
+  if (mod === 'acid') {
+    for (const p of acidPuddles) {
+      if (Math.hypot(R.x-p.x, R.y-p.y) < p.r) {
+        if (!(Arena._acidTimer > 0)) { damageRobot(4); Arena._acidTimer = 30; }
+      }
+      for (const e of Arena.enemies) {
+        if (Math.hypot(e.x-p.x, e.y-p.y) < p.r) {
+          if (!e._acidTimer || e._acidTimer<=0) { e.hp -= 3; e._acidTimer = 30; if (e.hp<=0) killEnemy(Arena.enemies.indexOf(e)); }
+        }
+        if (e._acidTimer > 0) e._acidTimer--;
+      }
+    }
+    if (Arena._acidTimer > 0) Arena._acidTimer--;
+  }
+
+  // Airdrop: spawn crates
+  if (mod === 'airdrop') {
+    airdropTimer--;
+    if (airdropTimer <= 0) { spawnAirdrop(); airdropTimer = AIRDROP_INTERVAL; }
+  }
+
+  // Vampire: enemies heal on melee hit (handled in damageRobot patch below)
+}
+
+// Pickup heal type
+const _origUpdatePickups = window.updatePickups || function(){};
+window.updatePickups = function() {
+  const R = Arena.robot;
+  for (let i = Arena.pickups.length-1; i >= 0; i--) {
+    const p = Arena.pickups[i];
+    if (p.type === 'heal' && Math.hypot(p.x-R.x, p.y-R.y) < R.radius + 14) {
+      R.hp = Math.min(R.maxHP, R.hp + p.value);
+      spawnParticles(p.x, p.y, '#44ff88', 10, 3);
+      Arena.pickups.splice(i,1);
+      updateHUD();
+      continue;
+    }
+  }
+  _origUpdatePickups();
+};
+
+// Fog: darken distant enemies in draw
+function drawEnemiesFog() {
+  if (Arena.modifier !== 'fog') return;
+  const R = Arena.robot;
+  for (const e of Arena.enemies) {
+    const dist = Math.hypot(e.x-R.x, e.y-R.y);
+    if (dist > 200) {
+      ctx.save();
+      const alpha = Math.min(0.95, (dist-200)/150);
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = C.bg;
+      ctx.beginPath(); ctx.arc(e.x, e.y, e.radius+6, 0, Math.PI*2); ctx.fill();
+      ctx.restore();
+    }
+  }
+}
+
+// Mirror bullets: bounce off walls once
+function updateMirrorBullets() {
+  if (Arena.modifier !== 'mirror') return;
+  for (const b of Arena.bullets) {
+    if (b._bounced) continue;
+    if (b.x < 4)               { b.vx = Math.abs(b.vx); b._bounced = true; }
+    if (b.x > Arena.arenaW-4)  { b.vx = -Math.abs(b.vx); b._bounced = true; }
+    if (b.y < Arena.arenaY+4)  { b.vy = Math.abs(b.vy); b._bounced = true; }
+    if (b.y > Arena.arenaY+Arena.arenaH-4) { b.vy = -Math.abs(b.vy); b._bounced = true; }
+  }
+}
+
+// Patch updateArena to call modifier hooks
+const _origUpdateArena = window.updateArena;
+window.updateArena = function() {
+  _origUpdateArena();
+  // Overlay effects (called after original draw)
+  if (!Arena.result) {
+    updateModifierEffects();
+    updateMirrorBullets();
+  }
+  drawAcidPuddles();
+  drawEnemiesFog();
+  drawModifierBanner();
+};
+
+// ═══════════════════════════════════════════════════════════
+//  MUTATION SYSTEM
+// ═══════════════════════════════════════════════════════════
+const MUTATIONS_DEF = [
+  { id:'speed',      label:'⚡ ФОРСАЖ',         color:'#44aaff', desc:'Базовая скорость +35%' },
+  { id:'damage',     label:'💥 ОСТРЫЕ УГЛЫ',    color:'#ff6644', desc:'Урон всего оружия ×1.3' },
+  { id:'hp',         label:'🛡 БРОНЕВИК',        color:'#44ff88', desc:'+100 к максимальному ПЗ' },
+  { id:'shield',     label:'💠 НАНОЩИТ',         color:'#4488ff', desc:'+60 щита, регенерация ×2' },
+  { id:'regen',      label:'🔋 РЕГЕНЕРАЦИЯ',     color:'#44ffcc', desc:'+3 ПЗ/сек автовосстановление' },
+  { id:'multishot',  label:'🔫 ОЧЕРЕДЬ',         color:'#ff88ff', desc:'Каждый 4й выстрел — тройной залп' },
+  { id:'explosive',  label:'💣 КАССЕТНЫЕ',       color:'#ffcc44', desc:'Пули взрываются при ударе (АоЕ)' },
+  { id:'vampire',    label:'🩸 ВАМПИРИЗМ',       color:'#ff4488', desc:'15% нанесённого урона → ПЗ тебе' },
+  { id:'magnet',     label:'🧲 МАГНИТ',          color:'#ccaaff', desc:'Автоподбор лома с большого расстояния' },
+  { id:'overclock',  label:'🔥 РАЗГОН',          color:'#ffaa44', desc:'Скорострельность ×1.5, но +20% перегрев' },
+];
+
+const Mutation = {
+  offered: [],   // 3 random mutations shown
+  picked: null,
+};
+
+// Active mutations on robot (accumulated across rounds)
+Game.mutations = Game.mutations || [];
+
+function pickMutations() {
+  const available = MUTATIONS_DEF.filter(m => !Game.mutations.includes(m.id));
+  const shuffled = available.sort(() => Math.random()-0.5);
+  Mutation.offered = shuffled.slice(0, 3);
+  Mutation.picked = null;
+}
+
+// Apply all active mutations to robot stats after startArena builds robot
+function applyMutations(R) {
+  for (const id of Game.mutations) {
+    if (id === 'speed')     R.speed    *= 1.35;
+    if (id === 'hp')        { R.maxHP += 100; R.hp = Math.min(R.hp + 100, R.maxHP); }
+    if (id === 'shield')    { R.maxShield = (R.maxShield||0) + 60; R.shield = (R.shield||0) + 60; R.shieldRegen = (R.shieldRegen||0) + 0.6; }
+    if (id === 'regen')     R._regenRate = (R._regenRate||0) + 3;
+    if (id === 'overclock') R.weapons.forEach(w => { w.def = Object.assign({}, w.def, { fireRate: Math.round(w.def.fireRate / 1.5) }); });
+  }
+}
+
+// Patch startArena to apply mutations
+const _startArenaWithMod = window.startArena;
+window.startArena = function() {
+  _startArenaWithMod();
+  applyMutations(Arena.robot);
+};
+
+// Regen tick in movement update
+const _origUpdateRobotMovement = window.updateRobotMovement;
+window.updateRobotMovement = function() {
+  _origUpdateRobotMovement();
+  const R = Arena.robot;
+  if (R._regenRate && Arena.frame % 60 === 0) {
+    R.hp = Math.min(R.maxHP, R.hp + R._regenRate);
+    updateHUD();
+  }
+  // Magnet: auto-collect scrap from far
+  if (Game.mutations.includes('magnet')) {
+    for (let i = Arena.pickups.length-1; i >= 0; i--) {
+      const p = Arena.pickups[i];
+      const d = Math.hypot(p.x-R.x, p.y-R.y);
+      if (d < 120) { // extra range
+        const ang = Math.atan2(R.y-p.y, R.x-p.x);
+        p.x += Math.cos(ang)*4; p.y += Math.sin(ang)*4;
+      }
+    }
+  }
+};
+
+// Damage mutations: explosive + vampire
+const _origDamageEnemy = window.damageEnemy;
+window.damageEnemy = function(idx, dmg, bvx=0, bvy=0) {
+  _origDamageEnemy(idx, dmg, bvx, bvy);
+  const R = Arena.robot;
+
+  // Vampire: heal player
+  if (Game.mutations.includes('vampire')) {
+    R.hp = Math.min(R.maxHP, R.hp + dmg * 0.15);
+    updateHUD();
+  }
+  // Explosive: AoE splash
+  if (Game.mutations.includes('explosive')) {
+    const src = Arena.enemies[idx];
+    const ex = src ? src.x : R.x + bvx, ey = src ? src.y : R.y + bvy;
+    spawnParticles(ex||R.x, ey||R.y, '#ffaa44', 10, 4, 25);
+    for (let j = Arena.enemies.length-1; j >= 0; j--) {
+      if (j === idx) continue;
+      const e2 = Arena.enemies[j];
+      if (e2 && Math.hypot(e2.x-(ex||R.x), e2.y-(ey||R.y)) < 55) {
+        e2.hp -= dmg * 0.4;
+        if (e2.hp <= 0) killEnemy(j);
+      }
+    }
+  }
+};
+
+// Multishot counter
+let _multishotCounter = 0;
+const _origFireWeapon = window.fireWeapon;
+window.fireWeapon = function(wi, R) {
+  _origFireWeapon(wi, R);
+  if (Game.mutations.includes('multishot')) {
+    _multishotCounter++;
+    if (_multishotCounter >= 4) {
+      _multishotCounter = 0;
+      // Fire 2 extra bullets with small spread
+      const w = R.weapons[wi];
+      if (!w) return;
+      let angle = R.angle;
+      const nearest = Arena.enemies.reduce((best, e) => {
+        const d = Math.hypot(e.x-R.x, e.y-R.y);
+        return (!best || d < best.d) ? {e, d} : best;
+      }, null);
+      if (nearest) angle = Math.atan2(nearest.e.y-R.y, nearest.e.x-R.x);
+      for (const da of [-0.2, 0.2]) {
+        const bx = R.x + Math.cos(angle+da)*(R.radius+4);
+        const by = R.y + Math.sin(angle+da)*(R.radius+4);
+        spawnBullet(bx, by, angle+da, w.def, true);
+      }
+    }
+  }
+};
+
+// ── Mutation screen (STATE.MUTATION = 6)
+function updateMutation() {
+  fillRect(0, 0, W, H, C.bg);
+  drawGrid(0, 0, W, H, 40, '#0b150b');
+
+  ctx.fillStyle = C.accent; ctx.font='bold 22px "Courier New",monospace'; ctx.textAlign='center';
+  ctx.fillText('МУТАЦИЯ ПРОТОКОЛА', W/2, 40);
+  ctx.fillStyle = C.textDim; ctx.font='13px "Courier New",monospace';
+  ctx.fillText('Выбери одно постоянное улучшение робота', W/2, 64);
+
+  const cardW = 230, cardH = 180, gap = 20;
+  const total = Mutation.offered.length * cardW + (Mutation.offered.length-1)*gap;
+  const sx = W/2 - total/2;
+
+  Mutation.offered.forEach((m, i) => {
+    const cx2 = sx + i*(cardW+gap), cy2 = H/2 - cardH/2 - 20;
+    const hov = isHover(cx2, cy2, cardW, cardH);
+    const sel = Mutation.picked === m.id;
+
+    fillRect(cx2, cy2, cardW, cardH, sel ? '#0f2a1f' : (hov ? '#0d1f0d' : '#080f08'));
+    strokeRect(cx2, cy2, cardW, cardH, sel ? m.color : (hov ? '#2a5a2a' : C.border), sel ? 3 : 1);
+    if (sel) {
+      ctx.fillStyle = m.color; ctx.font='18px serif'; ctx.textAlign='center';
+      ctx.fillText('✓', cx2+cardW-16, cy2+22);
+    }
+    ctx.save();
+    ctx.shadowColor = m.color; ctx.shadowBlur = sel ? 18 : 0;
+    ctx.fillStyle = m.color; ctx.font='bold 15px "Courier New",monospace'; ctx.textAlign='center';
+    ctx.fillText(m.label, cx2+cardW/2, cy2+40);
+    ctx.restore();
+
+    ctx.fillStyle = C.text; ctx.font='12px "Courier New",monospace'; ctx.textAlign='center';
+    // Word wrap desc
+    const words = m.desc.split(' ');
+    let line='', ly=cy2+70;
+    for (const w of words) {
+      const t = line ? line+' '+w : w;
+      if (t.length > 22 && line) { ctx.fillText(line, cx2+cardW/2, ly); line=w; ly+=18; }
+      else line=t;
+    }
+    ctx.fillText(line, cx2+cardW/2, ly);
+
+    // Effect preview
+    ctx.fillStyle = C.textDim; ctx.font='11px "Courier New",monospace';
+    ctx.fillText('ПОСТОЯННО', cx2+cardW/2, cy2+cardH-14);
+
+    if (isClick(cx2, cy2, cardW, cardH)) Mutation.picked = m.id;
+  });
+
+  // Confirm / skip
+  const bw2 = 220, bh2 = 36;
+  const bx2 = W/2 - bw2/2, by2 = H/2 + cardH/2 + 20;
+  const canConfirm = !!Mutation.picked;
+  const hov2 = isHover(bx2, by2, bw2, bh2);
+  drawButton(canConfirm ? `[ ПРИНЯТЬ МУТАЦИЮ ]` : `[ ВЫБЕРИ МУТАЦИЮ ]`, bx2, by2, bw2, bh2, hov2 && canConfirm);
+
+  const skipX = W/2-60, skipY = by2+46;
+  const hovSkip = isHover(skipX, skipY, 120, 24);
+  ctx.fillStyle = hovSkip ? C.textDim : '#1a2a1a'; ctx.font='11px "Courier New",monospace'; ctx.textAlign='center';
+  ctx.fillText('[ пропустить ]', W/2, skipY+16);
+
+  if (canConfirm && hov2 && Mouse.clicked) {
+    Game.mutations.push(Mutation.picked);
+    Mutation.picked = null;
+    initAssembly();
+    setState(STATE.ASSEMBLY);
+  }
+  if (hovSkip && Mouse.clicked) {
+    initAssembly();
+    setState(STATE.ASSEMBLY);
+  }
+
+  drawVignette();
+  drawScanlines();
+}
+
+// ── Patch prepLoot to go mutation→assembly instead of direct assembly
+const _origPrepLoot = window.prepLoot;
+window.prepLoot = function() {
+  _origPrepLoot();
+  // After loot, show mutation screen (not assembly directly)
+};
+
+// ── Patch loot confirm: after confirming loot go to MUTATION
+// Patch inside updateLoot — find the setState(STATE.ASSEMBLY) call
+// We do this by patching the flow in the loot click handler:
+const _origUpdateLoot = window.updateLoot;
+window.updateLoot = function() {
+  // Temporarily swap setState so ASSEMBLY→MUTATION
+  const _origSetState = window.setState;
+  window.setState = function(s) {
+    if (s === STATE.ASSEMBLY) {
+      window.setState = _origSetState;
+      pickMutations();
+      _origSetState(STATE.MUTATION);
+    } else {
+      _origSetState(s);
+    }
+  };
+  _origUpdateLoot();
+  // If setState wasn't triggered this frame, restore
+  if (window.setState !== _origSetState) window.setState = _origSetState;
+};
+
+console.log('[WRECK PROTOCOL] Modifiers + Mutations loaded.');
 </script>
 
 </body>
