@@ -2283,9 +2283,11 @@ function updateLoot() {
     ctx.fillStyle = C.textDim; ctx.font='9px "Courier New",monospace';
     const words = def.desc.split(' ');
     let line='', ly=cy2+83;
+    const maxDescW = cardW - 16;
     for (const w of words) {
-      if ((line+' '+w).length>24 && line) { ctx.fillText(line, cx2+8, ly); line=w; ly+=11; }
-      else line=(line?line+' ':'')+w;
+      const test = line ? line+' '+w : w;
+      if (ctx.measureText(test).width > maxDescW && line) { ctx.fillText(line, cx2+8, ly); line=w; ly+=11; }
+      else line=test;
     }
     ctx.fillText(line, cx2+8, ly);
 
@@ -3582,17 +3584,32 @@ console.log('[WRECK PROTOCOL] Performance + capacity display loaded.');
 // ═══════════════════════════════════════════════════════════
 //  FONT SETTINGS — stored in localStorage, applied globally
 // ═══════════════════════════════════════════════════════════
+
+// Load Press Start 2P (pixel/retro game font) for crisp Canvas rendering
+(function() {
+  const PIXEL_FONT_URL = 'https://fonts.gstatic.com/s/pressstart2p/v15/e3t4euO8T-267oIAQAu6jDQyK3nVivM.woff2';
+  if (document.fonts && typeof FontFace !== 'undefined') {
+    const ff = new FontFace('Press Start 2P', 'url(' + PIXEL_FONT_URL + ')');
+    ff.load().then(function(loaded) {
+      document.fonts.add(loaded);
+      console.log('[WRECK] Press Start 2P font loaded');
+    }).catch(function(e) {
+      console.warn('[WRECK] Press Start 2P load failed:', e);
+    });
+  }
+})();
+
 const FONT_FAMILIES = [
+  { id: 'pixel',    label: 'Пиксельный',   css: '"Press Start 2P",monospace' },
   { id: 'courier',  label: 'Courier New',  css: '"Courier New",monospace' },
   { id: 'mono',     label: 'Monospace',    css: 'monospace' },
   { id: 'system',   label: 'Системный',    css: 'system-ui,sans-serif' },
-  { id: 'arial',    label: 'Arial',        css: 'Arial,sans-serif' },
 ];
 
 const FONT_CFG_KEY = 'wreck_font_v1';
 function fontCfgLoad() {
   try { const r = localStorage.getItem(FONT_CFG_KEY); if (r) return JSON.parse(r); } catch(e) {}
-  return { family: 'courier', scale: 1.0, bold: false };
+  return { family: 'pixel', scale: 1.0, bold: false };
 }
 function fontCfgSave(cfg) {
   try { localStorage.setItem(FONT_CFG_KEY, JSON.stringify(cfg)); } catch(e) {}
@@ -4314,10 +4331,22 @@ const _curse_origStartArena = window.startArena;
 window.startArena = function() {
   _curse_origStartArena();
   const R = Arena.robot;
-  // Assembly.placed contains the actual part objects with _curse/_bless set during loot
+  // Assembly.placed contains the actual part objects with _curse/_bless set during loot.
+  // NOTE: initAssembly uses JSON.parse(JSON.stringify(...)) to preserve parts between rounds,
+  // which strips functions. We look up penalty/bonus from CURSE_POOL/BLESS_POOL by id as fallback.
   for (const p of Assembly.placed) {
-    if (p._curse) p._curse.penalty(R);
-    if (p._bless) p._bless.bonus(R);
+    if (p._curse) {
+      const c = (typeof p._curse.penalty === 'function')
+        ? p._curse
+        : CURSE_POOL.find(x => x.id === p._curse.id);
+      if (c && c.penalty) c.penalty(R);
+    }
+    if (p._bless) {
+      const b = (typeof p._bless.bonus === 'function')
+        ? p._bless
+        : BLESS_POOL.find(x => x.id === p._bless.id);
+      if (b && b.bonus) b.bonus(R);
+    }
   }
 };
 
@@ -4337,20 +4366,20 @@ window.updateLoot = function() {
 
     if (part._curse) {
       // Red curse badge top-right
-      fillRect(cx2+cardW-82, cy2, 82, 16, '#2a0808');
-      ctx.fillStyle = '#ff4444'; ctx.font = 'bold 8px "Courier New",monospace'; ctx.textAlign = 'center';
-      ctx.fillText(part._curse.badge, cx2+cardW-41, cy2+11);
+      fillRect(cx2+cardW-90, cy2, 90, 18, '#2a0808');
+      ctx.fillStyle = '#ff4444'; ctx.font = 'bold 10px "Courier New",monospace'; ctx.textAlign = 'center';
+      ctx.fillText(part._curse.badge, cx2+cardW-45, cy2+13);
       // Penalty text under description
-      ctx.fillStyle = '#cc2222'; ctx.font = '8px "Courier New",monospace'; ctx.textAlign = 'left';
+      ctx.fillStyle = '#cc2222'; ctx.font = '9px "Courier New",monospace'; ctx.textAlign = 'left';
       ctx.fillText('↓ ' + part._curse.desc, cx2+8, cy2+cardH-4);
     }
     if (part._bless) {
       // Gold bless badge top-left (or shift if curse present)
-      const bx2 = part._curse ? cx2 : cx2;
-      fillRect(bx2, cy2 + (part._curse ? 17 : 0), 80, 16, '#1a1a00');
-      ctx.fillStyle = '#ffdd44'; ctx.font = 'bold 8px "Courier New",monospace'; ctx.textAlign = 'center';
-      ctx.fillText(part._bless.badge, bx2+40, cy2+(part._curse?28:11));
-      ctx.fillStyle = '#aaaa00'; ctx.font = '8px "Courier New",monospace'; ctx.textAlign = 'left';
+      const bx2 = cx2;
+      fillRect(bx2, cy2 + (part._curse ? 19 : 0), 88, 18, '#1a1a00');
+      ctx.fillStyle = '#ffdd44'; ctx.font = 'bold 10px "Courier New",monospace'; ctx.textAlign = 'center';
+      ctx.fillText(part._bless.badge, bx2+44, cy2+(part._curse?32:13));
+      ctx.fillStyle = '#aaaa00'; ctx.font = '9px "Courier New",monospace'; ctx.textAlign = 'left';
       ctx.fillText('↑ ' + part._bless.desc, cx2+8, cy2+cardH-14);
     }
   });
