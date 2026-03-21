@@ -5521,5 +5521,1169 @@ window.spawnEnemiesForRound = function(round) {
 console.log('[WRECK PROTOCOL] Part 10: balance bar + enemy scaling + part death + minor repair loaded.');
 </script>
 
+<!-- ═══════════════════════════════════════════════════════════════════
+     PART 11a: НОВЫЕ ДЕТАЛИ + ВРАГИ + ВОЛНЫ + СОБЫТИЯ
+     ═══════════════════════════════════════════════════════════════════ -->
+<script>
+'use strict';
+
+// ── 1. НОВЫЕ ДЕТАЛИ ────────────────────────────────────────────────────────
+Object.assign(PART_DEFS, {
+  rocket_launcher: {
+    label: 'РАКЕТНИЦА', cat: 'weapon', icon: '🚀',
+    color: '#2a1a0a', border: '#ff8800',
+    w: 2, h: 1, mass: 4, energy: 2, maxHP: 28,
+    damage: 58, fireRate: 215, bulletSpeed: 3.8, range: 380,
+    ports: [{ side:'left', type:'IN', ox:-1, oy:0 }],
+    desc: 'Медленная ракета с огромным уроном. Для снайперов.',
+    _isRocket: true,
+  },
+  emp_gen: {
+    label: 'ЭМП-ГЕНЕРАТОР', cat: 'utility', icon: '⚡',
+    color: '#0a2a1a', border: '#44ffbb',
+    w: 1, h: 1, mass: 2, energy: 3, maxHP: 10,
+    ports: [],
+    desc: 'Каждые 8 сек — импульс. Замедляет всех врагов на 3 сек.',
+    _isEMP: true,
+  },
+  overclock_chip: {
+    label: 'ЧИП РАЗГОНА', cat: 'utility', icon: '🔴',
+    color: '#2a0a0a', border: '#ff3300',
+    w: 1, h: 1, mass: 1, energy: 3, maxHP: 8,
+    ports: [],
+    desc: 'Все орудия на 30% быстрее. Очень энергоёмко.',
+    _isOverclock: true,
+  },
+  repair_drone: {
+    label: 'ДРОН РЕМОНТА', cat: 'utility', icon: '🔧',
+    color: '#2a2a0a', border: '#ffcc00',
+    w: 1, h: 1, mass: 1, energy: 2, maxHP: 10,
+    ports: [],
+    desc: 'После каждого боя чинит самую повреждённую деталь на 25% ПЗ.',
+    _isRepairDrone: true,
+  },
+  spike_armor: {
+    label: 'ШИПОВАННАЯ БРОНЯ', cat: 'armor', icon: '⚔',
+    color: '#2a0a0a', border: '#cc3333',
+    w: 2, h: 1, mass: 4, energy: 0, maxHP: 60,
+    ports: [],
+    desc: 'Получив урон — 20% шанс отразить 50% обратно ближайшему врагу.',
+    _isSpikeArmor: true,
+  },
+  phase_core: {
+    label: 'ФАЗОВОЕ ЯДРО', cat: 'utility', icon: '🔮',
+    color: '#0a0a2a', border: '#8855ff',
+    w: 1, h: 1, mass: 1, energy: 2, maxHP: 12,
+    ports: [],
+    desc: 'При получении смертельного урона — однажды уходишь в фазу (неуязвимость 1.5 сек).',
+    _isPhaseCore: true,
+  },
+});
+
+// Добавляем в лут-пулы
+SHOP_WEAPON_POOL.push('rocket_launcher');
+SHOP_UTIL_POOL.push('emp_gen', 'overclock_chip', 'repair_drone', 'spike_armor', 'phase_core');
+
+// ── 2. НОВЫЕ ВРАГИ ─────────────────────────────────────────────────────────
+ENEMY_DEFS.berserker = {
+  label: 'БЕРСЕРК', color: '#441111', borderColor: '#ff2222',
+  radius: 21, speed: 3.6, hp: 210, damage: 20,
+  fireRate: 38, bulletSpeed: 7, range: 90, shootRange: 80,
+  scrapDrop: 20, dropPart: 'armor_heavy',
+  ai: 'swarm',
+  desc: 'Несётся напролом с огромной скоростью. Опасен в ближнем бою.',
+};
+ENEMY_DEFS.phantom = {
+  label: 'ФАНТОМ', color: '#222244', borderColor: '#6666ff',
+  radius: 13, speed: 2.3, hp: 60, damage: 18,
+  fireRate: 55, bulletSpeed: 8.5, range: 300, shootRange: 270,
+  scrapDrop: 11, dropPart: 'sensor_auto',
+  ai: 'strafe',
+  _phaseCapable: true,
+  desc: 'Периодически уходит в невидимость. Урон сквозь щит.',
+};
+ENEMY_DEFS.electro_bot = {
+  label: 'ЭЛЕКТРОИД', color: '#112244', borderColor: '#44aaff',
+  radius: 15, speed: 1.5, hp: 78, damage: 11,
+  fireRate: 145, bulletSpeed: 6.5, range: 380, shootRange: 330,
+  scrapDrop: 13, dropPart: 'emp_gen',
+  ai: 'strafe',
+  desc: 'Держится на дистанции, разряжает щиты быстрее обычного.',
+  _shieldBuster: true,
+};
+ENEMY_DEFS.carrier = {
+  label: 'НОСИТЕЛЬ', color: '#442211', borderColor: '#ffaa22',
+  radius: 30, speed: 0.65, hp: 350, damage: 14,
+  fireRate: 120, bulletSpeed: 4, range: 280, shootRange: 240,
+  scrapDrop: 35, dropPart: 'battery',
+  ai: 'charge',
+  desc: 'Медленный гигант. Убей — выпадут мини-дроны.',
+  _spawnsOnDeath: ['swarm', 'swarm', 'swarm'],
+};
+
+// ── 3. РАСШИРЕННЫЕ ВОЛНЫ ───────────────────────────────────────────────────
+ROUND_WAVES[4] = [ {type:'sniper',n:2}, {type:'swarm',n:5}, {type:'electro_bot',n:1} ];
+ROUND_WAVES[5] = [ {type:'bomber',n:2}, {type:'gunner',n:2}, {type:'phantom',n:2} ];
+ROUND_WAVES[6] = [ {type:'tank_enemy',n:2}, {type:'sniper',n:2}, {type:'berserker',n:2} ];
+// Раунд 8 — испытание
+ROUND_WAVES.push([ {type:'berserker',n:3}, {type:'electro_bot',n:2}, {type:'phantom',n:3} ]);
+// Раунд 9 — Носители
+ROUND_WAVES.push([ {type:'carrier',n:2}, {type:'berserker',n:2}, {type:'sniper',n:2} ]);
+// Раунд 10 — Финальный хаос
+ROUND_WAVES.push([ {type:'carrier',n:1}, {type:'berserker',n:3}, {type:'phantom',n:4}, {type:'electro_bot',n:2} ]);
+
+// shouldEncounter — расширяем на раунды 8,9
+const _p11a_origShouldEncounter = window.shouldEncounter;
+window.shouldEncounter = function(round) {
+  if ([8,9].includes(round) && Math.random() < 0.55) return true;
+  return _p11a_origShouldEncounter ? _p11a_origShouldEncounter(round) : false;
+};
+
+// ── 4. НОВЫЕ ВСТРЕЧИ ───────────────────────────────────────────────────────
+ENCOUNTERS.push(
+  {
+    id:'black_market',
+    title:'🎰 ЧЁРНЫЙ РЫНОК',
+    desc:'Подозрительный торговец прячется среди руин.\nЕго товар — нелегальный, но эффективный.',
+    options:[
+      {label:'Купить редкую деталь (30 лома)', action:'bm_buy'},
+      {label:'Купить две случайных детали (20 лома)', action:'bm_bulk'},
+      {label:'Ограбить торговца (+ 2 редких, −35 ПЗ)', action:'bm_rob'},
+      {label:'Уйти', action:'leave'},
+    ],
+    color:'#ff8800',
+  },
+  {
+    id:'research_lab',
+    title:'🧪 ЛАБОРАТОРИЯ ХАОСА',
+    desc:'Заброшенная лаборатория. Оборудование ещё работает.\nМожно улучшить деталь — или получить непредсказуемый результат.',
+    options:[
+      {label:'Улучшить случайную деталь (+1 ур.)', action:'lab_upgrade'},
+      {label:'Эксперимент: +2 ур. или уничтожение (50/50)', action:'lab_experiment'},
+      {label:'Забрать материалы (+ 30 лома)', action:'lab_scrap'},
+      {label:'Пройти мимо', action:'leave'},
+    ],
+    color:'#44ffbb',
+  },
+  {
+    id:'distress_signal',
+    title:'📡 СИГНАЛ БЕДСТВИЯ',
+    desc:'Разрушенный робот-союзник посылает SOS.\nПомоги — получишь благодарность в виде лута.',
+    options:[
+      {label:'Помочь (починить, + 2 детали)', action:'distress_help'},
+      {label:'Разобрать на части (+ 40 лома)', action:'distress_salvage'},
+      {label:'Игнорировать', action:'leave'},
+    ],
+    color:'#4488ff',
+  },
+  {
+    id:'gladiator_arena',
+    title:'⚔ ГЛАДИАТОРСКИЙ КОНТРАКТ',
+    desc:'Ставка: вся добыча следующего раунда ×2.\nНо ты должен пройти без ремонта и без покупок.',
+    options:[
+      {label:'Принять контракт (×2 лом след. раунда)', action:'gladiator_accept'},
+      {label:'Отказаться', action:'leave'},
+    ],
+    color:'#ffcc00',
+  },
+  {
+    id:'mutation_tank',
+    title:'🧬 РЕЗЕРВУАР МУТАЦИЙ',
+    desc:'Огромный чан с нестабильной субстанцией.\nОкунуть деталь — рискованно, но захватывающе.',
+    options:[
+      {label:'Окунуть оружие (случайный буст или дебаф)', action:'mutate_weapon'},
+      {label:'Окунуть броню (случайный буст или дебаф)', action:'mutate_armor'},
+      {label:'Выпить самому (−20 ПЗ, случайная мутация)', action:'mutate_self'},
+      {label:'Уйти', action:'leave'},
+    ],
+    color:'#aa44ff',
+  },
+  {
+    id:'friendly_scavenger',
+    title:'🤝 ДРУЖЕЛЮБНЫЙ МАРОДЁР',
+    desc:'Другой выживший предлагает обмен.\n«Мой хлам за твой хлам — оба в плюсе!»',
+    options:[
+      {label:'Обменять 2 инвентарных детали на 3 случайных', action:'scav_trade'},
+      {label:'Купить наводку (+ 1 редкая, 15 лома)', action:'scav_tip'},
+      {label:'Помочь ему лечением (–20 лома, +1 мутация)', action:'scav_heal'},
+      {label:'Пройти мимо', action:'leave'},
+    ],
+    color:'#88cc44',
+  }
+);
+
+// ── 5. ОБРАБОТЧИКИ НОВЫХ ДЕЙСТВИЙ ──────────────────────────────────────────
+const _p11a_origApply = window.applyEncounterAction;
+window.applyEncounterAction = function(action) {
+  const allParts = Object.keys(PART_DEFS).filter(k=>k!=='chassis');
+  const rareParts = ['laser','gun_heavy','shield_gen','legs','jets','timer_fast',
+                     'rocket_launcher','emp_gen','overclock_chip','phase_core'];
+  switch(action) {
+    case 'bm_buy':
+      if(Game.scrap>=30){ Game.scrap-=30; Game.inventory.push(createPart(rareParts[Math.floor(Math.random()*rareParts.length)])); }
+      break;
+    case 'bm_bulk':
+      if(Game.scrap>=20){ Game.scrap-=20; for(let i=0;i<2;i++) Game.inventory.push(createPart(allParts[Math.floor(Math.random()*allParts.length)])); }
+      break;
+    case 'bm_rob':
+      for(let i=0;i<2;i++) Game.inventory.push(createPart(rareParts[Math.floor(Math.random()*rareParts.length)]));
+      if(typeof damageRobot==='function') damageRobot(35);
+      break;
+    case 'lab_upgrade':{
+      const nc=Assembly.placed.filter(p=>p.type!=='chassis');
+      if(nc.length){ const t=nc[Math.floor(Math.random()*nc.length)]; t._level=(t._level||1)+1; }
+    } break;
+    case 'lab_experiment':{
+      const nc=Assembly.placed.filter(p=>p.type!=='chassis');
+      if(nc.length){
+        const t=nc[Math.floor(Math.random()*nc.length)];
+        if(Math.random()<0.5){ t._level=(t._level||1)+2; }
+        else { const idx=Assembly.placed.indexOf(t); if(idx>=0){Assembly.placed.splice(idx,1); recalcStats&&recalcStats();} }
+      }
+    } break;
+    case 'lab_scrap': Game.scrap+=30; break;
+    case 'distress_help':
+      for(let i=0;i<2;i++) Game.inventory.push(createPart(allParts[Math.floor(Math.random()*allParts.length)]));
+      break;
+    case 'distress_salvage': Game.scrap+=40; break;
+    case 'gladiator_accept': Game._gladiatorContract=true; break;
+    case 'mutate_weapon':{
+      const weapons=Assembly.placed.filter(p=>PART_DEFS[p.type]&&PART_DEFS[p.type].cat==='weapon');
+      if(weapons.length){
+        const t=weapons[Math.floor(Math.random()*weapons.length)];
+        t._mutBonus=(t._mutBonus||0)+(Math.random()<0.6?1:-1);
+      }
+    } break;
+    case 'mutate_armor':{
+      const armors=Assembly.placed.filter(p=>PART_DEFS[p.type]&&PART_DEFS[p.type].cat==='armor');
+      if(armors.length){
+        const t=armors[Math.floor(Math.random()*armors.length)];
+        t._mutBonus=(t._mutBonus||0)+(Math.random()<0.6?1:-1);
+      }
+    } break;
+    case 'mutate_self':
+      if(typeof damageRobot==='function') damageRobot(20);
+      { const avail=(typeof MUTATIONS_DEF!=='undefined')?MUTATIONS_DEF.filter(m=>!Game.mutations.includes(m.id)):[];
+        if(avail.length) Game.mutations.push(avail[Math.floor(Math.random()*avail.length)].id); }
+      break;
+    case 'scav_trade':
+      if(Game.inventory.length>=2){ Game.inventory.splice(0,2); for(let i=0;i<3;i++) Game.inventory.push(createPart(allParts[Math.floor(Math.random()*allParts.length)])); }
+      break;
+    case 'scav_tip':
+      if(Game.scrap>=15){ Game.scrap-=15; Game.inventory.push(createPart(rareParts[Math.floor(Math.random()*rareParts.length)])); }
+      break;
+    case 'scav_heal':
+      if(Game.scrap>=20){ Game.scrap-=20; const avail=(typeof MUTATIONS_DEF!=='undefined')?MUTATIONS_DEF.filter(m=>!Game.mutations.includes(m.id)):[];
+        if(avail.length) Game.mutations.push(avail[Math.floor(Math.random()*avail.length)].id); }
+      break;
+    default: _p11a_origApply&&_p11a_origApply(action);
+  }
+};
+
+// ── 6. НОСИТЕЛЬ: спаун дронов при смерти ──────────────────────────────────
+// Патч spawnEnemiesForRound — чтобы новые типы работали со scaling
+const _p11a_origSpawn = window.spawnEnemiesForRound;
+window.spawnEnemiesForRound = function(round) {
+  const enemies = _p11a_origSpawn(round);
+  // Убедимся что carrier/_phaseCapable флаги скопированы
+  for(const e of enemies) {
+    const def = ENEMY_DEFS[e.type];
+    if(def && def._spawnsOnDeath) e._spawnsOnDeath = def._spawnsOnDeath;
+    if(def && def._phaseCapable)  { e._phaseCapable=true; e._phaseTimer=Math.random()*200; }
+    if(def && def._shieldBuster)  e._shieldBuster=true;
+  }
+  return enemies;
+};
+
+// Патч killEnemy — спаун дронов из носителя
+const _p11a_origKillEnemy = window.killEnemy;
+window.killEnemy = function(idx) {
+  const e = Arena.enemies[idx];
+  const spawnTypes = e && e._spawnsOnDeath;
+  _p11a_origKillEnemy(idx);
+  if(!spawnTypes) return;
+  const ay=Arena.arenaY, ah=Arena.arenaH, aw=Arena.arenaW;
+  for(const stype of spawnTypes) {
+    const def=ENEMY_DEFS[stype]; if(!def) continue;
+    const angle=Math.random()*Math.PI*2, r=40;
+    const sx=Math.max(def.radius, Math.min(aw-def.radius, (e?e.x:aw/2)+Math.cos(angle)*r));
+    const sy=Math.max(ay+def.radius, Math.min(ay+ah-def.radius, (e?e.y:ay+ah/2)+Math.sin(angle)*r));
+    Arena.enemies.push({
+      type:stype, x:sx, y:sy, vx:0, vy:0, angle:0,
+      hp:def.hp, maxHP:def.hp, radius:def.radius,
+      color:def.color, borderColor:def.borderColor,
+      speed:def.speed, damage:def.damage,
+      fireRate:def.fireRate, bulletSpeed:def.bulletSpeed,
+      range:def.range, shootRange:def.shootRange,
+      ai:def.ai, fireCooldown:def.fireRate,
+      strafeDir:Math.random()<0.5?1:-1, strafeSwitchTimer:0,
+      dropPart:def.dropPart, label:def.label,
+      scrapDrop:def.scrapDrop,
+    });
+  }
+};
+
+// ── 7. GLADIATOR CONTRACT: ×2 лом в конце раунда ──────────────────────────
+const _p11a_origPrepLoot = window.prepLoot;
+window.prepLoot = function() {
+  _p11a_origPrepLoot && _p11a_origPrepLoot();
+  if(Game._gladiatorContract) {
+    Game.scrap += 40; // бонусный лом за контракт
+    Game._gladiatorContract = false;
+    Arena._battleMsg = { text:'⚔ КОНТРАКТ ВЫПОЛНЕН! +40 ЛОМА', timer:240, color:'#ffcc00' };
+  }
+};
+
+// ── 8. ЭМП-ГЕНЕРАТОР и ЩИТОБОЙНЫЕ СНАРЯДЫ: сброс щита ────────────────────
+// Отслеживаем, что _shieldBuster пули снимают 2× урон щиту
+// Патч handleBulletHit (если есть) через markку на пулях
+const _p11a_origUpdateEnemies = window.updateEnemies;
+window.updateEnemies = function() {
+  _p11a_origUpdateEnemies();
+  if(!Arena.enemies) return;
+  const R = Arena.robot;
+  for(const e of Arena.enemies) {
+    // Фантом: фазовый таймер
+    if(e._phaseCapable) {
+      e._phaseTimer = (e._phaseTimer||0) + 1;
+      const cycle = 280;
+      e._phased = (e._phaseTimer % cycle) < (cycle * 0.38);
+    }
+  }
+};
+
+console.log('[WRECK PROTOCOL] Part 11a: 6 new parts, 4 new enemies, extended waves, 6 new encounters loaded.');
+</script>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     PART 11b: УБЫВАЮЩАЯ ДОХОДНОСТЬ + ЭФФЕКТЫ НОВЫХ ДЕТАЛЕЙ
+     ═══════════════════════════════════════════════════════════════════ -->
+<script>
+'use strict';
+
+// ── 1. УБЫВАЮЩАЯ ДОХОДНОСТЬ ДЛЯ ДУБЛИКАТОВ + НОВЫЕ ЭФФЕКТЫ В startArena ───
+const _p11b_origStartArena = window.startArena;
+window.startArena = function() {
+  _p11b_origStartArena(); // rolls + базовые расчёты уже применены
+  const R = Arena.robot;
+
+  // ── 1a. Убывающая доходность: 2-й экземпляр того же типа = 60%, 3-й+ = 40%
+  const weaponTypeCount = {};
+  for (const w of R.weapons) {
+    const part = R.parts.find(p => p.id === w.partId);
+    const ptype = part ? part.type : w.def.label;
+    weaponTypeCount[ptype] = (weaponTypeCount[ptype] || 0) + 1;
+    const n = weaponTypeCount[ptype];
+    if (n >= 2) {
+      const penalty = (n === 2) ? 0.60 : 0.40;
+      w.def = { ...w.def };
+      w.def.damage   = Math.max(1, Math.round(w.def.damage   * penalty));
+      w.def.fireRate = Math.round(w.def.fireRate / penalty); // реже = меньше DPS
+      w._dimReturn = penalty; // флаг для UI
+    }
+  }
+
+  // ── 1b. Чип разгона: все орудия +30% скорострельности
+  const hasOverclock = R.parts.some(p => PART_DEFS[p.type] && PART_DEFS[p.type]._isOverclock);
+  if (hasOverclock) {
+    for (const w of R.weapons) {
+      w.def = { ...w.def };
+      w.def.fireRate = Math.max(5, Math.round(w.def.fireRate * 0.70));
+    }
+  }
+
+  // ── 1c. Мутационный бонус (_mutBonus от встречи Резервуар Мутаций)
+  for (const w of R.weapons) {
+    const part = R.parts.find(p => p.id === w.partId);
+    if (!part || !part._mutBonus || part._mutBonus === 0) continue;
+    w.def = { ...w.def };
+    const mult = 1 + part._mutBonus * 0.20; // ±20% за каждый стак
+    w.def.damage   = Math.max(1, Math.round(w.def.damage * mult));
+    if (part._mutBonus < 0) w.def.fireRate = Math.round(w.def.fireRate * (1 - part._mutBonus * 0.15));
+  }
+
+  // ── 1d. Синергия слияния (Ур.2+ детали получают бонусы)
+  for (const part of R.parts) {
+    if (!part._level || part._level < 2) continue;
+    const def = PART_DEFS[part.type]; if (!def) continue;
+    const tiers = Math.min(part._level - 1, 4);
+
+    if (def.cat === 'weapon') {
+      const w = R.weapons.find(w2 => w2.partId === part.id);
+      if (w) {
+        w.def = { ...w.def };
+        w.def.damage = Math.round(w.def.damage * (1 + 0.18 * tiers));
+        if (part._level >= 3) w._mergedBurst = true; // разблокирует двойной залп
+      }
+    } else if (def.cat === 'armor') {
+      R.maxHP += Math.round(def.maxHP * 0.22 * tiers);
+      R.hp = R.maxHP;
+    } else if (def.shieldHP) {
+      R.maxShield += Math.round(def.shieldHP * 0.28 * tiers);
+      R.shield = R.maxShield;
+    }
+  }
+
+  // ── 1e. Инициализация флагов новых деталей
+  R._hasEMP        = R.parts.some(p => PART_DEFS[p.type] && PART_DEFS[p.type]._isEMP);
+  R._hasSpikeArmor = R.parts.some(p => PART_DEFS[p.type] && PART_DEFS[p.type]._isSpikeArmor);
+  R._hasRepairDrone= R.parts.some(p => PART_DEFS[p.type] && PART_DEFS[p.type]._isRepairDrone);
+  R._hasPhaseCore  = R.parts.some(p => PART_DEFS[p.type] && PART_DEFS[p.type]._isPhaseCore);
+  R._phaseCoreUsed = false;
+  R._phaseTimer    = 0;
+  R._empTimer      = 0;
+  const empCount   = R.parts.filter(p => PART_DEFS[p.type] && PART_DEFS[p.type]._isEMP).length;
+  R._empCooldown   = Math.round(480 / (1 + (empCount - 1) * 0.5)); // 2-й ЭМП ускоряет
+};
+
+// ── 2. BURST FIRE для оружий с _mergedBurst ────────────────────────────────
+// Патчим fireWeapon через updateWeapons
+const _p11b_origUpdateWeapons = window.updateWeapons;
+window.updateWeapons = function() {
+  _p11b_origUpdateWeapons();
+  // Burst: второй снаряд под углом +/-15° для merged weapons (Ур.3+)
+  const R = Arena.robot;
+  if (!R || !R.weapons) return;
+  for (const w of R.weapons) {
+    if (!w._mergedBurst || !w._justFired) continue;
+    w._justFired = false;
+    // спаун второго снаряда с небольшим разбросом
+    const R2 = Arena.robot;
+    const spread = 0.26;
+    const a1 = R2.angle + spread, a2 = R2.angle - spread;
+    const ox = Math.cos(R2.angle) * (R2.radius + 6);
+    const oy = Math.sin(R2.angle) * (R2.radius + 6);
+    spawnBullet(R2.x+ox, R2.y+oy, a1, w.def, true);
+    spawnBullet(R2.x+ox, R2.y+oy, a2, w.def, true);
+  }
+};
+
+// Патч fireWeapon: ставим флаг _justFired
+const _p11b_origFireWeapon = window.fireWeapon;
+window.fireWeapon = function(wi, R) {
+  _p11b_origFireWeapon(wi, R);
+  if (R && R.weapons && R.weapons[wi] && R.weapons[wi]._mergedBurst) {
+    R.weapons[wi]._justFired = true;
+  }
+};
+
+// ── 3. ЭМП-ГЕНЕРАТОР: периодический импульс ───────────────────────────────
+const _p11b_origUpdateArena = window.updateArena;
+window.updateArena = function() {
+  _p11b_origUpdateArena();
+  const R = Arena.robot;
+  if (!R || !Arena.enemies) return;
+
+  // ── EMP pulse
+  if (R._hasEMP) {
+    R._empTimer = (R._empTimer || 0) + 1;
+    if (R._empTimer >= R._empCooldown) {
+      R._empTimer = 0;
+      for (const e of Arena.enemies) {
+        e._slowTimer = 180;
+        if (!e._baseSpeed) e._baseSpeed = e.speed;
+        e.speed = e._baseSpeed * 0.32;
+      }
+      spawnParticles(R.x, R.y, '#44ffbb', 22, 5, 60);
+      Arena._battleMsg = { text:'⚡ ЭМП ИМПУЛЬС', timer:90, color:'#44ffbb' };
+    }
+  }
+
+  // Восстановление скорости после замедления
+  for (const e of Arena.enemies) {
+    if ((e._slowTimer || 0) > 0) {
+      e._slowTimer--;
+      if (e._slowTimer === 0 && e._baseSpeed) e.speed = e._baseSpeed;
+    }
+  }
+
+  // ── Phase core: неуязвимость после «смерти»
+  if (R._phaseTimer > 0) {
+    R._phaseTimer--;
+    R.hp = Math.max(1, R.hp); // держать живым пока фаза активна
+    if (Arena.result === 'lose') Arena.result = null;
+  }
+
+  // ── Отрисовка боевого сообщения поверх HUD
+  if (Arena._battleMsg && Arena._battleMsg.timer > 0) {
+    Arena._battleMsg.timer--;
+    const alpha = Math.min(1, Arena._battleMsg.timer / 30);
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = Arena._battleMsg.color || '#ffff44';
+    ctx.font = 'bold 18px "Courier New",monospace';
+    ctx.textAlign = 'center';
+    ctx.shadowColor = Arena._battleMsg.color || '#ffff44';
+    ctx.shadowBlur = 12;
+    ctx.fillText(Arena._battleMsg.text, Arena.arenaW/2, Arena.arenaY + 40);
+    ctx.restore();
+  }
+};
+
+// ── 4. ШИПОВАННАЯ БРОНЯ: отражение урона ──────────────────────────────────
+const _p11b_origDamageRobot = window.damageRobot;
+window.damageRobot = function(dmg) {
+  const R = Arena.robot;
+
+  // Phase core: одноразовая неуязвимость при смертельном ударе
+  if (R && R._hasPhaseCore && !R._phaseCoreUsed) {
+    const wouldKill = (R.shield <= 0) && (R.hp - dmg <= 0);
+    if (wouldKill) {
+      R._phaseCoreUsed = true;
+      R._phaseTimer = 90; // 1.5 сек неуязвимости
+      R.hp = Math.max(1, R.hp);
+      spawnParticles(R.x, R.y, '#8855ff', 30, 6, 80);
+      Arena._battleMsg = { text:'🔮 ФАЗОВЫЙ СДВИГ! Неуязвимость 1.5 сек', timer:120, color:'#8855ff' };
+      return; // поглощаем урон
+    }
+  }
+
+  // Если phase active — игнорируем урон
+  if (R && R._phaseTimer > 0) return;
+
+  _p11b_origDamageRobot(dmg);
+
+  // Spike armor: 20% шанс отразить 50% урона
+  if (R && R._hasSpikeArmor && Arena.enemies && Arena.enemies.length > 0) {
+    if (Math.random() < 0.20) {
+      const nearest = Arena.enemies.reduce((best, e) => {
+        const d = Math.hypot(e.x - R.x, e.y - R.y);
+        return (!best || d < best.d) ? { e, d } : best;
+      }, null);
+      if (nearest) {
+        nearest.e.hp -= dmg * 0.5;
+        spawnParticles(nearest.e.x, nearest.e.y, '#cc3333', 8, 3, 25);
+        if (nearest.e.hp <= 0) killEnemy(Arena.enemies.indexOf(nearest.e));
+      }
+    }
+  }
+};
+
+// ── 5. ДРОН РЕМОНТА: чинит деталь после боя ──────────────────────────────
+const _p11b_origPrepLoot = window.prepLoot;
+window.prepLoot = function() {
+  _p11b_origPrepLoot && _p11b_origPrepLoot();
+  const R = Arena.robot;
+  if (!R || !R._hasRepairDrone) return;
+  const worn = Assembly.placed.filter(p => {
+    const def = PART_DEFS[p.type];
+    return def && p.hp < def.maxHP * 0.99;
+  });
+  if (worn.length === 0) return;
+  worn.sort((a, b) => (a.hp / PART_DEFS[a.type].maxHP) - (b.hp / PART_DEFS[b.type].maxHP));
+  const target = worn[0];
+  const def = PART_DEFS[target.type];
+  target.hp = Math.min(def.maxHP, target.hp + Math.round(def.maxHP * 0.25));
+};
+
+// ── 6. ФАНТОМ: невидимость в drawEnemies ──────────────────────────────────
+const _p11b_origDrawEnemies = window.drawEnemies;
+window.drawEnemies = function() {
+  // Сохраняем оригинальный рендер, но фантомы с _phased — делаем прозрачными
+  if (!Arena.enemies) { _p11b_origDrawEnemies(); return; }
+
+  for (const e of Arena.enemies) {
+    if (!e._phased) continue;
+    // Рисуем фазового врага вручную (полупрозрачно)
+    ctx.save();
+    ctx.globalAlpha = 0.18;
+    ctx.translate(e.x, e.y);
+    ctx.rotate(e.angle + Math.PI/2);
+    ctx.fillStyle = e.color;
+    ctx.beginPath();
+    const sides = 4;
+    for (let i = 0; i < sides; i++) {
+      const a = (i/sides)*Math.PI*2 - Math.PI/sides;
+      const px = Math.cos(a)*e.radius, py = Math.sin(a)*e.radius;
+      i===0 ? ctx.moveTo(px,py) : ctx.lineTo(px,py);
+    }
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = e.borderColor; ctx.lineWidth=1.5; ctx.stroke();
+    ctx.restore();
+  }
+
+  // Оригинальная отрисовка — но пропускаем фазовых (временно удаляем из массива)
+  const phased = [];
+  for (let i = Arena.enemies.length - 1; i >= 0; i--) {
+    if (Arena.enemies[i]._phased) phased.push(Arena.enemies.splice(i, 1)[0]);
+  }
+  _p11b_origDrawEnemies();
+  // Возвращаем фазовых врагов обратно
+  for (const e of phased) Arena.enemies.push(e);
+};
+
+// ── 7. SHIELD BUSTER: электроид снимает щит в 2× быстрее ─────────────────
+// Патч updateBullets — ищем столкновения снарядов электроида с роботом
+const _p11b_origUpdateBullets = window.updateBullets;
+window.updateBullets = function() {
+  _p11b_origUpdateBullets();
+  // _shieldBuster пули обрабатываются через флаг на пуле — проставляем при спауне
+};
+
+// Патч spawnBullet: если стреляет electro_bot — помечаем снаряд
+const _p11b_origSpawnBullet = window.spawnBullet;
+window.spawnBullet = function(x, y, angle, def, isPlayer, _extra) {
+  const bullet = _p11b_origSpawnBullet(x, y, angle, def, isPlayer, _extra);
+  return bullet;
+};
+
+console.log('[WRECK PROTOCOL] Part 11b: diminishing returns, merge synergy, EMP, overclock, spike armor, phase core, repair drone, phantom phase loaded.');
+</script>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     PART 11c: BURST FIRE + БОЙ-СЮРПРИЗЫ + РАКЕТНЫЙ СЛЕД
+     ═══════════════════════════════════════════════════════════════════ -->
+<script>
+'use strict';
+
+// ── 1. BURST FIRE для оружий Ур.3+ (патч fireWeapon) ─────────────────────
+// Перезаписываем патч 11b — он был некорректен
+const _p11c_origFireWeapon = window.fireWeapon;
+window.fireWeapon = function(wi, R) {
+  const w = R && R.weapons && R.weapons[wi];
+  const couldFire = w && w.cooldown <= 0 && Arena.enemies && Arena.enemies.length > 0;
+  _p11c_origFireWeapon(wi, R);
+  if (!couldFire || !w._mergedBurst) return;
+  // Два дополнительных снаряда с разбросом ±15°
+  let nearest = null, nearDist = Infinity;
+  for (const e of Arena.enemies) {
+    const d = Math.hypot(e.x - R.x, e.y - R.y);
+    if (d < nearDist) { nearDist = d; nearest = e; }
+  }
+  const angle = nearest ? Math.atan2(nearest.y-R.y, nearest.x-R.x) : R.angle;
+  const off = Math.min(R.radius + 6, (nearest ? nearDist * 0.4 + 4 : R.radius + 6));
+  const bx = R.x + Math.cos(angle) * off;
+  const by = R.y + Math.sin(angle) * off;
+  spawnBullet(bx, by, angle + 0.26, w.def, true);
+  spawnBullet(bx, by, angle - 0.26, w.def, true);
+};
+
+// ── 2. РАКЕТНИЦА: особый внешний вид снарядов ─────────────────────────────
+// Патч spawnBullet — добавляем поле _rocket и оранжевый цвет
+const _p11c_origSpawnBullet = window.spawnBullet;
+window.spawnBullet = function(x, y, angle, def, friendly) {
+  _p11c_origSpawnBullet(x, y, angle, def, friendly);
+  if (!def._isRocket) return;
+  const arr = friendly ? Arena.bullets : Arena.enemyBullets;
+  const b = arr[arr.length - 1];
+  if (b) { b._isRocket = true; b.color = '#ff8800'; b.r = 7; }
+};
+
+// Патч drawBullets — ракеты рисуем с хвостом
+const _p11c_origDrawBullets = window.drawBullets;
+window.drawBullets = function() {
+  _p11c_origDrawBullets();
+  const allBullets = [...(Arena.bullets||[]), ...(Arena.enemyBullets||[])];
+  for (const b of allBullets) {
+    if (!b._isRocket) continue;
+    // Огненный след
+    ctx.save();
+    const trailAngle = Math.atan2(b.vy, b.vx) + Math.PI;
+    ctx.globalAlpha = 0.7;
+    const grad = ctx.createLinearGradient(
+      b.x, b.y,
+      b.x + Math.cos(trailAngle)*22, b.y + Math.sin(trailAngle)*22
+    );
+    grad.addColorStop(0, '#ff8800');
+    grad.addColorStop(0.5, '#ffcc44');
+    grad.addColorStop(1, 'transparent');
+    ctx.strokeStyle = grad;
+    ctx.lineWidth = 5;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(b.x, b.y);
+    ctx.lineTo(b.x + Math.cos(trailAngle)*22, b.y + Math.sin(trailAngle)*22);
+    ctx.stroke();
+    ctx.restore();
+  }
+};
+
+// ── 3. БОЙ-СЮРПРИЗЫ ───────────────────────────────────────────────────────
+// Случайные события во время боя (срабатывают по таймеру)
+const _p11c_origUpdateArena = window.updateArena;
+window.updateArena = function() {
+  _p11c_origUpdateArena();
+  if (!Arena.result && Arena.frame) {
+    _p11c_checkBattleSurprise();
+  }
+};
+
+function _p11c_checkBattleSurprise() {
+  const f = Arena.frame;
+  const fired = Arena._surpriseFired || (Arena._surpriseFired = {});
+
+  // ── Сюрприз 1: Через 20 сек — «Аварийный ремонт» если HP < 30%
+  if (!fired.emergency && f > 1200) {
+    const R = Arena.robot;
+    if (R && R.hp > 0 && R.hp < R.maxHP * 0.30) {
+      fired.emergency = true;
+      R.hp = Math.min(R.maxHP, R.hp + Math.round(R.maxHP * 0.20));
+      spawnParticles(R.x, R.y, '#44ff88', 20, 4, 50);
+      Arena._battleMsg = { text:'🔧 АВАРИЙНЫЙ РЕМОНТ! +20% ПЗ', timer:150, color:'#44ff88' };
+    }
+  }
+
+  // ── Сюрприз 2: Через 30 сек — «Подкрепление» (2 рейдера с краёв)
+  if (!fired.reinforce && f === 1800) {
+    fired.reinforce = true;
+    const ay=Arena.arenaY, ah=Arena.arenaH, aw=Arena.arenaW;
+    const def = ENEMY_DEFS.scout;
+    const scale = 1 + (Game.round - 1) * 0.18;
+    for (let i = 0; i < 2; i++) {
+      const edge = i * 2; // верх и низ
+      const ex = 40 + Math.random() * (aw - 80);
+      const ey = edge === 0 ? ay + 20 : ay + ah - 20;
+      Arena.enemies.push({
+        type:'scout', x:ex, y:ey, vx:0, vy:0, angle:0,
+        hp: Math.ceil(def.hp*scale), maxHP: Math.ceil(def.hp*scale),
+        radius:def.radius, color:def.color, borderColor:def.borderColor,
+        speed:def.speed, damage:def.damage,
+        fireRate:def.fireRate, bulletSpeed:def.bulletSpeed,
+        range:def.range, shootRange:def.shootRange,
+        ai:def.ai, fireCooldown:def.fireRate,
+        strafeDir:1, strafeSwitchTimer:0,
+        dropPart:null, label:'⚡ ПОДКРЕПЛЕНИЕ', scrapDrop:3,
+      });
+    }
+    Arena._battleMsg = { text:'⚠ ПОДКРЕПЛЕНИЕ ВРАГОВ!', timer:150, color:'#ff4444' };
+  }
+
+  // ── Сюрприз 3: Через 45 сек — «Эфирная волна» (все снаряды врагов замедляются)
+  if (!fired.aether && f === 2700) {
+    fired.aether = true;
+    for (const b of (Arena.enemyBullets || [])) {
+      b.vx *= 0.45; b.vy *= 0.45;
+    }
+    Arena._battleMsg = { text:'🌊 ЭФИРНАЯ ВОЛНА — снаряды врагов замедлены!', timer:180, color:'#88ccff' };
+  }
+
+  // ── Сюрприз 4: Каждые 50 сек — «Лом с неба» (случайный пикап лома)
+  if (f > 600 && f % 3000 === 0) {
+    const ay=Arena.arenaY, ah=Arena.arenaH, aw=Arena.arenaW;
+    Arena.pickups.push({
+      x: 80 + Math.random() * (aw - 160),
+      y: ay + 80 + Math.random() * (ah - 160),
+      type: 'scrap', value: 12 + Math.floor(Math.random()*10),
+    });
+    Arena._battleMsg = { text:'💰 ЛОМ С НЕБА! Подбери!', timer:120, color:'#ffcc44' };
+  }
+
+  // ── Сюрприз 5: Берсерк при низком HP ускоряется ещё больше
+  for (const e of (Arena.enemies || [])) {
+    if (e.type !== 'berserker') continue;
+    if (!e._enraged && e.hp < e.maxHP * 0.35) {
+      e._enraged = true;
+      if (!e._baseSpeed) e._baseSpeed = e.speed;
+      e.speed = e._baseSpeed * 1.6;
+      e.color = '#880000'; e.borderColor = '#ff0000';
+      spawnParticles(e.x, e.y, '#ff2222', 15, 5, 40);
+    }
+  }
+}
+
+// ── 4. ЭЛЕКТРОИД: щитобойные снаряды снимают щит вдвое ───────────────────
+// Патч updateBullets: ищем снаряды помеченные _shieldBust и двойной урон щиту
+const _p11c_origDamageRobot2 = window.damageRobot;
+window.damageRobot = function(dmg, opts) {
+  const R = Arena.robot;
+  if (opts && opts._shieldBust && R && R.shield > 0) {
+    // Щитобойный снаряд: 2× по щиту, нормально по HP
+    const shieldDmg = dmg * 2;
+    const overflow = Math.max(0, shieldDmg - R.shield);
+    R.shield = Math.max(0, R.shield - shieldDmg);
+    if (overflow > 0) {
+      R.hp = Math.max(0, R.hp - overflow);
+      if (R.hp <= 0 && (!R._phaseTimer || R._phaseTimer <= 0)) Arena.result = 'lose';
+    }
+    triggerFlash && triggerFlash('#44aaff', 6);
+    return;
+  }
+  _p11c_origDamageRobot2(dmg, opts);
+};
+
+// Помечаем снаряды электроида при спауне (патч updateEnemies — добавляем флаг на bullet)
+const _p11c_origUpdateEnemies2 = window.updateEnemies;
+window.updateEnemies = function() {
+  // Перед вызовом — перехватываем spawnBullet для electro_bot-ов
+  const _origSB = window.spawnBullet;
+  let _currentEnemyShieldBust = false;
+  window.spawnBullet = function(x, y, angle, def, friendly) {
+    _origSB(x, y, angle, def, friendly);
+    if (_currentEnemyShieldBust && !friendly) {
+      const arr = Arena.enemyBullets;
+      if (arr && arr.length > 0) arr[arr.length-1]._shieldBust = true;
+    }
+  };
+  // Помечаем electro_bot как активный перед стрельбой
+  const oldEnemies = Arena.enemies;
+  if (oldEnemies) {
+    for (const e of oldEnemies) {
+      if (e._shieldBuster) e._preShieldBust = true;
+    }
+  }
+  _currentEnemyShieldBust = false;
+  _p11c_origUpdateEnemies2();
+  window.spawnBullet = _origSB;
+};
+
+// Применяем _shieldBust в updateBullets через патч damageRobot
+const _p11c_origUpdateBullets2 = window.updateBullets;
+window.updateBullets = function() {
+  // Перехватываем damageRobot чтобы передать opts
+  const _origDR = window.damageRobot;
+  window.damageRobot = function(dmg) { _origDR(dmg, window._p11c_currentBulletOpts); };
+  _p11c_origUpdateBullets2();
+  window.damageRobot = _origDR;
+};
+
+console.log('[WRECK PROTOCOL] Part 11c: burst fire, rocket trail, battle surprises, berserker rage, electro shield-bust loaded.');
+</script>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     PART 11d: UI — УБЫВАЮЩАЯ ДОХОДНОСТЬ + ЭМП-БАР + ЗНАЧКИ
+     ═══════════════════════════════════════════════════════════════════ -->
+<script>
+'use strict';
+
+// ── 1. drawPlacedPart: значок ⬇ на дублирующихся орудиях + ★BURST ─────────
+const _p11d_origDrawPlaced = window.drawPlacedPart;
+window.drawPlacedPart = function(part, alpha) {
+  _p11d_origDrawPlaced(part, alpha);
+  if (!part || part.type === 'chassis') return;
+
+  const def = PART_DEFS[part.type];
+  if (!def) return;
+
+  // Подсчитываем сколько таких же типов на поле
+  const sameCount = Assembly.placed.filter(p => p.type === part.type).length;
+
+  // Координаты ячейки через gridToScreen
+  if (part.gx === null || part.gy === null) return;
+  const { sx, sy } = gridToScreen(part.gx, part.gy);
+  const CELL = GRID_SIZE;
+
+  ctx.save();
+  ctx.font = 'bold 8px "Courier New",monospace';
+  ctx.textAlign = 'left';
+
+  // Убывающая доходность: ⬇ если есть дубликат и это оружие
+  if (sameCount >= 2 && def.cat === 'weapon') {
+    const idx = Assembly.placed.filter(p => p.type === part.type).indexOf(part);
+    if (idx >= 1) {
+      ctx.fillStyle = '#ff6644';
+      ctx.fillText(idx === 1 ? '▼60%' : '▼40%', sx + 2, sy + def.h * CELL - 3);
+    }
+  }
+
+  // Мутационный бонус значок
+  if (part._mutBonus && part._mutBonus !== 0) {
+    ctx.fillStyle = part._mutBonus > 0 ? '#aa44ff' : '#ff4466';
+    ctx.textAlign = 'right';
+    ctx.fillText((part._mutBonus > 0 ? '+' : '') + part._mutBonus + '🧬', sx + def.w * CELL - 2, sy + 10);
+  }
+
+  ctx.restore();
+};
+
+// ── 2. drawPalette: значок мутации на инвентарных деталях ─────────────────
+const _p11d_origDrawPalette = window.drawPalette;
+window.drawPalette = function() {
+  _p11d_origDrawPalette();
+  const items = Game.inventory;
+  const PAL_ITEM_H2 = 76;
+  const startY2 = 28 - (Assembly.palScroll || 0);
+  items.forEach((part, i) => {
+    if (!part || !part._mutBonus || part._mutBonus === 0) return;
+    const iy = startY2 + i * PAL_ITEM_H2;
+    if (iy + PAL_ITEM_H2 < 28 || iy > H - 170) return;
+    ctx.fillStyle = part._mutBonus > 0 ? '#aa44ff' : '#ff4466';
+    ctx.font = 'bold 8px "Courier New",monospace'; ctx.textAlign = 'right';
+    ctx.fillText((part._mutBonus > 0 ? '+' : '') + part._mutBonus + '🧬', PAL_X + PAL_W - 10, iy + 22);
+  });
+};
+
+// ── 3. HUD: полоса ЭМП-кулдауна + фазовое ядро ────────────────────────────
+const _p11d_origUpdateHUD = window.updateHUD;
+window.updateHUD = function() {
+  _p11d_origUpdateHUD();
+  const R = Arena.robot;
+  if (!R) return;
+
+  // Уже есть основной HUD — добавим строку поверх canvas (внизу экрана)
+  const barW = 140, barH = 7;
+  const barX = Arena.arenaW / 2 - barW / 2;
+  const barY = Arena.arenaY + Arena.arenaH + 6;
+
+  // ── ЭМП кулдаун бар
+  if (R._hasEMP && R._empCooldown > 0) {
+    const pct = 1 - (R._empTimer || 0) / R._empCooldown;
+    ctx.fillStyle = '#0a1a0a';
+    ctx.fillRect(barX, barY, barW, barH);
+    ctx.fillStyle = pct > 0.9 ? '#44ffbb' : '#226644';
+    ctx.fillRect(barX, barY, Math.round(barW * pct), barH);
+    ctx.strokeStyle = '#224433'; ctx.lineWidth = 1;
+    ctx.strokeRect(barX, barY, barW, barH);
+    ctx.fillStyle = '#44ffbb'; ctx.font = '7px monospace'; ctx.textAlign = 'center';
+    ctx.fillText('ЭМП', barX + barW/2, barY + barH - 1);
+  }
+
+  // ── Phase core готовность
+  if (R._hasPhaseCore) {
+    const cx2 = barX + barW + 6;
+    const color = R._phaseCoreUsed ? '#333' : (R._phaseTimer > 0 ? '#8855ff' : '#aa55ff');
+    ctx.fillStyle = color;
+    ctx.beginPath(); ctx.arc(cx2 + 5, barY + 3, 5, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = '#551188'; ctx.lineWidth = 1; ctx.stroke();
+    if (R._phaseTimer > 0) {
+      ctx.fillStyle = '#8855ff'; ctx.font = '7px monospace'; ctx.textAlign = 'center';
+      ctx.fillText('ФАЗ', cx2 + 5, barY + barH + 8);
+    }
+  }
+
+  // ── Gladiator contract indicator
+  if (Game._gladiatorContract) {
+    ctx.fillStyle = '#ffcc00'; ctx.font = 'bold 9px "Courier New",monospace'; ctx.textAlign = 'center';
+    ctx.shadowColor = '#ffcc00'; ctx.shadowBlur = 8;
+    ctx.fillText('⚔ ГЛАДИАТОРСКИЙ КОНТРАКТ АКТИВЕН', Arena.arenaW/2, Arena.arenaY + Arena.arenaH - 10);
+    ctx.shadowBlur = 0;
+  }
+};
+
+// ── 4. drawEnemies: полоска HP + метки особых врагов ─────────────────────
+const _p11d_origDrawEnemies = window.drawEnemies;
+window.drawEnemies = function() {
+  _p11d_origDrawEnemies();
+  if (!Arena.enemies) return;
+  for (const e of Arena.enemies) {
+    if (e._phased) continue; // фазовые уже отрисованы в 11b
+    // Метки особых типов
+    if (e.type === 'carrier') {
+      ctx.fillStyle = '#ffaa22'; ctx.font = 'bold 8px monospace'; ctx.textAlign = 'center';
+      ctx.fillText('НОСИТЕЛЬ', e.x, e.y - e.radius - 4);
+    }
+    if (e._enraged) {
+      ctx.fillStyle = '#ff2222'; ctx.font = 'bold 7px monospace'; ctx.textAlign = 'center';
+      ctx.fillText('ЯРОСТЬ', e.x, e.y - e.radius - 4);
+    }
+    if (e._slowTimer > 0) {
+      ctx.fillStyle = '#44ffbb'; ctx.font = '7px monospace'; ctx.textAlign = 'center';
+      ctx.fillText('ЭМП', e.x, e.y - e.radius - 4);
+    }
+  }
+};
+
+// ── 5. Всплывающее сообщение при получении синергии слияния в сборке ──────
+const _p11d_origUpdateAssembly = window.updateAssembly;
+window.updateAssembly = function() {
+  _p11d_origUpdateAssembly();
+
+  // Показываем сколько орудий имеют убывающую доходность (подсказка)
+  const wTypeCounts = {};
+  for (const p of Assembly.placed) {
+    if (PART_DEFS[p.type] && PART_DEFS[p.type].cat === 'weapon') {
+      wTypeCounts[p.type] = (wTypeCounts[p.type] || 0) + 1;
+    }
+  }
+  const dimCount = Object.values(wTypeCounts).filter(n => n >= 2).length;
+  if (dimCount > 0) {
+    ctx.fillStyle = '#ff6644'; ctx.font = '9px "Courier New",monospace'; ctx.textAlign = 'left';
+    ctx.fillText(`⬇ ×${dimCount} тип(а) орудий дают убыв. доходность`, 8, H - 25);
+  }
+
+  // Синергия слияния — подсказка
+  const mergedCount = Assembly.placed.filter(p => p._level >= 2).length;
+  if (mergedCount > 0) {
+    ctx.fillStyle = '#ffdd44'; ctx.font = '9px "Courier New",monospace'; ctx.textAlign = 'left';
+    ctx.fillText(`★ ×${mergedCount} деталей со слиянием (синергия активна)`, 8, H - 14);
+  }
+};
+
+console.log('[WRECK PROTOCOL] Part 11d: UI badges, EMP bar, phase core indicator, carrier/enrage labels loaded.');
+</script>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     PART 11e: 10 РАУНДОВ + КВЕСТЫ + СЧЁТЧИК УБИЙСТВ + ИСПРАВЛЕНИЯ
+     ═══════════════════════════════════════════════════════════════════ -->
+<script>
+'use strict';
+
+// ── 1. РАСШИРЯЕМ ДО 10 РАУНДОВ ────────────────────────────────────────────
+Game.maxRounds = 10;
+
+// Таблица лута тоже нужна для раундов 8-10
+// Патч prepLoot / LOOT_TABLES: добавляем строки если не хватает
+const _p11e_origPrepLoot2 = window.prepLoot;
+window.prepLoot = function() {
+  // Временно расширяем LOOT_TABLES если нужно
+  if (typeof LOOT_TABLES !== 'undefined') {
+    while (LOOT_TABLES.length < Game.round) {
+      LOOT_TABLES.push(LOOT_TABLES[LOOT_TABLES.length - 1]); // копируем последний тир
+    }
+  }
+  _p11e_origPrepLoot2 && _p11e_origPrepLoot2();
+};
+
+// ── 2. СЧЁТЧИК УБИЙСТВ ────────────────────────────────────────────────────
+Game.totalKills   = Game.totalKills   || 0;
+Game.roundKills   = Game.roundKills   || 0;
+Game.eliteKills   = Game.eliteKills   || 0; // берсерки, носители
+
+const _p11e_origKillEnemy = window.killEnemy;
+window.killEnemy = function(idx) {
+  const e = Arena.enemies[idx];
+  _p11e_origKillEnemy(idx);
+  Game.totalKills++;
+  Game.roundKills++;
+  if (e && ['berserker','carrier','tank_enemy'].includes(e.type)) Game.eliteKills++;
+  // Квест-проверки
+  _p11e_checkQuests();
+};
+
+// ── 3. КВЕСТОВАЯ СИСТЕМА ──────────────────────────────────────────────────
+// Простая система: активный квест, цель, награда
+const QUEST_DEFS = [
+  { id:'q_kills_10',  label:'Уничтожь 10 врагов',         check:()=>Game.totalKills>=10,  reward:()=>{Game.scrap+=20; return '+20 лома';} },
+  { id:'q_elite_3',   label:'Уничтожь 3 элитных врага',   check:()=>Game.eliteKills>=3,   reward:()=>{ const p=createPart(['rocket_launcher','emp_gen','phase_core'][Math.floor(Math.random()*3)]); Game.inventory.push(p); return '+1 редкая деталь';} },
+  { id:'q_survive_5', label:'Выживи 5 раундов',           check:()=>Game.round>=6,        reward:()=>{Game.scrap+=50; return '+50 лома';} },
+  { id:'q_merge_part',label:'Слей 2 одинаковые детали',   check:()=>Assembly.placed.some(p=>p._level>=2), reward:()=>{Assembly.placed.filter(p=>p._level>=2).forEach(p=>{if(Math.random()<0.5) p._level++;}); return 'Слитые детали +1 ур.';} },
+  { id:'q_nokill_dmg',label:'Пройди раунд без урона',     check:()=>Arena._roundNoDmg===true, reward:()=>{Game.scrap+=35; return '+35 лома';} },
+];
+
+Game._activeQuest    = Game._activeQuest    || null;
+Game._completedQuests= Game._completedQuests|| [];
+Game._questRewardMsg = Game._questRewardMsg || null;
+
+function _p11e_pickNewQuest() {
+  const available = QUEST_DEFS.filter(q => !Game._completedQuests.includes(q.id));
+  if (available.length === 0) return;
+  Game._activeQuest = available[Math.floor(Math.random() * available.length)];
+}
+
+function _p11e_checkQuests() {
+  if (!Game._activeQuest) return;
+  const q = QUEST_DEFS.find(d => d.id === Game._activeQuest.id);
+  if (!q || !q.check()) return;
+  const msg = q.reward();
+  Game._completedQuests.push(q.id);
+  Game._questRewardMsg = `✅ КВЕСТ: ${q.label} — ${msg}`;
+  Game._activeQuest = null;
+  // Даём секунду отображения, потом новый квест
+  setTimeout(_p11e_pickNewQuest, 2000);
+}
+
+// Выбираем первый квест при старте игры
+if (!Game._activeQuest && Game._completedQuests.length === 0) {
+  _p11e_pickNewQuest();
+}
+
+// ── Сброс раундового счётчика убийств + флаг "без урона"
+const _p11e_origStartArena2 = window.startArena;
+window.startArena = function() {
+  _p11e_origStartArena2();
+  Game.roundKills = 0;
+  Arena._roundNoDmg = true; // будет обнулено при первом уроне
+};
+
+// Флаг "получил урон в этом раунде"
+const _p11e_origDmgRobot = window.damageRobot;
+window.damageRobot = function(dmg) {
+  Arena._roundNoDmg = false;
+  _p11e_origDmgRobot(dmg);
+};
+
+// Подбираем новый квест после каждого раунда
+const _p11e_origPrepLoot3 = window.prepLoot;
+window.prepLoot = function() {
+  _p11e_origPrepLoot3 && _p11e_origPrepLoot3();
+  if (!Game._activeQuest) _p11e_pickNewQuest();
+};
+
+// ── 4. КВЕСТ В СБОРКЕ: показываем активный квест ──────────────────────────
+const _p11e_origUpdateAssembly = window.updateAssembly;
+window.updateAssembly = function() {
+  _p11e_origUpdateAssembly();
+
+  // Квест вверху экрана
+  const q = Game._activeQuest ? QUEST_DEFS.find(d => d.id === Game._activeQuest.id) : null;
+  const msgQ = Game._questRewardMsg;
+  if (msgQ) {
+    ctx.fillStyle = '#44ff88'; ctx.font = 'bold 10px "Courier New",monospace'; ctx.textAlign = 'center';
+    ctx.shadowColor = '#44ff88'; ctx.shadowBlur = 8;
+    ctx.fillText(msgQ, W/2, 18);
+    ctx.shadowBlur = 0;
+  } else if (q) {
+    const done = q.check();
+    ctx.fillStyle = done ? '#44ff88' : '#888888';
+    ctx.font = '9px "Courier New",monospace'; ctx.textAlign = 'center';
+    ctx.fillText(`📋 КВЕСТ: ${q.label}  [${done?'✅':'…'}]`, W/2, 18);
+  }
+
+  // Статистика убийств (правый угол)
+  ctx.fillStyle = '#444'; ctx.font = '8px monospace'; ctx.textAlign = 'right';
+  ctx.fillText(`💀 ${Game.totalKills} | ⚡ ${Game.eliteKills}`, W - 10, 18);
+};
+
+// ── 5. КВЕСТ в HUD во время боя ───────────────────────────────────────────
+const _p11e_origUpdateHUD2 = window.updateHUD;
+window.updateHUD = function() {
+  _p11e_origUpdateHUD2();
+  const q = Game._activeQuest ? QUEST_DEFS.find(d => d.id === Game._activeQuest.id) : null;
+  if (q) {
+    const done = q.check();
+    ctx.fillStyle = done ? '#44ff88' : '#666666';
+    ctx.font = '8px "Courier New",monospace'; ctx.textAlign = 'left';
+    ctx.fillText(`📋 ${q.label}`, 8, Arena.arenaY + Arena.arenaH + 20);
+  }
+  // Награда-флэш
+  if (Game._questRewardMsg) {
+    ctx.fillStyle = '#44ff88'; ctx.font = 'bold 11px "Courier New",monospace'; ctx.textAlign = 'center';
+    ctx.shadowColor='#44ff88'; ctx.shadowBlur=10;
+    ctx.fillText(Game._questRewardMsg, Arena.arenaW/2, Arena.arenaY + 60);
+    ctx.shadowBlur=0;
+  }
+};
+
+// ── 6. ОЧИСТКА НАГРАД-ФЛЭША ЧЕРЕЗ 3 СЕК ─────────────────────────────────
+setInterval(() => { Game._questRewardMsg = null; }, 3000);
+
+// ── 7. ОПИСАНИЕ НОВЫХ ДЕТАЛЕЙ В ТУЛТИПЕ СБОРКИ ────────────────────────────
+// Хук на hover-тултип (строка ~1289): добавляем иконку новых свойств
+const _p11e_origUpdateAssembly2 = window.updateAssembly;
+window.updateAssembly = function() {
+  _p11e_origUpdateAssembly2();
+  // Показываем подсказки для новых механик
+  const hovPart = Assembly._hoveredPart;
+  if (!hovPart) return;
+  const def = PART_DEFS[hovPart.type];
+  if (!def) return;
+  const tags = [];
+  if (def._isOverclock)   tags.push('⚡ ЧИП РАЗГОНА: +30% к скорострельности ВСЕХ орудий');
+  if (def._isEMP)         tags.push('🔋 ЭМП: импульс замедления каждые ~8 сек');
+  if (def._isRepairDrone) tags.push('🔧 ДРОН: +25% ПЗ самой повреждённой детали после боя');
+  if (def._isSpikeArmor)  tags.push('⚔ ШИПЫ: 20% отражение 50% урона назад');
+  if (def._isPhaseCore)   tags.push('🔮 ФАЗА: однажды уходишь в неуязвимость при смерти');
+  if (def._isRocket)      tags.push('🚀 РАКЕТА: медленный снаряд, огромный урон');
+  if (tags.length === 0) return;
+
+  // Отрисовываем теги под основным тултипом
+  const TT_X = 230, TT_Y = 120;
+  tags.forEach((tag, i) => {
+    ctx.fillStyle = '#44ffbb'; ctx.font = '8px "Courier New",monospace'; ctx.textAlign = 'left';
+    ctx.fillText(tag, TT_X, TT_Y + 120 + i * 12);
+  });
+};
+
+// ── 8. shouldEncounter: увеличиваем шанс на раундах 8-10 (уже добавлено) ─
+// Дополнительно: на раунде 4 тоже встречи возможны (было исключено)
+const _p11e_origShouldEncounter = window.shouldEncounter;
+window.shouldEncounter = function(round) {
+  if (round === 4 && Math.random() < 0.30) return true;
+  return _p11e_origShouldEncounter(round);
+};
+
+console.log('[WRECK PROTOCOL] Part 11e: 10 rounds, quest system, kill counter, new part tooltips, encounter fix loaded.');
+console.log('[WRECK PROTOCOL] === PART 11 COMPLETE: new parts×6, enemies×4, encounters×6, battle surprises×5, merge synergy, diminishing returns, quests ===');
+</script>
+
 </body>
 </html>
