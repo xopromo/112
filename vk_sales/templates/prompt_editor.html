@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% block title %}AI Промпт — VK Sales Bot{% endblock %}
+
+{% block content %}
+<h4 class="fw-bold mb-1">AI Промпт и база знаний</h4>
+<p class="text-muted mb-4 small">
+  Изменения применяются мгновенно — перезапуск бота не нужен.
+</p>
+
+<form method="post" action="/settings/ai/save">
+<div class="row g-4">
+
+  <!-- Системный промпт -->
+  <div class="col-lg-7">
+    <div class="card p-4">
+      <h6 class="fw-bold mb-1">
+        <i class="bi bi-chat-square-text me-2 text-primary"></i>Системный промпт
+      </h6>
+      <p class="text-muted small mb-3">
+        Инструкция для ИИ — его «характер», роль и правила. Отправляется скрытно в каждый диалог.
+        <br>Переменные: <code>{product}</code> <code>{stage}</code> <code>{name}</code> <code>{goal}</code>
+      </p>
+      <textarea name="prompt" id="promptArea" class="form-control font-monospace"
+                rows="22" style="font-size:0.82rem; resize:vertical;">{{ prompt }}</textarea>
+      <div class="d-flex justify-content-between align-items-center mt-2">
+        <div class="text-muted small" id="promptStats"></div>
+        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="resetPrompt()">
+          <i class="bi bi-arrow-counterclockwise me-1"></i>Вернуть встроенный
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- База знаний + подсказки -->
+  <div class="col-lg-5">
+    <div class="card p-4 mb-3">
+      <h6 class="fw-bold mb-1">
+        <i class="bi bi-book me-2 text-success"></i>База знаний
+      </h6>
+      <p class="text-muted small mb-3">
+        Факты о продукте: цены, условия, ответы на частые вопросы.
+        ИИ будет опираться на эти данные вместо того, чтобы придумывать.
+        Вставляется в конец каждого системного промпта.
+      </p>
+      <textarea name="kb" id="kbArea" class="form-control"
+                rows="12" style="font-size:0.85rem; resize:vertical;"
+                placeholder="Пример:
+Тариф «Старт»: 15 000 руб/мес
+Тариф «Стандарт»: 25 000 руб/мес — включает настройку + ведение
+Тариф «Про»: 40 000 руб/мес — всё + отчёты и А/Б тесты
+График работы: пн-пт 9:00-18:00
+Ссылка на сайт: example.ru
+Телефон: +7 (999) 123-45-67">{{ kb }}</textarea>
+      <div class="text-muted small mt-2" id="kbStats"></div>
+    </div>
+
+    <div class="card p-4 border-info">
+      <h6 class="fw-bold mb-2 text-info">
+        <i class="bi bi-lightbulb me-2"></i>Советы
+      </h6>
+      <ul class="small mb-0 ps-3">
+        <li class="mb-1">
+          Пиши базу знаний в свободном формате — ИИ понимает обычный текст
+        </li>
+        <li class="mb-1">
+          Если ИИ всё ещё «придумывает» — добавь в промпт:<br>
+          <code class="small">«отвечай ТОЛЬКО на основе базы знаний»</code>
+        </li>
+        <li class="mb-1">
+          Оптимальный размер базы: до 2 000 слов (~12 000 символов)
+        </li>
+        <li>
+          Если промпт пуст — используется встроенный шаблон
+        </li>
+      </ul>
+    </div>
+  </div>
+
+</div>
+
+<div class="mt-3">
+  <button type="submit" class="btn btn-primary px-4">
+    <i class="bi bi-check2 me-1"></i>Сохранить
+  </button>
+  <a href="/settings" class="btn btn-outline-secondary ms-2">Назад к настройкам</a>
+</div>
+</form>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Встроенный промпт по умолчанию (для кнопки «Вернуть»)
+const DEFAULT_PROMPT = `Ты — менеджер по продажам в ВКонтакте. Ведёшь переписку от имени компании.
+
+Продукт/услуга: {product}
+Текущий этап воронки: {stage}
+Имя клиента: {name}
+
+Правила:
+- Пиши коротко (1–3 предложения), по-человечески
+- Без корпоративных штампов и заглавных букв на каждом слове
+- Подстраивайся под тон клиента
+- На этапе "{stage}" твоя цель: {goal}
+- Если клиент просит не писать — скажи "хорошо, не буду беспокоить" и всё
+- Отвечай ТОЛЬКО на русском языке
+- НИКОГДА не перечисляй длинные списки (модули курса, пункты программы и т.п.)
+  Максимум — упомяни 2-3 ключевых пункта кратко, остальное: "и ещё X тем"
+- Не обещай списки которые не поместятся в 2-3 предложения`;
+
+function resetPrompt() {
+  if (confirm('Вернуть встроенный промпт? Твои изменения будут потеряны.')) {
+    document.getElementById('promptArea').value = DEFAULT_PROMPT;
+    updateStats();
+  }
+}
+
+function updateStats() {
+  const p = document.getElementById('promptArea');
+  const k = document.getElementById('kbArea');
+  const ps = document.getElementById('promptStats');
+  const ks = document.getElementById('kbStats');
+  const pWords = p.value.trim().split(/\s+/).filter(Boolean).length;
+  const kWords = k.value.trim().split(/\s+/).filter(Boolean).length;
+  ps.textContent = `${p.value.length} символов / ${pWords} слов`;
+  ks.textContent = kWords ? `${k.value.length} символов / ${kWords} слов` : '';
+}
+
+document.getElementById('promptArea').addEventListener('input', updateStats);
+document.getElementById('kbArea').addEventListener('input', updateStats);
+updateStats();
+</script>
+{% endblock %}

@@ -1,0 +1,26 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd /home/user/112 && git pull --rebase origin main 2>&1 | tail -3; bash agent/restore_config.sh 2>&1; bash agent/restore_db.sh 2>&1"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd /home/user/112 && bash agent/backup_db.sh 2>&1"
+          }
+        ]
+      }
+    ]
+  }
+}

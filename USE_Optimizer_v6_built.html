@@ -5418,7 +5418,7 @@ const ENTRY_REGISTRY = [
     id:        'matouch',
     flag:      'useMaTouch',
     htmlId:    'e_mat',
-    shortName: () => 'MAToch',
+    shortName: c => `MAToch${c.matPeriod||20}`,
     detectL: (cfg, i) => {
       if (!cfg.matMA || i < 3) return false;
       const crossUp = DATA[i-1].c > cfg.matMA[i-1] && DATA[i-2].c <= cfg.matMA[i-2];
@@ -8367,7 +8367,7 @@ async function runOpt() {
   if(tpPairs.length===0) tpPairs=[{a:{type:'rr',m:2},b:null,combo:false}];
 
   // Fixed params — read as ranges; single value = no extra loop overhead
-  const pinRatio=$n('e_pinr')||2;
+  const pinRatioArr=usePin?parseRange('e_pinr'):[2];
   const beTrigs=useBE?parseRange('x_bet'):[0.5];  // Default 0.5 when BE disabled
   if(!beTrigs.length) beTrigs.push(0.5);
   const revBarsArr=useRev?(()=>{const _a=parseRange('x_revb');return _a.length?_a:[2];})():[0];  // Default 0 when Reverse disabled
@@ -8493,11 +8493,9 @@ async function runOpt() {
     const al=$n('e_atbl')||14;
     atrBoMA=calcEMA(closes,al); atrBoATR2=calcRMA_ATR(al);
   }
-  let matMA=null,matZone=0;
-  if(useMaT) {
-    const mp=$n('e_matp')||20,mt=$v('e_matt');
-    matMA=calcMA(closes,mp,mt); matZone=$n('e_matz')||0.2;
-  }
+  const matMACache = {};
+  const matPArr = useMaT ? parseRange('e_matp') : [20];
+  const matZoneArr = useMaT ? parseRange('e_matz') : [0.2];
   let sqzOn=null,sqzCount=null;
   if(useSqz) {
     const sbl=$n('e_sqbl')||20,skm=$n('e_sqkm')||1.5;
@@ -8567,11 +8565,12 @@ async function runOpt() {
   const _tlAtrBase     = useTrendFigures ? calcRMA_ATR(14) : null;
   const _tlSigCache    = {}; // кэш {sigL,sigS} по ключу tlPvL+'_'+tlPvR
 
-  function _getTfSig(tlPvL, tlPvR) {
+  function _getTfSig(tlPvL, tlPvR, tlZone) {
     if (!useTrendFigures) return {sigL:null, sigS:null};
-    const key=tlPvL+'_'+tlPvR;
+    if (tlZone === undefined) tlZone = _tlZone;
+    const key=tlPvL+'_'+tlPvR+'_'+tlZone;
     if (_tlSigCache[key]) return _tlSigCache[key];
-    const tlZone=_tlZone, flagImpMin=_tlFlagImpMin, flagMaxBars=_tlFlagMaxBars;
+    const flagImpMin=_tlFlagImpMin, flagMaxBars=_tlFlagMaxBars;
     const flagRetrace=_tlFlagRetrace, atrBase=_tlAtrBase;
     const sigL=new Uint8Array(N), sigS=new Uint8Array(N);
     const tfPvLo=calcPivotLow(tlPvL,tlPvR), tfPvHi=calcPivotHigh(tlPvL,tlPvR);
@@ -8771,6 +8770,10 @@ async function runOpt() {
       ['eisPeriod',   (Array.isArray(eisPArr) && eisPArr.length > 0) ? eisPArr : [20]],
       ['erPeriod',    (Array.isArray(erPArr) && erPArr.length > 0) ? erPArr : [10]],
       ['kalmanCrossLen', (Array.isArray(kalmanCrossLenArr) && kalmanCrossLenArr.length > 0) ? kalmanCrossLenArr : [20]], // ##KALMAN_CROSS##
+      ['pinRatio',       (Array.isArray(pinRatioArr) && pinRatioArr.length > 0) ? pinRatioArr : [2]],
+      ['matPeriod',      (Array.isArray(matPArr) && matPArr.length > 0) ? matPArr : [20]],
+      ['matZone',        (Array.isArray(matZoneArr) && matZoneArr.length > 0) ? matZoneArr : [0.2]],
+      ['tlZonePct',      useTrendFigures ? parseRange('e_tl_zone') : [0.3]],
     ];
     // Defaults for all params (first element of each array)
     window._ipDef = Object.fromEntries(_allIp.map(([n,a])=>[n,a[0]]));
@@ -8792,7 +8795,8 @@ async function runOpt() {
       rsiExitOB: 70, maCrossP: 50, macdFast: 12, macdSlow: 26, macdSigP: 9,
       stochKP: 14, stochDP: 3, stochOS: 20, stochOB: 80, volMoveMult: 1.5, nReversalN: 3,
       stAtrP: 10, stMult: 3.0, waitBars: 0, waitRetrace: 0.618, eisPeriod: 20, erPeriod: 10,
-      kalmanCrossLen: 20 // ##KALMAN_CROSS##
+      kalmanCrossLen: 20, // ##KALMAN_CROSS##
+      pinRatio: 2, matPeriod: 20, matZone: 0.2, tlZonePct: 0.3
     };
     window._ipCombos = [{}];
     if (_isSynthMode && typeof _setSynthProgress !== 'undefined') {
@@ -8958,12 +8962,17 @@ async function runOpt() {
       const eisPeriod   = _ip.eisPeriod   ?? window._ipDef.eisPeriod;
       const erPeriod    = _ip.erPeriod    ?? window._ipDef.erPeriod;
       const kalmanCrossLen = _ip.kalmanCrossLen ?? window._ipDef.kalmanCrossLen; // ##KALMAN_CROSS##
+      const pinRatio    = _ip.pinRatio    ?? window._ipDef.pinRatio;
+      const matPeriod   = _ip.matPeriod   ?? window._ipDef.matPeriod;
+      const matZone     = _ip.matZone     ?? window._ipDef.matZone;
+      const tlZonePct   = _ip.tlZonePct   ?? window._ipDef.tlZonePct;
       const {lo:pivSLLo, hi:pivSLHi} = useSLPiv ? _getPivSL(slPivL, slPivR) : {lo:null, hi:null};
       const rsiExitArr = useRsiExit   ? (rsiExitCache[rsiExitPer]||(rsiExitCache[rsiExitPer]=calcRSI(rsiExitPer))) : null;
       const kalmanCrossArr = useKalmanCross ? (()=>{const k=kalmanCrossLen;return kalmanCrossCache[k]||(kalmanCrossCache[k]=_buildKalmanMA(closes,k));})() : null; // ##KALMAN_CROSS##
       const kalmanArr = useKalmanMA ? (()=>{return kalmanMACache[kalmanLen]||(kalmanMACache[kalmanLen]=_buildKalmanMA(closes,kalmanLen));})() : null; // ##KALMAN_MA##
       const maCrossArr = useMaCross   ? (()=>{const k=_mCrossType+'_'+maCrossP;return maCrossNewCache[k]||(maCrossNewCache[k]=calcMA(closes,maCrossP,_mCrossType));})() : null;
       const stDir      = (useSupertrend||useStExit) ? (()=>{const k=stAtrP+'_'+stMult;return stDirCache[k]||(stDirCache[k]=calcSupertrend(stAtrP,stMult));})() : null;
+      const matMA      = useMaT ? (()=>{const k=$v('e_matt')+'_'+matPeriod;return matMACache[k]||(matMACache[k]=calcMA(closes,matPeriod,$v('e_matt')));})() : null;
       let macdLine=null,macdSignal=null;
       if(useMacd||useMacdFilter){const mk=macdFast+'_'+macdSlow+'_'+macdSigP;if(!macdNewCache[mk]){const m=calcMACD(macdFast,macdSlow,macdSigP);macdNewCache[mk]=m;}macdLine=macdNewCache[mk].line;macdSignal=macdNewCache[mk].signal;}
       let stochD=null;
@@ -8972,7 +8981,7 @@ async function runOpt() {
       if(useEIS){const ep=eisPeriod||13;const ek='eis_'+ep;eisEMAArr=maCache[ek]||(maCache[ek]=calcEMA(closes,ep));if(!macdNewCache['eis_hist']){const m=calcMACD(12,26,9);const h=new Float64Array(N);for(let i=0;i<N;i++)h[i]=m.line[i]-m.signal[i];macdNewCache['eis_hist']=h;}eisHistArr=macdNewCache['eis_hist'];}
       let erArr=null;
       if(useER){const ep=erPeriod||10;const ek='er_'+ep;if(!maCache[ek]){const ea=new Float64Array(N);for(let i=ep;i<N;i++){const net=Math.abs(closes[i]-closes[i-ep]);let sum=0;for(let j=i-ep+1;j<=i;j++)sum+=Math.abs(closes[j]-closes[j-1]);ea[i]=sum>0?net/sum:0;}maCache[ek]=ea;}erArr=maCache[ek];}
-      const {sigL:tfSigL, sigS:tfSigS} = _getTfSig(tlPvL, tlPvR);
+      const {sigL:tfSigL, sigS:tfSigS} = _getTfSig(tlPvL, tlPvR, tlZonePct/100);
 
       // Пропускаем невалидные BE комбинации
       if (useBE && beOff >= beTrig) { continue; }
@@ -9007,7 +9016,7 @@ async function runOpt() {
         useBoll:useBol,bbB,bbD,
         useDonch:useDon,donH,donL,
         useAtrBo,atrBoMA,atrBoATR:atrBoATR2,atrBoMult:atrBoM,
-        useMaTouch:useMaT,matMA,matZone,
+        useMaTouch:useMaT,matMA,matZone,matPeriod,
         useSqueeze:useSqz,sqzOn,sqzCount,sqzMinBars,
         useTLTouch,useTLBreak,useFlag,useTri,tfSigL,tfSigS,tlPvL,tlPvR,
         useRsiExit,rsiExitArr,rsiExitPeriod:rsiExitPer,rsiExitOS,rsiExitOB,
@@ -9081,10 +9090,10 @@ async function runOpt() {
               useBoll:useBol,bbLen:$n('e_bbl')||20,bbMult:$n('e_bbm')||2,
               useDonch:useDon,donLen:$n('e_donl')||20,
               useAtrBo,atrBoLen:$n('e_atbl')||14,atrBoMult:atrBoM,
-              useMaTouch:useMaT,matType:$v('e_matt'),matPeriod:$n('e_matp')||20,matZone:$n('e_matz')||0.2,
+              useMaTouch:useMaT,matType:$v('e_matt'),matPeriod,matZone,
               useSqueeze:useSqz,sqzBBLen:$n('e_sqbl')||20,sqzKCMult:$n('e_sqkm')||1.5,sqzMinBars,
               useTLTouch,useTLBreak,useFlag,useTri,
-              tlPvL,tlPvR,tlZonePct:$n('e_tl_zone')||0.3,
+              tlPvL,tlPvR,tlZonePct,
               flagImpMin:$n('e_flag_imp')||2.0,flagMaxBars:$n('e_flag_bars')||20,flagRetrace:$n('e_flag_ret')||0.618,
               useRsiExit,rsiExitPeriod:rsiExitPer,rsiExitOS,rsiExitOB,
               useKalmanCross,kalmanCrossLen, // ##KALMAN_CROSS##
@@ -9294,12 +9303,17 @@ async function runOpt() {
       const eisPeriod   = _ip.eisPeriod   ?? window._ipDef.eisPeriod;
       const erPeriod    = _ip.erPeriod    ?? window._ipDef.erPeriod;
       const kalmanCrossLen = _ip.kalmanCrossLen ?? window._ipDef.kalmanCrossLen; // ##KALMAN_CROSS##
+      const pinRatio    = _ip.pinRatio    ?? window._ipDef.pinRatio;
+      const matPeriod   = _ip.matPeriod   ?? window._ipDef.matPeriod;
+      const matZone     = _ip.matZone     ?? window._ipDef.matZone;
+      const tlZonePct   = _ip.tlZonePct   ?? window._ipDef.tlZonePct;
       const {lo:pivSLLo, hi:pivSLHi} = useSLPiv ? _getPivSL(slPivL, slPivR) : {lo:null, hi:null};
       const rsiExitArr = useRsiExit   ? (rsiExitCache[rsiExitPer]||(rsiExitCache[rsiExitPer]=calcRSI(rsiExitPer))) : null;
       const kalmanCrossArr = useKalmanCross ? (()=>{const k=kalmanCrossLen;return kalmanCrossCache[k]||(kalmanCrossCache[k]=_buildKalmanMA(closes,k));})() : null; // ##KALMAN_CROSS##
       const kalmanArr = useKalmanMA ? (()=>{return kalmanMACache[kalmanLen]||(kalmanMACache[kalmanLen]=_buildKalmanMA(closes,kalmanLen));})() : null; // ##KALMAN_MA##
       const maCrossArr = useMaCross   ? (()=>{const k=_mCrossType+'_'+maCrossP;return maCrossNewCache[k]||(maCrossNewCache[k]=calcMA(closes,maCrossP,_mCrossType));})() : null;
       const stDir      = (useSupertrend||useStExit) ? (()=>{const k=stAtrP+'_'+stMult;return stDirCache[k]||(stDirCache[k]=calcSupertrend(stAtrP,stMult));})() : null;
+      const matMA      = useMaT ? (()=>{const k=$v('e_matt')+'_'+matPeriod;return matMACache[k]||(matMACache[k]=calcMA(closes,matPeriod,$v('e_matt')));})() : null;
       let macdLine=null,macdSignal=null;
       if(useMacd||useMacdFilter){const mk=macdFast+'_'+macdSlow+'_'+macdSigP;if(!macdNewCache[mk]){const m=calcMACD(macdFast,macdSlow,macdSigP);macdNewCache[mk]=m;}macdLine=macdNewCache[mk].line;macdSignal=macdNewCache[mk].signal;}
       let stochD=null;
@@ -9308,7 +9322,7 @@ async function runOpt() {
       if(useEIS){const ep=eisPeriod||13;const ek='eis_'+ep;eisEMAArr=maCache[ek]||(maCache[ek]=calcEMA(closes,ep));if(!macdNewCache['eis_hist']){const m=calcMACD(12,26,9);const h=new Float64Array(N);for(let i=0;i<N;i++)h[i]=m.line[i]-m.signal[i];macdNewCache['eis_hist']=h;}eisHistArr=macdNewCache['eis_hist'];}
       let erArr=null;
       if(useER){const ep=erPeriod||10;const ek='er_'+ep;if(!maCache[ek]){const ea=new Float64Array(N);for(let i=ep;i<N;i++){const net=Math.abs(closes[i]-closes[i-ep]);let sum=0;for(let j=i-ep+1;j<=i;j++)sum+=Math.abs(closes[j]-closes[j-1]);ea[i]=sum>0?net/sum:0;}maCache[ek]=ea;}erArr=maCache[ek];}
-      const {sigL:tfSigL, sigS:tfSigS} = _getTfSig(tlPvL, tlPvR);
+      const {sigL:tfSigL, sigS:tfSigS} = _getTfSig(tlPvL, tlPvR, tlZonePct/100);
 
       // Пропускаем невалидные BE комбинации
       if (useBE && beOff >= beTrig) { return 0; }
@@ -9346,7 +9360,7 @@ async function runOpt() {
         useBoll:useBol,bbB,bbD,
         useDonch:useDon,donH,donL,
         useAtrBo,atrBoMA,atrBoATR:atrBoATR2,atrBoMult:atrBoM,
-        useMaTouch:useMaT,matMA,matZone,
+        useMaTouch:useMaT,matMA,matZone,matPeriod,
         useSqueeze:useSqz,sqzOn,sqzCount,sqzMinBars,
         useTLTouch,useTLBreak,useFlag,useTri,tfSigL,tfSigS,tlPvL,tlPvR,
         useRsiExit,rsiExitArr,rsiExitPeriod:rsiExitPer,rsiExitOS,rsiExitOB,
@@ -9449,10 +9463,10 @@ async function runOpt() {
               useBoll:useBol,bbLen:$n('e_bbl')||20,bbMult:$n('e_bbm')||2,
               useDonch:useDon,donLen:$n('e_donl')||20,
               useAtrBo,atrBoLen:$n('e_atbl')||14,atrBoMult:atrBoM,
-              useMaTouch:useMaT,matType:$v('e_matt'),matPeriod:$n('e_matp')||20,matZone:$n('e_matz')||0.2,
+              useMaTouch:useMaT,matType:$v('e_matt'),matPeriod,matZone,
               useSqueeze:useSqz,sqzBBLen:$n('e_sqbl')||20,sqzKCMult:$n('e_sqkm')||1.5,sqzMinBars,
               useTLTouch,useTLBreak,useFlag,useTri,
-              tlPvL,tlPvR,tlZonePct:$n('e_tl_zone')||0.3,
+              tlPvL,tlPvR,tlZonePct,
               flagImpMin:$n('e_flag_imp')||2.0,flagMaxBars:$n('e_flag_bars')||20,flagRetrace:$n('e_flag_ret')||0.618,
               useRsiExit,rsiExitPeriod:rsiExitPer,rsiExitOS,rsiExitOB,
               useKalmanCross,kalmanCrossLen, // ##KALMAN_CROSS##
@@ -9910,12 +9924,17 @@ async function runOpt() {
                                     const waitBars    = _ip.waitBars    ?? window._ipDef.waitBars;
                                     const waitRetrace = _ip.waitRetrace ?? window._ipDef.waitRetrace;
                                     const kalmanCrossLen = _ip.kalmanCrossLen ?? window._ipDef.kalmanCrossLen; // ##KALMAN_CROSS##
+                                    const pinRatio    = _ip.pinRatio    ?? window._ipDef.pinRatio;
+                                    const matPeriod   = _ip.matPeriod   ?? window._ipDef.matPeriod;
+                                    const matZone     = _ip.matZone     ?? window._ipDef.matZone;
+                                    const tlZonePct   = _ip.tlZonePct   ?? window._ipDef.tlZonePct;
                                     const rsiExitArr = useRsiExit   ? (rsiExitCache[rsiExitPer]||(rsiExitCache[rsiExitPer]=calcRSI(rsiExitPer))) : null;
                                     const kalmanCrossArr = useKalmanCross ? (()=>{const k=kalmanCrossLen;return kalmanCrossCache[k]||(kalmanCrossCache[k]=_buildKalmanMA(closes,k));})() : null; // ##KALMAN_CROSS##
                                     const kalmanArr = useKalmanMA ? (()=>{return kalmanMACache[kalmanLen]||(kalmanMACache[kalmanLen]=_buildKalmanMA(closes,kalmanLen));})() : null; // ##KALMAN_MA##
                                     const _mCrossType0 = maCrossTypeArr[0]||maCrossType;
                                     const maCrossArr = useMaCross   ? (()=>{const k=_mCrossType0+'_'+maCrossP;return maCrossNewCache[k]||(maCrossNewCache[k]=calcMA(closes,maCrossP,_mCrossType0));})() : null;
                                     const stDir      = (useSupertrend||useStExit) ? (()=>{const k=stAtrP+'_'+stMult;return stDirCache[k]||(stDirCache[k]=calcSupertrend(stAtrP,stMult));})() : null;
+                                    const matMA      = useMaT ? (()=>{const k=$v('e_matt')+'_'+matPeriod;return matMACache[k]||(matMACache[k]=calcMA(closes,matPeriod,$v('e_matt')));})() : null;
                                     let macdLine=null,macdSignal=null;
                                     if(useMacd||useMacdFilter){const mk=macdFast+'_'+macdSlow+'_'+macdSigP;if(!macdNewCache[mk]){const m=calcMACD(macdFast,macdSlow,macdSigP);macdNewCache[mk]=m;}macdLine=macdNewCache[mk].line;macdSignal=macdNewCache[mk].signal;}
                                     let stochD=null;
@@ -9937,7 +9956,7 @@ async function runOpt() {
                                      }
 
                                     // Trendline signals (calculate from default parameters)
-                                    const {sigL:tfSigL, sigS:tfSigS} = useTrendFigures ? _getTfSig(tlPvL, tlPvR) : {sigL:null, sigS:null};
+                                    const {sigL:tfSigL, sigS:tfSigS} = useTrendFigures ? _getTfSig(tlPvL, tlPvR, tlZonePct/100) : {sigL:null, sigS:null};
 
                                      const btCfg={
                                       comm: commTotal,
@@ -9945,7 +9964,7 @@ async function runOpt() {
                                       useBoll:useBol,bbB,bbD,
                                       useDonch:useDon,donH,donL,
                                       useAtrBo,atrBoMA,atrBoATR:atrBoATR2,atrBoMult:atrBoM,
-                                      useMaTouch:useMaT,matMA,matZone,
+                                      useMaTouch:useMaT,matMA,matZone,matPeriod,
                                       useSqueeze:useSqz,sqzOn,sqzCount,sqzMinBars,
                                       // Trendline Figures
                                       useTLTouch,useTLBreak,useFlag,useTri,
@@ -10056,10 +10075,10 @@ async function runOpt() {
                                           useBoll:useBol, bbLen:$n('e_bbl')||20, bbMult:$n('e_bbm')||2,
                                           useDonch:useDon, donLen:$n('e_donl')||20,
                                           useAtrBo, atrBoLen:$n('e_atbl')||14, atrBoMult:atrBoM,
-                                          useMaTouch:useMaT, matType:$v('e_matt'), matPeriod:$n('e_matp')||20, matZone:$n('e_matz')||0.2,
+                                          useMaTouch:useMaT, matType:$v('e_matt'), matPeriod, matZone,
                                           useSqueeze:useSqz, sqzBBLen:$n('e_sqbl')||20, sqzKCMult:$n('e_sqkm')||1.5, sqzMinBars,
                                           useTLTouch, useTLBreak, useFlag, useTri,
-                                          tlPvL:$n('e_tl_pvl')||5, tlPvR:$n('e_tl_pvr')||3, tlZonePct:$n('e_tl_zone')||0.3,
+                                          tlPvL, tlPvR, tlZonePct,
                                           flagImpMin:$n('e_flag_imp')||2.0, flagMaxBars:$n('e_flag_bars')||20, flagRetrace:$n('e_flag_ret')||0.618,
                                           useRsiExit,rsiExitPeriod:rsiExitPer,rsiExitOS,rsiExitOB,
                                           useKalmanCross,kalmanCrossLen, // ##KALMAN_CROSS##
@@ -13463,7 +13482,34 @@ function loadTVcsv(event) {
 
 function _runTVcompare(tvRows, resultsEl) {
   const r = _tvCmpCurrentResult;
-  if (!r || !r.eq || !r.eq.length) {
+  if (!r || !r.cfg) {
+    resultsEl.innerHTML = '<span style="color:var(--neg);font-size:.8em">❌ Нет текущего результата.</span>';
+    return;
+  }
+
+  // Use equities[r.name] as primary source (same as showDetail equity chart = full IS+OOS run)
+  // Fall back to fresh backtest if equities map is unavailable, then to r.eq
+  let fullEq = r.eq; // fallback
+  let isFullRun = false;
+  let fullRunErr = '';
+  if (typeof equities !== 'undefined' && equities[r.name] && equities[r.name].length > 0) {
+    fullEq = equities[r.name];
+    isFullRun = true;
+  } else {
+    try {
+      const _ind   = typeof _calcIndicators === 'function' ? _calcIndicators(r.cfg) : null;
+      const _btCfg = (_ind && typeof buildBtCfg === 'function') ? buildBtCfg(r.cfg, _ind) : null;
+      if (_btCfg && typeof backtest === 'function') {
+        const rFull = backtest(_ind.pvLo, _ind.pvHi, _ind.atrArr, _btCfg);
+        if (rFull && rFull.eq && rFull.eq.length > 0) {
+          fullEq = rFull.eq;
+          isFullRun = true;
+        } else { fullRunErr = 'backtest вернул пустой eq'; }
+      } else { fullRunErr = '_calcIndicators/buildBtCfg/backtest не найдены'; }
+    } catch(e) { fullRunErr = e.message; }
+  }
+
+  if (!fullEq || !fullEq.length) {
     resultsEl.innerHTML = '<span style="color:var(--neg);font-size:.8em">❌ Нет equity для текущего результата.</span>';
     return;
   }
@@ -13477,7 +13523,7 @@ function _runTVcompare(tvRows, resultsEl) {
   for (let i = 0; i < DATA.length; i++) {
     const nt = _normTime(DATA[i]?.t || '');
     const tv = tvMap[nt];
-    if (tv && r.eq[i] !== undefined) pairs.push({ i, jsEq: r.eq[i], tvEq: tv.eq, tvRow: tv });
+    if (tv && fullEq[i] !== undefined) pairs.push({ i, jsEq: fullEq[i], tvEq: tv.eq, tvRow: tv });
   }
 
   if (pairs.length < 5) {
@@ -13535,18 +13581,31 @@ function _runTVcompare(tvRows, resultsEl) {
     if (p.tvRow.el === 1 || p.tvRow.es === 1 || p.tvRow.xl === 1 || p.tvRow.xs === 1) tvSigCount++;
   }
 
+  // Coverage: detect if TV CSV ends before DATA ends
+  const lastPairBar = pairs.length > 0 ? pairs[pairs.length - 1].i : -1;
+  const missingEnd  = DATA.length - 1 - lastPairBar;   // bars at end not covered by TV
+  const jsFullFinal = fullEq[DATA.length - 1] ?? NaN;  // equity at very last DATA bar
+
   const corrC = corr >= 0.99 ? 'pos' : corr >= 0.95 ? 'warn' : 'neg';
   const rmseC = rmse < 1 ? 'pos' : rmse < 5 ? 'warn' : 'neg';
   const fdC   = Math.abs(finalDiff) < 1 ? 'pos' : Math.abs(finalDiff) < 5 ? 'warn' : 'neg';
 
   // Сохраняем диагностику для copyTVdiag()
-  _tvCmpDiag = { r, pairs, corr, rmse, finalDiff, jsLast, tvLast, firstDivBar, firstDivTime, maxDiff, maxDiffBar, maxDiffTime, hasSigs, tvSigCount };
+  _tvCmpDiag = { r, pairs, corr, rmse, finalDiff, jsLast, tvLast, firstDivBar, firstDivTime, maxDiff, maxDiffBar, maxDiffTime, hasSigs, tvSigCount, fullEq, isFullRun, missingEnd, jsFullFinal, fullRunErr };
 
   let html = '';
+  html += row('Режим сравнения', isFullRun
+    ? `<span class="pos">IS+OOS (полный прогон)</span>`
+    : `<span class="warn">fallback (r.eq)</span>${fullRunErr ? ` · ${fullRunErr}` : ''}`, '');
   html += row('Совпало баров', `${pairs.length} / ${tvRows.length} TV · ${DATA.length} JS`, 'muted');
+  if (missingEnd > 0) {
+    const missedPnl = !isNaN(jsFullFinal) ? (jsFullFinal - jsLast).toFixed(1) : '?';
+    html += row('⚠️ TV CSV не покрывает конец', `<span class="warn">последние ${missingEnd} баров DATA без TV данных · пропущено JS PnL ≈ ${missedPnl}%</span>`, '');
+  }
+  html += row('JS полный итог', `<span class="${isNaN(jsFullFinal) ? 'muted' : 'pos'}">${isNaN(jsFullFinal) ? '—' : jsFullFinal.toFixed(1) + '%'}</span> (бар ${DATA.length-1})`, 'muted');
   html += row('Корреляция equity', `<span class="${corrC}">${(corr * 100).toFixed(2)}%</span>${corr >= 0.99 ? ' ✅' : corr < 0.95 ? ' ⚠️' : ''}`, '');
   html += row('RMSE equity', `<span class="${rmseC}">${rmse.toFixed(2)}%</span>`, '');
-  html += row('JS итог / TV итог', `<span class="${fdC}">JS ${jsLast.toFixed(1)}% · TV ${tvLast.toFixed(1)}% · Δ${finalDiff >= 0 ? '+' : ''}${finalDiff.toFixed(1)}%</span>`, '');
+  html += row('JS итог / TV итог', `<span class="${fdC}">JS ${jsLast.toFixed(1)}% · TV ${tvLast.toFixed(1)}% · Δ${finalDiff >= 0 ? '+' : ''}${finalDiff.toFixed(1)}%</span> (бар ${lastPairBar})`, '');
   if (firstDivBar >= 0) {
     html += row('Первое расхождение >0.5%', `<span class="warn">бар #${firstDivBar} · ${firstDivTime}</span>`, '');
     html += `<button class="tpl-btn2" style="margin-top:6px;padding:4px 12px;font-size:.82em;border-color:#c792ea;color:#c792ea;width:100%" onclick="copyTVdiag()">📋 Скопировать диагностику для Claude</button>`;
@@ -13559,7 +13618,7 @@ function _runTVcompare(tvRows, resultsEl) {
   resultsEl.innerHTML = html;
 
   // Draw TV equity overlay on existing canvas
-  _tvDrawOverlay(pairs, r.eq);
+  _tvDrawOverlay(pairs, fullEq);
 }
 
 function _tvDrawOverlay(pairs, jsEq) {
@@ -13604,14 +13663,24 @@ function copyTVdiag() {
   const d = _tvCmpDiag;
   if (!d) { alert('Нет данных диагностики — сначала загрузи TV CSV'); return; }
   const { r, pairs, corr, rmse, finalDiff, jsLast, tvLast,
-          firstDivBar, firstDivTime, maxDiff, maxDiffBar, maxDiffTime, hasSigs } = d;
+          firstDivBar, firstDivTime, maxDiff, maxDiffBar, maxDiffTime, hasSigs, isFullRun,
+          missingEnd, jsFullFinal, fullRunErr } = d;
   const c = r.cfg;
+  const lastPairBar2 = pairs.length > 0 ? pairs[pairs.length - 1].i : -1;
 
   const lines = [];
   lines.push('=== TV vs JS ДИАГНОСТИКА РАСХОЖДЕНИЯ ===');
   lines.push(`Результат: ${r.name}`);
+  lines.push(`Режим: ${isFullRun ? 'IS+OOS (полный прогон)' : `fallback (r.eq)${fullRunErr ? ' — ' + fullRunErr : ''}`} | Данные: ${pairs.length}/${DATA.length} баров`);
+  if (missingEnd > 0) {
+    const missedPnl = !isNaN(jsFullFinal) ? (jsFullFinal - jsLast).toFixed(1) : '?';
+    lines.push(`⚠️ TV CSV НЕ ПОКРЫВАЕТ последние ${missingEnd} баров DATA (пропущено JS PnL ≈ ${missedPnl}%)`);
+    lines.push(`   JS полный итог (бар ${DATA.length-1}): ${isNaN(jsFullFinal) ? '—' : jsFullFinal.toFixed(2) + '%'}`);
+    lines.push(`   JS @ последний TV бар (#${lastPairBar2}): ${jsLast.toFixed(2)}%`);
+    lines.push(`   → Загрузи TV CSV за весь период оптимизатора чтобы покрыть все ${DATA.length} баров`);
+  }
   lines.push(`Совпало баров: ${pairs.length} | Корреляция: ${(corr*100).toFixed(2)}% | RMSE: ${rmse.toFixed(2)}%`);
-  lines.push(`JS итог: ${jsLast.toFixed(2)}%  TV итог: ${tvLast.toFixed(2)}%  Δ: ${finalDiff>=0?'+':''}${finalDiff.toFixed(2)}%`);
+  lines.push(`JS итог (@ посл. TV бар): ${jsLast.toFixed(2)}%  TV итог: ${tvLast.toFixed(2)}%  Δ: ${finalDiff>=0?'+':''}${finalDiff.toFixed(2)}%`);
   lines.push(`Первое расхождение >0.5%: бар #${firstDivBar} (${firstDivTime})`);
   lines.push(`Макс. расхождение: ${maxDiff.toFixed(2)}% на баре #${maxDiffBar} (${maxDiffTime})`);
   lines.push('');
@@ -18063,7 +18132,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1773663917086;
+window._BUILD_TS = 1773937637293;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;

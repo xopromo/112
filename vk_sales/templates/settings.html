@@ -1,0 +1,408 @@
+{% extends "base.html" %}
+{% block title %}Настройки — VK Sales Bot{% endblock %}
+
+{% block content %}
+<h4 class="fw-bold mb-4">Настройки</h4>
+
+<div class="row g-4">
+  <div class="col-md-7">
+    <div class="card p-4">
+      <h6 class="fw-bold mb-3"><i class="bi bi-key me-2 text-primary"></i>Подключение к VKontakte</h6>
+
+      <form method="post" action="/settings/save" autocomplete="off">
+        <div class="mb-3">
+          <label class="form-label">Токен сообщества</label>
+          <div class="input-group">
+            <input type="text" name="group_token" id="tokenField"
+                   class="form-control font-monospace"
+                   autocomplete="off"
+                   value="{{ cfg.group_token or '' }}"
+                   placeholder="vk1.a.xxxxxxxxxxxxx">
+            <button type="button" class="btn btn-outline-secondary" onclick="toggleToken()">
+              <i class="bi bi-eye" id="eyeIcon"></i>
+            </button>
+          </div>
+          <div class="form-text">
+            Как получить:
+            <strong>Управление сообществом → Работа с API → Создать ключ</strong>
+            → выбрать права: <code>Сообщения</code>
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">ID сообщества</label>
+          <input type="number" name="group_id" class="form-control"
+                 value="{{ cfg.group_id or '' }}"
+                 placeholder="123456789">
+          <div class="form-text">
+            Открой сообщество → адрес страницы →
+            <code>vk.com/public<b>123456789</b></code> — вот этот номер.
+            Или через <code>vk.com/club<b>123456789</b></code>
+          </div>
+        </div>
+
+        <hr>
+        <h6 class="fw-bold mb-3"><i class="bi bi-cpu me-2 text-success"></i>AI-ответы</h6>
+
+        <div class="mb-3">
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" name="use_ai" id="useAI"
+                   {% if cfg.use_ai %}checked{% endif %}>
+            <label class="form-check-label" for="useAI">
+              <strong>Включить AI-ответы</strong>
+            </label>
+          </div>
+          <div class="form-text">Когда включено — бот отвечает через AI, а не по скриптам. Провайдеры пробуются по порядку при ошибке.</div>
+        </div>
+
+        <div class="mb-2">
+          <label class="form-label mb-1">Провайдеры <span class="text-muted small">(порядок = приоритет)</span></label>
+          <div id="providerList" class="d-flex flex-column gap-2"></div>
+          <input type="hidden" name="ai_models_json" id="aiModelsJson">
+          <div class="form-text mt-1">
+            Включённые провайдеры используются по очереди сверху вниз.
+            <br>
+            <span class="text-muted">Groq / Cerebras — бесплатно. Gemini — бесплатно (15 req/min). Mistral — платный.</span>
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Описание продукта/услуги</label>
+          <textarea name="ai_product" class="form-control" rows="3"
+                    placeholder="Например: SMM-услуги для малого бизнеса. Ведём ВКонтакте, создаём контент, настраиваем рекламу. Цена от 15 000 руб/мес.">{{ cfg.ai_product or '' }}</textarea>
+          <div class="form-text">AI будет использовать это описание в каждом диалоге.</div>
+        </div>
+
+        <hr>
+        <h6 class="fw-bold mb-3">Параметры отправки</h6>
+
+        <div class="row g-2 mb-3">
+          <div class="col-6">
+            <label class="form-label small">Мин. задержка (сек)</label>
+            <input type="number" name="send_delay_min" class="form-control form-control-sm"
+                   value="{{ cfg.send_delay_min or 2 }}" min="1" max="60">
+          </div>
+          <div class="col-6">
+            <label class="form-label small">Макс. задержка (сек)</label>
+            <input type="number" name="send_delay_max" class="form-control form-control-sm"
+                   value="{{ cfg.send_delay_max or 8 }}" min="1" max="60">
+          </div>
+          <div class="col-12">
+            <div class="form-text">Случайная задержка между сообщениями. Рекомендуем 2–10 сек чтобы не попасть в спам.</div>
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="dry_run" id="dryRunSet"
+                   {% if cfg.dry_run %}checked{% endif %}>
+            <label class="form-check-label" for="dryRunSet">
+              <strong>Тестовый режим (dry_run)</strong>
+            </label>
+          </div>
+          <div class="form-text text-warning">
+            <i class="bi bi-exclamation-triangle me-1"></i>
+            В тестовом режиме сообщения НЕ отправляются — только записываются в лог.
+            Отключи перед реальной работой.
+          </div>
+        </div>
+
+        <hr>
+        <h6 class="fw-bold mb-3"><i class="bi bi-image me-2 text-info"></i>Генерация изображений</h6>
+
+        <div class="mb-3">
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" name="use_image_gen" id="useImageGen"
+                   {% if cfg.use_image_gen %}checked{% endif %}>
+            <label class="form-check-label" for="useImageGen">
+              <strong>Отправлять изображение на этапе Питча</strong>
+            </label>
+          </div>
+          <div class="form-text">Картинка генерируется и отправляется вслед за AI-ответом когда диалог достигает этапа <strong>PITCH</strong>.</div>
+        </div>
+
+        <div class="mb-2">
+          <label class="form-label mb-1">Провайдер</label>
+          <select name="image_gen_provider" id="imageGenProvider" class="form-select form-select-sm w-auto">
+            <option value="pollinations" {% if cfg.image_gen_provider != 'gemini' %}selected{% endif %}>
+              Pollinations.ai — Flux (бесплатно, без ключа)
+            </option>
+            <option value="gemini" {% if cfg.image_gen_provider == 'gemini' %}selected{% endif %}>
+              Gemini 2.0 Flash Image (ключ из провайдеров выше)
+            </option>
+          </select>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Промпт для изображения</label>
+          <input type="text" name="image_gen_prompt" class="form-control"
+                 value="{{ cfg.image_gen_prompt or '' }}"
+                 placeholder="Professional product photo: {product}">
+          <div class="form-text"><code>{product}</code> заменяется на описание продукта выше.</div>
+        </div>
+
+        <div class="mb-3">
+          <button type="button" class="btn btn-outline-info btn-sm" onclick="testImage()">
+            <i class="bi bi-image me-1"></i>Сгенерировать тест
+          </button>
+          <div id="imgTestWrap" class="mt-2" style="display:none">
+            <div id="imgTestStatus" class="text-muted small mb-1"></div>
+            <img id="imgTestResult" src="" style="max-width:320px;border-radius:8px;display:none">
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-check2 me-1"></i>Сохранить
+        </button>
+
+        {% if cfg.group_token %}
+        <button type="button" class="btn btn-outline-secondary ms-2" onclick="testConnection()">
+          <i class="bi bi-wifi me-1"></i>Проверить подключение
+        </button>
+        {% endif %}
+      </form>
+    </div>
+  </div>
+
+  <!-- Инструкция -->
+  <div class="col-md-5">
+    <div class="card p-4 mb-3 border-warning">
+      <h6 class="fw-bold mb-3 text-warning">
+        <i class="bi bi-exclamation-triangle me-2"></i>Важно перед стартом
+      </h6>
+      <ol class="small mb-0 ps-3">
+        <li class="mb-2">В настройках сообщества ВКонтакте включи <strong>«Сообщения сообщества»</strong></li>
+        <li class="mb-2">В разделе <strong>«Работа с API»</strong> создай ключ с правом на <strong>сообщения</strong></li>
+        <li class="mb-2">Убедись что пользователи <strong>разрешили</strong> сообщения от сообщества (подписаны)</li>
+        <li>Сначала протестируй на нескольких ID с dry_run=ON</li>
+      </ol>
+    </div>
+
+    <div class="card p-4">
+      <h6 class="fw-bold mb-3"><i class="bi bi-database me-2"></i>База данных</h6>
+      <div class="small text-muted mb-2">
+        Файл: <code>vk_sales/sales.db</code>
+      </div>
+      <a href="/export/csv" class="btn btn-outline-secondary btn-sm w-100 mb-2">
+        <i class="bi bi-download me-1"></i>Экспорт диалогов (CSV)
+      </a>
+      <button class="btn btn-outline-danger btn-sm w-100"
+              onclick="if(confirm('Удалить все данные?')) location.href='/db/reset'">
+        <i class="bi bi-trash me-1"></i>Очистить базу
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Тест подключения -->
+<div id="testResult" class="mt-3" style="display:none">
+  <div class="alert" id="testAlert"></div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleToken() {
+  const f = document.getElementById('tokenField');
+  const i = document.getElementById('eyeIcon');
+  if(f.style.webkitTextSecurity !== 'disc') {
+    f.style.webkitTextSecurity = 'disc';
+    f.style.letterSpacing = '0.15em';
+    i.className = 'bi bi-eye-slash';
+  } else {
+    f.style.webkitTextSecurity = '';
+    f.style.letterSpacing = 'normal';
+    i.className = 'bi bi-eye';
+  }
+}
+
+// ─── Provider list ────────────────────────────────────────────────────────────
+
+const PROVIDER_META = {
+  groq:      { label: "Groq",     model: "llama-3.3-70b-versatile", color: "success",  link: "console.groq.com → API Keys", placeholder: "gsk_xxxxxxxxxxxx" },
+  cerebras:  { label: "Cerebras", model: "llama-3.3-70b",           color: "primary",  link: "cloud.cerebras.ai → API Keys", placeholder: "csk-xxxxxxxxxxxx" },
+  gemini:    { label: "Gemini",   model: "gemini-2.0-flash",        color: "warning",  link: "aistudio.google.com → Get API key", placeholder: "AIzaxxxxxxxxxx" },
+  mistral:   { label: "Mistral",  model: "mistral-small-latest",    color: "secondary",link: "console.mistral.ai → API Keys", placeholder: "xxxxxxxxxxxx" },
+};
+const PROVIDER_ORDER = ["groq", "cerebras", "gemini", "mistral"];
+
+// Build initial state from server config
+const _cfgModels = {{ (cfg.ai_models or []) | tojson }};
+const _cfgGroqKey = {{ (cfg.groq_key or '') | tojson }};
+
+// Merge: start with ai_models order, then append missing providers disabled
+let _providers = [];
+const _seen = new Set();
+for (const m of _cfgModels) {
+  if (!PROVIDER_META[m.provider]) continue;
+  _providers.push({ provider: m.provider, key: m.key || "", model: m.model || "", enabled: true });
+  _seen.add(m.provider);
+}
+// backward compat: if only groq_key was set (no ai_models)
+if (_providers.length === 0 && _cfgGroqKey) {
+  _providers.push({ provider: "groq", key: _cfgGroqKey, model: "", enabled: true });
+  _seen.add("groq");
+}
+for (const p of PROVIDER_ORDER) {
+  if (!_seen.has(p)) _providers.push({ provider: p, key: "", model: "", enabled: false });
+}
+
+function renderProviders() {
+  const list = document.getElementById('providerList');
+  list.innerHTML = '';
+  _providers.forEach((p, idx) => {
+    const meta = PROVIDER_META[p.provider];
+    const isFirst = idx === 0, isLast = idx === _providers.length - 1;
+    const keyId = `pkey_${p.provider}`;
+    const eyeId = `peye_${p.provider}`;
+    const row = document.createElement('div');
+    row.className = 'card px-3 py-2';
+    row.style.borderLeftWidth = '3px';
+    row.style.borderLeftColor = p.enabled ? 'var(--bs-success)' : '#dee2e6';
+    row.dataset.provider = p.provider;
+    row.innerHTML = `
+      <div class="d-flex align-items-center gap-2">
+        <!-- reorder -->
+        <div class="d-flex flex-column" style="gap:1px">
+          <button type="button" class="btn btn-sm btn-link p-0 lh-1 text-muted" onclick="moveProvider(${idx},-1)" ${isFirst ? 'disabled' : ''} title="Выше">
+            <i class="bi bi-chevron-up"></i>
+          </button>
+          <button type="button" class="btn btn-sm btn-link p-0 lh-1 text-muted" onclick="moveProvider(${idx},1)" ${isLast ? 'disabled' : ''} title="Ниже">
+            <i class="bi bi-chevron-down"></i>
+          </button>
+        </div>
+        <!-- priority badge -->
+        <span class="badge ${p.enabled ? 'bg-success' : 'bg-light text-muted border'}" style="min-width:22px;text-align:center">${p.enabled ? idx+1 : '—'}</span>
+        <!-- enable toggle -->
+        <div class="form-check form-switch mb-0 me-1">
+          <input class="form-check-input" type="checkbox" id="pen_${p.provider}"
+                 ${p.enabled ? 'checked' : ''} onchange="toggleProvider(${idx})">
+        </div>
+        <!-- name + model -->
+        <div class="flex-grow-1">
+          <span class="badge bg-${meta.color} me-1">${meta.label}</span>
+          <span class="${p.enabled ? 'text-muted' : 'text-muted'} small">${p.model || meta.model}</span>
+        </div>
+        <!-- key input -->
+        <div class="input-group input-group-sm" style="max-width:280px">
+          <input type="text" id="${keyId}" class="form-control font-monospace"
+                 autocomplete="off"
+                 placeholder="${meta.placeholder}"
+                 value="${escHtml(p.key)}"
+                 oninput="updateKey(${idx}, this.value)"
+                 style="${p.key ? 'letter-spacing:0.12em' : ''}">
+          <button type="button" class="btn btn-outline-secondary" onclick="toggleKeyVis('${keyId}','${eyeId}')" tabindex="-1">
+            <i id="${eyeId}" class="bi bi-eye"></i>
+          </button>
+        </div>
+      </div>
+      ${p.enabled && meta.link ? `<div class="form-text ps-5 mt-1" style="font-size:0.75rem">Получить: <strong>${meta.link}</strong></div>` : ''}
+    `;
+    list.appendChild(row);
+  });
+  serializeProviders();
+}
+
+function moveProvider(idx, dir) {
+  const other = idx + dir;
+  if (other < 0 || other >= _providers.length) return;
+  [_providers[idx], _providers[other]] = [_providers[other], _providers[idx]];
+  renderProviders();
+}
+function toggleProvider(idx) {
+  _providers[idx].enabled = !_providers[idx].enabled;
+  renderProviders();
+}
+function updateKey(idx, val) {
+  _providers[idx].key = val;
+  serializeProviders();
+}
+function toggleKeyVis(fieldId, eyeId) {
+  const f = document.getElementById(fieldId);
+  const i = document.getElementById(eyeId);
+  if (f.style.webkitTextSecurity !== 'disc') {
+    f.style.webkitTextSecurity = 'disc';
+    f.style.letterSpacing = '0.12em';
+    i.className = 'bi bi-eye-slash';
+  } else {
+    f.style.webkitTextSecurity = '';
+    f.style.letterSpacing = f.value ? '0.12em' : 'normal';
+    i.className = 'bi bi-eye';
+  }
+}
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function serializeProviders() {
+  const active = _providers.filter(p => p.enabled && p.key).map(p => ({
+    provider: p.provider,
+    key: p.key,
+    ...(p.model ? { model: p.model } : {})
+  }));
+  document.getElementById('aiModelsJson').value = JSON.stringify(active);
+}
+
+// Script is at end of body — DOM is ready, call directly
+renderProviders();
+
+// serialize before form submit so latest key values are captured
+const _settingsForm = document.querySelector('form[action="/settings/save"]');
+if (_settingsForm) {
+  _settingsForm.addEventListener('submit', () => {
+    _providers.forEach((p) => {
+      const el = document.getElementById(`pkey_${p.provider}`);
+      if (el) p.key = el.value;
+    });
+    serializeProviders();
+  });
+}
+
+function testConnection() {
+  fetch('/api/test_connection')
+    .then(r => r.json())
+    .then(data => {
+      const div = document.getElementById('testResult');
+      const alert = document.getElementById('testAlert');
+      div.style.display = 'block';
+      if(data.ok) {
+        alert.className = 'alert alert-success';
+        alert.innerHTML = `<i class="bi bi-check-circle me-2"></i>Подключено! Группа: <b>${data.group_name}</b>`;
+      } else {
+        alert.className = 'alert alert-danger';
+        alert.innerHTML = `<i class="bi bi-x-circle me-2"></i>Ошибка: ${data.error}`;
+      }
+    });
+}
+
+function testImage() {
+  const provider = document.getElementById('imageGenProvider').value;
+  const prompt   = document.querySelector('[name="image_gen_prompt"]').value.trim();
+  if (!prompt) { alert('Введи промпт для изображения'); return; }
+
+  const wrap = document.getElementById('imgTestWrap');
+  const status = document.getElementById('imgTestStatus');
+  const img    = document.getElementById('imgTestResult');
+  wrap.style.display = 'block';
+  img.style.display  = 'none';
+  status.textContent = 'Генерирую... (~30-60 сек)';
+
+  fetch('/api/test_image', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ provider, prompt }),
+  })
+    .then(r => r.json())
+    .then(d => {
+      if (d.ok) {
+        img.src = d.data_url;
+        img.style.display = 'block';
+        status.textContent = `Готово (${Math.round(d.size/1024)} КБ, провайдер: ${provider})`;
+      } else {
+        status.textContent = 'Ошибка: ' + d.error;
+      }
+    })
+    .catch(e => { status.textContent = 'Сетевая ошибка: ' + e; });
+}
+</script>
+{% endblock %}

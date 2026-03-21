@@ -3108,7 +3108,34 @@ function loadTVcsv(event) {
 
 function _runTVcompare(tvRows, resultsEl) {
   const r = _tvCmpCurrentResult;
-  if (!r || !r.eq || !r.eq.length) {
+  if (!r || !r.cfg) {
+    resultsEl.innerHTML = '<span style="color:var(--neg);font-size:.8em">❌ Нет текущего результата.</span>';
+    return;
+  }
+
+  // Use equities[r.name] as primary source (same as showDetail equity chart = full IS+OOS run)
+  // Fall back to fresh backtest if equities map is unavailable, then to r.eq
+  let fullEq = r.eq; // fallback
+  let isFullRun = false;
+  let fullRunErr = '';
+  if (typeof equities !== 'undefined' && equities[r.name] && equities[r.name].length > 0) {
+    fullEq = equities[r.name];
+    isFullRun = true;
+  } else {
+    try {
+      const _ind   = typeof _calcIndicators === 'function' ? _calcIndicators(r.cfg) : null;
+      const _btCfg = (_ind && typeof buildBtCfg === 'function') ? buildBtCfg(r.cfg, _ind) : null;
+      if (_btCfg && typeof backtest === 'function') {
+        const rFull = backtest(_ind.pvLo, _ind.pvHi, _ind.atrArr, _btCfg);
+        if (rFull && rFull.eq && rFull.eq.length > 0) {
+          fullEq = rFull.eq;
+          isFullRun = true;
+        } else { fullRunErr = 'backtest вернул пустой eq'; }
+      } else { fullRunErr = '_calcIndicators/buildBtCfg/backtest не найдены'; }
+    } catch(e) { fullRunErr = e.message; }
+  }
+
+  if (!fullEq || !fullEq.length) {
     resultsEl.innerHTML = '<span style="color:var(--neg);font-size:.8em">❌ Нет equity для текущего результата.</span>';
     return;
   }
@@ -3122,7 +3149,7 @@ function _runTVcompare(tvRows, resultsEl) {
   for (let i = 0; i < DATA.length; i++) {
     const nt = _normTime(DATA[i]?.t || '');
     const tv = tvMap[nt];
-    if (tv && r.eq[i] !== undefined) pairs.push({ i, jsEq: r.eq[i], tvEq: tv.eq, tvRow: tv });
+    if (tv && fullEq[i] !== undefined) pairs.push({ i, jsEq: fullEq[i], tvEq: tv.eq, tvRow: tv });
   }
 
   if (pairs.length < 5) {
@@ -3180,18 +3207,31 @@ function _runTVcompare(tvRows, resultsEl) {
     if (p.tvRow.el === 1 || p.tvRow.es === 1 || p.tvRow.xl === 1 || p.tvRow.xs === 1) tvSigCount++;
   }
 
+  // Coverage: detect if TV CSV ends before DATA ends
+  const lastPairBar = pairs.length > 0 ? pairs[pairs.length - 1].i : -1;
+  const missingEnd  = DATA.length - 1 - lastPairBar;   // bars at end not covered by TV
+  const jsFullFinal = fullEq[DATA.length - 1] ?? NaN;  // equity at very last DATA bar
+
   const corrC = corr >= 0.99 ? 'pos' : corr >= 0.95 ? 'warn' : 'neg';
   const rmseC = rmse < 1 ? 'pos' : rmse < 5 ? 'warn' : 'neg';
   const fdC   = Math.abs(finalDiff) < 1 ? 'pos' : Math.abs(finalDiff) < 5 ? 'warn' : 'neg';
 
   // Сохраняем диагностику для copyTVdiag()
-  _tvCmpDiag = { r, pairs, corr, rmse, finalDiff, jsLast, tvLast, firstDivBar, firstDivTime, maxDiff, maxDiffBar, maxDiffTime, hasSigs, tvSigCount };
+  _tvCmpDiag = { r, pairs, corr, rmse, finalDiff, jsLast, tvLast, firstDivBar, firstDivTime, maxDiff, maxDiffBar, maxDiffTime, hasSigs, tvSigCount, fullEq, isFullRun, missingEnd, jsFullFinal, fullRunErr };
 
   let html = '';
+  html += row('Режим сравнения', isFullRun
+    ? `<span class="pos">IS+OOS (полный прогон)</span>`
+    : `<span class="warn">fallback (r.eq)</span>${fullRunErr ? ` · ${fullRunErr}` : ''}`, '');
   html += row('Совпало баров', `${pairs.length} / ${tvRows.length} TV · ${DATA.length} JS`, 'muted');
+  if (missingEnd > 0) {
+    const missedPnl = !isNaN(jsFullFinal) ? (jsFullFinal - jsLast).toFixed(1) : '?';
+    html += row('⚠️ TV CSV не покрывает конец', `<span class="warn">последние ${missingEnd} баров DATA без TV данных · пропущено JS PnL ≈ ${missedPnl}%</span>`, '');
+  }
+  html += row('JS полный итог', `<span class="${isNaN(jsFullFinal) ? 'muted' : 'pos'}">${isNaN(jsFullFinal) ? '—' : jsFullFinal.toFixed(1) + '%'}</span> (бар ${DATA.length-1})`, 'muted');
   html += row('Корреляция equity', `<span class="${corrC}">${(corr * 100).toFixed(2)}%</span>${corr >= 0.99 ? ' ✅' : corr < 0.95 ? ' ⚠️' : ''}`, '');
   html += row('RMSE equity', `<span class="${rmseC}">${rmse.toFixed(2)}%</span>`, '');
-  html += row('JS итог / TV итог', `<span class="${fdC}">JS ${jsLast.toFixed(1)}% · TV ${tvLast.toFixed(1)}% · Δ${finalDiff >= 0 ? '+' : ''}${finalDiff.toFixed(1)}%</span>`, '');
+  html += row('JS итог / TV итог', `<span class="${fdC}">JS ${jsLast.toFixed(1)}% · TV ${tvLast.toFixed(1)}% · Δ${finalDiff >= 0 ? '+' : ''}${finalDiff.toFixed(1)}%</span> (бар ${lastPairBar})`, '');
   if (firstDivBar >= 0) {
     html += row('Первое расхождение >0.5%', `<span class="warn">бар #${firstDivBar} · ${firstDivTime}</span>`, '');
     html += `<button class="tpl-btn2" style="margin-top:6px;padding:4px 12px;font-size:.82em;border-color:#c792ea;color:#c792ea;width:100%" onclick="copyTVdiag()">📋 Скопировать диагностику для Claude</button>`;
@@ -3204,7 +3244,7 @@ function _runTVcompare(tvRows, resultsEl) {
   resultsEl.innerHTML = html;
 
   // Draw TV equity overlay on existing canvas
-  _tvDrawOverlay(pairs, r.eq);
+  _tvDrawOverlay(pairs, fullEq);
 }
 
 function _tvDrawOverlay(pairs, jsEq) {
@@ -3249,14 +3289,24 @@ function copyTVdiag() {
   const d = _tvCmpDiag;
   if (!d) { alert('Нет данных диагностики — сначала загрузи TV CSV'); return; }
   const { r, pairs, corr, rmse, finalDiff, jsLast, tvLast,
-          firstDivBar, firstDivTime, maxDiff, maxDiffBar, maxDiffTime, hasSigs } = d;
+          firstDivBar, firstDivTime, maxDiff, maxDiffBar, maxDiffTime, hasSigs, isFullRun,
+          missingEnd, jsFullFinal, fullRunErr } = d;
   const c = r.cfg;
+  const lastPairBar2 = pairs.length > 0 ? pairs[pairs.length - 1].i : -1;
 
   const lines = [];
   lines.push('=== TV vs JS ДИАГНОСТИКА РАСХОЖДЕНИЯ ===');
   lines.push(`Результат: ${r.name}`);
+  lines.push(`Режим: ${isFullRun ? 'IS+OOS (полный прогон)' : `fallback (r.eq)${fullRunErr ? ' — ' + fullRunErr : ''}`} | Данные: ${pairs.length}/${DATA.length} баров`);
+  if (missingEnd > 0) {
+    const missedPnl = !isNaN(jsFullFinal) ? (jsFullFinal - jsLast).toFixed(1) : '?';
+    lines.push(`⚠️ TV CSV НЕ ПОКРЫВАЕТ последние ${missingEnd} баров DATA (пропущено JS PnL ≈ ${missedPnl}%)`);
+    lines.push(`   JS полный итог (бар ${DATA.length-1}): ${isNaN(jsFullFinal) ? '—' : jsFullFinal.toFixed(2) + '%'}`);
+    lines.push(`   JS @ последний TV бар (#${lastPairBar2}): ${jsLast.toFixed(2)}%`);
+    lines.push(`   → Загрузи TV CSV за весь период оптимизатора чтобы покрыть все ${DATA.length} баров`);
+  }
   lines.push(`Совпало баров: ${pairs.length} | Корреляция: ${(corr*100).toFixed(2)}% | RMSE: ${rmse.toFixed(2)}%`);
-  lines.push(`JS итог: ${jsLast.toFixed(2)}%  TV итог: ${tvLast.toFixed(2)}%  Δ: ${finalDiff>=0?'+':''}${finalDiff.toFixed(2)}%`);
+  lines.push(`JS итог (@ посл. TV бар): ${jsLast.toFixed(2)}%  TV итог: ${tvLast.toFixed(2)}%  Δ: ${finalDiff>=0?'+':''}${finalDiff.toFixed(2)}%`);
   lines.push(`Первое расхождение >0.5%: бар #${firstDivBar} (${firstDivTime})`);
   lines.push(`Макс. расхождение: ${maxDiff.toFixed(2)}% на баре #${maxDiffBar} (${maxDiffTime})`);
   lines.push('');
