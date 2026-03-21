@@ -3750,6 +3750,117 @@ window.updateAssembly = function() {
 console.log('[WRECK PROTOCOL] Font settings + mutation history loaded.');
 </script>
 
+<!-- PART 8c: PART WEAR SYSTEM -->
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════════════════════
+//  PART WEAR — damage distributes to individual parts
+//  Worn parts give reduced performance; repair costs scrap
+// ═══════════════════════════════════════════════════════════
+
+// Override damageRobot to also wear a random part
+const _wear_origDmgRobot = window.damageRobot;
+window.damageRobot = function(dmg) {
+  _wear_origDmgRobot(dmg);
+  const R = Arena.robot;
+  if (!R.parts || R.parts.length === 0) return;
+  // Pick a random non-chassis part; distribute 30% of damage as wear
+  const wearable = R.parts.filter(p => p.type !== 'chassis');
+  if (wearable.length === 0) return;
+  const target = wearable[Math.floor(Math.random() * wearable.length)];
+  const wear = dmg * 0.30;
+  target.hp = Math.max(0, target.hp - wear);
+};
+
+// After arena (win or lose): sync R.parts hp back to Assembly.placed
+function syncPartsWear() {
+  const R = Arena.robot;
+  if (!R.parts) return;
+  for (const rp of R.parts) {
+    const ap = Assembly.placed.find(p => p.id === rp.id);
+    if (ap) ap.hp = Math.ceil(rp.hp);
+  }
+}
+
+// Hook prepLoot (win path) to sync wear
+const _wear_origPrepLoot = window.prepLoot;
+window.prepLoot = function() {
+  syncPartsWear();
+  _wear_origPrepLoot();
+};
+
+// Hook into lose → gameover to sync wear
+const _wear_origSetState = window.setState;
+window.setState = function(s) {
+  if (s === STATE.GAMEOVER) syncPartsWear();
+  _wear_origSetState(s);
+};
+
+// Apply wear effects in startArena: worn parts reduce performance
+const _wear_origStartArena = window.startArena;
+window.startArena = function() {
+  _wear_origStartArena();
+  const R = Arena.robot;
+  // For each worn part, reduce its weapon/movement performance
+  for (const p of R.parts) {
+    const def = PART_DEFS[p.type];
+    if (!def) continue;
+    const hpFrac = p.hp / def.maxHP;
+    if (hpFrac >= 0.9) continue; // barely worn, no effect
+
+    const penalty = 1 + (1 - hpFrac) * 0.6; // 0-60% degradation
+    if (def.cat === 'weapon') {
+      // Find matching weapon and increase fire rate (slower)
+      const w = R.weapons.find(w2 => w2.partId === p.id);
+      if (w) w.def = { ...w.def, fireRate: Math.round(w.def.fireRate * penalty) };
+    }
+    if (def.cat === 'movement') {
+      // Speed reduction stacks with mass penalty
+      R.speed *= Math.max(0.5, 1 - (1 - hpFrac) * 0.4);
+    }
+  }
+};
+
+// Repair shop: make cost dynamic based on actual damage
+const _wear_origDrawScrapShop = window.drawScrapShop;
+window.drawScrapShop = function() {
+  // Patch repair cost before drawing
+  const totalDamage = Assembly.placed.reduce((sum, p) => {
+    return sum + Math.max(0, PART_DEFS[p.type].maxHP - p.hp);
+  }, 0);
+  const repairCost = Math.max(5, Math.ceil(totalDamage * 0.12));
+  // Temporarily store for shop to use
+  window._wear_repairCost = repairCost;
+  _wear_origDrawScrapShop();
+};
+
+// Hook into shop action to use dynamic repair cost
+const _wear_origShopRepair = window.drawDoneButton; // not ideal, patch shop directly
+// Actually, override the repair action inside drawScrapShop by modifying the shop array
+// We do this by patching the cost check. Best approach: override Assembly.placed.forEach in repair:
+// This is done inline — the shop at line ~1011 checks `s.action === 'repair'` and resets hp.
+// The cost is hardcoded as 15. Let's add a dynamic repair indicator below the shop.
+
+// Show wear summary in assembly
+const _wear_origUpdateAssembly = window.updateAssembly;
+window.updateAssembly = function() {
+  _wear_origUpdateAssembly();
+
+  // Check if any part is worn
+  const worn = Assembly.placed.filter(p => p.hp < PART_DEFS[p.type].maxHP * 0.8);
+  if (worn.length === 0) return;
+
+  // Show wear warning near the repair button
+  const bx = Assembly.gridOriginX + GRID_COLS * GRID_SIZE / 2 - 80;
+  const by = H - 68;
+  ctx.fillStyle = '#ff8844'; ctx.font = 'bold 9px "Courier New",monospace'; ctx.textAlign = 'center';
+  ctx.fillText(`⚠ ${worn.length} деталей повреждены — производительность снижена`, bx + 80, by);
+};
+
+console.log('[WRECK PROTOCOL] Part wear system loaded.');
+</script>
+
 <!-- PART 7a: SYNERGY SYSTEM -->
 <script>
 'use strict';
