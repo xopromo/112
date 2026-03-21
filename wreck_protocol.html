@@ -782,14 +782,16 @@ function removePlaced(partId) {
 }
 
 function recalcStats() {
-  let mass = 0, energy = 4; // base energy
+  let mass = 0, capacity = 4, used = 0;
   for (const p of Assembly.placed) {
     const d = PART_DEFS[p.type];
     mass += d.mass;
-    energy += -(d.energy || 0); // negative energy = battery bonus
+    if ((d.energy || 0) < 0) capacity += Math.abs(d.energy); // battery adds capacity
+    else used += (d.energy || 0);                             // parts consume energy
   }
-  Assembly.totalMass = mass;
-  Assembly.totalEnergy = Math.max(0, energy);
+  Assembly.totalMass   = mass;
+  Assembly.usedEnergy  = used;
+  Assembly.totalEnergy = capacity; // capacity (for backward compat label)
 }
 
 function canPlace(part, gx, gy) {
@@ -947,13 +949,23 @@ function drawPalette() {
 
   // Stats
   const sy2 = 5 + PAL_H - 80;
-  const energyColor = Assembly.usedEnergy > Assembly.totalEnergy ? C.danger : C.accent;
-  ctx.fillStyle = C.text; ctx.font = '12px "Courier New",monospace'; ctx.textAlign = 'left';
-  ctx.fillText(`МАССА: ${Assembly.totalMass} кг`, PAL_X+8, sy2+16);
+  const energyOver = Assembly.usedEnergy > Assembly.totalEnergy;
+  const energyColor = energyOver ? C.danger : C.accent;
+  const massHeavy = Assembly.totalMass > 20;
+
+  ctx.font = '12px "Courier New",monospace'; ctx.textAlign = 'left';
+  ctx.fillStyle = massHeavy ? C.warn : C.text;
+  ctx.fillText(`МАССА: ${Assembly.totalMass} кг${massHeavy?' ⚠':''}`, PAL_X+8, sy2+16);
+
   ctx.fillStyle = energyColor;
-  ctx.fillText(`ЭНЕРГИЯ: ${Assembly.usedEnergy} / ${Assembly.totalEnergy+4}`, PAL_X+8, sy2+32);
+  ctx.fillText(`ЭНЕРГИЯ: ${Assembly.usedEnergy} / ${Assembly.totalEnergy}${energyOver?' ⚠':''}`, PAL_X+8, sy2+32);
+  if (energyOver) {
+    ctx.fillStyle = C.danger; ctx.font = '9px "Courier New",monospace';
+    ctx.fillText('перегрузка → скорость -30%', PAL_X+8, sy2+43);
+  }
+
   ctx.fillStyle = C.warn; ctx.font = 'bold 13px "Courier New",monospace';
-  ctx.fillText(`ЛОМ: ${Game.scrap} ед.`, PAL_X+8, sy2+52);
+  ctx.fillText(`ЛОМ: ${Game.scrap} ед.`, PAL_X+8, sy2+56);
 
   // ── Scrap shop buttons
   drawScrapShop();
@@ -1335,7 +1347,11 @@ function startArena() {
 
   // Mass penalty
   const massPenalty = Math.max(0.3, 1 - (mass - 4) * 0.025);
-  R.speed     = speed * massPenalty;
+  // Energy overload penalty: consuming more than capacity → speed -30%
+  const energyUsed = Assembly.usedEnergy || 0;
+  const energyCap  = Assembly.totalEnergy || 4;
+  const energyPenalty = (energyUsed > energyCap) ? 0.7 : 1.0;
+  R.speed     = speed * massPenalty * energyPenalty;
   R.turnSpeed = turn;
   R.maxHP     = hp;
   R.hp        = hp;
@@ -3509,6 +3525,56 @@ window.spawnEnemiesForRound=function(round){
 console.log('[WRECK PROTOCOL] Classes + Pillars + Bosses + Encounters loaded.');
 </script>
 
+<!-- PART 8a: PERFORMANCE + CAPACITY DISPLAY -->
+<script>
+'use strict';
+
+// ── Disable shadowBlur globally for performance (user request)
+// Monkeypatch the canvas 2D context prototype so all calls to shadowBlur/shadowColor are no-ops
+(function() {
+  const proto = CanvasRenderingContext2D.prototype;
+  const noop = () => {};
+  const zero = () => 0;
+  const transparent = () => 'transparent';
+  try {
+    Object.defineProperty(proto, 'shadowBlur',  { set: noop, get: zero,        configurable: true });
+    Object.defineProperty(proto, 'shadowColor', { set: noop, get: transparent, configurable: true });
+  } catch(e) {
+    console.warn('[WRECK] shadowBlur patch failed:', e);
+  }
+})();
+
+// ── Fix HUD: show energy (used/cap) instead of maxHP in the МАССА row
+const _hud_origUpdateHUD = window.updateHUD;
+window.updateHUD = function() {
+  _hud_origUpdateHUD();
+  const R = Arena.robot;
+  // Fix "МП" label to show energy capacity info
+  const eCap  = Assembly.totalEnergy || 4;
+  const eUsed = Assembly.usedEnergy  || 0;
+  document.getElementById('hud-energy').textContent = eUsed;
+  document.getElementById('hud-energy-max').textContent = eCap;
+  // Flash red label if overloaded
+  const el = document.getElementById('hud-energy').parentElement;
+  if (el) el.style.color = eUsed > eCap ? '#ff4444' : '#4eff91';
+};
+
+// ── Patch HUD label text (energy, not mass/mp)
+(function() {
+  const hud = document.getElementById('hud');
+  if (!hud) return;
+  const items = hud.querySelectorAll('.hud-item');
+  // item 2 is "МАССА X / МП Y" — rename to "ЭНЕРГИЯ X / Y"
+  if (items[2]) items[2].childNodes[0].textContent = 'ЭНЕРГИЯ ';
+  if (items[2]) {
+    const spans = items[2].querySelectorAll('span');
+    if (spans[1]) spans[1].previousSibling.textContent = ' / ';
+  }
+})();
+
+console.log('[WRECK PROTOCOL] Performance + capacity display loaded.');
+</script>
+
 <!-- PART 7a: SYNERGY SYSTEM -->
 <script>
 'use strict';
@@ -3947,7 +4013,7 @@ const _ch_origSpawn = window.spawnEnemiesForRound;
 window.spawnEnemiesForRound = function(round) {
   const enemies = _ch_origSpawn(round);
   if (Game._challengeMarathon) {
-    const types = ['scout','drone','brute'];
+    const types = ['scout','gunner','swarm'];
     for (let i = 0; i < 3; i++) {
       const def = ENEMY_DEFS[types[i % types.length]];
       enemies.push({
