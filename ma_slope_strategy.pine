@@ -20,9 +20,13 @@ grp_tp = "🎯 ТЕЙК-ПРОФИТ (slope/spread)"
 slope_lb    = input.int(3, "Lookback замедления slope (баров)", minval=1, maxval=20, tooltip="TP срабатывает когда slope[0] < slope[N] — скорость роста МА упала за N баров", group=grp_tp)
 spread_lb   = input.int(5, "Lookback сужения spread (баров)",  minval=2, maxval=50,  tooltip="TP срабатывает когда spread (цена-МА)/МА отошёл на 5%+ от максимума за N баров", group=grp_tp)
 use_ma_rev  = input.bool(true, "Выход при развороте МА", tooltip="Выходить из лонга когда MA снова повернула вниз, и наоборот", group=grp_tp)
+min_tp_pct  = input.float(0.3, "Мин. профит для TP %", minval=0.0, maxval=10.0, step=0.1, tooltip="TP (slope/spread) срабатывает ТОЛЬКО если уже есть хотя бы X% профита. Исключение: разворот МА работает всегда.", group=grp_tp)
 
 grp_sl = "🛡️ СТОП-ЛОСС"
-sl_pct      = input.float(1.5, "SL %", minval=0.1, maxval=20.0, step=0.1, group=grp_sl)
+sl_pct      = input.float(1.5, "Начальный SL %", minval=0.1, maxval=20.0, step=0.1, group=grp_sl)
+use_trail   = input.bool(true, "Трейлинг-стоп", tooltip="После достижения be_pct% профита SL переезжает в безубыток, затем тянется за ценой на trail_pct%", group=grp_sl)
+be_pct      = input.float(0.5, "Безубыток при профите %", minval=0.1, maxval=10.0, step=0.1, tooltip="Когда профит достигает этого значения — SL переносится на цену входа", group=grp_sl)
+trail_pct   = input.float(1.0, "Трейлинг %", minval=0.1, maxval=20.0, step=0.1, tooltip="SL = лучшая цена с момента входа × (1 − trail_pct%). Активируется одновременно с безубытком.", group=grp_sl)
 
 grp_dir = "⬆️ НАПРАВЛЕНИЕ"
 allow_long  = input.bool(true,  "Торговать лонги",  group=grp_dir)
@@ -98,6 +102,7 @@ var bool  bt_in   = false
 var int   bt_dir  = 0
 var float bt_ep   = 0.0
 var float bt_sl   = 0.0
+var float bt_best = 0.0   // лучшая цена с момента входа (для трейлинга)
 var float bt_pnl  = 0.0
 var int   bt_cnt  = 0
 var int   bt_wins = 0
@@ -109,6 +114,21 @@ var int   bt_eb   = -1
 if bar_index > (last_bar_index - max_bars) and barstate.isconfirmed
     // — Управление открытой позицией —
     if bt_in and bar_index > bt_eb
+        // Обновляем лучшую цену и трейлинг-стоп
+        if bt_dir == 1
+            bt_best := math.max(bt_best, high)
+            float profit_now = (bt_best - bt_ep) / bt_ep * 100.0
+            if use_trail and profit_now >= be_pct
+                float trail_sl = bt_best * (1.0 - trail_pct / 100.0)
+                bt_sl := math.max(bt_sl, math.max(bt_ep, trail_sl))  // не ниже безубытка
+        else
+            bt_best := math.min(bt_best, low)
+            float profit_now = (bt_ep - bt_best) / bt_ep * 100.0
+            if use_trail and profit_now >= be_pct
+                float trail_sl = bt_best * (1.0 + trail_pct / 100.0)
+                bt_sl := math.min(bt_sl, math.min(bt_ep, trail_sl))  // не выше безубытка
+
+        float cur_profit = bt_dir == 1 ? (close - bt_ep) / bt_ep * 100.0 : (bt_ep - close) / bt_ep * 100.0
         float xp     = close
         bool do_exit = false
 
@@ -117,17 +137,17 @@ if bar_index > (last_bar_index - max_bars) and barstate.isconfirmed
             if low <= bt_sl
                 xp := bt_sl
                 do_exit := true
-            // TP
-            else if tp_cond_l and close > bt_ep
+            // TP (только при достаточном профите)
+            else if tp_cond_l and cur_profit >= min_tp_pct
                 do_exit := true
-            // Разворот MA
+            // Разворот MA (без ограничения по профиту)
             else if ma_rev_s
                 do_exit := true
         else
             if high >= bt_sl
                 xp := bt_sl
                 do_exit := true
-            else if tp_cond_s and close < bt_ep
+            else if tp_cond_s and cur_profit >= min_tp_pct
                 do_exit := true
             else if ma_rev_l
                 do_exit := true
@@ -146,11 +166,12 @@ if bar_index > (last_bar_index - max_bars) and barstate.isconfirmed
     // — Вход в позицию —
     if not bt_in
         if sig_l or sig_s
-            bt_in  := true
-            bt_dir := sig_l ? 1 : -1
-            bt_ep  := close
-            bt_sl  := sig_l ? close * (1.0 - sl_pct/100.0) : close * (1.0 + sl_pct/100.0)
-            bt_eb  := bar_index
+            bt_in   := true
+            bt_dir  := sig_l ? 1 : -1
+            bt_ep   := close
+            bt_best := sig_l ? close : close
+            bt_sl   := sig_l ? close * (1.0 - sl_pct/100.0) : close * (1.0 + sl_pct/100.0)
+            bt_eb   := bar_index
 
     // — Текущая equity —
     bt_eq := bt_in ? bt_pnl + (bt_dir == 1 ? (close-bt_ep)/bt_ep*100.0 : (bt_ep-close)/bt_ep*100.0) : bt_pnl
@@ -178,6 +199,7 @@ var bool  v_in   = false
 var int   v_dir  = 0
 var float v_ep   = 0.0
 var float v_sl   = 0.0
+var float v_best = 0.0   // лучшая цена (для трейлинга в visual engine)
 var box   b_trade = na
 var line  l_sl_ln = na
 var int   v_eb   = -1
@@ -185,6 +207,21 @@ var int   v_eb   = -1
 if bar_index > (last_bar_index - max_bars) and barstate.isconfirmed
     // — Управление открытой позицией (визуально) —
     if v_in and bar_index > v_eb
+        // Трейлинг-стоп (visual)
+        if v_dir == 1
+            v_best := math.max(v_best, high)
+            float profit_now = (v_best - v_ep) / v_ep * 100.0
+            if use_trail and profit_now >= be_pct
+                float trail_sl = v_best * (1.0 - trail_pct / 100.0)
+                v_sl := math.max(v_sl, math.max(v_ep, trail_sl))
+        else
+            v_best := math.min(v_best, low)
+            float profit_now = (v_ep - v_best) / v_ep * 100.0
+            if use_trail and profit_now >= be_pct
+                float trail_sl = v_best * (1.0 + trail_pct / 100.0)
+                v_sl := math.min(v_sl, math.min(v_ep, trail_sl))
+
+        float vcur_profit = v_dir == 1 ? (close - v_ep) / v_ep * 100.0 : (v_ep - close) / v_ep * 100.0
         float vxp    = close
         string vxt   = ""
         bool do_exit = false
@@ -194,7 +231,7 @@ if bar_index > (last_bar_index - max_bars) and barstate.isconfirmed
                 vxp := v_sl
                 vxt := "SL"
                 do_exit := true
-            else if tp_cond_l and close > v_ep
+            else if tp_cond_l and vcur_profit >= min_tp_pct
                 vxt := slope_decel_up ? "TP slope" : "TP spread"
                 do_exit := true
             else if ma_rev_s
@@ -205,7 +242,7 @@ if bar_index > (last_bar_index - max_bars) and barstate.isconfirmed
                 vxp := v_sl
                 vxt := "SL"
                 do_exit := true
-            else if tp_cond_s and close < v_ep
+            else if tp_cond_s and vcur_profit >= min_tp_pct
                 vxt := slope_decel_down ? "TP slope" : "TP spread"
                 do_exit := true
             else if ma_rev_l
@@ -218,9 +255,11 @@ if bar_index > (last_bar_index - max_bars) and barstate.isconfirmed
             box.set_top(b_trade, math.max(v_ep, close))
             box.set_bottom(b_trade, math.min(v_ep, close))
 
-        // Обновляем линию SL
+        // Обновляем линию SL (трейлинг виден на графике)
         if show_sl_ln and not na(l_sl_ln)
             line.set_x2(l_sl_ln, bar_index)
+            line.set_y1(l_sl_ln, v_sl)
+            line.set_y2(l_sl_ln, v_sl)
 
         if do_exit
             bool win = v_dir == 1 ? vxp > v_ep : vxp < v_ep
@@ -249,6 +288,7 @@ if bar_index > (last_bar_index - max_bars) and barstate.isconfirmed
             v_in  := true
             v_dir := sig_l ? 1 : -1
             v_ep  := close
+            v_best := close
             v_sl  := sig_l ? close * (1.0 - sl_pct/100.0) : close * (1.0 + sl_pct/100.0)
             v_eb  := bar_index
             if show_tr
@@ -345,13 +385,13 @@ if barstate.islast
     table.cell(t, 0, 7, "Slope lb",   text_color=color.white,  text_size=size.small)
     table.cell(t, 1, 7, str.tostring(slope_lb),
                text_color=color.yellow, text_size=size.small)
-    table.cell(t, 2, 7, "Spread lb",  text_color=color.white,  text_size=size.small)
-    table.cell(t, 3, 7, str.tostring(spread_lb),
+    table.cell(t, 2, 7, "Мин.TP%",   text_color=color.white,  text_size=size.small)
+    table.cell(t, 3, 7, str.tostring(min_tp_pct, "#.#") + "%",
                text_color=color.yellow, text_size=size.small)
 
-    table.cell(t, 0, 8, "Мин.slope",  text_color=color.white,  text_size=size.small)
-    table.cell(t, 1, 8, str.tostring(min_slope, "#.######"),
-               text_color=color.yellow, text_size=size.small)
+    table.cell(t, 0, 8, "Trail",     text_color=color.white,  text_size=size.small)
+    table.cell(t, 1, 8, use_trail ? str.tostring(trail_pct, "#.#") + "% / BE " + str.tostring(be_pct, "#.#") + "%" : "выкл",
+               text_color=use_trail ? color.green : color.gray, text_size=size.small)
     table.cell(t, 2, 8, "Разворот MA", text_color=color.white, text_size=size.small)
     table.cell(t, 3, 8, use_ma_rev ? "вкл" : "выкл",
                text_color=use_ma_rev ? color.green : color.gray, text_size=size.small)
