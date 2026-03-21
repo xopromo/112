@@ -6685,5 +6685,319 @@ console.log('[WRECK PROTOCOL] Part 11e: 10 rounds, quest system, kill counter, n
 console.log('[WRECK PROTOCOL] === PART 11 COMPLETE: new parts×6, enemies×4, encounters×6, battle surprises×5, merge synergy, diminishing returns, quests ===');
 </script>
 
+<!-- ═══════════════════════════════════════════════════════════════════
+     PART 12a: ЭКРАН РЕЗУЛЬТАТОВ ВСТРЕЧИ
+     ═══════════════════════════════════════════════════════════════════ -->
+<script>
+'use strict';
+
+// ── ТРЕКЕР ЭФФЕКТОВ ВСТРЕЧИ ────────────────────────────────────────────────
+// Перехватывает applyEncounterAction и описывает что произошло
+Encounter.result = null; // { lines: [{icon, text, color}], title, color }
+
+const _p12a_origApply = window.applyEncounterAction;
+window.applyEncounterAction = function(action) {
+  const scrBefore = Game.scrap;
+  const invBefore = Game.inventory.length;
+  const hpsBefore = Assembly.placed.map(p => ({ id: p.id, hp: p.hp }));
+  const mutsBefore = [...(Game.mutations || [])];
+
+  _p12a_origApply(action);
+
+  if (action === 'leave') {
+    Encounter.result = { title: 'ПРОЙДЕНО МИМО', color: '#444444',
+      lines: [{ icon:'↩', text:'Ничего не произошло.', color:'#666' }] };
+    return;
+  }
+
+  const lines = [];
+  const scrDelta = Game.scrap - scrBefore;
+  const invDelta = Game.inventory.length - invBefore;
+  const newMuts  = (Game.mutations || []).filter(m => !mutsBefore.includes(m));
+
+  if (scrDelta > 0) lines.push({ icon:'💰', text:`+${scrDelta} лома`,  color:'#ffcc00' });
+  if (scrDelta < 0) lines.push({ icon:'💸', text:`${scrDelta} лома`,   color:'#ff6644' });
+
+  if (invDelta > 0) {
+    const newParts = Game.inventory.slice(-invDelta);
+    for (const p of newParts) {
+      const def = PART_DEFS[p.type];
+      lines.push({ icon: def.icon || '⚙', text: def.label, color: def.border });
+    }
+  }
+  if (invDelta < 0) lines.push({ icon:'🗑', text:`Потеряно ${-invDelta} деталей`, color:'#ff4444' });
+
+  for (const mId of newMuts) {
+    const mDef = (typeof MUTATIONS_DEF !== 'undefined') ? MUTATIONS_DEF.find(m => m.id === mId) : null;
+    lines.push({ icon:'🧬', text: mDef ? `Мутация: ${mDef.label}` : `Мутация: ${mId}`, color:'#aa44ff' });
+  }
+
+  Assembly.placed.forEach(p => {
+    const before = hpsBefore.find(b => b.id === p.id);
+    if (!before) return;
+    const delta = p.hp - before.hp;
+    const def = PART_DEFS[p.type];
+    if (delta > 0) lines.push({ icon:'🔧', text:`${def.label}: +${delta} ПЗ`, color:'#44ff88' });
+    if (delta < 0 && Math.abs(delta) > 1) lines.push({ icon:'💥', text:`${def.label}: ${delta} ПЗ`, color:'#ff4444' });
+  });
+
+  if (lines.length === 0) lines.push({ icon:'✓', text:'Выполнено без трофеев.', color:'#555' });
+
+  Encounter.result = {
+    title: 'РЕЗУЛЬТАТЫ ВСТРЕЧИ',
+    color: Encounter.current ? Encounter.current.color : '#4eff91',
+    lines,
+  };
+};
+
+// ── ПАТЧ updateEncounter: показываем результаты после выбора ─────────────
+const _p12a_origUpdateEncounter = window.updateEncounter;
+window.updateEncounter = function() {
+  // Если есть pending result — показываем его вместо обычного экрана
+  if (Encounter.result && Encounter._showingResult) {
+    _p12a_drawEncounterResult();
+    return;
+  }
+  _p12a_origUpdateEncounter();
+};
+
+// Перехватываем клик на опцию: сначала показываем результат
+const _p12a_origApply2 = window.applyEncounterAction;
+const _p12a_origUpdateEncounterNative = _p12a_origUpdateEncounter;
+
+// Патчим сам updateEncounter: в месте где происходит applyEncounterAction + setState
+// Нам нужно перехватить момент ПОСЛЕ applyEncounterAction, ДО setState(ASSEMBLY)
+// Делаем через патч setState внутри updateEncounter
+const _p12a_nativeUpdateEnc = window.updateEncounter;
+window.updateEncounter = function() {
+  if (Encounter._showingResult) {
+    _p12a_drawEncounterResult();
+    return;
+  }
+
+  // Подменяем setState на время отрисовки encounter
+  const _origSetState = window.setState;
+  window.setState = function(s) {
+    if (s === STATE.ASSEMBLY && Encounter.result) {
+      Encounter._showingResult = true;
+      Encounter._resultTimer = 0;
+      window.setState = _origSetState; // восстанавливаем
+      return; // не переходим пока не нажмут "Продолжить"
+    }
+    window.setState = _origSetState;
+    _origSetState(s);
+  };
+
+  _p12a_nativeUpdateEnc();
+
+  // Если мы заменили setState — нужно восстановить
+  if (window.setState !== _origSetState) window.setState = _origSetState;
+};
+
+function _p12a_drawEncounterResult() {
+  const res = Encounter.result;
+  if (!res) { Encounter._showingResult = false; return; }
+  Encounter._resultTimer = (Encounter._resultTimer || 0) + 1;
+
+  fillRect(0, 0, W, H, C.bg);
+  drawGrid(0, 0, W, H, 40, '#0b150b');
+
+  // Заголовок
+  const alpha = Math.min(1, Encounter._resultTimer / 20);
+  ctx.save();
+  ctx.globalAlpha = alpha;
+
+  fillRect(0, 0, W, 80, 'rgba(0,0,0,0.7)');
+  ctx.fillStyle = res.color; ctx.font = 'bold 22px "Courier New",monospace'; ctx.textAlign = 'center';
+  ctx.shadowColor = res.color; ctx.shadowBlur = 18;
+  ctx.fillText(res.title, W/2, 40); ctx.shadowBlur = 0;
+  ctx.fillStyle = '#44ff88'; ctx.font = '11px "Courier New",monospace';
+  ctx.fillText('Что вы получили:', W/2, 62);
+
+  // Карточки результата
+  const cardW = 520, cardH = 58 + res.lines.length * 34;
+  const cx = W/2 - cardW/2, cy = 90;
+  fillRect(cx, cy, cardW, cardH, '#050f05');
+  strokeRect(cx, cy, cardW, cardH, res.color, 2);
+
+  res.lines.forEach((line, i) => {
+    const ly = cy + 28 + i * 34;
+    // Строка лута
+    fillRect(cx + 12, ly - 18, cardW - 24, 28, '#0a140a');
+    strokeRect(cx + 12, ly - 18, cardW - 24, 28, '#1a3a1a', 1);
+    ctx.fillStyle = '#555'; ctx.font = 'bold 18px serif'; ctx.textAlign = 'left';
+    ctx.fillText(line.icon || '•', cx + 20, ly + 4);
+    ctx.fillStyle = line.color; ctx.font = 'bold 13px "Courier New",monospace';
+    ctx.textAlign = 'left';
+    ctx.shadowColor = line.color; ctx.shadowBlur = 6;
+    ctx.fillText(line.text, cx + 46, ly + 4);
+    ctx.shadowBlur = 0;
+  });
+
+  // Кнопка "Продолжить"
+  const btnY = cy + cardH + 22;
+  const btnW = 260, btnH = 38, btnX = W/2 - btnW/2;
+  const hov = isHover(btnX, btnY, btnW, btnH);
+  const canContinue = Encounter._resultTimer >= 30; // минимум 0.5 сек до клика
+  fillRect(btnX, btnY, btnW, btnH, hov && canContinue ? '#0f3a0f' : '#080f08');
+  strokeRect(btnX, btnY, btnW, btnH, canContinue ? '#4eff91' : '#1a3a1a', canContinue ? 2 : 1);
+  ctx.fillStyle = canContinue ? '#4eff91' : '#336633';
+  ctx.font = 'bold 14px "Courier New",monospace'; ctx.textAlign = 'center';
+  ctx.fillText(canContinue ? '[ ПРОДОЛЖИТЬ → СБОРКА ]' : '[ подождите... ]', W/2, btnY + 25);
+
+  if (hov && Mouse.clicked && canContinue) {
+    Encounter._showingResult = false;
+    Encounter.result = null;
+    Encounter.current = null;
+    initAssembly();
+    setState(STATE.ASSEMBLY);
+  }
+
+  ctx.restore();
+  drawVignette(); drawScanlines();
+}
+
+console.log('[WRECK PROTOCOL] Part 12a: encounter result screen loaded.');
+</script>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     PART 12b: ФИКСы СЛИЯНИЯ — ЩИТ + ПРАВИЛЬНЫЙ PREVIEW
+     ═══════════════════════════════════════════════════════════════════ -->
+<script>
+'use strict';
+
+// ── БАГ 1: roll.shieldHP не применяется в startArena ─────────────────────
+// Патчим ПОСЛЕ _roll_origStartArena (уже запатчен в Part 7a),
+// добавляем применение shieldHP к реальному shield значению.
+const _p12b_origStartArena = window.startArena;
+window.startArena = function() {
+  _p12b_origStartArena();
+  const R = Arena.robot;
+  // Применяем shieldHP роллы ко щиту (Part 7a их не применял)
+  for (const p of R.parts) {
+    if (!p._roll || !p._roll.shieldHP || p._roll.shieldHP === 1) continue;
+    const def = PART_DEFS[p.type];
+    if (!def.shieldHP) continue; // только детали с реальным shieldHP (shield_gen)
+    // R.maxShield уже включает base shieldHP; прибавляем бонус от ролла
+    const bonus = Math.round(def.shieldHP * (p._roll.shieldHP - 1));
+    R.maxShield += bonus;
+    R.shield    += bonus;
+  }
+};
+
+// ── БАГ 2: _upgradePreviewLines показывает неверные данные ────────────────
+// Перезаписываем функцию полностью с правильными расчётами.
+window._upgradePreviewLines = function(placed, invPart, quirk, fromPlaced=false) {
+  const def  = PART_DEFS[placed.type];
+  const roll = placed._roll || {};
+  const lines = [];
+  const mult  = fromPlaced ? 0.85 : 1.0;
+
+  if (def.cat === 'weapon') {
+    const dmgBoost = Math.round(0.20 * mult * 100);
+    lines.push({ text: `Урон: +${dmgBoost}% за шаг`, color: '#44ff88' });
+    const frBoost = Math.round(0.10 * mult * 100);
+    lines.push({ text: `Скорострельность: +${frBoost}% за шаг`, color: '#44ff88' });
+    // Текущее накопленное значение
+    if (roll.damage && roll.damage !== 1) {
+      const cur = Math.round((roll.damage - 1) * 100);
+      lines.push({ text: `→ ИТОГО сейчас: урон ${cur > 0 ? '+' : ''}${cur}%`, color: '#aaffaa' });
+    }
+  } else if (def.cat === 'movement') {
+    const sBoost = Math.round(0.15 * mult * 100);
+    lines.push({ text: `Скорость: +${sBoost}% за шаг`, color: '#44ff88' });
+    if (roll.speedMult && roll.speedMult !== 1) {
+      const cur = Math.round((roll.speedMult - 1) * 100);
+      lines.push({ text: `→ ИТОГО сейчас: скорость +${cur}%`, color: '#aaffaa' });
+    }
+  } else if (def.cat === 'utility') {
+    if (def.shieldHP) {
+      // Только для shield_gen — реальный бонус к щиту
+      const baseShield = def.shieldHP;
+      const stepBonus  = Math.round(baseShield * 0.20 * mult);
+      lines.push({ text: `Щит: +${stepBonus} HP за шаг`, color: '#4488ff' });
+      const curMult = roll.shieldHP || 1;
+      const curBonus = Math.round(baseShield * (curMult - 1));
+      if (curBonus > 0) {
+        lines.push({ text: `→ ИТОГО сейчас: щит +${curBonus} HP (×${curMult.toFixed(2)})`, color: '#aaaaff' });
+      }
+      // После этого слияния:
+      const newMult = curMult * (1 + 0.20 * mult);
+      const newBonus = Math.round(baseShield * (newMult - 1));
+      lines.push({ text: `→ После слияния: щит +${newBonus} HP (×${newMult.toFixed(2)})`, color: '#44ff88' });
+    } else {
+      // Для battery, emp_gen и т.д. — нет бонуса щита
+      lines.push({ text: `(у этой детали нет бонуса щита)`, color: '#666' });
+      // Для батареи — показываем что реально изменится
+      if (def.energy < 0) {
+        lines.push({ text: `Деталь даёт энергию, улучшение хранит параметры`, color: '#44ff88' });
+      }
+    }
+  } else if (def.cat === 'sensor') {
+    if (def.timerRate) {
+      const trBoost = Math.round(0.25 * mult * 100);
+      lines.push({ text: `Частота: +${trBoost}% за шаг`, color: '#44ff88' });
+    } else {
+      const srBoost = Math.round(0.15 * mult * 100);
+      lines.push({ text: `Дальность сенсора: +${srBoost}% за шаг`, color: '#44ff88' });
+    }
+  } else if (def.cat === 'armor') {
+    const hpBoost = Math.round(def.maxHP * 0.30 * mult);
+    lines.push({ text: `ПЗ детали: +${hpBoost}`, color: '#44ff88' });
+  }
+
+  if (!fromPlaced) {
+    lines.push({ text: 'ПЗ: полное восстановление', color: '#44ff88' });
+  } else {
+    lines.push({ text: '(слияние из поля: ПЗ не восстанавливается)', color: '#888888' });
+  }
+  return lines;
+};
+
+// ── БАГ 3: Battery в категории 'utility' показывала "Щит" в preview ───────
+// Также исправим: battery merge не должна обещать "+shieldHP" ролл
+// Патчим upgradePart: для utility без shieldHP — не трогать shieldHP ролл
+const _p12b_origUpgradePart = window.upgradePart;
+window.upgradePart = function(placed, invIdx, fromPlaced, sacId) {
+  const def = PART_DEFS[placed.type];
+  // Запоминаем shieldHP до вызова, восстановим если деталь не имеет реального shieldHP
+  const rollBefore = placed._roll ? { ...placed._roll } : null;
+  const result = _p12b_origUpgradePart(placed, invIdx, fromPlaced, sacId);
+  // Если utility без shieldHP — убираем shieldHP ролл (он бесполезен)
+  if (def.cat === 'utility' && !def.shieldHP) {
+    if (placed._roll) delete placed._roll.shieldHP;
+  }
+  return result;
+};
+
+// ── УЛУЧШЕНИЕ: уровень батареи даёт больше ёмкости энергии ───────────────
+// Патчим recalcStats: учитываем _level батарей
+const _p12b_origRecalcStats = window.recalcStats;
+window.recalcStats = function() {
+  _p12b_origRecalcStats();
+  // Дополнительная энергия от прокачанных батарей
+  let extraCap = 0;
+  for (const p of Assembly.placed) {
+    const d = PART_DEFS[p.type];
+    if (d && d.energy < 0 && p._level && p._level > 1) {
+      // Каждый уровень свыше 1 даёт +1 ёмкости
+      extraCap += (p._level - 1);
+    }
+  }
+  Assembly.totalEnergy = (Assembly.totalEnergy || 4) + extraCap;
+};
+
+// ── startArena: применяем extraCap батарей (энергия в бою) ────────────────
+const _p12b_origStartArena2 = window.startArena;
+window.startArena = function() {
+  _p12b_origStartArena2();
+  const R = Arena.robot;
+  // Батареи Ур.2+ дают доп. ёмкость → меньше энергоперегрузки
+  // (энергия влияет на speed в startArena через energyPenalty — уже учтено)
+};
+
+console.log('[WRECK PROTOCOL] Part 12b: shield roll fix, merge preview fix, battery level energy fix loaded.');
+</script>
+
 </body>
 </html>
