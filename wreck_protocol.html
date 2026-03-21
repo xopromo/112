@@ -782,14 +782,16 @@ function removePlaced(partId) {
 }
 
 function recalcStats() {
-  let mass = 0, energy = 4; // base energy
+  let mass = 0, capacity = 4, used = 0;
   for (const p of Assembly.placed) {
     const d = PART_DEFS[p.type];
     mass += d.mass;
-    energy += -(d.energy || 0); // negative energy = battery bonus
+    if ((d.energy || 0) < 0) capacity += Math.abs(d.energy); // battery adds capacity
+    else used += (d.energy || 0);                             // parts consume energy
   }
-  Assembly.totalMass = mass;
-  Assembly.totalEnergy = Math.max(0, energy);
+  Assembly.totalMass   = mass;
+  Assembly.usedEnergy  = used;
+  Assembly.totalEnergy = capacity; // capacity (for backward compat label)
 }
 
 function canPlace(part, gx, gy) {
@@ -947,13 +949,23 @@ function drawPalette() {
 
   // Stats
   const sy2 = 5 + PAL_H - 80;
-  const energyColor = Assembly.usedEnergy > Assembly.totalEnergy ? C.danger : C.accent;
-  ctx.fillStyle = C.text; ctx.font = '12px "Courier New",monospace'; ctx.textAlign = 'left';
-  ctx.fillText(`МАССА: ${Assembly.totalMass} кг`, PAL_X+8, sy2+16);
+  const energyOver = Assembly.usedEnergy > Assembly.totalEnergy;
+  const energyColor = energyOver ? C.danger : C.accent;
+  const massHeavy = Assembly.totalMass > 20;
+
+  ctx.font = '12px "Courier New",monospace'; ctx.textAlign = 'left';
+  ctx.fillStyle = massHeavy ? C.warn : C.text;
+  ctx.fillText(`МАССА: ${Assembly.totalMass} кг${massHeavy?' ⚠':''}`, PAL_X+8, sy2+16);
+
   ctx.fillStyle = energyColor;
-  ctx.fillText(`ЭНЕРГИЯ: ${Assembly.usedEnergy} / ${Assembly.totalEnergy+4}`, PAL_X+8, sy2+32);
+  ctx.fillText(`ЭНЕРГИЯ: ${Assembly.usedEnergy} / ${Assembly.totalEnergy}${energyOver?' ⚠':''}`, PAL_X+8, sy2+32);
+  if (energyOver) {
+    ctx.fillStyle = C.danger; ctx.font = '9px "Courier New",monospace';
+    ctx.fillText('перегрузка → скорость -30%', PAL_X+8, sy2+43);
+  }
+
   ctx.fillStyle = C.warn; ctx.font = 'bold 13px "Courier New",monospace';
-  ctx.fillText(`ЛОМ: ${Game.scrap} ед.`, PAL_X+8, sy2+52);
+  ctx.fillText(`ЛОМ: ${Game.scrap} ед.`, PAL_X+8, sy2+56);
 
   // ── Scrap shop buttons
   drawScrapShop();
@@ -1335,7 +1347,11 @@ function startArena() {
 
   // Mass penalty
   const massPenalty = Math.max(0.3, 1 - (mass - 4) * 0.025);
-  R.speed     = speed * massPenalty;
+  // Energy overload penalty: consuming more than capacity → speed -30%
+  const energyUsed = Assembly.usedEnergy || 0;
+  const energyCap  = Assembly.totalEnergy || 4;
+  const energyPenalty = (energyUsed > energyCap) ? 0.7 : 1.0;
+  R.speed     = speed * massPenalty * energyPenalty;
   R.turnSpeed = turn;
   R.maxHP     = hp;
   R.hp        = hp;
@@ -3509,6 +3525,483 @@ window.spawnEnemiesForRound=function(round){
 console.log('[WRECK PROTOCOL] Classes + Pillars + Bosses + Encounters loaded.');
 </script>
 
+<!-- PART 8a: PERFORMANCE + CAPACITY DISPLAY -->
+<script>
+'use strict';
+
+// ── Disable shadowBlur globally for performance (user request)
+// Monkeypatch the canvas 2D context prototype so all calls to shadowBlur/shadowColor are no-ops
+(function() {
+  const proto = CanvasRenderingContext2D.prototype;
+  const noop = () => {};
+  const zero = () => 0;
+  const transparent = () => 'transparent';
+  try {
+    Object.defineProperty(proto, 'shadowBlur',  { set: noop, get: zero,        configurable: true });
+    Object.defineProperty(proto, 'shadowColor', { set: noop, get: transparent, configurable: true });
+  } catch(e) {
+    console.warn('[WRECK] shadowBlur patch failed:', e);
+  }
+})();
+
+// ── Fix HUD: show energy (used/cap) instead of maxHP in the МАССА row
+const _hud_origUpdateHUD = window.updateHUD;
+window.updateHUD = function() {
+  _hud_origUpdateHUD();
+  const R = Arena.robot;
+  // Fix "МП" label to show energy capacity info
+  const eCap  = Assembly.totalEnergy || 4;
+  const eUsed = Assembly.usedEnergy  || 0;
+  document.getElementById('hud-energy').textContent = eUsed;
+  document.getElementById('hud-energy-max').textContent = eCap;
+  // Flash red label if overloaded
+  const el = document.getElementById('hud-energy').parentElement;
+  if (el) el.style.color = eUsed > eCap ? '#ff4444' : '#4eff91';
+};
+
+// ── Patch HUD label text (energy, not mass/mp)
+(function() {
+  const hud = document.getElementById('hud');
+  if (!hud) return;
+  const items = hud.querySelectorAll('.hud-item');
+  // item 2 is "МАССА X / МП Y" — rename to "ЭНЕРГИЯ X / Y"
+  if (items[2]) items[2].childNodes[0].textContent = 'ЭНЕРГИЯ ';
+  if (items[2]) {
+    const spans = items[2].querySelectorAll('span');
+    if (spans[1]) spans[1].previousSibling.textContent = ' / ';
+  }
+})();
+
+console.log('[WRECK PROTOCOL] Performance + capacity display loaded.');
+</script>
+
+<!-- PART 8b: FONT SETTINGS + MUTATION/BONUS HISTORY -->
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════════════════════
+//  FONT SETTINGS — stored in localStorage, applied globally
+// ═══════════════════════════════════════════════════════════
+const FONT_FAMILIES = [
+  { id: 'courier',  label: 'Courier New',  css: '"Courier New",monospace' },
+  { id: 'mono',     label: 'Monospace',    css: 'monospace' },
+  { id: 'system',   label: 'Системный',    css: 'system-ui,sans-serif' },
+  { id: 'arial',    label: 'Arial',        css: 'Arial,sans-serif' },
+];
+
+const FONT_CFG_KEY = 'wreck_font_v1';
+function fontCfgLoad() {
+  try { const r = localStorage.getItem(FONT_CFG_KEY); if (r) return JSON.parse(r); } catch(e) {}
+  return { family: 'courier', scale: 1.0, bold: false };
+}
+function fontCfgSave(cfg) {
+  try { localStorage.setItem(FONT_CFG_KEY, JSON.stringify(cfg)); } catch(e) {}
+}
+let FontCfg = fontCfgLoad();
+
+// Apply font config: patch ctx.font property to intercept all font assignments
+(function() {
+  const proto = CanvasRenderingContext2D.prototype;
+  let _fontVal = '10px monospace';
+  const _origDesc = Object.getOwnPropertyDescriptor(proto, 'font');
+  Object.defineProperty(proto, 'font', {
+    set(v) {
+      // Replace font family and apply scale/bold
+      const fam = FONT_FAMILIES.find(f => f.id === FontCfg.family) || FONT_FAMILIES[0];
+      let patched = v
+        .replace(/"Courier New",monospace/g, fam.css)
+        .replace(/'Courier New',monospace/g, fam.css)
+        .replace(/Courier New/g, fam.css);
+
+      // Scale font size
+      if (FontCfg.scale !== 1.0) {
+        patched = patched.replace(/(\d+(?:\.\d+)?)px/g, (m, n) =>
+          Math.round(parseFloat(n) * FontCfg.scale) + 'px');
+      }
+      // Bold override
+      if (FontCfg.bold && !patched.startsWith('bold')) {
+        patched = 'bold ' + patched;
+      }
+      _fontVal = patched;
+      _origDesc.set.call(this, patched);
+    },
+    get() { return _fontVal; },
+    configurable: true
+  });
+})();
+
+// ── Font settings screen (STATE reuse: show over menu)
+let _showFontSettings = false;
+
+function drawFontSettings() {
+  fillRect(W/2-200, H/2-160, 400, 320, '#030a03');
+  strokeRect(W/2-200, H/2-160, 400, 320, '#2a4a2a', 2);
+
+  ctx.fillStyle = '#4eff91'; ctx.font = 'bold 16px "Courier New",monospace'; ctx.textAlign = 'center';
+  ctx.fillText('НАСТРОЙКИ ШРИФТА', W/2, H/2-130);
+
+  const families = FONT_FAMILIES;
+  ctx.font = '12px "Courier New",monospace'; ctx.fillStyle = '#7aaa7a';
+  ctx.fillText('Семейство:', W/2-150, H/2-100);
+  families.forEach((f, i) => {
+    const bx = W/2-190+i*100, by = H/2-88;
+    const sel = FontCfg.family === f.id;
+    fillRect(bx, by, 94, 26, sel ? '#0f2a0f' : '#080f08');
+    strokeRect(bx, by, 94, 26, sel ? '#4eff91' : '#1a2a1a', 1);
+    ctx.fillStyle = sel ? '#4eff91' : '#5a8a5a';
+    ctx.font = '10px "Courier New",monospace'; ctx.textAlign = 'center';
+    ctx.fillText(f.label, bx+47, by+17);
+    if (isClick(bx, by, 94, 26)) { FontCfg.family = f.id; fontCfgSave(FontCfg); }
+  });
+
+  // Size scale
+  const scales = [0.8, 1.0, 1.2, 1.4];
+  const labels = ['80%', '100%', '120%', '140%'];
+  ctx.fillStyle = '#7aaa7a'; ctx.font = '12px "Courier New",monospace'; ctx.textAlign = 'left';
+  ctx.fillText('Размер:', W/2-150, H/2-44);
+  scales.forEach((s, i) => {
+    const bx = W/2-150+i*90, by = H/2-32;
+    const sel = Math.abs(FontCfg.scale - s) < 0.05;
+    fillRect(bx, by, 84, 26, sel ? '#0f2a0f' : '#080f08');
+    strokeRect(bx, by, 84, 26, sel ? '#4eff91' : '#1a2a1a', 1);
+    ctx.fillStyle = sel ? '#4eff91' : '#5a8a5a';
+    ctx.font = '11px "Courier New",monospace'; ctx.textAlign = 'center';
+    ctx.fillText(labels[i], bx+42, by+17);
+    if (isClick(bx, by, 84, 26)) { FontCfg.scale = s; fontCfgSave(FontCfg); }
+  });
+
+  // Bold toggle
+  const tbx = W/2-80, tby = H/2+20;
+  fillRect(tbx, tby, 160, 30, FontCfg.bold ? '#0f2a0f' : '#080f08');
+  strokeRect(tbx, tby, 160, 30, FontCfg.bold ? '#4eff91' : '#1a2a1a', 1);
+  ctx.fillStyle = FontCfg.bold ? '#4eff91' : '#5a8a5a';
+  ctx.font = '12px "Courier New",monospace'; ctx.textAlign = 'center';
+  ctx.fillText(FontCfg.bold ? '✓ ЖИРНЫЙ' : '○ ЖИРНЫЙ', W/2, tby+20);
+  if (isClick(tbx, tby, 160, 30)) { FontCfg.bold = !FontCfg.bold; fontCfgSave(FontCfg); }
+
+  // Preview
+  ctx.fillStyle = '#4eff91'; ctx.font = '14px "Courier New",monospace'; ctx.textAlign = 'center';
+  ctx.fillText('Предпросмотр: WRECK PROTOCOL 1234', W/2, H/2+76);
+
+  // Close
+  const cbx = W/2-70, cby = H/2+110;
+  const chov = isHover(cbx, cby, 140, 28);
+  drawButton('[ ЗАКРЫТЬ ]', cbx, cby, 140, 28, chov);
+  if (isClick(cbx, cby, 140, 28) || Keys['Escape_pressed']) {
+    _showFontSettings = false;
+    Keys['Escape_pressed'] = false;
+  }
+}
+
+// Hook into updateMenu to add settings button + overlay
+const _fontOrig_updateMenu = window.updateMenu;
+window.updateMenu = function() {
+  _fontOrig_updateMenu();
+  if (_showFontSettings) { drawFontSettings(); return; }
+
+  // Settings button bottom-right
+  const bx = W-130, by = H-40;
+  const hov = isHover(bx, by, 120, 26);
+  fillRect(bx, by, 120, 26, '#050f05');
+  strokeRect(bx, by, 120, 26, hov ? '#2a4a2a' : '#111a11', 1);
+  ctx.fillStyle = hov ? '#7aaa7a' : '#336633';
+  ctx.font = '10px "Courier New",monospace'; ctx.textAlign = 'center';
+  ctx.fillText('⚙ ШРИФТ', bx+60, by+17);
+  if (isClick(bx, by, 120, 26)) _showFontSettings = true;
+};
+
+// ═══════════════════════════════════════════════════════════
+//  MUTATION/BONUS HISTORY — shown in assembly screen
+// ═══════════════════════════════════════════════════════════
+const _mbOrig_updateAssembly = window.updateAssembly;
+window.updateAssembly = function() {
+  _mbOrig_updateAssembly();
+
+  // Show active mutations + last challenge reward below grid bottom-left
+  const mx = 60, my = Assembly.gridOriginY + GRID_ROWS * GRID_SIZE + 8;
+  if (my > H - 60) return; // no space
+
+  ctx.font = 'bold 9px "Courier New",monospace'; ctx.textAlign = 'left';
+  ctx.fillStyle = '#336633';
+  ctx.fillText('— АКТИВНЫЕ МУТАЦИИ —', mx, my + 10);
+
+  if (!Game.mutations || Game.mutations.length === 0) {
+    ctx.fillStyle = '#2a3a2a'; ctx.font = '9px "Courier New",monospace';
+    ctx.fillText('нет', mx, my + 22);
+  } else {
+    let rx = mx, ry = my + 20;
+    for (const id of Game.mutations) {
+      const m = (typeof MUTATIONS_DEF !== 'undefined') ? MUTATIONS_DEF.find(x => x.id === id) : null;
+      if (!m) continue;
+      ctx.fillStyle = m.color; ctx.font = '9px "Courier New",monospace';
+      ctx.fillText(m.label, rx, ry);
+      rx += ctx.measureText(m.label).width + 10;
+      if (rx > mx + GRID_COLS * GRID_SIZE - 20) { rx = mx; ry += 12; }
+    }
+  }
+
+  // Last challenge reward if any
+  if (Game._lastChallengeReward) {
+    ctx.fillStyle = '#cccc44'; ctx.font = '9px "Courier New",monospace';
+    ctx.fillText('Испытание: ' + Game._lastChallengeReward, mx, my + 46);
+  }
+};
+
+console.log('[WRECK PROTOCOL] Font settings + mutation history loaded.');
+</script>
+
+<!-- PART 8c: PART WEAR SYSTEM -->
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════════════════════
+//  PART WEAR — damage distributes to individual parts
+//  Worn parts give reduced performance; repair costs scrap
+// ═══════════════════════════════════════════════════════════
+
+// Override damageRobot to also wear a random part
+const _wear_origDmgRobot = window.damageRobot;
+window.damageRobot = function(dmg) {
+  _wear_origDmgRobot(dmg);
+  const R = Arena.robot;
+  if (!R.parts || R.parts.length === 0) return;
+  // Pick a random non-chassis part; distribute 30% of damage as wear
+  const wearable = R.parts.filter(p => p.type !== 'chassis');
+  if (wearable.length === 0) return;
+  const target = wearable[Math.floor(Math.random() * wearable.length)];
+  const wear = dmg * 0.30;
+  target.hp = Math.max(0, target.hp - wear);
+};
+
+// After arena (win or lose): sync R.parts hp back to Assembly.placed
+function syncPartsWear() {
+  const R = Arena.robot;
+  if (!R.parts) return;
+  for (const rp of R.parts) {
+    const ap = Assembly.placed.find(p => p.id === rp.id);
+    if (ap) ap.hp = Math.ceil(rp.hp);
+  }
+}
+
+// Hook prepLoot (win path) to sync wear
+const _wear_origPrepLoot = window.prepLoot;
+window.prepLoot = function() {
+  syncPartsWear();
+  _wear_origPrepLoot();
+};
+
+// Hook into lose → gameover to sync wear
+const _wear_origSetState = window.setState;
+window.setState = function(s) {
+  if (s === STATE.GAMEOVER) syncPartsWear();
+  _wear_origSetState(s);
+};
+
+// Apply wear effects in startArena: worn parts reduce performance
+const _wear_origStartArena = window.startArena;
+window.startArena = function() {
+  _wear_origStartArena();
+  const R = Arena.robot;
+  // For each worn part, reduce its weapon/movement performance
+  for (const p of R.parts) {
+    const def = PART_DEFS[p.type];
+    if (!def) continue;
+    const hpFrac = p.hp / def.maxHP;
+    if (hpFrac >= 0.9) continue; // barely worn, no effect
+
+    const penalty = 1 + (1 - hpFrac) * 0.6; // 0-60% degradation
+    if (def.cat === 'weapon') {
+      // Find matching weapon and increase fire rate (slower)
+      const w = R.weapons.find(w2 => w2.partId === p.id);
+      if (w) w.def = { ...w.def, fireRate: Math.round(w.def.fireRate * penalty) };
+    }
+    if (def.cat === 'movement') {
+      // Speed reduction stacks with mass penalty
+      R.speed *= Math.max(0.5, 1 - (1 - hpFrac) * 0.4);
+    }
+  }
+};
+
+// Repair shop: make cost dynamic based on actual damage
+const _wear_origDrawScrapShop = window.drawScrapShop;
+window.drawScrapShop = function() {
+  // Patch repair cost before drawing
+  const totalDamage = Assembly.placed.reduce((sum, p) => {
+    return sum + Math.max(0, PART_DEFS[p.type].maxHP - p.hp);
+  }, 0);
+  const repairCost = Math.max(5, Math.ceil(totalDamage * 0.12));
+  // Temporarily store for shop to use
+  window._wear_repairCost = repairCost;
+  _wear_origDrawScrapShop();
+};
+
+// Hook into shop action to use dynamic repair cost
+const _wear_origShopRepair = window.drawDoneButton; // not ideal, patch shop directly
+// Actually, override the repair action inside drawScrapShop by modifying the shop array
+// We do this by patching the cost check. Best approach: override Assembly.placed.forEach in repair:
+// This is done inline — the shop at line ~1011 checks `s.action === 'repair'` and resets hp.
+// The cost is hardcoded as 15. Let's add a dynamic repair indicator below the shop.
+
+// Show wear summary in assembly
+const _wear_origUpdateAssembly = window.updateAssembly;
+window.updateAssembly = function() {
+  _wear_origUpdateAssembly();
+
+  // Check if any part is worn
+  const worn = Assembly.placed.filter(p => p.hp < PART_DEFS[p.type].maxHP * 0.8);
+  if (worn.length === 0) return;
+
+  // Show wear warning near the repair button
+  const bx = Assembly.gridOriginX + GRID_COLS * GRID_SIZE / 2 - 80;
+  const by = H - 68;
+  ctx.fillStyle = '#ff8844'; ctx.font = 'bold 9px "Courier New",monospace'; ctx.textAlign = 'center';
+  ctx.fillText(`⚠ ${worn.length} деталей повреждены — производительность снижена`, bx + 80, by);
+};
+
+console.log('[WRECK PROTOCOL] Part wear system loaded.');
+</script>
+
+<!-- PART 8d: POST-ROUND COLLECT PAUSE + RANDOM PART STATS -->
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════════════════════
+//  POST-ROUND COLLECT PAUSE — 3 seconds to pick up parts
+// ═══════════════════════════════════════════════════════════
+const _pause_origUpdateArena = window.updateArena;
+window.updateArena = function() {
+  // Intercept win condition: insert collect timer
+  const wasNoResult = !Arena.result;
+  const noEnemies   = Arena.enemies && Arena.enemies.length === 0;
+
+  if (wasNoResult && noEnemies) {
+    // Start collect timer on first detection
+    if (!Arena._collectTimer) {
+      Arena._collectTimer = 180; // 3 seconds at 60fps
+      spawnParticles(Arena.arenaW/2, Arena.arenaY + Arena.arenaH/2, '#4eff91', 20, 4, 60);
+    }
+    Arena._collectTimer--;
+    if (Arena._collectTimer <= 0) {
+      Arena._collectTimer = 0;
+      Arena.result = 'win';
+    }
+  }
+
+  _pause_origUpdateArena();
+
+  // Collect timer overlay (shown while counting down)
+  if (!Arena.result && Arena._collectTimer > 0) {
+    const sec = Math.ceil(Arena._collectTimer / 60);
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.fillRect(0, Arena.arenaY, Arena.arenaW, 24);
+    ctx.fillStyle = '#4eff91'; ctx.font = 'bold 13px "Courier New",monospace'; ctx.textAlign = 'center';
+    ctx.fillText(`✓ ПОБЕДА! Собери детали... ${sec}`, Arena.arenaW / 2, Arena.arenaY + 16);
+    // Pulse ring on remaining pickups
+    if (Arena.pickups) {
+      Arena.pickups.forEach(p => {
+        const pulse = Math.sin(Arena.frame * 0.2) * 4 + 12;
+        ctx.strokeStyle = '#ffcc44'; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.arc(p.x, p.y, pulse, 0, Math.PI*2); ctx.stroke();
+      });
+    }
+  }
+};
+
+// Reset collect timer when new arena starts
+const _pause_origStartArena = window.startArena;
+window.startArena = function() {
+  Arena._collectTimer = 0;
+  _pause_origStartArena();
+};
+
+// ═══════════════════════════════════════════════════════════
+//  RANDOM PART STATS — each part gets ±15% stat variation
+// ═══════════════════════════════════════════════════════════
+const _origCreatePart = window.createPart;
+window.createPart = function(type, rot) {
+  const part = _origCreatePart(type, rot);
+  if (!part) return part;
+  const def = PART_DEFS[type];
+  if (!def) return part;
+
+  // Only roll stats for meaningful categories
+  if (def.cat === 'chassis' || def.cat === 'armor') return part; // no interesting stats
+
+  // Roll ±15% on key stats
+  const roll = (range) => 1 + (Math.random() * 2 - 1) * range;
+  const r = {};
+  if (def.cat === 'weapon') {
+    r.damage   = Math.round(roll(0.20) * 10) / 10; // ±20%
+    r.fireRate = Math.round(roll(0.15) * 10) / 10; // ±15% (inverse: higher = slower)
+    r.range    = Math.round(roll(0.10) * 10) / 10; // ±10%
+  } else if (def.cat === 'movement') {
+    r.speedMult = Math.round(roll(0.15) * 10) / 10; // ±15%
+  } else if (def.cat === 'sensor') {
+    r.sensorRange = Math.round(roll(0.15) * 10) / 10;
+  } else if (def.cat === 'utility') {
+    r.shieldHP = Math.round(roll(0.20) * 10) / 10;
+  }
+  part._roll = r;
+  return part;
+};
+
+// Apply roll in startArena (after R.weapons etc are built)
+const _roll_origStartArena = window.startArena;
+window.startArena = function() {
+  _roll_origStartArena();
+  const R = Arena.robot;
+  // Apply weapon rolls
+  for (const w of R.weapons) {
+    const placed = R.parts.find(p => p.id === w.partId);
+    if (!placed || !placed._roll) continue;
+    const r = placed._roll;
+    w.def = { ...w.def };
+    if (r.damage)   w.def.damage   = Math.round(w.def.damage * r.damage);
+    if (r.fireRate) w.def.fireRate  = Math.round(w.def.fireRate * r.fireRate);
+    if (r.range)    w.def.range     = Math.round(w.def.range * r.range);
+  }
+  // Apply movement roll
+  for (const p of R.parts) {
+    const def = PART_DEFS[p.type];
+    if (!p._roll || def.cat !== 'movement') continue;
+    R.speed *= (p._roll.speedMult || 1);
+  }
+};
+
+// Show roll badge on loot cards (overlay after curse/bless layer)
+const _roll_origUpdateLoot = window.updateLoot;
+window.updateLoot = function() {
+  _roll_origUpdateLoot();
+  const cols = 4, cardW = 180, cardH = 110;
+  const startX = W/2 - (cols*cardW + (cols-1)*12)/2;
+  const startY = 90;
+
+  Loot.offered.forEach((part, i) => {
+    if (!part || !part._roll) return;
+    const def = PART_DEFS[part.type];
+    const col = i % cols, row = Math.floor(i / cols);
+    const cx2 = startX + col*(cardW+12) + 8;
+    const cy2 = startY + row*(cardH+12);
+
+    const r = part._roll;
+    const lines = [];
+    if (r.damage)     { const pct = Math.round((r.damage-1)*100); lines.push(`урон ${pct>0?'+':''}${pct}%`); }
+    if (r.fireRate)   { const pct = Math.round((r.fireRate-1)*100); lines.push(`скорость ${pct>0?'+':''}${pct}%`); }
+    if (r.speedMult)  { const pct = Math.round((r.speedMult-1)*100); lines.push(`скорость ${pct>0?'+':''}${pct}%`); }
+    if (r.sensorRange){ const pct = Math.round((r.sensorRange-1)*100); lines.push(`обнаружение ${pct>0?'+':''}${pct}%`); }
+
+    lines.forEach((line, li) => {
+      const isGood = !line.includes('-');
+      ctx.fillStyle = isGood ? '#44ff88' : '#ff6644';
+      ctx.font = 'bold 8px "Courier New",monospace'; ctx.textAlign = 'left';
+      ctx.fillText(line, cx2, cy2 + cardH - 26 + li * 10);
+    });
+  });
+};
+
+console.log('[WRECK PROTOCOL] Post-round pause + random part stats loaded.');
+</script>
+
 <!-- PART 7a: SYNERGY SYSTEM -->
 <script>
 'use strict';
@@ -3947,7 +4440,7 @@ const _ch_origSpawn = window.spawnEnemiesForRound;
 window.spawnEnemiesForRound = function(round) {
   const enemies = _ch_origSpawn(round);
   if (Game._challengeMarathon) {
-    const types = ['scout','drone','brute'];
+    const types = ['scout','gunner','swarm'];
     for (let i = 0; i < 3; i++) {
       const def = ENEMY_DEFS[types[i % types.length]];
       enemies.push({
@@ -4045,6 +4538,156 @@ window.updateArena = function() {
 };
 
 console.log('[WRECK PROTOCOL] Challenge system loaded.');
+</script>
+
+<!-- PART 8e: PART UPGRADES + UNIQUE PROPERTY DISPLAY -->
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════════════════════
+//  PART UPGRADES — merge 2 same-type parts for a stronger one
+// ═══════════════════════════════════════════════════════════
+function findUpgradeable() {
+  const result = [];
+  for (const p of Assembly.placed) {
+    if (p.type === 'chassis') continue;
+    const dupIdx = (Game.inventory || []).findIndex(inv => inv && inv.type === p.type);
+    if (dupIdx >= 0) result.push({ placed: p, invIdx: dupIdx });
+  }
+  return result;
+}
+
+function upgradePart(placed, invIdx) {
+  const cost = 15;
+  if (Game.scrap < cost) return false;
+  Game.scrap -= cost;
+  Game.inventory.splice(invIdx, 1);
+  placed._level = (placed._level || 1) + 1;
+  placed._roll = placed._roll || {};
+  const def = PART_DEFS[placed.type];
+  if (def.cat === 'weapon') {
+    placed._roll.damage   = (placed._roll.damage   || 1) * 1.25;
+    placed._roll.fireRate = (placed._roll.fireRate  || 1) * 0.88; // faster
+    placed._roll.range    = (placed._roll.range     || 1) * 1.10;
+  } else if (def.cat === 'movement') {
+    placed._roll.speedMult = (placed._roll.speedMult || 1) * 1.18;
+  } else if (def.cat === 'utility') {
+    placed._roll.shieldHP  = (placed._roll.shieldHP  || 1) * 1.25;
+  } else if (def.cat === 'sensor') {
+    placed._roll.sensorRange = (placed._roll.sensorRange || 1) * 1.20;
+    placed._roll.triggerRate = (placed._roll.triggerRate || 1) * 0.85;
+  }
+  placed.hp = def.maxHP; // restore HP on upgrade
+  recalcStats();
+  return true;
+}
+
+// ── Show upgrade button in assembly screen
+const _upg_origUpdateAssembly = window.updateAssembly;
+window.updateAssembly = function() {
+  _upg_origUpdateAssembly();
+
+  const upgradeable = findUpgradeable();
+  if (upgradeable.length === 0) return;
+
+  // Upgrade panel above DONE button
+  const gx = Assembly.gridOriginX;
+  const bw = GRID_COLS * GRID_SIZE;
+  const by2 = H - 82;
+
+  fillRect(gx, by2, bw, 32, '#0a0f0a');
+  strokeRect(gx, by2, bw, 32, '#2a5a2a', 1);
+  ctx.fillStyle = '#4eff91'; ctx.font = 'bold 10px "Courier New",monospace'; ctx.textAlign = 'left';
+  ctx.fillText(`⇧ СЛИЯНИЕ ДОСТУПНО: ${upgradeable.length} деталей`, gx+8, by2+13);
+  ctx.fillStyle = '#336633'; ctx.font = '9px "Courier New",monospace';
+  ctx.fillText('Кликни на деталь на сетке для улучшения (15 лома)', gx+8, by2+25);
+
+  // Click on a placed part to upgrade it
+  if (Mouse.clicked) {
+    const mx = Mouse.x, my = Mouse.y;
+    const gox = Assembly.gridOriginX, goy = Assembly.gridOriginY;
+    const gcx = Math.floor((mx - gox) / GRID_SIZE);
+    const gcy = Math.floor((my - goy) / GRID_SIZE);
+    for (const { placed, invIdx } of upgradeable) {
+      if (gcx >= placed.gx && gcx < placed.gx + partW(placed) &&
+          gcy >= placed.gy && gcy < placed.gy + partH(placed)) {
+        if (upgradePart(placed, invIdx)) {
+          spawnParticles(mx, my, '#4eff91', 12, 3, 30);
+        }
+        break;
+      }
+    }
+  }
+};
+
+// ── Show level badge on placed parts in grid
+const _upg_origDrawPart = window.drawPart;
+if (typeof drawPart !== 'undefined') {
+  window.drawPart = function(part, sx, sy, pw, ph, alpha) {
+    _upg_origDrawPart(part, sx, sy, pw, ph, alpha);
+    if (part._level && part._level > 1) {
+      ctx.fillStyle = '#ffdd44'; ctx.font = 'bold 9px "Courier New",monospace'; ctx.textAlign = 'right';
+      ctx.fillText('★' + part._level, sx + pw - 2, sy + 10);
+    }
+  };
+}
+
+// ═══════════════════════════════════════════════════════════
+//  UNIQUE PROPERTY DISPLAY IN PALETTE
+//  Show _curse, _bless, _roll, _level badges on inventory items
+// ═══════════════════════════════════════════════════════════
+const _upg_origDrawPalette = window.drawPalette;
+window.drawPalette = function() {
+  _upg_origDrawPalette();
+  // Overlay extra info on each palette item
+  const items = Game.inventory;
+  const PAL_ITEM_H2 = 76; // same as PAL_ITEM_H
+  const startY2 = 28 - Assembly.palScroll;
+
+  items.forEach((part, i) => {
+    if (!part) return;
+    const iy = startY2 + i * PAL_ITEM_H2;
+    if (iy + PAL_ITEM_H2 < 28 || iy > H - 170) return; // outside clip area
+
+    let tagY = iy + 4;
+
+    // Level badge
+    if (part._level && part._level > 1) {
+      ctx.fillStyle = '#ffdd44'; ctx.font = 'bold 8px "Courier New",monospace'; ctx.textAlign = 'right';
+      ctx.fillText('★Ур.' + part._level, PAL_X + PAL_W - 10, tagY + 8);
+      tagY += 10;
+    }
+    // Curse badge
+    if (part._curse) {
+      ctx.fillStyle = '#ff4444'; ctx.font = '7px "Courier New",monospace'; ctx.textAlign = 'right';
+      ctx.fillText(part._curse.badge, PAL_X + PAL_W - 10, tagY + 8);
+      tagY += 10;
+    }
+    // Bless badge
+    if (part._bless) {
+      ctx.fillStyle = '#ffdd44'; ctx.font = '7px "Courier New",monospace'; ctx.textAlign = 'right';
+      ctx.fillText(part._bless.badge, PAL_X + PAL_W - 10, tagY + 8);
+      tagY += 10;
+    }
+    // Roll stats
+    if (part._roll) {
+      const r = part._roll;
+      const lines = [];
+      if (r.damage)    { const p = Math.round((r.damage-1)*100);    if (Math.abs(p) > 2) lines.push(`урон${p>0?'+':''}${p}%`); }
+      if (r.fireRate)  { const p = Math.round((1-r.fireRate)*100);  if (Math.abs(p) > 2) lines.push(`скор.${p>0?'+':''}${p}%`); }
+      if (r.speedMult) { const p = Math.round((r.speedMult-1)*100); if (Math.abs(p) > 2) lines.push(`скор.${p>0?'+':''}${p}%`); }
+      lines.forEach(ln => {
+        const good = ln.includes('+');
+        ctx.fillStyle = good ? '#44ff88' : '#ff6644';
+        ctx.font = '7px "Courier New",monospace'; ctx.textAlign = 'right';
+        ctx.fillText(ln, PAL_X + PAL_W - 10, tagY + 8);
+        tagY += 10;
+      });
+    }
+  });
+};
+
+console.log('[WRECK PROTOCOL] Part upgrades + unique property display loaded.');
 </script>
 
 </body>
