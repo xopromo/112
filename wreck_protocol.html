@@ -3869,5 +3869,183 @@ window.updateLoot = function() {
 console.log('[WRECK PROTOCOL] Cursed/Blessed parts system loaded.');
 </script>
 
+<!-- PART 7d: ROUND CHALLENGES -->
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════════════════════
+//  CHALLENGE SYSTEM — optional hard modifier per round with bonus reward
+// ═══════════════════════════════════════════════════════════
+const CHALLENGE_DEFS = [
+  {
+    id: 'marathon', label: '⚔ МАРАФОН', color: '#ff6b35',
+    desc: 'На 3 врага больше в этом раунде.',
+    reward: 'Выбор +1 трофей',
+    apply: () => { Game._challengeMarathon = true; },
+    reward_fn: () => { Loot.maxPick = Math.min(Loot.maxPick + 1, 5); }
+  },
+  {
+    id: 'fragile', label: '💔 ХРУПКОСТЬ', color: '#ff3344',
+    desc: 'Входящий урон ×1.5.',
+    reward: '+35 металлолома',
+    apply: () => { Game._challengeFragile = true; },
+    reward_fn: () => { Game.scrap += 35; }
+  },
+  {
+    id: 'berserk', label: '⚡ БЕРСЕРК', color: '#ffaa00',
+    desc: 'Враги быстрее на 40%.',
+    reward: '+25 металлолома',
+    apply: () => { Game._challengeBerserk = true; },
+    reward_fn: () => { Game.scrap += 25; }
+  },
+  {
+    id: 'acid_rain', label: '☣ КИСЛОТНЫЙ ДОЖДЬ', color: '#44ff88',
+    desc: 'Постоянный кислотный урон по арене.',
+    reward: '+30 металлолома',
+    apply: () => { Game._challengeAcid = true; },
+    reward_fn: () => { Game.scrap += 30; }
+  },
+  {
+    id: 'blind', label: '👁 СЛЕПОТА', color: '#8844ff',
+    desc: 'Враги невидимы. Стреляй по наитию.',
+    reward: '+40 металлолома + деталь',
+    apply: () => { Game._challengeBlind = true; },
+    reward_fn: () => {
+      Game.scrap += 40;
+      const t = ['gun_rapid','armor_light','sensor_auto','battery'][Math.floor(Math.random()*4)];
+      Game.inventory.push(createPart(t));
+    }
+  },
+];
+
+function rollChallenge() {
+  // 40% chance of a challenge each round (not round 1)
+  if (Game.round <= 1 || Math.random() > 0.40) return null;
+  return CHALLENGE_DEFS[Math.floor(Math.random() * CHALLENGE_DEFS.length)];
+}
+
+function clearChallenge() {
+  Game._challengeMarathon = false;
+  Game._challengeFragile  = false;
+  Game._challengeBerserk  = false;
+  Game._challengeAcid     = false;
+  Game._challengeBlind    = false;
+  Game._activeChallenge   = null;
+}
+
+// ── Roll challenge when assembly starts (before each round)
+const _ch_origInitAssembly = window.initAssembly;
+window.initAssembly = function() {
+  _ch_origInitAssembly();
+  clearChallenge();
+  const ch = rollChallenge();
+  if (ch) { Game._activeChallenge = ch; ch.apply(); }
+};
+
+// ── Marathon: spawn extra enemies
+const _ch_origSpawn = window.spawnEnemiesForRound;
+window.spawnEnemiesForRound = function(round) {
+  const enemies = _ch_origSpawn(round);
+  if (Game._challengeMarathon) {
+    const types = ['scout','drone','brute'];
+    for (let i = 0; i < 3; i++) {
+      const def = ENEMY_DEFS[types[i % types.length]];
+      enemies.push({
+        ...def, type: types[i % types.length],
+        x: 60 + i * 90, y: Arena.arenaY + 60,
+        vx: 0, vy: 0, angle: 0,
+        hp: def.hp, maxHP: def.hp, fireCooldown: 60,
+        strafeDir: 1, strafeSwitchTimer: 0, dropPart: null, _meleeCooldown: 0
+      });
+    }
+  }
+  return enemies;
+};
+
+// ── Fragile: extra damage on robot
+const _ch_origDmgRobot2 = window.damageRobot;
+window.damageRobot = function(dmg) {
+  const extra = Game._challengeFragile ? dmg * 0.5 : 0;
+  _ch_origDmgRobot2(dmg + extra);
+};
+
+// ── Berserk: enemy speed boost (applied in updateArena hook)
+// ── Acid rain: periodic damage (applied in updateArena hook)
+// ── Blind: skip drawEnemies
+const _ch_origUpdateArena = window.updateArena;
+window.updateArena = function() {
+  // Berserk: temporarily boost enemy speed each frame
+  if (Game._challengeBerserk && Arena.enemies) {
+    Arena.enemies.forEach(e => { e._origSpeed = e._origSpeed || e.speed; e.speed = e._origSpeed * 1.4; });
+  }
+  // Acid rain: every 90 frames damage robot
+  if (Game._challengeAcid && Arena.frame > 0 && Arena.frame % 90 === 0 && !Arena.result) {
+    window.damageRobot(6);
+    triggerFlash('#44ff88', 4);
+  }
+  _ch_origUpdateArena();
+};
+
+// ── Blind: don't draw enemies (override drawEnemies)
+const _ch_origDrawEnemies = window.drawEnemies;
+window.drawEnemies = function() {
+  if (Game._challengeBlind) {
+    // Only draw a small ??? indicator at each enemy position
+    if (Arena.enemies) {
+      Arena.enemies.forEach(e => {
+        ctx.fillStyle = 'rgba(136,68,255,0.25)';
+        ctx.font = '14px monospace'; ctx.textAlign = 'center';
+        ctx.fillText('?', e.x, e.y + 5);
+      });
+    }
+    return;
+  }
+  _ch_origDrawEnemies();
+};
+
+// ── Apply reward on round win (hook into prepLoot)
+const _ch_origPrepLoot = window.prepLoot;
+window.prepLoot = function() {
+  if (Game._activeChallenge) {
+    Game._activeChallenge.reward_fn();
+    // Reset maxPick after marathon
+    if (Game._activeChallenge.id === 'marathon') {
+      // will be reset naturally next initAssembly
+    }
+    const ch = Game._activeChallenge;
+    Game._lastChallengeReward = ch.reward;
+  }
+  _ch_origPrepLoot();
+};
+
+// ── Show challenge in assembly screen
+const _ch_origUpdateAssembly = window.updateAssembly;
+window.updateAssembly = function() {
+  _ch_origUpdateAssembly();
+  if (!Game._activeChallenge) return;
+  const ch = Game._activeChallenge;
+  // Banner below title
+  const bw = 340, bh = 36, bx = W/2 - bw/2, by = 6;
+  fillRect(bx, by, bw, bh, '#0a0a0a');
+  strokeRect(bx, by, bw, bh, ch.color, 1);
+  ctx.fillStyle = ch.color; ctx.font = 'bold 11px "Courier New",monospace'; ctx.textAlign = 'center';
+  ctx.fillText(`ИСПЫТАНИЕ: ${ch.label} — ${ch.desc}`, W/2, by + 16);
+  ctx.fillStyle = '#888888'; ctx.font = '9px "Courier New",monospace';
+  ctx.fillText(`Победи → ${ch.reward}`, W/2, by + 28);
+};
+
+// ── Show challenge in arena HUD (top banner)
+const _ch_origUpdateArena2 = window.updateArena;
+window.updateArena = function() {
+  _ch_origUpdateArena2();
+  if (!Game._activeChallenge || Arena.result) return;
+  const ch = Game._activeChallenge;
+  ctx.fillStyle = ch.color + '99'; ctx.font = 'bold 10px "Courier New",monospace'; ctx.textAlign = 'center';
+  ctx.fillText(`⚠ ИСПЫТАНИЕ: ${ch.label}`, W/2, Arena.arenaY - 2);
+};
+
+console.log('[WRECK PROTOCOL] Challenge system loaded.');
+</script>
+
 </body>
 </html>
