@@ -4540,5 +4540,155 @@ window.updateArena = function() {
 console.log('[WRECK PROTOCOL] Challenge system loaded.');
 </script>
 
+<!-- PART 8e: PART UPGRADES + UNIQUE PROPERTY DISPLAY -->
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════════════════════
+//  PART UPGRADES — merge 2 same-type parts for a stronger one
+// ═══════════════════════════════════════════════════════════
+function findUpgradeable() {
+  const result = [];
+  for (const p of Assembly.placed) {
+    if (p.type === 'chassis') continue;
+    const dupIdx = (Game.inventory || []).findIndex(inv => inv && inv.type === p.type);
+    if (dupIdx >= 0) result.push({ placed: p, invIdx: dupIdx });
+  }
+  return result;
+}
+
+function upgradePart(placed, invIdx) {
+  const cost = 15;
+  if (Game.scrap < cost) return false;
+  Game.scrap -= cost;
+  Game.inventory.splice(invIdx, 1);
+  placed._level = (placed._level || 1) + 1;
+  placed._roll = placed._roll || {};
+  const def = PART_DEFS[placed.type];
+  if (def.cat === 'weapon') {
+    placed._roll.damage   = (placed._roll.damage   || 1) * 1.25;
+    placed._roll.fireRate = (placed._roll.fireRate  || 1) * 0.88; // faster
+    placed._roll.range    = (placed._roll.range     || 1) * 1.10;
+  } else if (def.cat === 'movement') {
+    placed._roll.speedMult = (placed._roll.speedMult || 1) * 1.18;
+  } else if (def.cat === 'utility') {
+    placed._roll.shieldHP  = (placed._roll.shieldHP  || 1) * 1.25;
+  } else if (def.cat === 'sensor') {
+    placed._roll.sensorRange = (placed._roll.sensorRange || 1) * 1.20;
+    placed._roll.triggerRate = (placed._roll.triggerRate || 1) * 0.85;
+  }
+  placed.hp = def.maxHP; // restore HP on upgrade
+  recalcStats();
+  return true;
+}
+
+// ── Show upgrade button in assembly screen
+const _upg_origUpdateAssembly = window.updateAssembly;
+window.updateAssembly = function() {
+  _upg_origUpdateAssembly();
+
+  const upgradeable = findUpgradeable();
+  if (upgradeable.length === 0) return;
+
+  // Upgrade panel above DONE button
+  const gx = Assembly.gridOriginX;
+  const bw = GRID_COLS * GRID_SIZE;
+  const by2 = H - 82;
+
+  fillRect(gx, by2, bw, 32, '#0a0f0a');
+  strokeRect(gx, by2, bw, 32, '#2a5a2a', 1);
+  ctx.fillStyle = '#4eff91'; ctx.font = 'bold 10px "Courier New",monospace'; ctx.textAlign = 'left';
+  ctx.fillText(`⇧ СЛИЯНИЕ ДОСТУПНО: ${upgradeable.length} деталей`, gx+8, by2+13);
+  ctx.fillStyle = '#336633'; ctx.font = '9px "Courier New",monospace';
+  ctx.fillText('Кликни на деталь на сетке для улучшения (15 лома)', gx+8, by2+25);
+
+  // Click on a placed part to upgrade it
+  if (Mouse.clicked) {
+    const mx = Mouse.x, my = Mouse.y;
+    const gox = Assembly.gridOriginX, goy = Assembly.gridOriginY;
+    const gcx = Math.floor((mx - gox) / GRID_SIZE);
+    const gcy = Math.floor((my - goy) / GRID_SIZE);
+    for (const { placed, invIdx } of upgradeable) {
+      if (gcx >= placed.gx && gcx < placed.gx + partW(placed) &&
+          gcy >= placed.gy && gcy < placed.gy + partH(placed)) {
+        if (upgradePart(placed, invIdx)) {
+          spawnParticles(mx, my, '#4eff91', 12, 3, 30);
+        }
+        break;
+      }
+    }
+  }
+};
+
+// ── Show level badge on placed parts in grid
+const _upg_origDrawPart = window.drawPart;
+if (typeof drawPart !== 'undefined') {
+  window.drawPart = function(part, sx, sy, pw, ph, alpha) {
+    _upg_origDrawPart(part, sx, sy, pw, ph, alpha);
+    if (part._level && part._level > 1) {
+      ctx.fillStyle = '#ffdd44'; ctx.font = 'bold 9px "Courier New",monospace'; ctx.textAlign = 'right';
+      ctx.fillText('★' + part._level, sx + pw - 2, sy + 10);
+    }
+  };
+}
+
+// ═══════════════════════════════════════════════════════════
+//  UNIQUE PROPERTY DISPLAY IN PALETTE
+//  Show _curse, _bless, _roll, _level badges on inventory items
+// ═══════════════════════════════════════════════════════════
+const _upg_origDrawPalette = window.drawPalette;
+window.drawPalette = function() {
+  _upg_origDrawPalette();
+  // Overlay extra info on each palette item
+  const items = Game.inventory;
+  const PAL_ITEM_H2 = 76; // same as PAL_ITEM_H
+  const startY2 = 28 - Assembly.palScroll;
+
+  items.forEach((part, i) => {
+    if (!part) return;
+    const iy = startY2 + i * PAL_ITEM_H2;
+    if (iy + PAL_ITEM_H2 < 28 || iy > H - 170) return; // outside clip area
+
+    let tagY = iy + 4;
+
+    // Level badge
+    if (part._level && part._level > 1) {
+      ctx.fillStyle = '#ffdd44'; ctx.font = 'bold 8px "Courier New",monospace'; ctx.textAlign = 'right';
+      ctx.fillText('★Ур.' + part._level, PAL_X + PAL_W - 10, tagY + 8);
+      tagY += 10;
+    }
+    // Curse badge
+    if (part._curse) {
+      ctx.fillStyle = '#ff4444'; ctx.font = '7px "Courier New",monospace'; ctx.textAlign = 'right';
+      ctx.fillText(part._curse.badge, PAL_X + PAL_W - 10, tagY + 8);
+      tagY += 10;
+    }
+    // Bless badge
+    if (part._bless) {
+      ctx.fillStyle = '#ffdd44'; ctx.font = '7px "Courier New",monospace'; ctx.textAlign = 'right';
+      ctx.fillText(part._bless.badge, PAL_X + PAL_W - 10, tagY + 8);
+      tagY += 10;
+    }
+    // Roll stats
+    if (part._roll) {
+      const r = part._roll;
+      const lines = [];
+      if (r.damage)    { const p = Math.round((r.damage-1)*100);    if (Math.abs(p) > 2) lines.push(`урон${p>0?'+':''}${p}%`); }
+      if (r.fireRate)  { const p = Math.round((1-r.fireRate)*100);  if (Math.abs(p) > 2) lines.push(`скор.${p>0?'+':''}${p}%`); }
+      if (r.speedMult) { const p = Math.round((r.speedMult-1)*100); if (Math.abs(p) > 2) lines.push(`скор.${p>0?'+':''}${p}%`); }
+      lines.forEach(ln => {
+        const good = ln.includes('+');
+        ctx.fillStyle = good ? '#44ff88' : '#ff6644';
+        ctx.font = '7px "Courier New",monospace'; ctx.textAlign = 'right';
+        ctx.fillText(ln, PAL_X + PAL_W - 10, tagY + 8);
+        tagY += 10;
+      });
+    }
+  });
+};
+
+console.log('[WRECK PROTOCOL] Part upgrades + unique property display loaded.');
+</script>
+
 </body>
 </html>
