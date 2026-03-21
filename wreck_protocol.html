@@ -85,7 +85,7 @@ window.addEventListener('resize', resizeCanvas);
 // ═══════════════════════════════════════════════════════════
 //  GAME STATES
 // ═══════════════════════════════════════════════════════════
-const STATE = { MENU: 0, ASSEMBLY: 1, ARENA: 2, LOOT: 3, GAMEOVER: 4, WIN: 5, MUTATION: 6 };
+const STATE = { MENU: 0, ASSEMBLY: 1, ARENA: 2, LOOT: 3, GAMEOVER: 4, WIN: 5, MUTATION: 6, CLASS_SELECT: 7, ENCOUNTER: 8 };
 let gameState = STATE.MENU;
 
 function setState(s) {
@@ -347,8 +347,7 @@ function updateMenu() {
   const startHover = isHover(bx, H/2+40, btnW, btnH);
   drawButton('[ НАЧАТЬ ЗАБЕГ ]', bx, H/2+40, btnW, btnH, startHover);
   if (isClick(bx, H/2+40, btnW, btnH)) {
-    startNewGame();
-    setState(STATE.ASSEMBLY);
+    setState(STATE.CLASS_SELECT);
   }
 
   // Info
@@ -402,6 +401,10 @@ function onStateEnter(s) {
     instr.textContent = 'СБОРКА: тащи детали на сетку · R вращение · ПКМ убрать деталь · нажми СРАЖАТЬСЯ';
   } else if (s === STATE.ARENA) {
     instr.textContent = 'WASD/стрелки — движение · ПРОБЕЛ — огонь · уничтожь всех врагов!';
+  } else if (s === STATE.CLASS_SELECT) {
+    instr.textContent = 'Выбери класс — он определит твой стиль игры на весь забег';
+  } else if (s === STATE.ENCOUNTER) {
+    instr.textContent = 'Случайная встреча — выбери действие';
   } else if (s === STATE.MUTATION) {
     instr.textContent = 'Выбери мутацию · она останется навсегда';
   } else if (s === STATE.LOOT) {
@@ -421,6 +424,8 @@ function initAssembly() {}                        // replaced in Part 2
 function updateAssembly() {}                      // replaced in Part 2
 function updateArena() {}                         // replaced in Part 4
 function updateLoot() {}                          // replaced in Part 5
+function updateClassSelect() {}                   // replaced in Part 6
+function updateEncounter() {}                     // replaced in Part 6
 function updateGameOver() {}
 function updateWin() {}
 
@@ -482,7 +487,9 @@ function loop(timestamp) {
     case STATE.LOOT:     updateLoot();             break;
     case STATE.GAMEOVER: drawEndScreen(false);     break;
     case STATE.WIN:      drawEndScreen(true);      break;
-    case STATE.MUTATION: updateMutation();         break;
+    case STATE.MUTATION:      updateMutation();       break;
+    case STATE.CLASS_SELECT:  updateClassSelect();    break;
+    case STATE.ENCOUNTER:     updateEncounter();      break;
   }
 
   updateParticles();
@@ -2804,6 +2811,1240 @@ window.updateLoot = function() {
 };
 
 console.log('[WRECK PROTOCOL] Modifiers + Mutations loaded.');
+</script>
+
+<!-- PART 6a: STARTING CLASSES -->
+<script>
+'use strict';
+
+const CLASSES = [
+  {
+    id:'assault', label:'ШТУРМОВИК', color:'#ff6b35', icon:'⚔',
+    desc:'Двойная пушка с автосенсором.\nАгрессивный средний класс.',
+    flavor:'"Бей первым. Бей чаще."',
+    stats:{СКОРОСТЬ:'●●●○○',УРОН:'●●●●○',БРОНЯ:'●●○○○',СЛОЖНОСТЬ:'★☆☆'},
+    parts:['chassis','gun_basic','gun_basic','wheel','sensor_auto'],
+  },
+  {
+    id:'ghost', label:'ПРИЗРАК', color:'#35c5ff', icon:'👁',
+    desc:'Лазер + паучьи ноги + батарея.\nМанёвренный, хрупкий снайпер.',
+    flavor:'"Не видят — не попадут."',
+    stats:{СКОРОСТЬ:'●●●●●',УРОН:'●●●○○',БРОНЯ:'●○○○○',СЛОЖНОСТЬ:'★★☆'},
+    parts:['chassis','laser','legs','battery'],
+  },
+  {
+    id:'fortress', label:'КРЕПОСТЬ', color:'#aaaaaa', icon:'🏰',
+    desc:'Тяжёлая пушка + гусеницы + броня.\nМедленный, неуязвимый танк.',
+    flavor:'"Стою. Жду. Уничтожаю."',
+    stats:{СКОРОСТЬ:'●○○○○',УРОН:'●●●●●',БРОНЯ:'●●●●●',СЛОЖНОСТЬ:'★★☆'},
+    parts:['chassis','gun_heavy','tracks','armor_heavy'],
+  },
+];
+
+let classSelAnim = 0;
+
+function updateClassSelect() {
+  classSelAnim++;
+  fillRect(0,0,W,H,C.bg);
+  drawGrid(0,0,W,H,40,'#0b150b');
+
+  ctx.fillStyle=C.accent; ctx.font='bold 26px "Courier New",monospace'; ctx.textAlign='center';
+  ctx.shadowColor=C.accent; ctx.shadowBlur=15;
+  ctx.fillText('ВЫБЕРИ КЛАСС',W/2,48); ctx.shadowBlur=0;
+  ctx.fillStyle=C.textDim; ctx.font='13px "Courier New",monospace';
+  ctx.fillText('Стартовое снаряжение и стиль игры навсегда',W/2,70);
+
+  const cardW=248,cardH=370,gap=18;
+  const sx=W/2-(CLASSES.length*cardW+(CLASSES.length-1)*gap)/2;
+
+  CLASSES.forEach((cls,i)=>{
+    const cx2=sx+i*(cardW+gap), cy2=90;
+    const hov=isHover(cx2,cy2,cardW,cardH);
+    const bob=hov?Math.sin(classSelAnim*0.08)*3:0;
+
+    fillRect(cx2,cy2+bob,cardW,cardH,hov?'#0f2010':'#080e08');
+    ctx.save();
+    if(hov){ctx.shadowColor=cls.color;ctx.shadowBlur=18;}
+    strokeRect(cx2,cy2+bob,cardW,cardH,hov?cls.color:'#1a2a1a',hov?2:1);
+    ctx.restore();
+
+    ctx.font='50px serif'; ctx.textAlign='center';
+    ctx.fillText(cls.icon,cx2+cardW/2,cy2+68+bob);
+
+    ctx.fillStyle=cls.color; ctx.font='bold 17px "Courier New",monospace';
+    ctx.fillText(cls.label,cx2+cardW/2,cy2+97+bob);
+    ctx.fillStyle=C.textDim; ctx.font='italic 11px "Courier New",monospace';
+    ctx.fillText(cls.flavor,cx2+cardW/2,cy2+114+bob);
+
+    ctx.strokeStyle='#1a3a1a'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(cx2+10,cy2+124+bob); ctx.lineTo(cx2+cardW-10,cy2+124+bob); ctx.stroke();
+
+    // Desc
+    ctx.fillStyle=C.text; ctx.font='12px "Courier New",monospace'; ctx.textAlign='left';
+    let ly=cy2+140+bob;
+    for(const ln of cls.desc.split('\n')){ctx.fillText(ln,cx2+12,ly);ly+=17;}
+
+    // Stats
+    ly+=6;
+    for(const [k,v] of Object.entries(cls.stats)){
+      ctx.fillStyle=k==='СЛОЖНОСТЬ'?C.warn:C.textDim;
+      ctx.font='11px "Courier New",monospace'; ctx.textAlign='left';
+      ctx.fillText(k+':',cx2+12,ly);
+      ctx.fillStyle=cls.color; ctx.textAlign='right';
+      ctx.fillText(v,cx2+cardW-12,ly);
+      ly+=16;
+    }
+
+    // Parts list
+    ly+=4;
+    ctx.fillStyle='#1a3a1a'; ctx.fillRect(cx2+8,ly,cardW-16,1); ly+=10;
+    ctx.fillStyle=C.textDim; ctx.font='10px "Courier New",monospace'; ctx.textAlign='left';
+    ctx.fillText('СТАРТОВЫЕ ДЕТАЛИ:',cx2+12,ly); ly+=14;
+    [...new Set(cls.parts.filter(p=>p!=='chassis'))].forEach(pt=>{
+      const def=PART_DEFS[pt]; if(!def)return;
+      ctx.fillStyle=def.border; ctx.fillText(def.icon+' '+def.label,cx2+14,ly); ly+=13;
+    });
+
+    // Button
+    const btnY=cy2+cardH-38+bob;
+    const bh=isHover(cx2+10,btnY,cardW-20,30);
+    fillRect(cx2+10,btnY,cardW-20,30,bh?cls.color:'#0f1f0f');
+    strokeRect(cx2+10,btnY,cardW-20,30,cls.color,1);
+    ctx.fillStyle=bh?'#000':cls.color;
+    ctx.font='bold 13px "Courier New",monospace'; ctx.textAlign='center';
+    ctx.fillText('[ ВЫБРАТЬ ]',cx2+cardW/2,btnY+20);
+    if(bh&&Mouse.clicked) startGameWithClass(cls);
+  });
+
+  drawVignette(); drawScanlines();
+}
+
+function startGameWithClass(cls){
+  startNewGame();
+  Game.selectedClass=cls.id;
+  Game.inventory=cls.parts.filter(p=>p!=='chassis').map(p=>createPart(p));
+  initAssembly();
+  setState(STATE.ASSEMBLY);
+}
+</script>
+
+<!-- PART 6b: ARENA PILLARS -->
+<script>
+'use strict';
+
+Arena.pillars=[];
+
+function genPillars(round){
+  Arena.pillars=[];
+  if(round<=1)return;
+  const count=Math.min(2+Math.floor(round*0.7),7);
+  const cx=Arena.arenaW/2, cy=Arena.arenaY+Arena.arenaH/2;
+  for(let i=0;i<count;i++){
+    let x,y,tries=0;
+    do{
+      x=70+Math.random()*(Arena.arenaW-140);
+      y=Arena.arenaY+70+Math.random()*(Arena.arenaH-140);
+      tries++;
+    }while(tries<40&&Math.hypot(x-cx,y-cy)<110);
+    Arena.pillars.push({x,y,r:16+Math.random()*14});
+  }
+}
+
+function drawPillars(){
+  for(const p of Arena.pillars){
+    ctx.fillStyle='rgba(0,0,0,0.35)';
+    ctx.beginPath(); ctx.ellipse(p.x+4,p.y+5,p.r,p.r*0.6,0,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#1a2a1a';
+    ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle='#3a5a3a'; ctx.lineWidth=2; ctx.stroke();
+    ctx.strokeStyle='#4a7a4a'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.arc(p.x-p.r*0.2,p.y-p.r*0.25,p.r*0.55,Math.PI,Math.PI*1.55); ctx.stroke();
+    ctx.fillStyle='#2a5a2a';
+    ctx.beginPath(); ctx.arc(p.x,p.y,3,0,Math.PI*2); ctx.fill();
+  }
+}
+
+function pillarHit(x,y,r){
+  for(const p of Arena.pillars)
+    if(Math.hypot(x-p.x,y-p.y)<p.r+r) return true;
+  return false;
+}
+
+function pushOutPillar(obj,rad){
+  for(const p of Arena.pillars){
+    const dx=obj.x-p.x,dy=obj.y-p.y,dist=Math.hypot(dx,dy);
+    const min=p.r+rad+1;
+    if(dist<min&&dist>0.1){
+      obj.x+=dx/dist*(min-dist);
+      obj.y+=dy/dist*(min-dist);
+      if(obj.vx!==undefined){
+        const dot=obj.vx*(dx/dist)+obj.vy*(dy/dist);
+        if(dot<0){obj.vx-=dot*(dx/dist)*0.8;obj.vy-=dot*(dy/dist)*0.8;}
+      }
+    }
+  }
+}
+
+// Hook into startArena chain
+const _saP=window.startArena;
+window.startArena=function(){_saP();genPillars(Game.round);};
+
+// Each frame: remove bullets hitting pillars, push robots out
+function applyPillarPhysics(){
+  for(let i=Arena.bullets.length-1;i>=0;i--){
+    const b=Arena.bullets[i];
+    if(pillarHit(b.x,b.y,b.r)){spawnParticles(b.x,b.y,'#4a8a4a',4,1.5,10);Arena.bullets.splice(i,1);}
+  }
+  for(let i=Arena.enemyBullets.length-1;i>=0;i--){
+    const b=Arena.enemyBullets[i];
+    if(pillarHit(b.x,b.y,b.r)){Arena.enemyBullets.splice(i,1);}
+  }
+  const R=Arena.robot;
+  pushOutPillar(R,R.radius);
+  for(const e of Arena.enemies) pushOutPillar(e,e.radius);
+}
+
+// Draw pillars on top of floor but below robots — inject after drawArenaBackground
+const _uaP=window.updateArena;
+window.updateArena=function(){
+  _uaP();
+  drawPillars();
+  applyPillarPhysics();
+};
+</script>
+
+<!-- PART 6c: BOSSES -->
+<script>
+'use strict';
+
+// ── Boss spawns on rounds 4 and 7 instead of normal wave
+function isBossRound(round){ return round===4||round===7; }
+
+function spawnBossForRound(round){
+  const cx=Arena.arenaW/2, cy=Arena.arenaY+Arena.arenaH/2;
+  if(round===4) return [makeKuznetsBoss(cx,cy)];
+  if(round===7) return [makeProtocolBoss(cx,cy)];
+  return [];
+}
+
+function makeKuznetsBoss(x,y){
+  return {
+    type:'boss_kuznetс',
+    label:'КУЗНЕЦ',
+    x,y,vx:0,vy:0,angle:0,
+    hp:500,maxHP:500,
+    radius:38,
+    color:'#2a3a5a',borderColor:'#ff8800',
+    speed:1.1,damage:22,
+    fireRate:55,bulletSpeed:5,range:500,shootRange:480,
+    ai:'boss_kuznetс',
+    fireCooldown:60,
+    strafeDir:1,strafeSwitchTimer:0,
+    dropPart:'gun_heavy',
+    // Boss-specific
+    phase:1,         // 1=normal, 2=enraged (<40% HP)
+    droneSpawnTimer:0,
+    shield:120,maxShield:120,
+    _meleeCooldown:0,
+  };
+}
+
+function makeProtocolBoss(x,y){
+  return {
+    type:'boss_protocol',
+    label:'ПРОТОКОЛ-0',
+    x,y,vx:0,vy:0,angle:0,
+    hp:800,maxHP:800,
+    radius:50,
+    color:'#1a0a2a',borderColor:'#cc44ff',
+    speed:1.4,damage:30,
+    fireRate:35,bulletSpeed:7,range:600,shootRange:560,
+    ai:'boss_protocol',
+    fireCooldown:40,
+    strafeDir:1,strafeSwitchTimer:0,
+    dropPart:'laser',
+    // Boss-specific
+    teleportTimer:0,
+    copyMutation:null,   // copies one player mutation
+    burstMode:false,
+    burstCount:0,
+    _meleeCooldown:0,
+  };
+}
+
+// ── Boss AI (injected into updateEnemies via type check)
+function updateBossAI(e, R){
+  const dx=R.x-e.x, dy=R.y-e.y;
+  const dist=Math.hypot(dx,dy);
+  const toPlayer=Math.atan2(dy,dx);
+  e.angle=toPlayer;
+
+  if(e.ai==='boss_kuznetс'){
+    // Phase transition
+    if(e.phase===1&&e.hp/e.maxHP<0.4){
+      e.phase=2; e.speed=1.8; e.fireRate=30;
+      spawnParticles(e.x,e.y,'#ff8800',30,5,60);
+      triggerFlash('#ff8800',15);
+    }
+    // Shield blocks damage until drones dead
+    if(e.shield>0&&Arena.frame%120===0) e.shield=Math.min(e.maxShield,e.shield+8);
+    // Strafe + approach
+    e.strafeSwitchTimer++;
+    if(e.strafeSwitchTimer>90){e.strafeDir*=-1;e.strafeSwitchTimer=0;}
+    const perp=toPlayer+Math.PI/2*e.strafeDir;
+    const ideal=180;
+    if(dist>ideal+40){e.vx+=Math.cos(toPlayer)*0.18;e.vy+=Math.sin(toPlayer)*0.18;}
+    else if(dist<ideal-40){e.vx-=Math.cos(toPlayer)*0.12;e.vy-=Math.sin(toPlayer)*0.12;}
+    e.vx+=Math.cos(perp)*0.15; e.vy+=Math.sin(perp)*0.15;
+    // Drone spawn every 8 sec (only 2 drones max)
+    e.droneSpawnTimer++;
+    if(e.droneSpawnTimer>=480&&Arena.enemies.filter(x=>x.type==='drone').length<2){
+      e.droneSpawnTimer=0;
+      const a=Math.random()*Math.PI*2;
+      const ne={...ENEMY_DEFS.swarm,type:'drone',label:'ДРОН',
+        x:e.x+Math.cos(a)*70,y:e.y+Math.sin(a)*70,
+        vx:0,vy:0,angle:0,
+        hp:35,maxHP:35,radius:11,
+        color:'#3a3a1a',borderColor:'#ffaa22',
+        fireCooldown:80,strafeDir:1,strafeSwitchTimer:0,
+        dropPart:null,_meleeCooldown:0};
+      Arena.enemies.push(ne);
+      spawnParticles(ne.x,ne.y,'#ffaa22',8,3,25);
+    }
+  }
+
+  if(e.ai==='boss_protocol'){
+    // Teleport every 5 sec
+    e.teleportTimer++;
+    if(e.teleportTimer>=300){
+      e.teleportTimer=0;
+      const ay=Arena.arenaY,ah=Arena.arenaH,aw=Arena.arenaW;
+      e.x=80+Math.random()*(aw-160);
+      e.y=ay+80+Math.random()*(ah-160);
+      spawnParticles(e.x,e.y,'#cc44ff',20,4,40);
+      triggerFlash('#cc44ff',8);
+    }
+    // Burst mode: 5-shot spread at 50% HP
+    if(!e.burstMode&&e.hp/e.maxHP<0.5){
+      e.burstMode=true;
+      spawnParticles(e.x,e.y,'#cc44ff',25,5,50);
+    }
+    // Orbit player
+    e.strafeSwitchTimer++;
+    if(e.strafeSwitchTimer>150){e.strafeDir*=-1;e.strafeSwitchTimer=0;}
+    const ideal2=220;
+    const perp2=toPlayer+Math.PI/2*e.strafeDir;
+    if(dist>ideal2+40){e.vx+=Math.cos(toPlayer)*0.2;e.vy+=Math.sin(toPlayer)*0.2;}
+    else if(dist<ideal2-40){e.vx-=Math.cos(toPlayer)*0.15;e.vy-=Math.sin(toPlayer)*0.15;}
+    e.vx+=Math.cos(perp2)*0.2; e.vy+=Math.sin(perp2)*0.2;
+  }
+
+  // Speed cap + friction
+  const spd=Math.hypot(e.vx,e.vy);
+  if(spd>e.speed){e.vx*=e.speed/spd;e.vy*=e.speed/spd;}
+  e.vx*=0.88;e.vy*=0.88;
+}
+
+// ── Boss fire override
+function bossFire(e,R){
+  const toPlayer=Math.atan2(R.y-e.y,R.x-e.x);
+  const bx=e.x+Math.cos(toPlayer)*(e.radius+8);
+  const by=e.y+Math.sin(toPlayer)*(e.radius+8);
+
+  if(e.ai==='boss_kuznetс'){
+    // Triple spread in phase 2
+    const shots=e.phase===2?3:1;
+    for(let s=0;s<shots;s++){
+      const ang=toPlayer+(s-1)*0.22;
+      spawnBullet(bx,by,ang,{bulletSpeed:e.bulletSpeed,damage:e.damage,range:e.range},false);
+    }
+  }
+  if(e.ai==='boss_protocol'){
+    if(e.burstMode){
+      // 5-way spread
+      for(let s=0;s<5;s++){
+        const ang=toPlayer+(s-2)*0.28;
+        spawnBullet(bx,by,ang,{bulletSpeed:e.bulletSpeed,damage:e.damage*0.7,range:e.range},false);
+      }
+    } else {
+      spawnBullet(bx,by,toPlayer,{bulletSpeed:e.bulletSpeed,damage:e.damage,range:e.range},false);
+    }
+  }
+}
+
+// ── Boss draw
+function drawBoss(e){
+  ctx.save();
+  ctx.translate(e.x,e.y);
+  ctx.rotate(e.angle+Math.PI/2);
+
+  // Glow aura
+  ctx.save();
+  ctx.globalAlpha=0.18+Math.sin(Arena.frame*0.05)*0.07;
+  ctx.fillStyle=e.borderColor;
+  ctx.beginPath(); ctx.arc(0,0,e.radius+12,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+
+  // Body (octagon for bosses)
+  ctx.fillStyle=e.color;
+  ctx.beginPath();
+  for(let i=0;i<8;i++){
+    const a=(i/8)*Math.PI*2-Math.PI/8;
+    i===0?ctx.moveTo(Math.cos(a)*e.radius,Math.sin(a)*e.radius)
+         :ctx.lineTo(Math.cos(a)*e.radius,Math.sin(a)*e.radius);
+  }
+  ctx.closePath(); ctx.fill();
+  ctx.strokeStyle=e.borderColor; ctx.lineWidth=3; ctx.stroke();
+
+  // Shield ring
+  if(e.shield>0){
+    ctx.save();
+    ctx.globalAlpha=(e.shield/e.maxShield)*0.6;
+    ctx.strokeStyle='#4488ff'; ctx.lineWidth=4;
+    ctx.beginPath(); ctx.arc(0,0,e.radius+6,0,Math.PI*2); ctx.stroke();
+    ctx.restore();
+  }
+
+  // Barrel
+  ctx.fillStyle='#666';
+  ctx.fillRect(-5,-e.radius-10,10,16);
+
+  ctx.restore();
+
+  // HP bar (wide, below boss)
+  const bw=e.radius*3, bx2=e.x-bw/2, by2=e.y+e.radius+8;
+  fillRect(bx2,by2,bw,8,'#111');
+  fillRect(bx2,by2,bw*(e.hp/e.maxHP),8,e.hp/e.maxHP>0.4?e.borderColor:'#ff3333');
+  if(e.maxShield){
+    fillRect(bx2,by2-9,bw,6,'#112244');
+    fillRect(bx2,by2-9,bw*(e.shield/e.maxShield),6,'#4488ff');
+  }
+
+  // Name + phase
+  ctx.fillStyle=e.borderColor; ctx.font='bold 12px "Courier New",monospace'; ctx.textAlign='center';
+  ctx.fillText('⚠ '+e.label+(e.phase===2?' [БЕРСЕРК]':''),e.x,e.y-e.radius-14);
+}
+
+// Override damageEnemy for boss shield
+const _origDE=window.damageEnemy;
+window.damageEnemy=function(idx,dmg,bvx,bvy){
+  const e=Arena.enemies[idx];
+  if(e&&e.shield>0){
+    const absorbed=Math.min(e.shield,dmg);
+    e.shield-=absorbed;
+    dmg-=absorbed;
+    spawnParticles(e.x,e.y,'#4488ff',4,2,12);
+    if(dmg<=0){spawnParticles(e.x,e.y,'#ff8800',3,1.5,8);return;}
+  }
+  _origDE(idx,dmg,bvx,bvy);
+};
+
+// Hook boss AI into enemy update — patch spawnEnemiesForRound
+const _origSpawn=window.spawnEnemiesForRound;
+window.spawnEnemiesForRound=function(round){
+  if(isBossRound(round)) return spawnBossForRound(round);
+  return _origSpawn(round);
+};
+
+// Hook boss draw + AI into drawEnemies / updateEnemies
+const _origDrawEnemies=window.drawEnemies;
+window.drawEnemies=function(){
+  for(const e of Arena.enemies){
+    if(e.ai&&e.ai.startsWith('boss_')) drawBoss(e);
+  }
+  _origDrawEnemies();
+};
+
+const _origUpdateEnemies=window.updateEnemies;
+window.updateEnemies=function(){
+  const R=Arena.robot;
+  for(const e of Arena.enemies){
+    if(!e.ai||!e.ai.startsWith('boss_')) continue;
+    updateBossAI(e,R);
+    e.x=Math.max(e.radius,Math.min(Arena.arenaW-e.radius,e.x));
+    e.y=Math.max(Arena.arenaY+e.radius,Math.min(Arena.arenaY+Arena.arenaH-e.radius,e.y));
+    e.fireCooldown--;
+    const dist=Math.hypot(R.x-e.x,R.y-e.y);
+    if(e.fireCooldown<=0&&dist<e.shootRange){
+      e.fireCooldown=e.fireRate+Math.floor(Math.random()*20-10);
+      bossFire(e,R);
+    }
+    const sep=e.radius+R.radius+4;
+    if(dist<sep&&dist>0.1){
+      const nx=(R.x-e.x)/dist,ny=(R.y-e.y)/dist;
+      const overlap=sep-dist;
+      e.x-=nx*overlap*0.3; e.y-=ny*overlap*0.3;
+      if(!R.knockbackImmune){R.x+=nx*overlap*0.7;R.y+=ny*overlap*0.7;}
+      if(!e._meleeCooldown||e._meleeCooldown<=0){
+        damageRobot(e.damage*0.6); e._meleeCooldown=50;
+      }
+    }
+    if(e._meleeCooldown>0)e._meleeCooldown--;
+  }
+  _origUpdateEnemies();
+};
+</script>
+
+<!-- PART 6d: RANDOM ENCOUNTERS -->
+<script>
+'use strict';
+
+// Encounter types
+const ENCOUNTERS=[
+  {
+    id:'scrapyard',
+    title:'⚙ ПОЛЕ ОБЛОМКОВ',
+    desc:'Ты натыкаешься на поле разбросанных деталей после прошлого боя.\nМожно забрать несколько, но что-то здесь не так...',
+    options:[
+      {label:'Забрать детали (+ 2 случайных детали)',action:'take_parts'},
+      {label:'Тщательно обыскать (+ 4 детали, +1 враг в след. раунде)',action:'search_deep'},
+      {label:'Забрать металлолом (+ 25 лома)',action:'take_scrap'},
+    ],
+    color:'#ff8800',
+  },
+  {
+    id:'merchant',
+    title:'💰 ТОРГОВЕЦ ЛОМОМ',
+    desc:'Потрёпанный робот предлагает обмен.\nОн выглядит надёжно... примерно.',
+    options:[
+      {label:'Купить деталь (-30 лома, + редкая деталь)',action:'buy_rare'},
+      {label:'Обменять 2 детали на 3 случайных',action:'trade'},
+      {label:'Ограбить (+ 40 лома, -20 ПЗ)',action:'rob'},
+    ],
+    color:'#ffcc44',
+  },
+  {
+    id:'cache',
+    title:'🔒 СЕКРЕТНЫЙ ТАЙНИК',
+    desc:'Ты обнаруживаешь спрятанный контейнер.\nЗамок взломан наполовину.',
+    options:[
+      {label:'Взломать до конца (+ мутация без экрана мутации)',action:'bonus_mutation'},
+      {label:'Забрать как есть (+ 20 лома + 1 деталь)',action:'take_cache'},
+      {label:'Оставить — слишком подозрительно',action:'leave'},
+    ],
+    color:'#4488ff',
+  },
+  {
+    id:'hospital',
+    title:'🔋 ЗАРЯДНАЯ СТАНЦИЯ',
+    desc:'Уцелевшая зарядная станция.\nЭнергии хватит на полное восстановление.',
+    options:[
+      {label:'Починить весь робот (все детали → полное ПЗ)',action:'repair_full'},
+      {label:'Зарядить и двигаться (+ 50 лома от экономии)',action:'charge_scrap'},
+      {label:'Уничтожить станцию (+ мощная деталь)',action:'destroy_station'},
+    ],
+    color:'#44ff88',
+  },
+];
+
+const Encounter={current:null};
+
+// Chance of encounter: 40% on rounds 2,3,5,6 (not 1,4,7)
+function shouldEncounter(round){
+  return [2,3,5,6].includes(round)&&Math.random()<0.45;
+}
+
+function startEncounter(){
+  Encounter.current=ENCOUNTERS[Math.floor(Math.random()*ENCOUNTERS.length)];
+  setState(STATE.ENCOUNTER);
+}
+
+function applyEncounterAction(action){
+  const allParts=Object.keys(PART_DEFS).filter(k=>k!=='chassis');
+  const rareParts=['laser','gun_heavy','shield_gen','legs','jets','timer_fast'];
+  switch(action){
+    case 'take_parts':
+      for(let i=0;i<2;i++) Game.inventory.push(createPart(allParts[Math.floor(Math.random()*allParts.length)]));
+      break;
+    case 'search_deep':
+      for(let i=0;i<4;i++) Game.inventory.push(createPart(allParts[Math.floor(Math.random()*allParts.length)]));
+      Game._bonusEnemyNext=(Game._bonusEnemyNext||0)+1;
+      break;
+    case 'take_scrap': Game.scrap+=25; break;
+    case 'buy_rare':
+      if(Game.scrap>=30){
+        Game.scrap-=30;
+        Game.inventory.push(createPart(rareParts[Math.floor(Math.random()*rareParts.length)]));
+      } break;
+    case 'trade':
+      if(Game.inventory.length>=2){
+        Game.inventory.splice(0,2);
+        for(let i=0;i<3;i++) Game.inventory.push(createPart(allParts[Math.floor(Math.random()*allParts.length)]));
+      } break;
+    case 'rob':
+      Game.scrap+=40; damageRobot(20); break;
+    case 'bonus_mutation':{
+      const avail=MUTATIONS_DEF.filter(m=>!Game.mutations.includes(m.id));
+      if(avail.length){Game.mutations.push(avail[Math.floor(Math.random()*avail.length)].id);}
+    } break;
+    case 'take_cache':
+      Game.scrap+=20;
+      Game.inventory.push(createPart(allParts[Math.floor(Math.random()*allParts.length)]));
+      break;
+    case 'leave': break;
+    case 'repair_full':
+      Assembly.placed.forEach(p=>{p.hp=PART_DEFS[p.type].maxHP;}); break;
+    case 'charge_scrap': Game.scrap+=50; break;
+    case 'destroy_station':
+      Game.inventory.push(createPart(rareParts[Math.floor(Math.random()*rareParts.length)])); break;
+  }
+}
+
+function updateEncounter(){
+  const enc=Encounter.current;
+  if(!enc){setState(STATE.ASSEMBLY);return;}
+
+  fillRect(0,0,W,H,C.bg);
+  drawGrid(0,0,W,H,40,'#0b150b');
+
+  // Header
+  fillRect(0,0,W,90,'rgba(0,0,0,0.6)');
+  ctx.fillStyle=enc.color; ctx.font='bold 22px "Courier New",monospace'; ctx.textAlign='center';
+  ctx.shadowColor=enc.color; ctx.shadowBlur=15;
+  ctx.fillText(enc.title,W/2,38); ctx.shadowBlur=0;
+  ctx.fillStyle=C.textDim; ctx.font='11px "Courier New",monospace';
+  ctx.fillText(`РАУНД ${Game.round-1} → ${Game.round} · СЛУЧАЙНАЯ ВСТРЕЧА`,W/2,58);
+
+  // Description panel
+  const px=W/2-310,py=105,pw=620,ph=100;
+  fillRect(px,py,pw,ph,'#080e08');
+  strokeRect(px,py,pw,ph,enc.color,1);
+  ctx.fillStyle=C.text; ctx.font='13px "Courier New",monospace'; ctx.textAlign='left';
+  let ly=py+22;
+  for(const line of enc.desc.split('\n')){ctx.fillText(line,px+16,ly);ly+=20;}
+
+  // Options
+  const optX=W/2-280, optW=560;
+  enc.options.forEach((opt,i)=>{
+    const oy=220+i*70;
+    const hov=isHover(optX,oy,optW,58);
+    fillRect(optX,oy,optW,58,hov?'#0f2010':'#080f08');
+    strokeRect(optX,oy,optW,58,hov?enc.color:'#1a3a1a',hov?2:1);
+
+    // Option number
+    ctx.fillStyle=hov?enc.color:C.textDim;
+    ctx.font='bold 18px "Courier New",monospace'; ctx.textAlign='left';
+    ctx.fillText(`${i+1}.`,optX+12,oy+36);
+
+    // Label (word wrap)
+    ctx.fillStyle=hov?C.text:C.textDim;
+    ctx.font='13px "Courier New",monospace';
+    const words=opt.label.split(' '); let line='', lx=optX+38, lly=oy+24;
+    for(const w of words){
+      const t=line?line+' '+w:w;
+      if(t.length>52&&line){ctx.fillText(line,lx,lly);line=w;lly+=17;}
+      else line=t;
+    }
+    ctx.fillText(line,lx,lly);
+
+    if(hov&&Mouse.clicked){
+      applyEncounterAction(opt.action);
+      Encounter.current=null;
+      initAssembly();
+      setState(STATE.ASSEMBLY);
+    }
+  });
+
+  // Skip
+  const sy=H-50;
+  const shov=isHover(W/2-80,sy,160,28);
+  ctx.fillStyle=shov?C.textDim:'#1a2a1a';
+  ctx.font='11px "Courier New",monospace'; ctx.textAlign='center';
+  ctx.fillText('[ пропустить встречу ]',W/2,sy+18);
+  if(shov&&Mouse.clicked){
+    Encounter.current=null; initAssembly(); setState(STATE.ASSEMBLY);
+  }
+
+  drawVignette(); drawScanlines();
+}
+
+// Hook into loot flow: after loot→mutation, before assembly check encounter
+const _origUpdateLoot2=window.updateLoot;
+window.updateLoot=function(){
+  const _oSS=window.setState;
+  window.setState=function(s){
+    if(s===STATE.ASSEMBLY){
+      window.setState=_oSS;
+      // After loot: mutation → then maybe encounter
+      pickMutations();
+      _oSS(STATE.MUTATION);
+    } else _oSS(s);
+  };
+  _origUpdateLoot2();
+  if(window.setState!==_oSS) window.setState=_oSS;
+};
+
+// After mutation confirmed → check encounter
+const _origUpdateMutation=window.updateMutation;
+window.updateMutation=function(){
+  const _oSS=window.setState;
+  window.setState=function(s){
+    if(s===STATE.ASSEMBLY){
+      window.setState=_oSS;
+      if(shouldEncounter(Game.round)) startEncounter();
+      else{initAssembly();_oSS(STATE.ASSEMBLY);}
+    } else _oSS(s);
+  };
+  _origUpdateMutation();
+  if(window.setState!==_oSS) window.setState=_oSS;
+};
+
+// Add bonus enemy from encounter search_deep
+const _origSpawnE=window.spawnEnemiesForRound;
+window.spawnEnemiesForRound=function(round){
+  const enemies=_origSpawnE(round);
+  if(Game._bonusEnemyNext>0){
+    Game._bonusEnemyNext--;
+    const def=ENEMY_DEFS.scout;
+    enemies.push({
+      ...def,type:'scout',label:'РОЙ-БОНУС',
+      x:80,y:Arena.arenaY+80,vx:0,vy:0,angle:0,
+      hp:def.hp,maxHP:def.hp,fireCooldown:30,
+      strafeDir:1,strafeSwitchTimer:0,dropPart:null,_meleeCooldown:0
+    });
+  }
+  return enemies;
+};
+
+console.log('[WRECK PROTOCOL] Classes + Pillars + Bosses + Encounters loaded.');
+</script>
+
+<!-- PART 7a: SYNERGY SYSTEM -->
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════════════════════
+//  SYNERGIES — passive bonuses for specific part combos
+// ═══════════════════════════════════════════════════════════
+const SYNERGIES = [
+  {
+    id: 'artillery', label: '⚔ АРТИЛЛЕРИЯ', color: '#ff6b35',
+    desc: '3+ оружия → урон всех +25%',
+    requires: p => p.filter(x => PART_DEFS[x.type].cat === 'weapon').length >= 3,
+    apply: R => { R.weapons.forEach(w => { w.def = {...w.def, damage: Math.round(w.def.damage * 1.25)}; }); }
+  },
+  {
+    id: 'bunker', label: '🛡 БУНКЕР', color: '#888888',
+    desc: '2+ брони + гусеницы → урон -25%',
+    requires: p => p.filter(x => x.type === 'armor_heavy' || x.type === 'armor_light').length >= 2 && p.some(x => x.type === 'tracks'),
+    apply: R => { R._dmgReduction = (R._dmgReduction || 0) + 0.25; }
+  },
+  {
+    id: 'powerplant', label: '💠 СИЛОВОЙ ЩИТ', color: '#4488ff',
+    desc: 'Батарея + щит-ген → щит +60, рег. ×2',
+    requires: p => p.some(x => x.type === 'battery') && p.some(x => x.type === 'shield_gen'),
+    apply: R => { R.maxShield += 60; R.shield += 60; R.shieldRegen *= 2; }
+  },
+  {
+    id: 'speedster', label: '🚀 СТРЕМИТЕЛЬНЫЙ', color: '#ff6644',
+    desc: 'Реактивы + лёгкая броня → скорость +35%',
+    requires: p => p.some(x => x.type === 'jets') && p.some(x => x.type === 'armor_light'),
+    apply: R => { R.speed *= 1.35; }
+  },
+  {
+    id: 'autoaim', label: '⚡ АВТОПРИЦЕЛ', color: '#35c5ff',
+    desc: 'Лазер + автосенсор → урон лазера +50%',
+    requires: p => p.some(x => x.type === 'laser') && p.some(x => x.type === 'sensor_auto'),
+    apply: R => { R.weapons.filter(w => w.def.isLaser).forEach(w => { w.def = {...w.def, damage: Math.round(w.def.damage * 1.5)}; }); }
+  },
+  {
+    id: 'ironwall', label: '🔩 ЖЕЛЕЗНАЯ СТЕНА', color: '#cccccc',
+    desc: '3+ брони → +100 к макс. ПЗ',
+    requires: p => p.filter(x => PART_DEFS[x.type].cat === 'armor').length >= 3,
+    apply: R => { R.maxHP += 100; R.hp += 100; }
+  },
+  {
+    id: 'spider_web', label: '🕷 ПАУТИНА', color: '#cc44cc',
+    desc: 'Паучьи ноги + 2+ оружия → огонь во все стороны',
+    requires: p => p.some(x => x.type === 'legs') && p.filter(x => PART_DEFS[x.type].cat === 'weapon').length >= 2,
+    apply: R => { R._omnifire = true; }
+  },
+  {
+    id: 'overclocker', label: '⏱ РАЗГОН', color: '#cccc44',
+    desc: 'Таймер + батарея → скорострельность ×1.4',
+    requires: p => p.some(x => x.type === 'timer_fast') && p.some(x => x.type === 'battery'),
+    apply: R => { R.weapons.forEach(w => { w.def = {...w.def, fireRate: Math.max(6, Math.round(w.def.fireRate / 1.4))}; }); }
+  },
+];
+
+// Track active synergies on robot
+function calcSynergies(placed) {
+  return SYNERGIES.filter(s => s.requires(placed));
+}
+
+// Override startArena to apply synergies after stat calc
+const _syn_origStartArena = window.startArena;
+window.startArena = function() {
+  _syn_origStartArena();
+  const R = Arena.robot;
+  const active = calcSynergies(Assembly.placed);
+  R._activeSynergies = active.map(s => s.id);
+  active.forEach(s => s.apply(R));
+  if (active.length > 0) {
+    console.log('[Synergies] Active:', active.map(s => s.label).join(', '));
+  }
+};
+
+// Override damageRobot to apply damage reduction synergy
+const _syn_origDamageRobot = window.damageRobot;
+window.damageRobot = function(dmg) {
+  const R = Arena.robot;
+  const reduced = dmg * (1 - (R._dmgReduction || 0));
+  _syn_origDamageRobot(reduced);
+};
+
+// ── Draw synergy panel in assembly screen (appended below grid)
+const _syn_origUpdateAssembly = window.updateAssembly;
+window.updateAssembly = function() {
+  _syn_origUpdateAssembly();
+  if (window.curState !== STATE.ASSEMBLY) return;
+
+  const active = calcSynergies(Assembly.placed);
+  const inactive = SYNERGIES.filter(s => !s.requires(Assembly.placed));
+
+  // Synergy panel: right side below palette stats
+  const sx = 60 + GRID_COLS * GRID_SIZE + 16;
+  const sw = W - sx - 8;
+  // Find bottom of palette (approximate)
+  const sy = H - 160;
+
+  ctx.font = 'bold 10px "Courier New",monospace'; ctx.textAlign = 'left';
+  ctx.fillStyle = '#336633';
+  ctx.fillText('— СИНЕРГИИ —', sx + 4, sy + 12);
+
+  let row = 0;
+  // Active synergies first
+  for (const s of active) {
+    const ry = sy + 20 + row * 24;
+    fillRect(sx + 2, ry, sw - 4, 20, '#0a1a0a');
+    strokeRect(sx + 2, ry, sw - 4, 20, s.color, 1);
+    ctx.fillStyle = s.color;
+    ctx.font = 'bold 9px "Courier New",monospace';
+    ctx.fillText('✓ ' + s.label, sx + 6, ry + 13);
+    row++;
+  }
+  // Show 2 nearest inactive as hints
+  const hints = inactive.slice(0, 2);
+  for (const s of hints) {
+    const ry = sy + 20 + row * 24;
+    fillRect(sx + 2, ry, sw - 4, 20, '#080808');
+    strokeRect(sx + 2, ry, sw - 4, 20, '#1a2a1a', 1);
+    ctx.fillStyle = '#2a3a2a';
+    ctx.font = '9px "Courier New",monospace';
+    ctx.fillText('○ ' + s.desc, sx + 6, ry + 13);
+    row++;
+  }
+};
+
+// Omnifire: if synergy active, weapons fire in all 4 directions
+const _syn_origFireWeapon = window.fireWeapon;
+window.fireWeapon = function(wi, R) {
+  if (!R._omnifire) { _syn_origFireWeapon(wi, R); return; }
+  // Fire in 4 cardinal directions
+  const origAngle = R.angle;
+  for (let d = 0; d < 4; d++) {
+    R.angle = origAngle + d * Math.PI / 2;
+    _syn_origFireWeapon(wi, R);
+  }
+  R.angle = origAngle;
+};
+
+console.log('[WRECK PROTOCOL] Synergy system loaded. Synergies:', SYNERGIES.length);
+</script>
+
+<!-- PART 7b: META-PROGRESSION + RECORDS -->
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════════════════════
+//  META-PROGRESSION — saved across runs in localStorage
+// ═══════════════════════════════════════════════════════════
+const META_KEY = 'wreck_meta_v1';
+
+function metaLoad() {
+  try {
+    const raw = localStorage.getItem(META_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch(e) {}
+  return { runs: 0, wins: 0, bestRound: 0, bestSynergies: 0, history: [] };
+}
+
+function metaSave(data) {
+  try { localStorage.setItem(META_KEY, JSON.stringify(data)); } catch(e) {}
+}
+
+function metaReset() {
+  metaSave({ runs: 0, wins: 0, bestRound: 0, bestSynergies: 0, history: [] });
+}
+
+// Called at end of each run
+function metaRecordRun(win) {
+  const data = metaLoad();
+  const round = Game.round - 1;
+  const synCount = (Arena.robot._activeSynergies || []).length;
+  data.runs++;
+  if (win) data.wins++;
+  if (round > data.bestRound) data.bestRound = round;
+  if (synCount > data.bestSynergies) data.bestSynergies = synCount;
+  data.history.unshift({ win, round, class: Game._startClass || '?', synCount });
+  if (data.history.length > 10) data.history.length = 10; // keep last 10
+  metaSave(data);
+  return data;
+}
+
+// Bonus starting scrap: +5 per win, max +25
+function metaBonusScrap() {
+  const data = metaLoad();
+  return Math.min(data.wins * 5, 25);
+}
+
+// ── Override setState to record run on game end
+const _meta_origSetState = window.setState;
+window.setState = function(s) {
+  if (s === STATE.GAMEOVER) metaRecordRun(false);
+  if (s === STATE.WIN)      metaRecordRun(true);
+  _meta_origSetState(s);
+};
+
+// ── Apply bonus scrap at game start (hook into startGameWithClass)
+const _meta_origStartGame = window.startGameWithClass;
+window.startGameWithClass = function(cls) {
+  _meta_origStartGame(cls);
+  const bonus = metaBonusScrap();
+  if (bonus > 0) {
+    Game.scrap += bonus;
+    Game._startClass = cls ? cls.id : 'none';
+  }
+};
+
+// ── Patch menu to show records
+const _meta_origUpdateMenu = window.updateMenu;
+window.updateMenu = function() {
+  _meta_origUpdateMenu();
+
+  const data = metaLoad();
+  if (data.runs === 0) return; // first run, nothing to show
+
+  // Records panel bottom-left
+  const px = 20, py = H - 130, pw = 220;
+  fillRect(px, py, pw, 115, '#050f05');
+  strokeRect(px, py, pw, 115, '#1a3a1a', 1);
+
+  ctx.fillStyle = '#336633'; ctx.font = 'bold 10px "Courier New",monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText('— СТАТИСТИКА —', px+8, py+14);
+
+  ctx.fillStyle = C.textDim; ctx.font = '11px "Courier New",monospace';
+  ctx.fillText(`Забегов: ${data.runs}`, px+8, py+30);
+  ctx.fillText(`Побед: ${data.wins}`, px+8, py+44);
+  ctx.fillText(`Лучший раунд: ${data.bestRound}/7`, px+8, py+58);
+  ctx.fillText(`Макс. синергий: ${data.bestSynergies}`, px+8, py+72);
+
+  const bonus = metaBonusScrap();
+  if (bonus > 0) {
+    ctx.fillStyle = '#4eff91';
+    ctx.fillText(`+ ${bonus} лома (бонус за победы)`, px+8, py+88);
+  }
+
+  // Last 3 runs mini-history
+  const recent = data.history.slice(0, 3);
+  let hy = py + 102;
+  ctx.font = '9px "Courier New",monospace';
+  for (const r of recent) {
+    ctx.fillStyle = r.win ? '#4eff91' : '#ff4444';
+    ctx.fillText(`${r.win ? '✓' : '✗'} Раунд ${r.round}/7  класс:${r.class}`, px+8, hy);
+    hy += 12;
+  }
+
+  // Reset hint
+  ctx.fillStyle = '#1a2a1a'; ctx.font = '9px "Courier New",monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('Del — сбросить рекорды', px + pw/2, py + 118);
+
+  // Delete key to reset
+  if (Keys['Delete_pressed']) {
+    metaReset();
+    Keys['Delete_pressed'] = false;
+  }
+};
+
+console.log('[WRECK PROTOCOL] Meta-progression loaded. Runs so far:', metaLoad().runs);
+</script>
+
+<!-- PART 7c: CURSED & BLESSED PARTS -->
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════════════════════
+//  CURSED PARTS — loot items with risk/reward tradeoffs
+// ═══════════════════════════════════════════════════════════
+const CURSE_POOL = [
+  { id:'c_slow',    badge:'⚠ МЕДЛИТ',   desc:'Скорость -20%', penalty: R => { R.speed *= 0.8; } },
+  { id:'c_fragile', badge:'⚠ ХРУПКАЯ',  desc:'ПЗ -30',        penalty: R => { R.maxHP = Math.max(10, R.maxHP - 30); R.hp = Math.min(R.hp, R.maxHP); } },
+  { id:'c_hungry',  badge:'⚠ ПРОЖОРЛИВАЯ', desc:'Урон -15%',  penalty: R => { R.weapons.forEach(w => { w.def = {...w.def, damage: Math.round(w.def.damage * 0.85)}; }); } },
+  { id:'c_unstable',badge:'⚠ НЕСТАБИЛЬНАЯ', desc:'Огонь -25% скорости', penalty: R => { R.weapons.forEach(w => { w.def = {...w.def, fireRate: Math.round(w.def.fireRate * 1.25)}; }); } },
+  { id:'c_heavy',   badge:'⚠ ТЯЖЁЛАЯ',  desc:'Масса +4кг',    penalty: R => { R.mass = (R.mass||0)+4; const pen=Math.max(0.3,1-(R.mass-4)*0.025); R.speed=Math.max(0.5,R.speed*0.88); } },
+];
+
+const BLESS_POOL = [
+  { id:'b_sharp',   badge:'★ ОСТРАЯ',   desc:'Урон +20%',      bonus: R => { R.weapons.forEach(w => { w.def = {...w.def, damage: Math.round(w.def.damage * 1.2)}; }); } },
+  { id:'b_swift',   badge:'★ БЫСТРАЯ',  desc:'Скорость +20%',  bonus: R => { R.speed *= 1.2; } },
+  { id:'b_tough',   badge:'★ ПРОЧНАЯ',  desc:'ПЗ +40',         bonus: R => { R.maxHP += 40; R.hp += 40; } },
+  { id:'b_regen',   badge:'★ ЖИВАЯ',    desc:'Реген 0.1/фр',   bonus: R => { R._regenRate = (R._regenRate||0) + 0.1; } },
+];
+
+// ── Inject curse/bless into loot (override prepLoot)
+const _curse_origPrepLoot = window.prepLoot;
+window.prepLoot = function() {
+  _curse_origPrepLoot();
+  // From round 2 onwards, add curses/blessings
+  if (Game.round < 2) return;
+  Loot.offered.forEach(part => {
+    if (!part || part.type === 'chassis') return;
+    const roll = Math.random();
+    if (roll < 0.25) {
+      // Cursed: random penalty
+      part._curse = CURSE_POOL[Math.floor(Math.random() * CURSE_POOL.length)];
+    } else if (roll < 0.38) {
+      // Blessed: random bonus
+      part._bless = BLESS_POOL[Math.floor(Math.random() * BLESS_POOL.length)];
+    } else if (roll < 0.45) {
+      // Cursed AND blessed (high risk high reward)
+      part._curse = CURSE_POOL[Math.floor(Math.random() * CURSE_POOL.length)];
+      part._bless = BLESS_POOL[Math.floor(Math.random() * BLESS_POOL.length)];
+    }
+  });
+};
+
+// ── Apply curses/blessings from placed parts in startArena
+const _curse_origStartArena = window.startArena;
+window.startArena = function() {
+  _curse_origStartArena();
+  const R = Arena.robot;
+  // Assembly.placed contains the actual part objects with _curse/_bless set during loot
+  for (const p of Assembly.placed) {
+    if (p._curse) p._curse.penalty(R);
+    if (p._bless) p._bless.bonus(R);
+  }
+};
+
+// ── Draw curse/bless badges on loot cards (overlay after original render)
+const _curse_origUpdateLoot = window.updateLoot;
+window.updateLoot = function() {
+  _curse_origUpdateLoot();
+  // Re-draw badges on top of each card
+  const cols = 4, cardW = 180, cardH = 110;
+  const startX = W/2 - (cols*cardW + (cols-1)*12)/2;
+  const startY = 90;
+  Loot.offered.forEach((part, i) => {
+    if (!part) return;
+    const col = i % cols, row = Math.floor(i / cols);
+    const cx2 = startX + col*(cardW+12);
+    const cy2 = startY + row*(cardH+12);
+
+    if (part._curse) {
+      // Red curse badge top-right
+      fillRect(cx2+cardW-82, cy2, 82, 16, '#2a0808');
+      ctx.fillStyle = '#ff4444'; ctx.font = 'bold 8px "Courier New",monospace'; ctx.textAlign = 'center';
+      ctx.fillText(part._curse.badge, cx2+cardW-41, cy2+11);
+      // Penalty text under description
+      ctx.fillStyle = '#cc2222'; ctx.font = '8px "Courier New",monospace'; ctx.textAlign = 'left';
+      ctx.fillText('↓ ' + part._curse.desc, cx2+8, cy2+cardH-4);
+    }
+    if (part._bless) {
+      // Gold bless badge top-left (or shift if curse present)
+      const bx2 = part._curse ? cx2 : cx2;
+      fillRect(bx2, cy2 + (part._curse ? 17 : 0), 80, 16, '#1a1a00');
+      ctx.fillStyle = '#ffdd44'; ctx.font = 'bold 8px "Courier New",monospace'; ctx.textAlign = 'center';
+      ctx.fillText(part._bless.badge, bx2+40, cy2+(part._curse?28:11));
+      ctx.fillStyle = '#aaaa00'; ctx.font = '8px "Courier New",monospace'; ctx.textAlign = 'left';
+      ctx.fillText('↑ ' + part._bless.desc, cx2+8, cy2+cardH-14);
+    }
+  });
+};
+
+// Note: curse/bless is stored directly on the part object,
+// so it survives Game.inventory → Assembly.placed transfer automatically.
+
+console.log('[WRECK PROTOCOL] Cursed/Blessed parts system loaded.');
+</script>
+
+<!-- PART 7d: ROUND CHALLENGES -->
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════════════════════
+//  CHALLENGE SYSTEM — optional hard modifier per round with bonus reward
+// ═══════════════════════════════════════════════════════════
+const CHALLENGE_DEFS = [
+  {
+    id: 'marathon', label: '⚔ МАРАФОН', color: '#ff6b35',
+    desc: 'На 3 врага больше в этом раунде.',
+    reward: 'Выбор +1 трофей',
+    apply: () => { Game._challengeMarathon = true; },
+    reward_fn: () => { Loot.maxPick = Math.min(Loot.maxPick + 1, 5); }
+  },
+  {
+    id: 'fragile', label: '💔 ХРУПКОСТЬ', color: '#ff3344',
+    desc: 'Входящий урон ×1.5.',
+    reward: '+35 металлолома',
+    apply: () => { Game._challengeFragile = true; },
+    reward_fn: () => { Game.scrap += 35; }
+  },
+  {
+    id: 'berserk', label: '⚡ БЕРСЕРК', color: '#ffaa00',
+    desc: 'Враги быстрее на 40%.',
+    reward: '+25 металлолома',
+    apply: () => { Game._challengeBerserk = true; },
+    reward_fn: () => { Game.scrap += 25; }
+  },
+  {
+    id: 'acid_rain', label: '☣ КИСЛОТНЫЙ ДОЖДЬ', color: '#44ff88',
+    desc: 'Постоянный кислотный урон по арене.',
+    reward: '+30 металлолома',
+    apply: () => { Game._challengeAcid = true; },
+    reward_fn: () => { Game.scrap += 30; }
+  },
+  {
+    id: 'blind', label: '👁 СЛЕПОТА', color: '#8844ff',
+    desc: 'Враги невидимы. Стреляй по наитию.',
+    reward: '+40 металлолома + деталь',
+    apply: () => { Game._challengeBlind = true; },
+    reward_fn: () => {
+      Game.scrap += 40;
+      const t = ['gun_rapid','armor_light','sensor_auto','battery'][Math.floor(Math.random()*4)];
+      Game.inventory.push(createPart(t));
+    }
+  },
+];
+
+function rollChallenge() {
+  // 40% chance of a challenge each round (not round 1)
+  if (Game.round <= 1 || Math.random() > 0.40) return null;
+  return CHALLENGE_DEFS[Math.floor(Math.random() * CHALLENGE_DEFS.length)];
+}
+
+function clearChallenge() {
+  Game._challengeMarathon = false;
+  Game._challengeFragile  = false;
+  Game._challengeBerserk  = false;
+  Game._challengeAcid     = false;
+  Game._challengeBlind    = false;
+  Game._activeChallenge   = null;
+}
+
+// ── Roll challenge when assembly starts (before each round)
+const _ch_origInitAssembly = window.initAssembly;
+window.initAssembly = function() {
+  _ch_origInitAssembly();
+  clearChallenge();
+  const ch = rollChallenge();
+  if (ch) { Game._activeChallenge = ch; ch.apply(); }
+};
+
+// ── Marathon: spawn extra enemies
+const _ch_origSpawn = window.spawnEnemiesForRound;
+window.spawnEnemiesForRound = function(round) {
+  const enemies = _ch_origSpawn(round);
+  if (Game._challengeMarathon) {
+    const types = ['scout','drone','brute'];
+    for (let i = 0; i < 3; i++) {
+      const def = ENEMY_DEFS[types[i % types.length]];
+      enemies.push({
+        ...def, type: types[i % types.length],
+        x: 60 + i * 90, y: Arena.arenaY + 60,
+        vx: 0, vy: 0, angle: 0,
+        hp: def.hp, maxHP: def.hp, fireCooldown: 60,
+        strafeDir: 1, strafeSwitchTimer: 0, dropPart: null, _meleeCooldown: 0
+      });
+    }
+  }
+  return enemies;
+};
+
+// ── Fragile: extra damage on robot
+const _ch_origDmgRobot2 = window.damageRobot;
+window.damageRobot = function(dmg) {
+  const extra = Game._challengeFragile ? dmg * 0.5 : 0;
+  _ch_origDmgRobot2(dmg + extra);
+};
+
+// ── Berserk: enemy speed boost (applied in updateArena hook)
+// ── Acid rain: periodic damage (applied in updateArena hook)
+// ── Blind: skip drawEnemies
+const _ch_origUpdateArena = window.updateArena;
+window.updateArena = function() {
+  // Berserk: temporarily boost enemy speed each frame
+  if (Game._challengeBerserk && Arena.enemies) {
+    Arena.enemies.forEach(e => { e._origSpeed = e._origSpeed || e.speed; e.speed = e._origSpeed * 1.4; });
+  }
+  // Acid rain: every 90 frames damage robot
+  if (Game._challengeAcid && Arena.frame > 0 && Arena.frame % 90 === 0 && !Arena.result) {
+    window.damageRobot(6);
+    triggerFlash('#44ff88', 4);
+  }
+  _ch_origUpdateArena();
+};
+
+// ── Blind: don't draw enemies (override drawEnemies)
+const _ch_origDrawEnemies = window.drawEnemies;
+window.drawEnemies = function() {
+  if (Game._challengeBlind) {
+    // Only draw a small ??? indicator at each enemy position
+    if (Arena.enemies) {
+      Arena.enemies.forEach(e => {
+        ctx.fillStyle = 'rgba(136,68,255,0.25)';
+        ctx.font = '14px monospace'; ctx.textAlign = 'center';
+        ctx.fillText('?', e.x, e.y + 5);
+      });
+    }
+    return;
+  }
+  _ch_origDrawEnemies();
+};
+
+// ── Apply reward on round win (hook into prepLoot)
+const _ch_origPrepLoot = window.prepLoot;
+window.prepLoot = function() {
+  if (Game._activeChallenge) {
+    Game._activeChallenge.reward_fn();
+    // Reset maxPick after marathon
+    if (Game._activeChallenge.id === 'marathon') {
+      // will be reset naturally next initAssembly
+    }
+    const ch = Game._activeChallenge;
+    Game._lastChallengeReward = ch.reward;
+  }
+  _ch_origPrepLoot();
+};
+
+// ── Show challenge in assembly screen
+const _ch_origUpdateAssembly = window.updateAssembly;
+window.updateAssembly = function() {
+  _ch_origUpdateAssembly();
+  if (!Game._activeChallenge) return;
+  const ch = Game._activeChallenge;
+  // Banner below title
+  const bw = 340, bh = 36, bx = W/2 - bw/2, by = 6;
+  fillRect(bx, by, bw, bh, '#0a0a0a');
+  strokeRect(bx, by, bw, bh, ch.color, 1);
+  ctx.fillStyle = ch.color; ctx.font = 'bold 11px "Courier New",monospace'; ctx.textAlign = 'center';
+  ctx.fillText(`ИСПЫТАНИЕ: ${ch.label} — ${ch.desc}`, W/2, by + 16);
+  ctx.fillStyle = '#888888'; ctx.font = '9px "Courier New",monospace';
+  ctx.fillText(`Победи → ${ch.reward}`, W/2, by + 28);
+};
+
+// ── Show challenge in arena HUD (top banner)
+const _ch_origUpdateArena2 = window.updateArena;
+window.updateArena = function() {
+  _ch_origUpdateArena2();
+  if (!Game._activeChallenge || Arena.result) return;
+  const ch = Game._activeChallenge;
+  ctx.fillStyle = ch.color + '99'; ctx.font = 'bold 10px "Courier New",monospace'; ctx.textAlign = 'center';
+  ctx.fillText(`⚠ ИСПЫТАНИЕ: ${ch.label}`, W/2, Arena.arenaY - 2);
+};
+
+console.log('[WRECK PROTOCOL] Challenge system loaded.');
 </script>
 
 </body>
