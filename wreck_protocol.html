@@ -39,7 +39,7 @@ body {
   border: 1px solid #4eff91; color: #ccc;
   font-size: 11px; padding: 6px 10px;
   pointer-events: none; display: none;
-  max-width: 180px; line-height: 1.5;
+  max-width: 280px; line-height: 1.5;
 }
 #instructions {
   position: absolute; bottom: 10px; left: 50%;
@@ -859,8 +859,8 @@ function drawPlacedPart(part, alpha=1) {
   fillRect(sx+1, sy+1, pw-2, ph-2, def.color);
   strokeRect(sx+1, sy+1, pw-2, ph-2, def.border, 2);
 
-  // HP bar
-  const hpFrac = part.hp / def.maxHP;
+  // HP bar (clamped to prevent overflow when hp > maxHP)
+  const hpFrac = Math.min(1, Math.max(0, part.hp / def.maxHP));
   const barW = pw - 8;
   fillRect(sx+4, sy+ph-6, barW, 3, '#111');
   fillRect(sx+4, sy+ph-6, barW * hpFrac, 3,
@@ -1283,16 +1283,35 @@ function updateAssembly() {
         Assembly._tipTimer = (Assembly._tipTimer || 0) + 1;
         if (Assembly._tipTimer >= 22) { // ~0.35s delay
           const def = PART_DEFS[hovPart.type];
-          const hpPct = Math.round(hovPart.hp / def.maxHP * 100);
+          const clampedHP = Math.min(hovPart.hp, def.maxHP);
+          const hpPct = Math.round(clampedHP / def.maxHP * 100);
           const hpColor = hpPct > 70 ? '#44ff88' : hpPct > 35 ? '#ffcc00' : '#ff4444';
-          const lvl = hovPart._level ? ` · Ур.${hovPart._level}` : '';
+          const lvl = hovPart._level ? ` <span style="color:#ffdd44">★Ур.${hovPart._level}</span>` : '';
           const curse = hovPart._curse ? `<br><span style="color:#ff4444">↓ ${hovPart._curse.desc}</span>` : '';
           const bless = hovPart._bless ? `<br><span style="color:#ffdd44">↑ ${hovPart._bless.desc}</span>` : '';
+          // Build roll effects list
+          let rollHtml = '';
+          if (hovPart._roll) {
+            const r = hovPart._roll;
+            const rl = [];
+            if (r.damage    && r.damage    !== 1) { const p=Math.round((r.damage-1)*100);    if(p) rl.push(`<span style="color:${p>0?'#44ff88':'#ff6644'}">→ Урон ${p>0?'+':''}${p}%</span>`); }
+            if (r.fireRate  && r.fireRate  !== 1) { const p=Math.round((1-r.fireRate)*100);  if(p) rl.push(`<span style="color:${p>0?'#44ff88':'#ff6644'}">→ Скорость ${p>0?'+':''}${p}%</span>`); }
+            if (r.range     && r.range     !== 1) { const p=Math.round((r.range-1)*100);     if(p) rl.push(`<span style="color:${p>0?'#44ff88':'#ff6644'}">→ Дальность ${p>0?'+':''}${p}%</span>`); }
+            if (r.speedMult && r.speedMult !== 1) { const p=Math.round((r.speedMult-1)*100); if(p) rl.push(`<span style="color:${p>0?'#44ff88':'#ff6644'}">→ Скорость ${p>0?'+':''}${p}%</span>`); }
+            if (r.shieldHP  && r.shieldHP  !== 1) { const p=Math.round((r.shieldHP-1)*100);  if(p) rl.push(`<span style="color:${p>0?'#44ff88':'#ff6644'}">→ Щит ${p>0?'+':''}${p}%</span>`); }
+            if (r.sensorRange && r.sensorRange !== 1) { const p=Math.round((r.sensorRange-1)*100); if(p) rl.push(`<span style="color:${p>0?'#44ff88':'#ff6644'}">→ Обнаружение ${p>0?'+':''}${p}%</span>`); }
+            if (r.triggerRate && r.triggerRate !== 1) { const p=Math.round((1-r.triggerRate)*100); if(p) rl.push(`<span style="color:${p>0?'#44ff88':'#ff6644'}">→ Частота ${p>0?'+':''}${p}%</span>`); }
+            if (r.pierce)   rl.push(`<span style="color:#ff8844">→ БРОНЕБОЙНЫЙ</span>`);
+            if (r.burst)    rl.push(`<span style="color:#ffcc44">→ ОЧЕРЕДЬ×${r.burst}</span>`);
+            if (r.regen)    rl.push(`<span style="color:#44ff88">→ САМОРЕМОНТ</span>`);
+            if (r.reactive) rl.push(`<span style="color:#44ff88">→ РЕАКТИВНАЯ</span>`);
+            if (rl.length) rollHtml = '<br>' + rl.join('<br>');
+          }
           tip.style.display = 'block';
           tip.style.left = (Mouse.cx+14)+'px';
           tip.style.top  = (Mouse.cy-12)+'px';
-          tip.innerHTML = `<b style="color:${def.border}">${def.label}${lvl}</b><br>${def.desc}<br>
-            <span style="color:#888">${def.mass}кг · ${def.energy}Э · ПЗ:<span style="color:${hpColor}">${hovPart.hp}/${def.maxHP}</span></span>${curse}${bless}`;
+          tip.innerHTML = `<b style="color:${def.border}">${def.label}</b>${lvl}<br>${def.desc}<br>
+            <span style="color:#888">${def.mass}кг · ${def.energy}Э · ПЗ:<span style="color:${hpColor}">${clampedHP}/${def.maxHP}</span></span>${rollHtml}${curse}${bless}`;
           shown = true;
         }
       } else {
@@ -2339,7 +2358,7 @@ function updateLoot() {
 
     // HP bar of part (if worn)
     if (part.hp < def.maxHP) {
-      const hpFrac = part.hp / def.maxHP;
+      const hpFrac = Math.min(1, Math.max(0, part.hp / def.maxHP));
       const barW = cardW - 20;
       fillRect(cx2+10, statY+6, barW, 4, '#111');
       fillRect(cx2+10, statY+6, barW*hpFrac, 4, hpFrac>0.5?'#44ff88':hpFrac>0.25?'#ffcc00':'#ff3333');
@@ -3973,7 +3992,7 @@ function syncPartsWear() {
   if (!R.parts) return;
   for (const rp of R.parts) {
     const ap = Assembly.placed.find(p => p.id === rp.id);
-    if (ap) ap.hp = Math.ceil(rp.hp);
+    if (ap) ap.hp = Math.min(PART_DEFS[ap.type].maxHP, Math.max(0, Math.ceil(rp.hp)));
   }
 }
 
@@ -4810,17 +4829,27 @@ function upgradePart(placed, invIdx, fromPlaced=false, sacId=null) {
   const cost = fromPlaced ? 5 : 10; // cheaper if using placed duplicate
   if (Game.scrap < cost) return false;
   Game.scrap -= cost;
+
+  let sacRoll = null, sacLevel = 1;
   if (!fromPlaced) {
+    const sacPart = Game.inventory[invIdx];
+    if (sacPart) { sacRoll = sacPart._roll ? {...sacPart._roll} : null; sacLevel = sacPart._level || 1; }
     Game.inventory.splice(invIdx, 1);
   } else {
-    // Remove the sacrificed placed part
+    // Remove the sacrificed placed part; inherit its accumulated stats
     const sacIdx = Assembly.placed.findIndex(p => p.id === sacId);
-    if (sacIdx >= 0) Assembly.placed.splice(sacIdx, 1);
+    if (sacIdx >= 0) {
+      const sacPart = Assembly.placed[sacIdx];
+      sacRoll = sacPart._roll ? {...sacPart._roll} : null;
+      sacLevel = sacPart._level || 1;
+      Assembly.placed.splice(sacIdx, 1);
+    }
   }
-  placed._level = (placed._level || 1) + 1;
+  // Level = sum of both parts' levels (level 2 + level 3 = level 5)
+  placed._level = (placed._level || 1) + sacLevel;
   placed._roll = placed._roll || {};
   const def = PART_DEFS[placed.type];
-  // Slightly smaller effect when upgrading from placed+placed
+  // Slightly smaller new-upgrade effect when merging placed+placed
   const mult = fromPlaced ? 0.85 : 1.0;
   if (def.cat === 'weapon') {
     placed._roll.damage   = (placed._roll.damage   || 1) * (1 + 0.20*mult);
@@ -4837,6 +4866,24 @@ function upgradePart(placed, invIdx, fromPlaced=false, sacId=null) {
     placed.hp = Math.min(def.maxHP, placed.hp + Math.floor(def.maxHP * 0.30 * mult));
   }
   if (!fromPlaced) placed.hp = def.maxHP; // full restore only from inventory upgrade
+
+  // Inherit accumulated _roll stats from the sacrificed part (70% efficiency)
+  if (sacRoll) {
+    const eff = 0.70;
+    const r = placed._roll;
+    if (sacRoll.damage    && sacRoll.damage    !== 1) r.damage    = (r.damage    || 1) * (1 + (sacRoll.damage    - 1) * eff);
+    if (sacRoll.fireRate  && sacRoll.fireRate  !== 1) r.fireRate  = (r.fireRate  || 1) * (1 + (sacRoll.fireRate  - 1) * eff);
+    if (sacRoll.range     && sacRoll.range     !== 1) r.range     = (r.range     || 1) * (1 + (sacRoll.range     - 1) * eff);
+    if (sacRoll.speedMult && sacRoll.speedMult !== 1) r.speedMult = (r.speedMult || 1) * (1 + (sacRoll.speedMult - 1) * eff);
+    if (sacRoll.shieldHP  && sacRoll.shieldHP  !== 1) r.shieldHP  = (r.shieldHP  || 1) * (1 + (sacRoll.shieldHP  - 1) * eff);
+    if (sacRoll.sensorRange && sacRoll.sensorRange !== 1) r.sensorRange = (r.sensorRange || 1) * (1 + (sacRoll.sensorRange - 1) * eff);
+    if (sacRoll.triggerRate && sacRoll.triggerRate !== 1) r.triggerRate = (r.triggerRate || 1) * (1 + (sacRoll.triggerRate - 1) * eff);
+    if (sacRoll.pierce)  r.pierce  = true;
+    if (sacRoll.burst)   r.burst   = sacRoll.burst;
+    if (sacRoll.regen)   r.regen   = true;
+    if (sacRoll.reactive) r.reactive = true;
+  }
+
   recalcStats();
   return true;
 }
@@ -4950,7 +4997,7 @@ window.drawPlacedPart = function(part, alpha=1) {
   const { sx, sy } = gridToScreen(part.gx, part.gy);
   const pw = partW(part) * GRID_SIZE;
   const ph = partH(part) * GRID_SIZE;
-  const hpFrac = part.hp / def.maxHP;
+  const hpFrac = Math.min(1, Math.max(0, part.hp / def.maxHP));
 
   // The original drawPlacedPart already draws an HP bar.
   // Override it here with a cleaner version.
@@ -5116,6 +5163,7 @@ window.updateAssembly = function() {
         // Apply upgrade via updated upgradePart function
         upgradePart(placed, invIdx, fromPlaced, sacId);
         if (quirk) quirk.apply(placed);
+        delete placed._pendingQuirk; // unlock quirk after confirmed upgrade
         spawnParticles(
           Assembly.gridOriginX + (placed.gx + partW(placed)/2) * GRID_SIZE,
           Assembly.gridOriginY + (placed.gy + partH(placed)/2) * GRID_SIZE,
@@ -5123,6 +5171,8 @@ window.updateAssembly = function() {
         );
         _upgConfirm = null;
       } else if (isHover(cancelBx, cancelBy, btnW, btnH)) {
+        // Note: _pendingQuirk stays on placed — same quirk shows if clicked again
+        // To get different quirk, player must confirm the upgrade (no exploit possible)
         _upgConfirm = null;
       }
     }
@@ -5142,9 +5192,11 @@ window.updateAssembly = function() {
       if (gcx >= placed.gx && gcx < placed.gx + partW(placed) &&
           gcy >= placed.gy && gcy < placed.gy + partH(placed)) {
         const invPart = !fromPlaced ? Game.inventory[invIdx] : null;
-        const quirk = _rollUpgradeQuirk(PART_DEFS[placed.type]);
+        // Lock quirk on the placed part to prevent exploit (re-clicking to cycle quirks)
+        if (!placed._pendingQuirk) placed._pendingQuirk = _rollUpgradeQuirk(PART_DEFS[placed.type]);
+        const quirk = placed._pendingQuirk;
         _upgConfirm = { placed, invIdx, quirk, fromPlaced: !!fromPlaced, sacId: sacId||null,
-          previewLines: _upgradePreviewLines(placed, invPart, quirk) };
+          previewLines: _upgradePreviewLines(placed, invPart, quirk, !!fromPlaced) };
         break;
       }
     }
