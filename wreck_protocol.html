@@ -73,14 +73,26 @@ const ctx = canvas.getContext('2d');
 const W = 900, H = 650;
 canvas.width = W; canvas.height = H;
 
+// User-controlled zoom (Ctrl+scroll)
+let _userScale = 1.0;
+
 // Scale canvas to fit window while maintaining aspect ratio
 function resizeCanvas() {
-  const scale = Math.min(window.innerWidth / W, window.innerHeight / H) * 0.97;
+  const baseScale = Math.min(window.innerWidth / W, window.innerHeight / H);
+  const scale = baseScale * _userScale;
   canvas.style.width  = (W * scale) + 'px';
   canvas.style.height = (H * scale) + 'px';
 }
 resizeCanvas();
 window.addEventListener('resize', resizeCanvas);
+
+// Ctrl+scroll to zoom in/out
+window.addEventListener('wheel', e => {
+  if (!e.ctrlKey) return;
+  e.preventDefault();
+  _userScale = Math.max(0.4, Math.min(2.0, _userScale - e.deltaY * 0.0008));
+  resizeCanvas();
+}, { passive: false });
 
 // ═══════════════════════════════════════════════════════════
 //  GAME STATES
@@ -523,12 +535,7 @@ const PART_DEFS = {
   chassis: {
     label: 'ШАССИ', cat: 'chassis', color: '#2a4a2a', border: '#4eff91',
     w: 2, h: 2, mass: 4, energy: 0, maxHP: 60,
-    ports: [
-      { side:'top',    type:'OUT', ox: 0,  oy:-1 },
-      { side:'right',  type:'OUT', ox: 1,  oy: 0 },
-      { side:'bottom', type:'OUT', ox: 0,  oy: 1 },
-      { side:'left',   type:'OUT', ox:-1,  oy: 0 },
-    ],
+    ports: [],
     desc: 'Ядро робота. Уничтожат это — ты проиграл.',
     icon: '⬛',
   },
@@ -2265,9 +2272,8 @@ function prepLoot() {
   Loot.selected = [];
   Arena._droppedParts = [];
 
-  // Put back Assembly parts into inventory (they're on the placed grid, keep them there)
-  // Reset placement — robot HP is restored for next round
-  Assembly.placed.forEach(p => { p.hp = PART_DEFS[p.type].maxHP; });
+  // NOTE: Parts keep their worn HP between rounds — repair via shop or encounter.
+  // (HP is NOT reset here — wear persists as intended)
 }
 
 function updateLoot() {
@@ -2276,23 +2282,30 @@ function updateLoot() {
 
   // Title
   ctx.fillStyle = C.accent; ctx.font='bold 20px "Courier New",monospace'; ctx.textAlign='center';
-  ctx.fillText('ТРОФЕИ ВОЙНЫ', W/2, 35);
+  ctx.fillText('ТРОФЕИ ВОЙНЫ', W/2, 28);
   ctx.fillStyle = C.textDim; ctx.font='12px "Courier New",monospace';
-  ctx.fillText(`Выбери до ${Loot.maxPick} деталей · остальное уйдёт в металлолом`, W/2, 56);
+  ctx.fillText(`Выбери до ${Loot.maxPick} деталей · остальное уйдёт в металлолом`, W/2, 46);
   ctx.fillStyle = C.warn;
-  ctx.fillText(`МЕТАЛЛОЛОМ: ${Game.scrap}`, W/2, 72);
+  ctx.fillText(`МЕТАЛЛОЛОМ: ${Game.scrap}`, W/2, 62);
 
-  // Part cards in grid
-  const cols = 4, cardW = 180, cardH = 110;
-  const startX = W/2 - (cols*cardW + (cols-1)*12)/2;
-  const startY = 90;
+  // Part cards — fill the screen
+  const cols = 4;
+  const pad = 12;
+  const cardW = Math.floor((W - pad*2 - (cols-1)*10) / cols); // ~214px
+  const startX = pad;
+  const startY = 72;
+  const availH = H - startY - 80; // leave room for counter+button
+  const rows = Math.ceil(Loot.offered.length / cols);
+  const cardH = Math.floor((availH - (rows-1)*10) / rows);
+
+  const CAT_RU2 = {chassis:'ШАССИ',weapon:'ОРУЖИЕ',sensor:'СЕНСОР',movement:'ДВИЖЕНИЕ',armor:'БРОНЯ',utility:'УТИЛИТА'};
 
   Loot.offered.forEach((part, i) => {
     if (!part) return;
     const def = PART_DEFS[part.type];
     const col = i % cols, row = Math.floor(i / cols);
-    const cx2 = startX + col*(cardW+12);
-    const cy2 = startY + row*(cardH+12);
+    const cx2 = startX + col*(cardW+10);
+    const cy2 = startY + row*(cardH+10);
 
     const selected = Loot.selected.includes(part.id);
     const hov = isHover(cx2, cy2, cardW, cardH);
@@ -2304,38 +2317,45 @@ function updateLoot() {
 
     // Selected checkmark
     if (selected) {
-      ctx.fillStyle = C.accent; ctx.font='16px monospace'; ctx.textAlign='right';
-      ctx.fillText('✓', cx2+cardW-6, cy2+20);
+      ctx.fillStyle = C.accent; ctx.font='18px monospace'; ctx.textAlign='right';
+      ctx.fillText('✓', cx2+cardW-8, cy2+22);
     }
 
-    // Icon
-    ctx.font=`28px serif`; ctx.textAlign='left';
-    ctx.fillText(def.icon, cx2+8, cy2+38);
+    // Icon (larger)
+    ctx.font=`34px serif`; ctx.textAlign='left';
+    ctx.fillText(def.icon, cx2+10, cy2+42);
 
     // Name + cat
-    ctx.fillStyle = def.border; ctx.font='bold 11px "Courier New",monospace';
+    ctx.fillStyle = def.border; ctx.font='bold 13px "Courier New",monospace';
     ctx.textAlign='left';
-    ctx.fillText(def.label, cx2+44, cy2+22);
-    const CAT_RU2 = {chassis:'ШАССИ',weapon:'ОРУЖИЕ',sensor:'СЕНСОР',movement:'ДВИЖЕНИЕ',armor:'БРОНЯ',utility:'УТИЛИТА'};
-    ctx.fillStyle = C.textDim; ctx.font='9px "Courier New",monospace';
-    ctx.fillText(CAT_RU2[def.cat]||def.cat.toUpperCase(), cx2+44, cy2+34);
+    ctx.fillText(def.label, cx2+52, cy2+22);
+    ctx.fillStyle = C.textDim; ctx.font='10px "Courier New",monospace';
+    ctx.fillText(CAT_RU2[def.cat]||def.cat.toUpperCase(), cx2+52, cy2+36);
 
-    // Stats
-    ctx.fillStyle = C.text; ctx.font='10px "Courier New",monospace';
-    ctx.fillText(`${def.w}×${def.h}  ${def.mass}кг  ${def.energy>0?'-':'+'}${Math.abs(def.energy)}Э`, cx2+8, cy2+55);
-    ctx.fillText(`ПЗ: ${def.maxHP}`, cx2+8, cy2+68);
+    // Stats row
+    const statY = cy2+56;
+    ctx.fillStyle = C.text; ctx.font='11px "Courier New",monospace';
+    ctx.fillText(`${def.w}×${def.h}  ${def.mass}кг  ${def.energy>0?'-':'+'}${Math.abs(def.energy)}Э  ПЗ:${def.maxHP}`, cx2+10, statY);
 
-    // Desc
-    ctx.fillStyle = C.textDim; ctx.font='9px "Courier New",monospace';
-    const words = def.desc.split(' ');
-    let line='', ly=cy2+83;
-    const maxDescW = cardW - 16;
-    for (const w of words) {
+    // HP bar of part (if worn)
+    if (part.hp < def.maxHP) {
+      const hpFrac = part.hp / def.maxHP;
+      const barW = cardW - 20;
+      fillRect(cx2+10, statY+6, barW, 4, '#111');
+      fillRect(cx2+10, statY+6, barW*hpFrac, 4, hpFrac>0.5?'#44ff88':hpFrac>0.25?'#ffcc00':'#ff3333');
+    }
+
+    // Desc (word wrap, more room now)
+    ctx.fillStyle = C.textDim; ctx.font='11px "Courier New",monospace';
+    const descWords = def.desc.split(' ');
+    let line='', ly=cy2+76;
+    const maxDescW = cardW - 20;
+    for (const w of descWords) {
       const test = line ? line+' '+w : w;
-      if (ctx.measureText(test).width > maxDescW && line) { ctx.fillText(line, cx2+8, ly); line=w; ly+=11; }
+      if (ctx.measureText(test).width > maxDescW && line) { ctx.fillText(line, cx2+10, ly); line=w; ly+=14; }
       else line=test;
     }
-    ctx.fillText(line, cx2+8, ly);
+    ctx.fillText(line, cx2+10, ly);
 
     // Toggle selection
     if (isClick(cx2, cy2, cardW, cardH)) {
@@ -2347,21 +2367,17 @@ function updateLoot() {
     }
   });
 
-  // Counter
-  ctx.fillStyle = C.text; ctx.font='13px "Courier New",monospace'; ctx.textAlign='center';
-  ctx.fillText(`Выбрано: ${Loot.selected.length} / ${Loot.maxPick}`, W/2, H-60);
-
-  // Scrap value of unselected
+  // Counter + scrap
   const unselected = Loot.offered.filter(p => p && !Loot.selected.includes(p.id));
   const scrapVal = unselected.reduce((sum, p) => sum + PART_DEFS[p.type].mass*2, 0);
-  ctx.fillStyle = C.textDim; ctx.font='11px "Courier New",monospace';
-  ctx.fillText(`Отброшено → +${scrapVal} металлолома`, W/2, H-44);
+  ctx.fillStyle = C.text; ctx.font='13px "Courier New",monospace'; ctx.textAlign='center';
+  ctx.fillText(`Выбрано: ${Loot.selected.length} / ${Loot.maxPick}   ·   Отброшено → +${scrapVal} лома`, W/2, H-52);
 
   // Confirm button
-  const bx = W/2-110, by = H-34;
-  const hov = isHover(bx, by, 220, 28);
+  const bx = W/2-130, by = H-36;
+  const hov = isHover(bx, by, 260, 30);
   const nextLabel = Game.round > Game.maxRounds ? '[ ФИНАЛЬНАЯ ПОБЕДА ]' : `[ ПРОДОЛЖИТЬ → РАУНД ${Game.round} ]`;
-  drawButton(nextLabel, bx, by, 220, 28, hov);
+  drawButton(nextLabel, bx, by, 260, 30, hov);
 
   if (isClick(bx, by, 220, 28)) {
     // Add selected parts to inventory
@@ -3363,6 +3379,7 @@ const ENCOUNTERS=[
       {label:'Забрать детали (+ 2 случайных детали)',action:'take_parts'},
       {label:'Тщательно обыскать (+ 4 детали, +1 враг в след. раунде)',action:'search_deep'},
       {label:'Забрать металлолом (+ 25 лома)',action:'take_scrap'},
+      {label:'⚠ Войти в зону радиации (-30 ПЗ, + 4 редких детали)',action:'rad_zone'},
     ],
     color:'#ff8800',
   },
@@ -3374,6 +3391,7 @@ const ENCOUNTERS=[
       {label:'Купить деталь (-30 лома, + редкая деталь)',action:'buy_rare'},
       {label:'Обменять 2 детали на 3 случайных',action:'trade'},
       {label:'Ограбить (+ 40 лома, -20 ПЗ)',action:'rob'},
+      {label:'⚠ Купить "уценённую" деталь (-5 лома, деталь с проклятием)',action:'buy_cursed'},
     ],
     color:'#ffcc44',
   },
@@ -3384,6 +3402,7 @@ const ENCOUNTERS=[
     options:[
       {label:'Взломать до конца (+ мутация без экрана мутации)',action:'bonus_mutation'},
       {label:'Забрать как есть (+ 20 лома + 1 деталь)',action:'take_cache'},
+      {label:'⚠ Взломать силой (+ 2 редкие детали, случайная деталь сломана)',action:'force_crack'},
       {label:'Оставить — слишком подозрительно',action:'leave'},
     ],
     color:'#4488ff',
@@ -3396,8 +3415,31 @@ const ENCOUNTERS=[
       {label:'Починить весь робот (все детали → полное ПЗ)',action:'repair_full'},
       {label:'Зарядить и двигаться (+ 50 лома от экономии)',action:'charge_scrap'},
       {label:'Уничтожить станцию (+ мощная деталь)',action:'destroy_station'},
+      {label:'⚠ Перегрузить (+ 80 лома, случайная деталь уходит в 10% ПЗ)',action:'overcharge'},
     ],
     color:'#44ff88',
+  },
+  {
+    id:'ambush',
+    title:'💀 ЗАСАДА',
+    desc:'Ты попадаешь в ловушку. Выхода нет — нужно действовать.\nКаждый вариант несёт потери, но что-то можно спасти.',
+    options:[
+      {label:'Прорваться с боем (-25 ПЗ, + 30 лома за разрушенных врагов)',action:'fight_ambush'},
+      {label:'Откупиться (-40 лома, избежать урона)',action:'pay_ambush'},
+      {label:'⚠ Бросить всё и бежать (теряешь 2 детали из инвентаря)',action:'flee_ambush'},
+    ],
+    color:'#ff3333',
+  },
+  {
+    id:'glitch',
+    title:'⚡ СИСТЕМНЫЙ СБОЙ',
+    desc:'Твои системы дают сбой. Часть оборудования повреждена.\nНужно решить: тратить ресурсы на восстановление или двигаться дальше.',
+    options:[
+      {label:'Восстановить системы (-20 лома, починить случайную деталь)',action:'restore_sys'},
+      {label:'Игнорировать сбой (все детали теряют 25% ПЗ, +25 лома)',action:'ignore_glitch'},
+      {label:'Перезагрузка через пожертвование (уничтожить 1 деталь, починить остальные)',action:'sacrifice_part'},
+    ],
+    color:'#aa44ff',
   },
 ];
 
@@ -3451,6 +3493,74 @@ function applyEncounterAction(action){
     case 'charge_scrap': Game.scrap+=50; break;
     case 'destroy_station':
       Game.inventory.push(createPart(rareParts[Math.floor(Math.random()*rareParts.length)])); break;
+    case 'overcharge':{
+      Game.scrap+=80;
+      const nonChassis=Assembly.placed.filter(p=>p.type!=='chassis');
+      if(nonChassis.length){
+        const target=nonChassis[Math.floor(Math.random()*nonChassis.length)];
+        target.hp=Math.max(1,Math.floor(PART_DEFS[target.type].maxHP*0.1));
+      }
+    } break;
+    case 'rad_zone':
+      // Damage robot, give 4 rare parts
+      if(typeof damageRobot==='function') damageRobot(30);
+      else Assembly.placed.forEach(p=>{if(p.type==='chassis'){p.hp=Math.max(10,p.hp-30);}});
+      for(let i=0;i<4;i++) Game.inventory.push(createPart(rareParts[Math.floor(Math.random()*rareParts.length)]));
+      break;
+    case 'buy_cursed':{
+      if(Game.scrap>=5){
+        Game.scrap-=5;
+        const t=allParts[Math.floor(Math.random()*allParts.length)];
+        const cursedPart=createPart(t);
+        if(typeof CURSE_POOL!=='undefined')
+          cursedPart._curse=CURSE_POOL[Math.floor(Math.random()*CURSE_POOL.length)];
+        Game.inventory.push(cursedPart);
+      }
+    } break;
+    case 'force_crack':{
+      for(let i=0;i<2;i++) Game.inventory.push(createPart(rareParts[Math.floor(Math.random()*rareParts.length)]));
+      const nonChassis2=Assembly.placed.filter(p=>p.type!=='chassis');
+      if(nonChassis2.length){
+        const t=nonChassis2[Math.floor(Math.random()*nonChassis2.length)];
+        t.hp=Math.max(1,Math.floor(t.hp*0.3));
+      }
+    } break;
+    case 'fight_ambush':
+      if(typeof damageRobot==='function') damageRobot(25);
+      Game.scrap+=30;
+      break;
+    case 'pay_ambush':
+      Game.scrap=Math.max(0,Game.scrap-40); break;
+    case 'flee_ambush':
+      if(Game.inventory.length>=2) Game.inventory.splice(0,2);
+      else Game.inventory=[];
+      break;
+    case 'restore_sys':
+      if(Game.scrap>=20){
+        Game.scrap-=20;
+        const nonChassis3=Assembly.placed.filter(p=>p.type!=='chassis');
+        if(nonChassis3.length){
+          const t=nonChassis3[Math.floor(Math.random()*nonChassis3.length)];
+          t.hp=PART_DEFS[t.type].maxHP;
+        }
+      } break;
+    case 'ignore_glitch':
+      Assembly.placed.forEach(p=>{p.hp=Math.max(1,Math.floor(p.hp*0.75));});
+      Game.scrap+=25;
+      break;
+    case 'sacrifice_part':{
+      const nonChassis4=Assembly.placed.filter(p=>p.type!=='chassis');
+      if(nonChassis4.length){
+        // Remove the weakest part
+        nonChassis4.sort((a,b)=>a.hp-b.hp);
+        const sacrifice=nonChassis4[0];
+        const idx=Assembly.placed.indexOf(sacrifice);
+        if(idx>=0) Assembly.placed.splice(idx,1);
+        // Repair all others
+        Assembly.placed.forEach(p=>{p.hp=PART_DEFS[p.type].maxHP;});
+        recalcStats();
+      }
+    } break;
   }
 }
 
@@ -4035,16 +4145,20 @@ window.startArena = function() {
 const _roll_origUpdateLoot = window.updateLoot;
 window.updateLoot = function() {
   _roll_origUpdateLoot();
-  const cols = 4, cardW = 180, cardH = 110;
-  const startX = W/2 - (cols*cardW + (cols-1)*12)/2;
-  const startY = 90;
+  const cols = 4, pad = 12;
+  const cardW = Math.floor((W - pad*2 - (cols-1)*10) / cols);
+  const startX = pad;
+  const startY = 72;
+  const availH = H - startY - 80;
+  const rows = Math.ceil(Loot.offered.length / cols);
+  const cardH = Math.floor((availH - (rows-1)*10) / rows);
 
   Loot.offered.forEach((part, i) => {
     if (!part || !part._roll) return;
     const def = PART_DEFS[part.type];
     const col = i % cols, row = Math.floor(i / cols);
-    const cx2 = startX + col*(cardW+12) + 8;
-    const cy2 = startY + row*(cardH+12);
+    const cx2 = startX + col*(cardW+10) + 8;
+    const cy2 = startY + row*(cardH+10);
 
     const r = part._roll;
     const lines = [];
@@ -4056,8 +4170,8 @@ window.updateLoot = function() {
     lines.forEach((line, li) => {
       const isGood = !line.includes('-');
       ctx.fillStyle = isGood ? '#44ff88' : '#ff6644';
-      ctx.font = 'bold 8px "Courier New",monospace'; ctx.textAlign = 'left';
-      ctx.fillText(line, cx2, cy2 + cardH - 26 + li * 10);
+      ctx.font = 'bold 9px "Courier New",monospace'; ctx.textAlign = 'left';
+      ctx.fillText(line, cx2, cy2 + cardH - 30 + li * 12);
     });
   });
 };
@@ -4400,33 +4514,38 @@ window.startArena = function() {
 const _curse_origUpdateLoot = window.updateLoot;
 window.updateLoot = function() {
   _curse_origUpdateLoot();
-  // Re-draw badges on top of each card
-  const cols = 4, cardW = 180, cardH = 110;
-  const startX = W/2 - (cols*cardW + (cols-1)*12)/2;
-  const startY = 90;
+  // Re-draw badges on top of each card — match updateLoot layout
+  const cols = 4, pad = 12;
+  const cardW = Math.floor((W - pad*2 - (cols-1)*10) / cols);
+  const startX = pad;
+  const startY = 72;
+  const availH = H - startY - 80;
+  const rows = Math.ceil(Loot.offered.length / cols);
+  const cardH = Math.floor((availH - (rows-1)*10) / rows);
   Loot.offered.forEach((part, i) => {
     if (!part) return;
     const col = i % cols, row = Math.floor(i / cols);
-    const cx2 = startX + col*(cardW+12);
-    const cy2 = startY + row*(cardH+12);
+    const cx2 = startX + col*(cardW+10);
+    const cy2 = startY + row*(cardH+10);
 
     if (part._curse) {
       // Red curse badge top-right
-      fillRect(cx2+cardW-90, cy2, 90, 18, '#2a0808');
-      ctx.fillStyle = '#ff4444'; ctx.font = 'bold 10px "Courier New",monospace'; ctx.textAlign = 'center';
-      ctx.fillText(part._curse.badge, cx2+cardW-45, cy2+13);
-      // Penalty text under description
-      ctx.fillStyle = '#cc2222'; ctx.font = '9px "Courier New",monospace'; ctx.textAlign = 'left';
-      ctx.fillText('↓ ' + part._curse.desc, cx2+8, cy2+cardH-4);
+      fillRect(cx2+cardW-100, cy2, 100, 20, '#2a0808');
+      ctx.fillStyle = '#ff4444'; ctx.font = 'bold 11px "Courier New",monospace'; ctx.textAlign = 'center';
+      ctx.fillText(part._curse.badge, cx2+cardW-50, cy2+14);
+      // Penalty text bottom
+      ctx.fillStyle = '#cc2222'; ctx.font = '10px "Courier New",monospace'; ctx.textAlign = 'left';
+      ctx.fillText('↓ ' + part._curse.desc, cx2+10, cy2+cardH-6);
     }
     if (part._bless) {
-      // Gold bless badge top-left (or shift if curse present)
+      // Gold bless badge
       const bx2 = cx2;
-      fillRect(bx2, cy2 + (part._curse ? 19 : 0), 88, 18, '#1a1a00');
-      ctx.fillStyle = '#ffdd44'; ctx.font = 'bold 10px "Courier New",monospace'; ctx.textAlign = 'center';
-      ctx.fillText(part._bless.badge, bx2+44, cy2+(part._curse?32:13));
-      ctx.fillStyle = '#aaaa00'; ctx.font = '9px "Courier New",monospace'; ctx.textAlign = 'left';
-      ctx.fillText('↑ ' + part._bless.desc, cx2+8, cy2+cardH-14);
+      const blessOffY = part._curse ? 22 : 0;
+      fillRect(bx2, cy2 + blessOffY, 96, 20, '#1a1a00');
+      ctx.fillStyle = '#ffdd44'; ctx.font = 'bold 11px "Courier New",monospace'; ctx.textAlign = 'center';
+      ctx.fillText(part._bless.badge, bx2+48, cy2+blessOffY+14);
+      ctx.fillStyle = '#aaaa00'; ctx.font = '10px "Courier New",monospace'; ctx.textAlign = 'left';
+      ctx.fillText('↑ ' + part._bless.desc, cx2+10, cy2+cardH-(part._curse?20:6));
     }
   });
 };
@@ -4622,37 +4741,56 @@ console.log('[WRECK PROTOCOL] Challenge system loaded.');
 // ═══════════════════════════════════════════════════════════
 //  PART UPGRADES — merge 2 same-type parts for a stronger one
 // ═══════════════════════════════════════════════════════════
+// Returns upgradeable pairs: { placed, invIdx, fromPlaced(bool), sacId(if fromPlaced) }
 function findUpgradeable() {
   const result = [];
   for (const p of Assembly.placed) {
     if (p.type === 'chassis') continue;
+    // Option 1: duplicate in inventory
     const dupIdx = (Game.inventory || []).findIndex(inv => inv && inv.type === p.type);
-    if (dupIdx >= 0) result.push({ placed: p, invIdx: dupIdx });
+    if (dupIdx >= 0) result.push({ placed: p, invIdx: dupIdx, fromPlaced: false });
+    else {
+      // Option 2: another copy placed on grid (pick first duplicate found)
+      const dupPlaced = Assembly.placed.find(other => other.id !== p.id && other.type === p.type && other.type !== 'chassis');
+      if (dupPlaced && !result.some(r => r.sacId === dupPlaced.id || r.placed.id === dupPlaced.id)) {
+        result.push({ placed: p, invIdx: -1, fromPlaced: true, sacId: dupPlaced.id });
+      }
+    }
   }
   return result;
 }
 
-function upgradePart(placed, invIdx) {
-  const cost = 15;
+function upgradePart(placed, invIdx, fromPlaced=false, sacId=null) {
+  const cost = fromPlaced ? 5 : 10; // cheaper if using placed duplicate
   if (Game.scrap < cost) return false;
   Game.scrap -= cost;
-  Game.inventory.splice(invIdx, 1);
+  if (!fromPlaced) {
+    Game.inventory.splice(invIdx, 1);
+  } else {
+    // Remove the sacrificed placed part
+    const sacIdx = Assembly.placed.findIndex(p => p.id === sacId);
+    if (sacIdx >= 0) Assembly.placed.splice(sacIdx, 1);
+  }
   placed._level = (placed._level || 1) + 1;
   placed._roll = placed._roll || {};
   const def = PART_DEFS[placed.type];
+  // Slightly smaller effect when upgrading from placed+placed
+  const mult = fromPlaced ? 0.85 : 1.0;
   if (def.cat === 'weapon') {
-    placed._roll.damage   = (placed._roll.damage   || 1) * 1.25;
-    placed._roll.fireRate = (placed._roll.fireRate  || 1) * 0.88; // faster
-    placed._roll.range    = (placed._roll.range     || 1) * 1.10;
+    placed._roll.damage   = (placed._roll.damage   || 1) * (1 + 0.20*mult);
+    placed._roll.fireRate = (placed._roll.fireRate  || 1) * (1 - 0.10*mult);
+    placed._roll.range    = (placed._roll.range     || 1) * (1 + 0.08*mult);
   } else if (def.cat === 'movement') {
-    placed._roll.speedMult = (placed._roll.speedMult || 1) * 1.18;
+    placed._roll.speedMult = (placed._roll.speedMult || 1) * (1 + 0.15*mult);
   } else if (def.cat === 'utility') {
-    placed._roll.shieldHP  = (placed._roll.shieldHP  || 1) * 1.25;
+    placed._roll.shieldHP  = (placed._roll.shieldHP  || 1) * (1 + 0.20*mult);
   } else if (def.cat === 'sensor') {
-    placed._roll.sensorRange = (placed._roll.sensorRange || 1) * 1.20;
-    placed._roll.triggerRate = (placed._roll.triggerRate || 1) * 0.85;
+    placed._roll.sensorRange = (placed._roll.sensorRange || 1) * (1 + 0.15*mult);
+    placed._roll.triggerRate = (placed._roll.triggerRate || 1) * (1 - 0.12*mult);
+  } else if (def.cat === 'armor') {
+    placed.hp = Math.min(def.maxHP, placed.hp + Math.floor(def.maxHP * 0.30 * mult));
   }
-  placed.hp = def.maxHP; // restore HP on upgrade
+  if (!fromPlaced) placed.hp = def.maxHP; // full restore only from inventory upgrade
   recalcStats();
   return true;
 }
@@ -4670,13 +4808,15 @@ window.updateAssembly = function() {
   const gx = Assembly.gridOriginX;
   const bw = GRID_COLS * GRID_SIZE;
   const by2 = H - 82;
+  const fromPlacedCount = upgradeable.filter(u => u.fromPlaced).length;
+  const fromInvCount = upgradeable.filter(u => !u.fromPlaced).length;
 
   fillRect(gx, by2, bw, 32, '#0a0f0a');
   strokeRect(gx, by2, bw, 32, '#2a5a2a', 1);
   ctx.fillStyle = '#4eff91'; ctx.font = 'bold 10px "Courier New",monospace'; ctx.textAlign = 'left';
-  ctx.fillText(`⇧ СЛИЯНИЕ ДОСТУПНО: ${upgradeable.length} деталей`, gx+8, by2+13);
+  ctx.fillText(`⇧ СЛИЯНИЕ: ${fromInvCount > 0 ? fromInvCount + ' из инвентаря (-10 лома)' : ''}${fromInvCount && fromPlacedCount ? '  ·  ' : ''}${fromPlacedCount > 0 ? fromPlacedCount + ' внутри поля (-5 лома)' : ''}`, gx+8, by2+13);
   ctx.fillStyle = '#336633'; ctx.font = '9px "Courier New",monospace';
-  ctx.fillText('Кликни на деталь для предпросмотра улучшения (15 лома)', gx+8, by2+25);
+  ctx.fillText('Кликни на деталь на поле для апгрейда', gx+8, by2+25);
 };
 
 // ── Show level badge on placed parts in grid
@@ -4757,6 +4897,7 @@ console.log('[WRECK PROTOCOL] Part upgrades + unique property display loaded.');
 //  TASK 1: PART WEAR VISUALIZATION
 //  Enhance drawPlacedPart: bigger HP bar, damage tint, cracks
 // ═══════════════════════════════════════════════════════════
+// Part 9 wear visualization: simplified — only clean green HP bar, no tint/cracks
 const _p9_origDrawPlaced = window.drawPlacedPart;
 window.drawPlacedPart = function(part, alpha=1) {
   const def = PART_DEFS[part.type];
@@ -4765,54 +4906,20 @@ window.drawPlacedPart = function(part, alpha=1) {
   const ph = partH(part) * GRID_SIZE;
   const hpFrac = part.hp / def.maxHP;
 
-  // Call original rendering
+  // The original drawPlacedPart already draws an HP bar.
+  // Override it here with a cleaner version.
   _p9_origDrawPlaced(part, alpha);
 
-  if (hpFrac >= 1) return; // pristine — no wear overlay
+  if (hpFrac >= 1) return; // pristine — nothing extra
 
+  // Overwrite the original HP bar with a better one
   ctx.save();
   ctx.globalAlpha = alpha;
-
-  // Damage tint overlay: red at low HP
-  const tintAlpha = (1 - hpFrac) * 0.30;
-  ctx.globalAlpha = alpha * tintAlpha;
-  ctx.fillStyle = hpFrac < 0.35 ? '#ff2200' : '#ff8800';
-  ctx.fillRect(sx+1, sy+1, pw-2, ph-2);
-
-  // Crack marks at < 50% HP
-  if (hpFrac < 0.50) {
-    ctx.globalAlpha = alpha * 0.55;
-    ctx.strokeStyle = '#ff4400';
-    ctx.lineWidth = 1;
-    const seed = (part.id || 0) % 7;
-    // 2-3 diagonal cracks based on part id for visual variety
-    const cracks = hpFrac < 0.25 ? 3 : 2;
-    for (let c = 0; c < cracks; c++) {
-      const fx = sx + (0.25 + ((seed + c * 3) % 5) * 0.14) * pw;
-      const fy = sy + (0.20 + ((seed + c * 2) % 4) * 0.18) * ph;
-      ctx.beginPath();
-      ctx.moveTo(fx, fy);
-      ctx.lineTo(fx + (c % 2 === 0 ? 1 : -1) * pw * 0.18, fy + ph * 0.22);
-      ctx.stroke();
-    }
-  }
-
-  // Bigger HP bar (5px) with glow at critical
-  ctx.globalAlpha = alpha;
   const barW = pw - 8;
-  const barColor = hpFrac > 0.5 ? '#44ff88' : hpFrac > 0.25 ? '#ffcc00' : '#ff3333';
+  // Background
   fillRect(sx+4, sy+ph-7, barW, 5, '#111');
-  fillRect(sx+4, sy+ph-7, Math.max(2, barW * hpFrac), 5, barColor);
-
-  // HP% text on part when worn > 20%
-  if (hpFrac < 0.80) {
-    ctx.fillStyle = hpFrac < 0.35 ? '#ff4444' : '#ffaa44';
-    ctx.font = 'bold 8px "Courier New",monospace';
-    ctx.textAlign = 'center';
-    ctx.globalAlpha = alpha * 0.9;
-    ctx.fillText(Math.round(hpFrac * 100) + '%', sx + pw/2, sy + ph - 10);
-  }
-
+  // Green bar — always green, size shows remaining HP
+  fillRect(sx+4, sy+ph-7, Math.max(2, barW * hpFrac), 5, '#44ff88');
   ctx.restore();
 };
 
@@ -4821,27 +4928,31 @@ window.drawPlacedPart = function(part, alpha=1) {
 //  Random quirks (positive + negative), confirmation overlay
 // ═══════════════════════════════════════════════════════════
 
-// Possible quirks per category — {id, label, color, apply(placed)}
+// Possible quirks per category — {id, label, desc, color, apply(placed)}
 const UPGRADE_QUIRKS = {
   weapon: [
-    { id:'w_pierce',  label:'БРОНЕБОЙНЫЙ',   color:'#ff8844', good:true,  apply: p => { p._roll.pierce = true; } },
-    { id:'w_burst',   label:'ОЧЕРЕДЬ×2',      color:'#ffcc44', good:true,  apply: p => { p._roll.burst = 2; } },
-    { id:'w_overheat',label:'ПЕРЕГРЕВ',        color:'#ff4444', good:false, apply: p => { p._roll.fireRate = (p._roll.fireRate||1) * 1.40; } },
-    { id:'w_fragile', label:'ХРУПКОЕ',         color:'#ff4444', good:false, apply: p => { p.hp = Math.max(5, Math.floor(p.hp * 0.6)); } },
-    { id:'w_accurate',label:'ТОЧНОЕ',          color:'#44ff88', good:true,  apply: p => { p._roll.range = (p._roll.range||1) * 1.20; } },
+    { id:'w_pierce',  label:'БРОНЕБОЙНЫЙ',   desc:'Пули пробивают броню: +15% урона по бронированным целям', color:'#ff8844', good:true,  apply: p => { p._roll.pierce = true; } },
+    { id:'w_burst',   label:'ОЧЕРЕДЬ×2',      desc:'Каждый 2-й выстрел даёт дополнительный снаряд', color:'#ffcc44', good:true,  apply: p => { p._roll.burst = 2; } },
+    { id:'w_overheat',label:'ПЕРЕГРЕВ',        desc:'Скорострельность -40% из-за перегрева', color:'#ff4444', good:false, apply: p => { p._roll.fireRate = (p._roll.fireRate||1) * 1.40; } },
+    { id:'w_fragile', label:'ХРУПКОЕ',         desc:'ПЗ детали уменьшается на 40% — ломается быстрее', color:'#ff4444', good:false, apply: p => { p.hp = Math.max(5, Math.floor(p.hp * 0.6)); } },
+    { id:'w_accurate',label:'ТОЧНОЕ',          desc:'Дальность стрельбы +20%', color:'#44ff88', good:true,  apply: p => { p._roll.range = (p._roll.range||1) * 1.20; } },
   ],
   movement: [
-    { id:'m_sprint',  label:'СПРИНТ',          color:'#44ff88', good:true,  apply: p => { p._roll.speedMult = (p._roll.speedMult||1) * 1.15; } },
-    { id:'m_heavy',   label:'ТЯЖЁЛОЕ',         color:'#ff4444', good:false, apply: p => { p._roll.speedMult = (p._roll.speedMult||1) * 0.85; } },
-    { id:'m_nimble',  label:'ЮРКОЕ',           color:'#44ff88', good:true,  apply: p => { p._roll.speedMult = (p._roll.speedMult||1) * 1.10; } },
+    { id:'m_sprint',  label:'СПРИНТ',          desc:'Скорость +15% из-за улучшенных приводов', color:'#44ff88', good:true,  apply: p => { p._roll.speedMult = (p._roll.speedMult||1) * 1.15; } },
+    { id:'m_heavy',   label:'ТЯЖЁЛОЕ',         desc:'Скорость -15% — детали стали тяжелее при слиянии', color:'#ff4444', good:false, apply: p => { p._roll.speedMult = (p._roll.speedMult||1) * 0.85; } },
+    { id:'m_nimble',  label:'ЮРКОЕ',           desc:'Скорость +10%, повороты более отзывчивые', color:'#44ff88', good:true,  apply: p => { p._roll.speedMult = (p._roll.speedMult||1) * 1.10; } },
   ],
   sensor: [
-    { id:'s_wide',    label:'ШИРОКИЙ ОБЗОР',   color:'#44aaff', good:true,  apply: p => { p._roll.sensorRange = (p._roll.sensorRange||1) * 1.30; } },
-    { id:'s_delay',   label:'ЗАДЕРЖКА',         color:'#ff4444', good:false, apply: p => { p._roll.triggerRate = (p._roll.triggerRate||1) * 1.25; } },
+    { id:'s_wide',    label:'ШИРОКИЙ ОБЗОР',   desc:'Радиус обнаружения +30%', color:'#44aaff', good:true,  apply: p => { p._roll.sensorRange = (p._roll.sensorRange||1) * 1.30; } },
+    { id:'s_delay',   label:'ЗАДЕРЖКА',         desc:'Частота срабатывания -25% из-за помех', color:'#ff4444', good:false, apply: p => { p._roll.triggerRate = (p._roll.triggerRate||1) * 1.25; } },
   ],
   utility: [
-    { id:'u_regen',   label:'САМОРЕМОНТ',       color:'#44ff88', good:true,  apply: p => { p._roll.regen = true; } },
-    { id:'u_drain',   label:'ЭНЕРГОЗАТРАТНОЕ',  color:'#ff4444', good:false, apply: p => { p._roll.extraEnergy = (p._roll.extraEnergy||0) + 1; } },
+    { id:'u_regen',   label:'САМОРЕМОНТ',       desc:'Деталь медленно регенерирует ПЗ между боями', color:'#44ff88', good:true,  apply: p => { p._roll.regen = true; } },
+    { id:'u_drain',   label:'ЭНЕРГОЗАТРАТНОЕ',  desc:'Потребление энергии +1 единица', color:'#ff4444', good:false, apply: p => { p._roll.extraEnergy = (p._roll.extraEnergy||0) + 1; } },
+  ],
+  armor: [
+    { id:'a_reactive',label:'РЕАКТИВНАЯ',       desc:'При ударе отталкивает вражеские снаряды', color:'#44ff88', good:true,  apply: p => { p._roll.reactive = true; } },
+    { id:'a_brittle', label:'ХРУПКАЯ',          desc:'ПЗ -30% — слияние нарушило структуру', color:'#ff4444', good:false, apply: p => { p.hp = Math.max(5, Math.floor(p.hp * 0.7)); } },
   ],
 };
 
@@ -4854,27 +4965,33 @@ function _rollUpgradeQuirk(def) {
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
-function _upgradePreviewLines(placed, invPart, quirk) {
+function _upgradePreviewLines(placed, invPart, quirk, fromPlaced=false) {
   const def = PART_DEFS[placed.type];
   const roll = placed._roll || {};
   const lines = [];
+  const mult = fromPlaced ? 0.85 : 1.0;
   if (def.cat === 'weapon') {
-    const dmgPct = Math.round(((roll.damage || 1) * 1.25 - 1) * 100);
-    lines.push({ text: `Урон: +25% (итого +${dmgPct}%)`, color: '#44ff88' });
-    const frPct = Math.round((1 - (roll.fireRate || 1) * 0.88) * 100);
-    lines.push({ text: `Скорострельность: +${frPct}%`, color: '#44ff88' });
+    const dmgBoost = Math.round(0.20 * mult * 100);
+    lines.push({ text: `Урон: +${dmgBoost}%`, color: '#44ff88' });
+    const frBoost = Math.round(0.10 * mult * 100);
+    lines.push({ text: `Скорострельность: +${frBoost}%`, color: '#44ff88' });
   } else if (def.cat === 'movement') {
-    const sPct = Math.round(((roll.speedMult || 1) * 1.18 - 1) * 100);
-    lines.push({ text: `Скорость: +18% (итого +${sPct}%)`, color: '#44ff88' });
+    const sBoost = Math.round(0.15 * mult * 100);
+    lines.push({ text: `Скорость: +${sBoost}%`, color: '#44ff88' });
   } else if (def.cat === 'utility') {
-    const shPct = Math.round(((roll.shieldHP || 1) * 1.25 - 1) * 100);
-    lines.push({ text: `Щит: +25% (итого +${shPct}%)`, color: '#44ff88' });
+    const shBoost = Math.round(0.20 * mult * 100);
+    lines.push({ text: `Щит: +${shBoost}%`, color: '#44ff88' });
   } else if (def.cat === 'sensor') {
-    lines.push({ text: 'Дальность сенсора: +20%', color: '#44ff88' });
+    const srBoost = Math.round(0.15 * mult * 100);
+    lines.push({ text: `Дальность сенсора: +${srBoost}%`, color: '#44ff88' });
+  } else if (def.cat === 'armor') {
+    const hpBoost = Math.round(def.maxHP * 0.30 * mult);
+    lines.push({ text: `ПЗ детали: +${hpBoost}`, color: '#44ff88' });
   }
-  lines.push({ text: 'ПЗ: полное восстановление', color: '#44ff88' });
-  if (quirk) {
-    lines.push({ text: `Квирк: ${quirk.label}`, color: quirk.good ? '#ffdd44' : '#ff6644' });
+  if (!fromPlaced) {
+    lines.push({ text: 'ПЗ: полное восстановление', color: '#44ff88' });
+  } else {
+    lines.push({ text: '(слияние из поля: ПЗ не восстанавливается)', color: '#888888' });
   }
   return lines;
 }
@@ -4886,63 +5003,67 @@ window.updateAssembly = function() {
 
   // Draw confirmation overlay if active
   if (_upgConfirm) {
-    const { placed, invIdx, quirk, previewLines } = _upgConfirm;
+    const { placed, invIdx, quirk, previewLines, fromPlaced, sacId } = _upgConfirm;
     const def = PART_DEFS[placed.type];
-    const ox = W/2 - 200, oy = H/2 - 150, ow = 400, oh = 300;
+    const upgCost = fromPlaced ? 5 : 10;
+    const ox = W/2 - 220, oy = H/2 - 170, ow = 440, oh = 340;
     fillRect(ox, oy, ow, oh, '#050f05');
     strokeRect(ox, oy, ow, oh, '#4eff91', 2);
 
     ctx.fillStyle = '#4eff91'; ctx.font = 'bold 14px "Courier New",monospace'; ctx.textAlign = 'center';
     ctx.fillText(`⇧ СЛИЯНИЕ: ${def.label}`, W/2, oy + 24);
-    ctx.fillStyle = '#888'; ctx.font = '10px "Courier New",monospace';
-    ctx.fillText('Стоимость: 15 металлолома', W/2, oy + 42);
+    ctx.fillStyle = '#888'; ctx.font = '11px "Courier New",monospace';
+    const srcLabel = fromPlaced ? 'Источник: дублирующая деталь на поле' : 'Источник: деталь из инвентаря';
+    ctx.fillText(`${srcLabel}  ·  Стоимость: ${upgCost} лома`, W/2, oy + 42);
 
+    // Divider
+    ctx.strokeStyle = '#1a3a1a'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(ox+10, oy+50); ctx.lineTo(ox+ow-10, oy+50); ctx.stroke();
+
+    // Preview lines
     previewLines.forEach((ln, i) => {
-      ctx.fillStyle = ln.color; ctx.font = '11px "Courier New",monospace'; ctx.textAlign = 'left';
-      ctx.fillText(ln.text, ox + 20, oy + 66 + i * 18);
+      ctx.fillStyle = ln.color; ctx.font = '12px "Courier New",monospace'; ctx.textAlign = 'left';
+      ctx.fillText(ln.text, ox + 20, oy + 68 + i * 20);
     });
 
-    const canAfford = Game.scrap >= 15;
-    const confirmBx = ox + 20, confirmBy = oy + oh - 56;
-    const cancelBx  = ox + ow/2 + 10, cancelBy = oy + oh - 56;
-    const btnW = ow/2 - 30, btnH = 32;
+    // Quirk box (detailed)
+    if (quirk) {
+      const qy = oy + 68 + previewLines.length * 20 + 8;
+      fillRect(ox + 10, qy, ow - 20, 52, quirk.good ? '#0a1f0a' : '#1f0a0a');
+      strokeRect(ox + 10, qy, ow - 20, 52, quirk.color, 1);
+      ctx.fillStyle = quirk.color; ctx.font = 'bold 12px "Courier New",monospace'; ctx.textAlign = 'left';
+      ctx.fillText(`КВИРК: ${quirk.label}`, ox + 18, qy + 16);
+      ctx.fillStyle = quirk.good ? '#aaffaa' : '#ffaaaa';
+      ctx.font = '11px "Courier New",monospace';
+      ctx.fillText(quirk.desc, ox + 18, qy + 34);
+      ctx.fillStyle = quirk.good ? '#44ff88' : '#ff6644';
+      ctx.font = '10px "Courier New",monospace'; ctx.textAlign = 'right';
+      ctx.fillText(quirk.good ? '✓ положительный' : '✗ отрицательный', ox + ow - 18, qy + 48);
+    }
+
+    const canAfford = Game.scrap >= upgCost;
+    const confirmBx = ox + 20, confirmBy = oy + oh - 50;
+    const cancelBx  = ox + ow/2 + 10, cancelBy = oy + oh - 50;
+    const btnW = ow/2 - 30, btnH = 34;
 
     const hovC = isHover(confirmBx, confirmBy, btnW, btnH);
     fillRect(confirmBx, confirmBy, btnW, btnH, canAfford && hovC ? '#0f3a0f' : '#0a0f0a');
     strokeRect(confirmBx, confirmBy, btnW, btnH, canAfford ? '#4eff91' : '#333', 1);
     ctx.fillStyle = canAfford ? '#4eff91' : '#336633';
-    ctx.font = 'bold 11px "Courier New",monospace'; ctx.textAlign = 'center';
-    ctx.fillText(canAfford ? '[ УЛУЧШИТЬ ]' : '[ НЕТ ЛОМА ]', confirmBx + btnW/2, confirmBy + 20);
+    ctx.font = 'bold 12px "Courier New",monospace'; ctx.textAlign = 'center';
+    ctx.fillText(canAfford ? `[ УЛУЧШИТЬ (-${upgCost} лома) ]` : `[ НЕТ ЛОМА (нужно ${upgCost}) ]`, confirmBx + btnW/2, confirmBy + 22);
 
     const hovX = isHover(cancelBx, cancelBy, btnW, btnH);
     fillRect(cancelBx, cancelBy, btnW, btnH, hovX ? '#1a0a0a' : '#0a0a0a');
     strokeRect(cancelBx, cancelBy, btnW, btnH, '#663333', 1);
-    ctx.fillStyle = '#cc4444'; ctx.font = 'bold 11px "Courier New",monospace'; ctx.textAlign = 'center';
-    ctx.fillText('[ ОТМЕНА ]', cancelBx + btnW/2, cancelBy + 20);
+    ctx.fillStyle = '#cc4444'; ctx.font = 'bold 12px "Courier New",monospace'; ctx.textAlign = 'center';
+    ctx.fillText('[ ОТМЕНА ]', cancelBx + btnW/2, cancelBy + 22);
 
     if (Mouse.clicked) {
       if (isHover(confirmBx, confirmBy, btnW, btnH) && canAfford) {
-        // Apply upgrade
-        Game.scrap -= 15;
-        Game.inventory.splice(invIdx, 1);
-        placed._level = (placed._level || 1) + 1;
-        placed._roll = placed._roll || {};
-        const ddef = PART_DEFS[placed.type];
-        if (ddef.cat === 'weapon') {
-          placed._roll.damage   = (placed._roll.damage   || 1) * 1.25;
-          placed._roll.fireRate = (placed._roll.fireRate  || 1) * 0.88;
-          placed._roll.range    = (placed._roll.range     || 1) * 1.10;
-        } else if (ddef.cat === 'movement') {
-          placed._roll.speedMult = (placed._roll.speedMult || 1) * 1.18;
-        } else if (ddef.cat === 'utility') {
-          placed._roll.shieldHP  = (placed._roll.shieldHP  || 1) * 1.25;
-        } else if (ddef.cat === 'sensor') {
-          placed._roll.sensorRange = (placed._roll.sensorRange || 1) * 1.20;
-          placed._roll.triggerRate = (placed._roll.triggerRate || 1) * 0.85;
-        }
-        placed.hp = ddef.maxHP; // restore HP
+        // Apply upgrade via updated upgradePart function
+        upgradePart(placed, invIdx, fromPlaced, sacId);
         if (quirk) quirk.apply(placed);
-        recalcStats();
         spawnParticles(
           Assembly.gridOriginX + (placed.gx + partW(placed)/2) * GRID_SIZE,
           Assembly.gridOriginY + (placed.gy + partH(placed)/2) * GRID_SIZE,
@@ -4964,12 +5085,14 @@ window.updateAssembly = function() {
     const gox = Assembly.gridOriginX, goy = Assembly.gridOriginY;
     const gcx = Math.floor((mx - gox) / GRID_SIZE);
     const gcy = Math.floor((my - goy) / GRID_SIZE);
-    for (const { placed, invIdx } of upgradeable) {
+    for (const upg of upgradeable) {
+      const { placed, invIdx, fromPlaced, sacId } = upg;
       if (gcx >= placed.gx && gcx < placed.gx + partW(placed) &&
           gcy >= placed.gy && gcy < placed.gy + partH(placed)) {
-        const invPart = Game.inventory[invIdx];
+        const invPart = !fromPlaced ? Game.inventory[invIdx] : null;
         const quirk = _rollUpgradeQuirk(PART_DEFS[placed.type]);
-        _upgConfirm = { placed, invIdx, quirk, previewLines: _upgradePreviewLines(placed, invPart, quirk) };
+        _upgConfirm = { placed, invIdx, quirk, fromPlaced: !!fromPlaced, sacId: sacId||null,
+          previewLines: _upgradePreviewLines(placed, invPart, quirk) };
         break;
       }
     }
@@ -5090,6 +5213,208 @@ if (_p9_origDrawEnd) {
 }
 
 console.log('[WRECK PROTOCOL] Part 9: wear vis + upgrade redesign + wire hints + font overlay loaded.');
+</script>
+
+<!-- PART 10: BALANCE DISPLAY + ENEMY SCALING + PART DEATH + MINOR REPAIR -->
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════════════════════
+//  TASK 9: ASSEMBLY BALANCE BAR
+//  Show mass / energy / HP / scrap prominently above grid
+// ═══════════════════════════════════════════════════════════
+const _p10_origUpdateAssembly = window.updateAssembly;
+window.updateAssembly = function() {
+  _p10_origUpdateAssembly();
+
+  const gx = Assembly.gridOriginX;
+  const gw = GRID_COLS * GRID_SIZE;
+  const gy = Assembly.gridOriginY;
+
+  // Total HP of all placed parts
+  const totalHP = Assembly.placed.reduce((s, p) => s + Math.ceil(p.hp), 0);
+  const totalHPMax = Assembly.placed.reduce((s, p) => s + PART_DEFS[p.type].maxHP, 0);
+
+  // Draw balance bar ABOVE the grid
+  const barY = gy - 24;
+  const barH = 20;
+  fillRect(gx, barY, gw, barH, '#050f05');
+  strokeRect(gx, barY, gw, barH, '#1a3a1a', 1);
+
+  const energyOver = Assembly.usedEnergy > Assembly.totalEnergy;
+  const massHeavy = Assembly.totalMass > 20;
+
+  ctx.font = 'bold 11px "Courier New",monospace'; ctx.textAlign = 'left';
+  const gap = Math.floor(gw / 4);
+
+  ctx.fillStyle = massHeavy ? C.warn : '#88cc88';
+  ctx.fillText(`⚖ ${Assembly.totalMass}кг${massHeavy?' ⚠':''}`, gx+6, barY+14);
+
+  ctx.fillStyle = energyOver ? C.danger : '#88cc88';
+  ctx.fillText(`⚡ ${Assembly.usedEnergy}/${Assembly.totalEnergy}Э${energyOver?' ⚠':''}`, gx+gap+6, barY+14);
+
+  const hpColor = totalHP < totalHPMax * 0.4 ? C.danger : totalHP < totalHPMax * 0.7 ? C.warn : '#44ff88';
+  ctx.fillStyle = hpColor;
+  ctx.fillText(`❤ ${totalHP}/${totalHPMax}ПЗ`, gx+gap*2+6, barY+14);
+
+  ctx.fillStyle = C.warn;
+  ctx.fillText(`💰 ${Game.scrap} лома`, gx+gap*3+6, barY+14);
+};
+
+// ═══════════════════════════════════════════════════════════
+//  TASK 7: MINOR REPAIR — any inventory part → small repair
+//  Right-click on inventory item while hovering a placed part
+//  to sacrifice the inventory item for a small HP restore
+// ═══════════════════════════════════════════════════════════
+// We add a "РЕМОНТ" button in the upgrade hint area when:
+// - an inventory part is selected (right-clicked)
+// - hovering a worn placed part on grid
+// Simpler: add a scrap-shop button "Пожертвовать деталь → ремонт"
+// that removes first inventory item and heals 20% HP on most damaged part
+
+let _minorRepairHint = false;
+
+const _p10_origUpdateAssembly2 = window.updateAssembly;
+window.updateAssembly = function() {
+  _p10_origUpdateAssembly2();
+
+  if (Game.inventory && Game.inventory.length > 0) {
+    const wornParts = Assembly.placed.filter(p => p.hp < PART_DEFS[p.type].maxHP * 0.99);
+    if (wornParts.length > 0) {
+      // Show minor repair option below shop
+      const bx = Assembly.gridOriginX + GRID_COLS * GRID_SIZE + 16 + 4;
+      const bw = W - bx - 12;
+      const by = H - 205;
+      const hov = isHover(bx, by, bw, 26);
+
+      fillRect(bx, by, bw, 26, hov ? '#0a1a0a' : '#060e06');
+      strokeRect(bx, by, bw, 26, '#1a3a1a', 1);
+      ctx.fillStyle = hov ? '#44ff88' : '#336633';
+      ctx.font = '10px "Courier New",monospace'; ctx.textAlign = 'left';
+      ctx.fillText('🔧 ПОЖЕРТВОВАТЬ ДЕТАЛЬ → МЕЛКИЙ РЕМОНТ', bx+6, by+10);
+      ctx.fillStyle = '#2a4a2a'; ctx.font = '9px "Courier New",monospace';
+      ctx.fillText('Самая поврежд. деталь +20% ПЗ, бесплатно', bx+6, by+22);
+
+      if (hov && Mouse.clicked) {
+        // Remove first non-null inventory item
+        const invIdx = Game.inventory.findIndex(p => p != null);
+        if (invIdx >= 0) {
+          Game.inventory.splice(invIdx, 1);
+          // Repair most damaged part
+          wornParts.sort((a, b) => (a.hp/PART_DEFS[a.type].maxHP) - (b.hp/PART_DEFS[b.type].maxHP));
+          const target = wornParts[0];
+          const repairAmt = Math.floor(PART_DEFS[target.type].maxHP * 0.20);
+          target.hp = Math.min(PART_DEFS[target.type].maxHP, target.hp + repairAmt);
+          spawnParticles(
+            Assembly.gridOriginX + (target.gx + partW(target)/2) * GRID_SIZE,
+            Assembly.gridOriginY + (target.gy + partH(target)/2) * GRID_SIZE,
+            '#44ff88', 10, 3, 25
+          );
+        }
+      }
+    }
+  }
+};
+
+// ═══════════════════════════════════════════════════════════
+//  TASK 8 FIX: PART DEATH IN COMBAT
+//  When a part reaches 0 HP during arena, it is destroyed
+//  and removed from the robot (effects disabled)
+// ═══════════════════════════════════════════════════════════
+const _p10_origDamageRobot = window.damageRobot;
+window.damageRobot = function(dmg) {
+  _p10_origDamageRobot(dmg);
+  const R = Arena.robot;
+  if (!R.parts) return;
+
+  // Check for destroyed parts
+  let anyDestroyed = false;
+  for (let i = R.parts.length - 1; i >= 0; i--) {
+    const p = R.parts[i];
+    if (p.hp > 0) continue;
+    const def = PART_DEFS[p.type];
+
+    if (p.type === 'chassis') {
+      // Chassis destroyed = instant game over
+      Arena.result = 'lose';
+      return;
+    }
+
+    // Remove weapon if this was a weapon
+    const wIdx = R.weapons.findIndex(w => w.partId === p.id);
+    if (wIdx >= 0) R.weapons.splice(wIdx, 1);
+
+    // Remove sensor
+    const sIdx = R.sensors.findIndex(s => s.partId === p.id);
+    if (sIdx >= 0) R.sensors.splice(sIdx, 1);
+
+    // Remove part
+    R.parts.splice(i, 1);
+    anyDestroyed = true;
+
+    // Visual feedback
+    if (def) {
+      const partScreenX = R.x + (Math.random()-0.5)*R.radius;
+      const partScreenY = R.y + (Math.random()-0.5)*R.radius;
+      spawnParticles(partScreenX, partScreenY, def.border || '#ff4444', 14, 4, 40);
+      triggerFlash('#ff8800', 10);
+    }
+  }
+
+  // Recalculate robot radius if parts changed
+  if (anyDestroyed) {
+    R.radius = Math.max(14, 14 + Math.sqrt(R.parts.length) * 5);
+    updateHUD();
+  }
+};
+
+// ═══════════════════════════════════════════════════════════
+//  TASK 10: ENEMY SCALING BY ROBOT POWER
+//  Enemies get stronger based on the robot's total power score
+// ═══════════════════════════════════════════════════════════
+function calcRobotPowerScore() {
+  const placed = Assembly.placed;
+  if (!placed || placed.length === 0) return 1;
+
+  let score = 0;
+  for (const p of placed) {
+    const def = PART_DEFS[p.type];
+    // Weapons contribute by damage
+    if (def.cat === 'weapon') score += (def.damage || 10) * 0.5;
+    // HP contributes directly
+    score += (def.maxHP || 10) * 0.05;
+    // Movement adds some
+    if (def.cat === 'movement') score += 10;
+    // Upgrades boost score
+    if (p._level) score += (p._level - 1) * 15;
+  }
+  // Normalize: base robot (chassis + gun + wheel) scores ~30
+  return Math.max(1, score / 30);
+}
+
+const _p10_origSpawnEnemies = window.spawnEnemiesForRound;
+window.spawnEnemiesForRound = function(round) {
+  const enemies = _p10_origSpawnEnemies(round);
+  const robotPower = calcRobotPowerScore();
+  // Blend: 70% round-based, 30% power-based — prevents runaway scaling
+  const powerBonus = Math.max(0, (robotPower - 1) * 0.3);
+  const roundScale = 1 + (round - 1) * 0.18;
+  const finalScale = roundScale + powerBonus;
+
+  for (const e of enemies) {
+    if (!e._scaledByPower) {
+      // Apply extra power scaling (round scaling already applied in original spawn)
+      const extraMult = finalScale / roundScale; // just the power bonus part
+      e.hp    = Math.ceil(e.hp * extraMult);
+      e.maxHP = e.hp;
+      e.damage = Math.ceil(e.damage * Math.sqrt(extraMult)); // damage scales slower
+      e._scaledByPower = true;
+    }
+  }
+  return enemies;
+};
+
+console.log('[WRECK PROTOCOL] Part 10: balance bar + enemy scaling + part death + minor repair loaded.');
 </script>
 
 </body>
