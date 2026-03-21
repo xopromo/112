@@ -14,7 +14,7 @@ indicator("MA Slope [USE]", shorttitle="MA_SLOPE", overlay=true, max_lines_count
 grp_ma = "📈 MA НАСТРОЙКИ"
 ma_type     = input.string("EMA", "Тип МА", options=["SMA","EMA","WMA","HMA"], group=grp_ma)
 ma_len      = input.int(20, "Период МА", minval=5, maxval=500, group=grp_ma)
-min_slope   = input.float(0.0001, "Мин. наклон (фильтр шума)", minval=0.0, step=0.00001, tooltip="Нулевой = любое изменение MA засчитывается как сигнал", group=grp_ma)
+min_slope   = input.float(0.0001, "Мин. наклон (фильтр шума)", minval=0.0, step=0.00001, tooltip="Относительный % изменения МА за 1 бар (0.0001 = 0.01%). Нулевой = любое изменение MA засчитывается как сигнал", group=grp_ma)
 
 grp_tp = "🎯 ТЕЙК-ПРОФИТ (slope/spread)"
 slope_lb    = input.int(3, "Lookback замедления slope (баров)", minval=1, maxval=20, tooltip="TP срабатывает когда slope[0] < slope[N] — скорость роста МА упала за N баров", group=grp_tp)
@@ -55,8 +55,8 @@ get_ma(src, len, t) =>
 ma_val  = get_ma(close, ma_len, ma_type)
 atr14   = ta.atr(14)
 
-// Slope: скорость изменения МА за 1 бар
-slope = ma_val - ma_val[1]
+// Slope: относительная скорость изменения МА (% за бар)
+slope = ma_val[1] != 0 ? (ma_val - ma_val[1]) / ma_val[1] : 0.0
 
 // Spread: насколько цена "убежала" от МА (%)
 spread = (close - ma_val) / ma_val * 100.0
