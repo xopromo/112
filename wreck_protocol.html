@@ -678,8 +678,8 @@ const PART_DEFS = {
     label: 'ЩИТ-ГЕНЕРАТОР', cat: 'utility', color: '#1a2a3a', border: '#4488ff',
     w: 1, h: 1, mass: 2, energy: 2, maxHP: 15,
     shieldHP: 40, shieldRegen: 0.3,
-    ports: [{ side:'left', type:'IN', ox:-1, oy:0 }],
-    desc: 'Генерирует щит с авторегенерацией.',
+    ports: [],
+    desc: 'Генерирует щит с авторегенерацией. Вместе с Батареей → синергия СИЛОВОЙ ЩИТ.',
     icon: '💠',
   },
 };
@@ -3932,18 +3932,39 @@ console.log('[WRECK PROTOCOL] Font settings + mutation history loaded.');
 //  Worn parts give reduced performance; repair costs scrap
 // ═══════════════════════════════════════════════════════════
 
-// Override damageRobot to also wear a random part
+// Override damageRobot to also wear parts (priority: armor/shield > others > chassis last)
 const _wear_origDmgRobot = window.damageRobot;
 window.damageRobot = function(dmg) {
   _wear_origDmgRobot(dmg);
   const R = Arena.robot;
   if (!R.parts || R.parts.length === 0) return;
-  // Pick a random non-chassis part; distribute 30% of damage as wear
-  const wearable = R.parts.filter(p => p.type !== 'chassis');
-  if (wearable.length === 0) return;
-  const target = wearable[Math.floor(Math.random() * wearable.length)];
-  const wear = dmg * 0.30;
-  target.hp = Math.max(0, target.hp - wear);
+
+  // Build weighted pool: armor/shield_gen = weight 4, chassis = weight 0.1 (only if alone)
+  // Everything else = weight 1
+  const nonChassis = R.parts.filter(p => p.type !== 'chassis' && p.hp > 0);
+  const chassis    = R.parts.find(p => p.type === 'chassis');
+
+  let pool;
+  if (nonChassis.length > 0) {
+    // Prefer non-chassis parts; armor/shield much more likely to wear
+    pool = [];
+    for (const p of nonChassis) {
+      const def = PART_DEFS[p.type];
+      const w = (def.cat === 'armor' || p.type === 'shield_gen') ? 4 : 1;
+      for (let i = 0; i < w; i++) pool.push(p);
+    }
+  } else if (chassis && chassis.hp > 0) {
+    // Only chassis remains — it takes wear
+    pool = [chassis];
+  } else {
+    return;
+  }
+
+  const target = pool[Math.floor(Math.random() * pool.length)];
+  const def = PART_DEFS[target.type];
+  // Armor/shield absorb more wear per hit; others take less
+  const wearFactor = (def.cat === 'armor' || target.type === 'shield_gen') ? 0.35 : 0.15;
+  target.hp = Math.max(0, target.hp - dmg * wearFactor);
 };
 
 // After arena (win or lose): sync R.parts hp back to Assembly.placed
@@ -4043,24 +4064,41 @@ console.log('[WRECK PROTOCOL] Part wear system loaded.');
 // ═══════════════════════════════════════════════════════════
 const _pause_origUpdateArena = window.updateArena;
 window.updateArena = function() {
-  // Intercept win condition: insert collect timer
-  const wasNoResult = !Arena.result;
-  const noEnemies   = Arena.enemies && Arena.enemies.length === 0;
+  // Run the original first (handles movement, bullets, enemies, pickups, etc.)
+  _pause_origUpdateArena();
 
-  if (wasNoResult && noEnemies) {
-    // Start collect timer on first detection
+  // Intercept: if original just set 'win' because enemies are gone,
+  // override with collect timer so player has 3 seconds to pick up drops.
+  const noEnemies = Arena.enemies && Arena.enemies.length === 0;
+  if (noEnemies && Arena.result === 'win' && !Arena._collectTimerDone) {
+    // Start countdown on first trigger
     if (!Arena._collectTimer) {
       Arena._collectTimer = 180; // 3 seconds at 60fps
       spawnParticles(Arena.arenaW/2, Arena.arenaY + Arena.arenaH/2, '#4eff91', 20, 4, 60);
     }
     Arena._collectTimer--;
     if (Arena._collectTimer <= 0) {
+      Arena._collectTimerDone = true;
       Arena._collectTimer = 0;
-      Arena.result = 'win';
+      // Auto-collect remaining part pickups so nothing is lost
+      if (Arena.pickups) {
+        for (let i = Arena.pickups.length - 1; i >= 0; i--) {
+          const pk = Arena.pickups[i];
+          if (pk.type === 'scrap') {
+            Game.scrap += pk.value;
+          } else if (pk.type === 'part') {
+            Arena._droppedParts = Arena._droppedParts || [];
+            Arena._droppedParts.push(createPart(pk.partType));
+          }
+          Arena.pickups.splice(i, 1);
+        }
+      }
+      // Let the win stand — result stays 'win'
+    } else {
+      // Suppress win: keep arena running so player can collect
+      Arena.result = null;
     }
   }
-
-  _pause_origUpdateArena();
 
   // Collect timer overlay (shown while counting down)
   if (!Arena.result && Arena._collectTimer > 0) {
@@ -4084,6 +4122,7 @@ window.updateArena = function() {
 const _pause_origStartArena = window.startArena;
 window.startArena = function() {
   Arena._collectTimer = 0;
+  Arena._collectTimerDone = false;
   _pause_origStartArena();
 };
 
@@ -4162,16 +4201,17 @@ window.updateLoot = function() {
 
     const r = part._roll;
     const lines = [];
-    if (r.damage)     { const pct = Math.round((r.damage-1)*100); lines.push(`урон ${pct>0?'+':''}${pct}%`); }
-    if (r.fireRate)   { const pct = Math.round((r.fireRate-1)*100); lines.push(`скорость ${pct>0?'+':''}${pct}%`); }
-    if (r.speedMult)  { const pct = Math.round((r.speedMult-1)*100); lines.push(`скорость ${pct>0?'+':''}${pct}%`); }
-    if (r.sensorRange){ const pct = Math.round((r.sensorRange-1)*100); lines.push(`обнаружение ${pct>0?'+':''}${pct}%`); }
+    if (r.damage)     { const pct = Math.round((r.damage-1)*100);     if (pct !== 0) lines.push(`урон ${pct>0?'+':''}${pct}%`); }
+    if (r.fireRate)   { const pct = Math.round((r.fireRate-1)*100);   if (pct !== 0) lines.push(`скорость ${pct>0?'+':''}${pct}%`); }
+    if (r.speedMult)  { const pct = Math.round((r.speedMult-1)*100);  if (pct !== 0) lines.push(`скорость ${pct>0?'+':''}${pct}%`); }
+    if (r.sensorRange){ const pct = Math.round((r.sensorRange-1)*100);if (pct !== 0) lines.push(`обнаруж. ${pct>0?'+':''}${pct}%`); }
 
+    // Draw stat lines at bottom-left, avoid overlapping right-side badges
     lines.forEach((line, li) => {
       const isGood = !line.includes('-');
       ctx.fillStyle = isGood ? '#44ff88' : '#ff6644';
       ctx.font = 'bold 9px "Courier New",monospace'; ctx.textAlign = 'left';
-      ctx.fillText(line, cx2, cy2 + cardH - 30 + li * 12);
+      ctx.fillText(line, cx2 + 4, cy2 + cardH - 8 - (lines.length - 1 - li) * 12);
     });
   });
 };
@@ -4460,7 +4500,7 @@ const BLESS_POOL = [
   { id:'b_sharp',   badge:'★ ОСТРАЯ',   desc:'Урон +20%',      bonus: R => { R.weapons.forEach(w => { w.def = {...w.def, damage: Math.round(w.def.damage * 1.2)}; }); } },
   { id:'b_swift',   badge:'★ БЫСТРАЯ',  desc:'Скорость +20%',  bonus: R => { R.speed *= 1.2; } },
   { id:'b_tough',   badge:'★ ПРОЧНАЯ',  desc:'ПЗ +40',         bonus: R => { R.maxHP += 40; R.hp += 40; } },
-  { id:'b_regen',   badge:'★ ЖИВАЯ',    desc:'Реген 0.1/фр',   bonus: R => { R._regenRate = (R._regenRate||0) + 0.1; } },
+  { id:'b_regen',   badge:'★ ЖИВАЯ',    desc:'+0.1 ПЗ/кадр роботу в бою (≈6/сек)',   bonus: R => { R._regenRate = (R._regenRate||0) + 0.1; } },
 ];
 
 // ── Inject curse/bless into loot (override prepLoot)
@@ -4528,24 +4568,30 @@ window.updateLoot = function() {
     const cx2 = startX + col*(cardW+10);
     const cy2 = startY + row*(cardH+10);
 
+    // All badges on the right side; stack from top
+    let badgeOffY = 0;
     if (part._curse) {
-      // Red curse badge top-right
-      fillRect(cx2+cardW-100, cy2, 100, 20, '#2a0808');
-      ctx.fillStyle = '#ff4444'; ctx.font = 'bold 11px "Courier New",monospace'; ctx.textAlign = 'center';
-      ctx.fillText(part._curse.badge, cx2+cardW-50, cy2+14);
-      // Penalty text bottom
-      ctx.fillStyle = '#cc2222'; ctx.font = '10px "Courier New",monospace'; ctx.textAlign = 'left';
-      ctx.fillText('↓ ' + part._curse.desc, cx2+10, cy2+cardH-6);
+      // Red curse badge — top right
+      fillRect(cx2+cardW-104, cy2 + badgeOffY, 104, 20, '#2a0808');
+      ctx.fillStyle = '#ff4444'; ctx.font = 'bold 10px "Courier New",monospace'; ctx.textAlign = 'right';
+      ctx.fillText(part._curse.badge, cx2+cardW-4, cy2 + badgeOffY + 14);
+      badgeOffY += 22;
+      // Penalty desc line below badge
+      fillRect(cx2+cardW-104, cy2 + badgeOffY, 104, 16, '#1a0000');
+      ctx.fillStyle = '#cc2222'; ctx.font = '9px "Courier New",monospace'; ctx.textAlign = 'right';
+      ctx.fillText('↓ ' + part._curse.desc, cx2+cardW-4, cy2 + badgeOffY + 11);
+      badgeOffY += 18;
     }
     if (part._bless) {
-      // Gold bless badge
-      const bx2 = cx2;
-      const blessOffY = part._curse ? 22 : 0;
-      fillRect(bx2, cy2 + blessOffY, 96, 20, '#1a1a00');
-      ctx.fillStyle = '#ffdd44'; ctx.font = 'bold 11px "Courier New",monospace'; ctx.textAlign = 'center';
-      ctx.fillText(part._bless.badge, bx2+48, cy2+blessOffY+14);
-      ctx.fillStyle = '#aaaa00'; ctx.font = '10px "Courier New",monospace'; ctx.textAlign = 'left';
-      ctx.fillText('↑ ' + part._bless.desc, cx2+10, cy2+cardH-(part._curse?20:6));
+      // Gold bless badge — right, below curse if present
+      fillRect(cx2+cardW-104, cy2 + badgeOffY, 104, 20, '#1a1a00');
+      ctx.fillStyle = '#ffdd44'; ctx.font = 'bold 10px "Courier New",monospace'; ctx.textAlign = 'right';
+      ctx.fillText(part._bless.badge, cx2+cardW-4, cy2 + badgeOffY + 14);
+      badgeOffY += 22;
+      // Bonus desc line below badge
+      fillRect(cx2+cardW-104, cy2 + badgeOffY, 104, 16, '#0d0d00');
+      ctx.fillStyle = '#aaaa00'; ctx.font = '9px "Courier New",monospace'; ctx.textAlign = 'right';
+      ctx.fillText('↑ ' + part._bless.desc, cx2+cardW-4, cy2 + badgeOffY + 11);
     }
   });
 };
@@ -4982,8 +5028,14 @@ function _upgradePreviewLines(placed, invPart, quirk, fromPlaced=false) {
     const shBoost = Math.round(0.20 * mult * 100);
     lines.push({ text: `Щит: +${shBoost}%`, color: '#44ff88' });
   } else if (def.cat === 'sensor') {
-    const srBoost = Math.round(0.15 * mult * 100);
-    lines.push({ text: `Дальность сенсора: +${srBoost}%`, color: '#44ff88' });
+    if (def.timerRate) {
+      // Timer parts: boost frequency (fire rate), not range
+      const trBoost = Math.round(0.25 * mult * 100);
+      lines.push({ text: `Частота срабатывания: +${trBoost}%`, color: '#44ff88' });
+    } else {
+      const srBoost = Math.round(0.15 * mult * 100);
+      lines.push({ text: `Дальность сенсора: +${srBoost}%`, color: '#44ff88' });
+    }
   } else if (def.cat === 'armor') {
     const hpBoost = Math.round(def.maxHP * 0.30 * mult);
     lines.push({ text: `ПЗ детали: +${hpBoost}`, color: '#44ff88' });
