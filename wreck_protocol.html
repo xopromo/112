@@ -3861,6 +3861,147 @@ window.updateAssembly = function() {
 console.log('[WRECK PROTOCOL] Part wear system loaded.');
 </script>
 
+<!-- PART 8d: POST-ROUND COLLECT PAUSE + RANDOM PART STATS -->
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════════════════════
+//  POST-ROUND COLLECT PAUSE — 3 seconds to pick up parts
+// ═══════════════════════════════════════════════════════════
+const _pause_origUpdateArena = window.updateArena;
+window.updateArena = function() {
+  // Intercept win condition: insert collect timer
+  const wasNoResult = !Arena.result;
+  const noEnemies   = Arena.enemies && Arena.enemies.length === 0;
+
+  if (wasNoResult && noEnemies) {
+    // Start collect timer on first detection
+    if (!Arena._collectTimer) {
+      Arena._collectTimer = 180; // 3 seconds at 60fps
+      spawnParticles(Arena.arenaW/2, Arena.arenaY + Arena.arenaH/2, '#4eff91', 20, 4, 60);
+    }
+    Arena._collectTimer--;
+    if (Arena._collectTimer <= 0) {
+      Arena._collectTimer = 0;
+      Arena.result = 'win';
+    }
+  }
+
+  _pause_origUpdateArena();
+
+  // Collect timer overlay (shown while counting down)
+  if (!Arena.result && Arena._collectTimer > 0) {
+    const sec = Math.ceil(Arena._collectTimer / 60);
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.fillRect(0, Arena.arenaY, Arena.arenaW, 24);
+    ctx.fillStyle = '#4eff91'; ctx.font = 'bold 13px "Courier New",monospace'; ctx.textAlign = 'center';
+    ctx.fillText(`✓ ПОБЕДА! Собери детали... ${sec}`, Arena.arenaW / 2, Arena.arenaY + 16);
+    // Pulse ring on remaining pickups
+    if (Arena.pickups) {
+      Arena.pickups.forEach(p => {
+        const pulse = Math.sin(Arena.frame * 0.2) * 4 + 12;
+        ctx.strokeStyle = '#ffcc44'; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.arc(p.x, p.y, pulse, 0, Math.PI*2); ctx.stroke();
+      });
+    }
+  }
+};
+
+// Reset collect timer when new arena starts
+const _pause_origStartArena = window.startArena;
+window.startArena = function() {
+  Arena._collectTimer = 0;
+  _pause_origStartArena();
+};
+
+// ═══════════════════════════════════════════════════════════
+//  RANDOM PART STATS — each part gets ±15% stat variation
+// ═══════════════════════════════════════════════════════════
+const _origCreatePart = window.createPart;
+window.createPart = function(type, rot) {
+  const part = _origCreatePart(type, rot);
+  if (!part) return part;
+  const def = PART_DEFS[type];
+  if (!def) return part;
+
+  // Only roll stats for meaningful categories
+  if (def.cat === 'chassis' || def.cat === 'armor') return part; // no interesting stats
+
+  // Roll ±15% on key stats
+  const roll = (range) => 1 + (Math.random() * 2 - 1) * range;
+  const r = {};
+  if (def.cat === 'weapon') {
+    r.damage   = Math.round(roll(0.20) * 10) / 10; // ±20%
+    r.fireRate = Math.round(roll(0.15) * 10) / 10; // ±15% (inverse: higher = slower)
+    r.range    = Math.round(roll(0.10) * 10) / 10; // ±10%
+  } else if (def.cat === 'movement') {
+    r.speedMult = Math.round(roll(0.15) * 10) / 10; // ±15%
+  } else if (def.cat === 'sensor') {
+    r.sensorRange = Math.round(roll(0.15) * 10) / 10;
+  } else if (def.cat === 'utility') {
+    r.shieldHP = Math.round(roll(0.20) * 10) / 10;
+  }
+  part._roll = r;
+  return part;
+};
+
+// Apply roll in startArena (after R.weapons etc are built)
+const _roll_origStartArena = window.startArena;
+window.startArena = function() {
+  _roll_origStartArena();
+  const R = Arena.robot;
+  // Apply weapon rolls
+  for (const w of R.weapons) {
+    const placed = R.parts.find(p => p.id === w.partId);
+    if (!placed || !placed._roll) continue;
+    const r = placed._roll;
+    w.def = { ...w.def };
+    if (r.damage)   w.def.damage   = Math.round(w.def.damage * r.damage);
+    if (r.fireRate) w.def.fireRate  = Math.round(w.def.fireRate * r.fireRate);
+    if (r.range)    w.def.range     = Math.round(w.def.range * r.range);
+  }
+  // Apply movement roll
+  for (const p of R.parts) {
+    const def = PART_DEFS[p.type];
+    if (!p._roll || def.cat !== 'movement') continue;
+    R.speed *= (p._roll.speedMult || 1);
+  }
+};
+
+// Show roll badge on loot cards (overlay after curse/bless layer)
+const _roll_origUpdateLoot = window.updateLoot;
+window.updateLoot = function() {
+  _roll_origUpdateLoot();
+  const cols = 4, cardW = 180, cardH = 110;
+  const startX = W/2 - (cols*cardW + (cols-1)*12)/2;
+  const startY = 90;
+
+  Loot.offered.forEach((part, i) => {
+    if (!part || !part._roll) return;
+    const def = PART_DEFS[part.type];
+    const col = i % cols, row = Math.floor(i / cols);
+    const cx2 = startX + col*(cardW+12) + 8;
+    const cy2 = startY + row*(cardH+12);
+
+    const r = part._roll;
+    const lines = [];
+    if (r.damage)     { const pct = Math.round((r.damage-1)*100); lines.push(`урон ${pct>0?'+':''}${pct}%`); }
+    if (r.fireRate)   { const pct = Math.round((r.fireRate-1)*100); lines.push(`скорость ${pct>0?'+':''}${pct}%`); }
+    if (r.speedMult)  { const pct = Math.round((r.speedMult-1)*100); lines.push(`скорость ${pct>0?'+':''}${pct}%`); }
+    if (r.sensorRange){ const pct = Math.round((r.sensorRange-1)*100); lines.push(`обнаружение ${pct>0?'+':''}${pct}%`); }
+
+    lines.forEach((line, li) => {
+      const isGood = !line.includes('-');
+      ctx.fillStyle = isGood ? '#44ff88' : '#ff6644';
+      ctx.font = 'bold 8px "Courier New",monospace'; ctx.textAlign = 'left';
+      ctx.fillText(line, cx2, cy2 + cardH - 26 + li * 10);
+    });
+  });
+};
+
+console.log('[WRECK PROTOCOL] Post-round pause + random part stats loaded.');
+</script>
+
 <!-- PART 7a: SYNERGY SYSTEM -->
 <script>
 'use strict';
