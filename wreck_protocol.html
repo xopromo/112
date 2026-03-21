@@ -3575,6 +3575,181 @@ window.updateHUD = function() {
 console.log('[WRECK PROTOCOL] Performance + capacity display loaded.');
 </script>
 
+<!-- PART 8b: FONT SETTINGS + MUTATION/BONUS HISTORY -->
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════════════════════
+//  FONT SETTINGS — stored in localStorage, applied globally
+// ═══════════════════════════════════════════════════════════
+const FONT_FAMILIES = [
+  { id: 'courier',  label: 'Courier New',  css: '"Courier New",monospace' },
+  { id: 'mono',     label: 'Monospace',    css: 'monospace' },
+  { id: 'system',   label: 'Системный',    css: 'system-ui,sans-serif' },
+  { id: 'arial',    label: 'Arial',        css: 'Arial,sans-serif' },
+];
+
+const FONT_CFG_KEY = 'wreck_font_v1';
+function fontCfgLoad() {
+  try { const r = localStorage.getItem(FONT_CFG_KEY); if (r) return JSON.parse(r); } catch(e) {}
+  return { family: 'courier', scale: 1.0, bold: false };
+}
+function fontCfgSave(cfg) {
+  try { localStorage.setItem(FONT_CFG_KEY, JSON.stringify(cfg)); } catch(e) {}
+}
+let FontCfg = fontCfgLoad();
+
+// Apply font config: patch ctx.font property to intercept all font assignments
+(function() {
+  const proto = CanvasRenderingContext2D.prototype;
+  let _fontVal = '10px monospace';
+  const _origDesc = Object.getOwnPropertyDescriptor(proto, 'font');
+  Object.defineProperty(proto, 'font', {
+    set(v) {
+      // Replace font family and apply scale/bold
+      const fam = FONT_FAMILIES.find(f => f.id === FontCfg.family) || FONT_FAMILIES[0];
+      let patched = v
+        .replace(/"Courier New",monospace/g, fam.css)
+        .replace(/'Courier New',monospace/g, fam.css)
+        .replace(/Courier New/g, fam.css);
+
+      // Scale font size
+      if (FontCfg.scale !== 1.0) {
+        patched = patched.replace(/(\d+(?:\.\d+)?)px/g, (m, n) =>
+          Math.round(parseFloat(n) * FontCfg.scale) + 'px');
+      }
+      // Bold override
+      if (FontCfg.bold && !patched.startsWith('bold')) {
+        patched = 'bold ' + patched;
+      }
+      _fontVal = patched;
+      _origDesc.set.call(this, patched);
+    },
+    get() { return _fontVal; },
+    configurable: true
+  });
+})();
+
+// ── Font settings screen (STATE reuse: show over menu)
+let _showFontSettings = false;
+
+function drawFontSettings() {
+  fillRect(W/2-200, H/2-160, 400, 320, '#030a03');
+  strokeRect(W/2-200, H/2-160, 400, 320, '#2a4a2a', 2);
+
+  ctx.fillStyle = '#4eff91'; ctx.font = 'bold 16px "Courier New",monospace'; ctx.textAlign = 'center';
+  ctx.fillText('НАСТРОЙКИ ШРИФТА', W/2, H/2-130);
+
+  const families = FONT_FAMILIES;
+  ctx.font = '12px "Courier New",monospace'; ctx.fillStyle = '#7aaa7a';
+  ctx.fillText('Семейство:', W/2-150, H/2-100);
+  families.forEach((f, i) => {
+    const bx = W/2-190+i*100, by = H/2-88;
+    const sel = FontCfg.family === f.id;
+    fillRect(bx, by, 94, 26, sel ? '#0f2a0f' : '#080f08');
+    strokeRect(bx, by, 94, 26, sel ? '#4eff91' : '#1a2a1a', 1);
+    ctx.fillStyle = sel ? '#4eff91' : '#5a8a5a';
+    ctx.font = '10px "Courier New",monospace'; ctx.textAlign = 'center';
+    ctx.fillText(f.label, bx+47, by+17);
+    if (isClick(bx, by, 94, 26)) { FontCfg.family = f.id; fontCfgSave(FontCfg); }
+  });
+
+  // Size scale
+  const scales = [0.8, 1.0, 1.2, 1.4];
+  const labels = ['80%', '100%', '120%', '140%'];
+  ctx.fillStyle = '#7aaa7a'; ctx.font = '12px "Courier New",monospace'; ctx.textAlign = 'left';
+  ctx.fillText('Размер:', W/2-150, H/2-44);
+  scales.forEach((s, i) => {
+    const bx = W/2-150+i*90, by = H/2-32;
+    const sel = Math.abs(FontCfg.scale - s) < 0.05;
+    fillRect(bx, by, 84, 26, sel ? '#0f2a0f' : '#080f08');
+    strokeRect(bx, by, 84, 26, sel ? '#4eff91' : '#1a2a1a', 1);
+    ctx.fillStyle = sel ? '#4eff91' : '#5a8a5a';
+    ctx.font = '11px "Courier New",monospace'; ctx.textAlign = 'center';
+    ctx.fillText(labels[i], bx+42, by+17);
+    if (isClick(bx, by, 84, 26)) { FontCfg.scale = s; fontCfgSave(FontCfg); }
+  });
+
+  // Bold toggle
+  const tbx = W/2-80, tby = H/2+20;
+  fillRect(tbx, tby, 160, 30, FontCfg.bold ? '#0f2a0f' : '#080f08');
+  strokeRect(tbx, tby, 160, 30, FontCfg.bold ? '#4eff91' : '#1a2a1a', 1);
+  ctx.fillStyle = FontCfg.bold ? '#4eff91' : '#5a8a5a';
+  ctx.font = '12px "Courier New",monospace'; ctx.textAlign = 'center';
+  ctx.fillText(FontCfg.bold ? '✓ ЖИРНЫЙ' : '○ ЖИРНЫЙ', W/2, tby+20);
+  if (isClick(tbx, tby, 160, 30)) { FontCfg.bold = !FontCfg.bold; fontCfgSave(FontCfg); }
+
+  // Preview
+  ctx.fillStyle = '#4eff91'; ctx.font = '14px "Courier New",monospace'; ctx.textAlign = 'center';
+  ctx.fillText('Предпросмотр: WRECK PROTOCOL 1234', W/2, H/2+76);
+
+  // Close
+  const cbx = W/2-70, cby = H/2+110;
+  const chov = isHover(cbx, cby, 140, 28);
+  drawButton('[ ЗАКРЫТЬ ]', cbx, cby, 140, 28, chov);
+  if (isClick(cbx, cby, 140, 28) || Keys['Escape_pressed']) {
+    _showFontSettings = false;
+    Keys['Escape_pressed'] = false;
+  }
+}
+
+// Hook into updateMenu to add settings button + overlay
+const _fontOrig_updateMenu = window.updateMenu;
+window.updateMenu = function() {
+  _fontOrig_updateMenu();
+  if (_showFontSettings) { drawFontSettings(); return; }
+
+  // Settings button bottom-right
+  const bx = W-130, by = H-40;
+  const hov = isHover(bx, by, 120, 26);
+  fillRect(bx, by, 120, 26, '#050f05');
+  strokeRect(bx, by, 120, 26, hov ? '#2a4a2a' : '#111a11', 1);
+  ctx.fillStyle = hov ? '#7aaa7a' : '#336633';
+  ctx.font = '10px "Courier New",monospace'; ctx.textAlign = 'center';
+  ctx.fillText('⚙ ШРИФТ', bx+60, by+17);
+  if (isClick(bx, by, 120, 26)) _showFontSettings = true;
+};
+
+// ═══════════════════════════════════════════════════════════
+//  MUTATION/BONUS HISTORY — shown in assembly screen
+// ═══════════════════════════════════════════════════════════
+const _mbOrig_updateAssembly = window.updateAssembly;
+window.updateAssembly = function() {
+  _mbOrig_updateAssembly();
+
+  // Show active mutations + last challenge reward below grid bottom-left
+  const mx = 60, my = Assembly.gridOriginY + GRID_ROWS * GRID_SIZE + 8;
+  if (my > H - 60) return; // no space
+
+  ctx.font = 'bold 9px "Courier New",monospace'; ctx.textAlign = 'left';
+  ctx.fillStyle = '#336633';
+  ctx.fillText('— АКТИВНЫЕ МУТАЦИИ —', mx, my + 10);
+
+  if (!Game.mutations || Game.mutations.length === 0) {
+    ctx.fillStyle = '#2a3a2a'; ctx.font = '9px "Courier New",monospace';
+    ctx.fillText('нет', mx, my + 22);
+  } else {
+    let rx = mx, ry = my + 20;
+    for (const id of Game.mutations) {
+      const m = (typeof MUTATIONS_DEF !== 'undefined') ? MUTATIONS_DEF.find(x => x.id === id) : null;
+      if (!m) continue;
+      ctx.fillStyle = m.color; ctx.font = '9px "Courier New",monospace';
+      ctx.fillText(m.label, rx, ry);
+      rx += ctx.measureText(m.label).width + 10;
+      if (rx > mx + GRID_COLS * GRID_SIZE - 20) { rx = mx; ry += 12; }
+    }
+  }
+
+  // Last challenge reward if any
+  if (Game._lastChallengeReward) {
+    ctx.fillStyle = '#cccc44'; ctx.font = '9px "Courier New",monospace';
+    ctx.fillText('Испытание: ' + Game._lastChallengeReward, mx, my + 46);
+  }
+};
+
+console.log('[WRECK PROTOCOL] Font settings + mutation history loaded.');
+</script>
+
 <!-- PART 7a: SYNERGY SYSTEM -->
 <script>
 'use strict';
