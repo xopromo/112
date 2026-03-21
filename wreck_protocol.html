@@ -3771,5 +3771,103 @@ window.updateMenu = function() {
 console.log('[WRECK PROTOCOL] Meta-progression loaded. Runs so far:', metaLoad().runs);
 </script>
 
+<!-- PART 7c: CURSED & BLESSED PARTS -->
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════════════════════
+//  CURSED PARTS — loot items with risk/reward tradeoffs
+// ═══════════════════════════════════════════════════════════
+const CURSE_POOL = [
+  { id:'c_slow',    badge:'⚠ МЕДЛИТ',   desc:'Скорость -20%', penalty: R => { R.speed *= 0.8; } },
+  { id:'c_fragile', badge:'⚠ ХРУПКАЯ',  desc:'ПЗ -30',        penalty: R => { R.maxHP = Math.max(10, R.maxHP - 30); R.hp = Math.min(R.hp, R.maxHP); } },
+  { id:'c_hungry',  badge:'⚠ ПРОЖОРЛИВАЯ', desc:'Урон -15%',  penalty: R => { R.weapons.forEach(w => { w.def = {...w.def, damage: Math.round(w.def.damage * 0.85)}; }); } },
+  { id:'c_unstable',badge:'⚠ НЕСТАБИЛЬНАЯ', desc:'Огонь -25% скорости', penalty: R => { R.weapons.forEach(w => { w.def = {...w.def, fireRate: Math.round(w.def.fireRate * 1.25)}; }); } },
+  { id:'c_heavy',   badge:'⚠ ТЯЖЁЛАЯ',  desc:'Масса +4кг',    penalty: R => { R.mass = (R.mass||0)+4; const pen=Math.max(0.3,1-(R.mass-4)*0.025); R.speed=Math.max(0.5,R.speed*0.88); } },
+];
+
+const BLESS_POOL = [
+  { id:'b_sharp',   badge:'★ ОСТРАЯ',   desc:'Урон +20%',      bonus: R => { R.weapons.forEach(w => { w.def = {...w.def, damage: Math.round(w.def.damage * 1.2)}; }); } },
+  { id:'b_swift',   badge:'★ БЫСТРАЯ',  desc:'Скорость +20%',  bonus: R => { R.speed *= 1.2; } },
+  { id:'b_tough',   badge:'★ ПРОЧНАЯ',  desc:'ПЗ +40',         bonus: R => { R.maxHP += 40; R.hp += 40; } },
+  { id:'b_regen',   badge:'★ ЖИВАЯ',    desc:'Реген 0.1/фр',   bonus: R => { R._regenRate = (R._regenRate||0) + 0.1; } },
+];
+
+// ── Inject curse/bless into loot (override prepLoot)
+const _curse_origPrepLoot = window.prepLoot;
+window.prepLoot = function() {
+  _curse_origPrepLoot();
+  // From round 2 onwards, add curses/blessings
+  if (Game.round < 2) return;
+  Loot.offered.forEach(part => {
+    if (!part || part.type === 'chassis') return;
+    const roll = Math.random();
+    if (roll < 0.25) {
+      // Cursed: random penalty
+      part._curse = CURSE_POOL[Math.floor(Math.random() * CURSE_POOL.length)];
+    } else if (roll < 0.38) {
+      // Blessed: random bonus
+      part._bless = BLESS_POOL[Math.floor(Math.random() * BLESS_POOL.length)];
+    } else if (roll < 0.45) {
+      // Cursed AND blessed (high risk high reward)
+      part._curse = CURSE_POOL[Math.floor(Math.random() * CURSE_POOL.length)];
+      part._bless = BLESS_POOL[Math.floor(Math.random() * BLESS_POOL.length)];
+    }
+  });
+};
+
+// ── Apply curses/blessings from placed parts in startArena
+const _curse_origStartArena = window.startArena;
+window.startArena = function() {
+  _curse_origStartArena();
+  const R = Arena.robot;
+  // Assembly.placed contains the actual part objects with _curse/_bless set during loot
+  for (const p of Assembly.placed) {
+    if (p._curse) p._curse.penalty(R);
+    if (p._bless) p._bless.bonus(R);
+  }
+};
+
+// ── Draw curse/bless badges on loot cards (overlay after original render)
+const _curse_origUpdateLoot = window.updateLoot;
+window.updateLoot = function() {
+  _curse_origUpdateLoot();
+  // Re-draw badges on top of each card
+  const cols = 4, cardW = 180, cardH = 110;
+  const startX = W/2 - (cols*cardW + (cols-1)*12)/2;
+  const startY = 90;
+  Loot.offered.forEach((part, i) => {
+    if (!part) return;
+    const col = i % cols, row = Math.floor(i / cols);
+    const cx2 = startX + col*(cardW+12);
+    const cy2 = startY + row*(cardH+12);
+
+    if (part._curse) {
+      // Red curse badge top-right
+      fillRect(cx2+cardW-82, cy2, 82, 16, '#2a0808');
+      ctx.fillStyle = '#ff4444'; ctx.font = 'bold 8px "Courier New",monospace'; ctx.textAlign = 'center';
+      ctx.fillText(part._curse.badge, cx2+cardW-41, cy2+11);
+      // Penalty text under description
+      ctx.fillStyle = '#cc2222'; ctx.font = '8px "Courier New",monospace'; ctx.textAlign = 'left';
+      ctx.fillText('↓ ' + part._curse.desc, cx2+8, cy2+cardH-4);
+    }
+    if (part._bless) {
+      // Gold bless badge top-left (or shift if curse present)
+      const bx2 = part._curse ? cx2 : cx2;
+      fillRect(bx2, cy2 + (part._curse ? 17 : 0), 80, 16, '#1a1a00');
+      ctx.fillStyle = '#ffdd44'; ctx.font = 'bold 8px "Courier New",monospace'; ctx.textAlign = 'center';
+      ctx.fillText(part._bless.badge, bx2+40, cy2+(part._curse?28:11));
+      ctx.fillStyle = '#aaaa00'; ctx.font = '8px "Courier New",monospace'; ctx.textAlign = 'left';
+      ctx.fillText('↑ ' + part._bless.desc, cx2+8, cy2+cardH-14);
+    }
+  });
+};
+
+// Note: curse/bless is stored directly on the part object,
+// so it survives Game.inventory → Assembly.placed transfer automatically.
+
+console.log('[WRECK PROTOCOL] Cursed/Blessed parts system loaded.');
+</script>
+
 </body>
 </html>
