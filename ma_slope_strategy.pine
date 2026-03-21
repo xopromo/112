@@ -115,7 +115,8 @@ if bar_index > (last_bar_index - max_bars) and barstate.isconfirmed
         if bt_dir == 1
             // SL
             if low <= bt_sl
-                xp := bt_sl; do_exit := true
+                xp := bt_sl
+                do_exit := true
             // TP
             else if tp_cond_l and close > bt_ep
                 do_exit := true
@@ -124,7 +125,8 @@ if bar_index > (last_bar_index - max_bars) and barstate.isconfirmed
                 do_exit := true
         else
             if high >= bt_sl
-                xp := bt_sl; do_exit := true
+                xp := bt_sl
+                do_exit := true
             else if tp_cond_s and close < bt_ep
                 do_exit := true
             else if ma_rev_l
@@ -189,18 +191,26 @@ if bar_index > (last_bar_index - max_bars) and barstate.isconfirmed
 
         if v_dir == 1
             if low <= v_sl
-                vxp := v_sl; vxt := "SL"; do_exit := true
+                vxp := v_sl
+                vxt := "SL"
+                do_exit := true
             else if tp_cond_l and close > v_ep
-                vxt := slope_decel_up ? "TP slope" : "TP spread"; do_exit := true
+                vxt := slope_decel_up ? "TP slope" : "TP spread"
+                do_exit := true
             else if ma_rev_s
-                vxt := "MA↓"; do_exit := true
+                vxt := "MA↓"
+                do_exit := true
         else
             if high >= v_sl
-                vxp := v_sl; vxt := "SL"; do_exit := true
+                vxp := v_sl
+                vxt := "SL"
+                do_exit := true
             else if tp_cond_s and close < v_ep
-                vxt := slope_decel_down ? "TP slope" : "TP spread"; do_exit := true
+                vxt := slope_decel_down ? "TP slope" : "TP spread"
+                do_exit := true
             else if ma_rev_l
-                vxt := "MA↑"; do_exit := true
+                vxt := "MA↑"
+                do_exit := true
 
         // Обновляем живой бокс
         if show_tr and not na(b_trade)
