@@ -3509,5 +3509,267 @@ window.spawnEnemiesForRound=function(round){
 console.log('[WRECK PROTOCOL] Classes + Pillars + Bosses + Encounters loaded.');
 </script>
 
+<!-- PART 7a: SYNERGY SYSTEM -->
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════════════════════
+//  SYNERGIES — passive bonuses for specific part combos
+// ═══════════════════════════════════════════════════════════
+const SYNERGIES = [
+  {
+    id: 'artillery', label: '⚔ АРТИЛЛЕРИЯ', color: '#ff6b35',
+    desc: '3+ оружия → урон всех +25%',
+    requires: p => p.filter(x => PART_DEFS[x.type].cat === 'weapon').length >= 3,
+    apply: R => { R.weapons.forEach(w => { w.def = {...w.def, damage: Math.round(w.def.damage * 1.25)}; }); }
+  },
+  {
+    id: 'bunker', label: '🛡 БУНКЕР', color: '#888888',
+    desc: '2+ брони + гусеницы → урон -25%',
+    requires: p => p.filter(x => x.type === 'armor_heavy' || x.type === 'armor_light').length >= 2 && p.some(x => x.type === 'tracks'),
+    apply: R => { R._dmgReduction = (R._dmgReduction || 0) + 0.25; }
+  },
+  {
+    id: 'powerplant', label: '💠 СИЛОВОЙ ЩИТ', color: '#4488ff',
+    desc: 'Батарея + щит-ген → щит +60, рег. ×2',
+    requires: p => p.some(x => x.type === 'battery') && p.some(x => x.type === 'shield_gen'),
+    apply: R => { R.maxShield += 60; R.shield += 60; R.shieldRegen *= 2; }
+  },
+  {
+    id: 'speedster', label: '🚀 СТРЕМИТЕЛЬНЫЙ', color: '#ff6644',
+    desc: 'Реактивы + лёгкая броня → скорость +35%',
+    requires: p => p.some(x => x.type === 'jets') && p.some(x => x.type === 'armor_light'),
+    apply: R => { R.speed *= 1.35; }
+  },
+  {
+    id: 'autoaim', label: '⚡ АВТОПРИЦЕЛ', color: '#35c5ff',
+    desc: 'Лазер + автосенсор → урон лазера +50%',
+    requires: p => p.some(x => x.type === 'laser') && p.some(x => x.type === 'sensor_auto'),
+    apply: R => { R.weapons.filter(w => w.def.isLaser).forEach(w => { w.def = {...w.def, damage: Math.round(w.def.damage * 1.5)}; }); }
+  },
+  {
+    id: 'ironwall', label: '🔩 ЖЕЛЕЗНАЯ СТЕНА', color: '#cccccc',
+    desc: '3+ брони → +100 к макс. ПЗ',
+    requires: p => p.filter(x => PART_DEFS[x.type].cat === 'armor').length >= 3,
+    apply: R => { R.maxHP += 100; R.hp += 100; }
+  },
+  {
+    id: 'spider_web', label: '🕷 ПАУТИНА', color: '#cc44cc',
+    desc: 'Паучьи ноги + 2+ оружия → огонь во все стороны',
+    requires: p => p.some(x => x.type === 'legs') && p.filter(x => PART_DEFS[x.type].cat === 'weapon').length >= 2,
+    apply: R => { R._omnifire = true; }
+  },
+  {
+    id: 'overclocker', label: '⏱ РАЗГОН', color: '#cccc44',
+    desc: 'Таймер + батарея → скорострельность ×1.4',
+    requires: p => p.some(x => x.type === 'timer_fast') && p.some(x => x.type === 'battery'),
+    apply: R => { R.weapons.forEach(w => { w.def = {...w.def, fireRate: Math.max(6, Math.round(w.def.fireRate / 1.4))}; }); }
+  },
+];
+
+// Track active synergies on robot
+function calcSynergies(placed) {
+  return SYNERGIES.filter(s => s.requires(placed));
+}
+
+// Override startArena to apply synergies after stat calc
+const _syn_origStartArena = window.startArena;
+window.startArena = function() {
+  _syn_origStartArena();
+  const R = Arena.robot;
+  const active = calcSynergies(Assembly.placed);
+  R._activeSynergies = active.map(s => s.id);
+  active.forEach(s => s.apply(R));
+  if (active.length > 0) {
+    console.log('[Synergies] Active:', active.map(s => s.label).join(', '));
+  }
+};
+
+// Override damageRobot to apply damage reduction synergy
+const _syn_origDamageRobot = window.damageRobot;
+window.damageRobot = function(dmg) {
+  const R = Arena.robot;
+  const reduced = dmg * (1 - (R._dmgReduction || 0));
+  _syn_origDamageRobot(reduced);
+};
+
+// ── Draw synergy panel in assembly screen (appended below grid)
+const _syn_origUpdateAssembly = window.updateAssembly;
+window.updateAssembly = function() {
+  _syn_origUpdateAssembly();
+  if (window.curState !== STATE.ASSEMBLY) return;
+
+  const active = calcSynergies(Assembly.placed);
+  const inactive = SYNERGIES.filter(s => !s.requires(Assembly.placed));
+
+  // Synergy panel: right side below palette stats
+  const sx = 60 + GRID_COLS * GRID_SIZE + 16;
+  const sw = W - sx - 8;
+  // Find bottom of palette (approximate)
+  const sy = H - 160;
+
+  ctx.font = 'bold 10px "Courier New",monospace'; ctx.textAlign = 'left';
+  ctx.fillStyle = '#336633';
+  ctx.fillText('— СИНЕРГИИ —', sx + 4, sy + 12);
+
+  let row = 0;
+  // Active synergies first
+  for (const s of active) {
+    const ry = sy + 20 + row * 24;
+    fillRect(sx + 2, ry, sw - 4, 20, '#0a1a0a');
+    strokeRect(sx + 2, ry, sw - 4, 20, s.color, 1);
+    ctx.fillStyle = s.color;
+    ctx.font = 'bold 9px "Courier New",monospace';
+    ctx.fillText('✓ ' + s.label, sx + 6, ry + 13);
+    row++;
+  }
+  // Show 2 nearest inactive as hints
+  const hints = inactive.slice(0, 2);
+  for (const s of hints) {
+    const ry = sy + 20 + row * 24;
+    fillRect(sx + 2, ry, sw - 4, 20, '#080808');
+    strokeRect(sx + 2, ry, sw - 4, 20, '#1a2a1a', 1);
+    ctx.fillStyle = '#2a3a2a';
+    ctx.font = '9px "Courier New",monospace';
+    ctx.fillText('○ ' + s.desc, sx + 6, ry + 13);
+    row++;
+  }
+};
+
+// Omnifire: if synergy active, weapons fire in all 4 directions
+const _syn_origFireWeapon = window.fireWeapon;
+window.fireWeapon = function(wi, R) {
+  if (!R._omnifire) { _syn_origFireWeapon(wi, R); return; }
+  // Fire in 4 cardinal directions
+  const origAngle = R.angle;
+  for (let d = 0; d < 4; d++) {
+    R.angle = origAngle + d * Math.PI / 2;
+    _syn_origFireWeapon(wi, R);
+  }
+  R.angle = origAngle;
+};
+
+console.log('[WRECK PROTOCOL] Synergy system loaded. Synergies:', SYNERGIES.length);
+</script>
+
+<!-- PART 7b: META-PROGRESSION + RECORDS -->
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════════════════════
+//  META-PROGRESSION — saved across runs in localStorage
+// ═══════════════════════════════════════════════════════════
+const META_KEY = 'wreck_meta_v1';
+
+function metaLoad() {
+  try {
+    const raw = localStorage.getItem(META_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch(e) {}
+  return { runs: 0, wins: 0, bestRound: 0, bestSynergies: 0, history: [] };
+}
+
+function metaSave(data) {
+  try { localStorage.setItem(META_KEY, JSON.stringify(data)); } catch(e) {}
+}
+
+function metaReset() {
+  metaSave({ runs: 0, wins: 0, bestRound: 0, bestSynergies: 0, history: [] });
+}
+
+// Called at end of each run
+function metaRecordRun(win) {
+  const data = metaLoad();
+  const round = Game.round - 1;
+  const synCount = (Arena.robot._activeSynergies || []).length;
+  data.runs++;
+  if (win) data.wins++;
+  if (round > data.bestRound) data.bestRound = round;
+  if (synCount > data.bestSynergies) data.bestSynergies = synCount;
+  data.history.unshift({ win, round, class: Game._startClass || '?', synCount });
+  if (data.history.length > 10) data.history.length = 10; // keep last 10
+  metaSave(data);
+  return data;
+}
+
+// Bonus starting scrap: +5 per win, max +25
+function metaBonusScrap() {
+  const data = metaLoad();
+  return Math.min(data.wins * 5, 25);
+}
+
+// ── Override setState to record run on game end
+const _meta_origSetState = window.setState;
+window.setState = function(s) {
+  if (s === STATE.GAMEOVER) metaRecordRun(false);
+  if (s === STATE.WIN)      metaRecordRun(true);
+  _meta_origSetState(s);
+};
+
+// ── Apply bonus scrap at game start (hook into startGameWithClass)
+const _meta_origStartGame = window.startGameWithClass;
+window.startGameWithClass = function(cls) {
+  _meta_origStartGame(cls);
+  const bonus = metaBonusScrap();
+  if (bonus > 0) {
+    Game.scrap += bonus;
+    Game._startClass = cls ? cls.id : 'none';
+  }
+};
+
+// ── Patch menu to show records
+const _meta_origUpdateMenu = window.updateMenu;
+window.updateMenu = function() {
+  _meta_origUpdateMenu();
+
+  const data = metaLoad();
+  if (data.runs === 0) return; // first run, nothing to show
+
+  // Records panel bottom-left
+  const px = 20, py = H - 130, pw = 220;
+  fillRect(px, py, pw, 115, '#050f05');
+  strokeRect(px, py, pw, 115, '#1a3a1a', 1);
+
+  ctx.fillStyle = '#336633'; ctx.font = 'bold 10px "Courier New",monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText('— СТАТИСТИКА —', px+8, py+14);
+
+  ctx.fillStyle = C.textDim; ctx.font = '11px "Courier New",monospace';
+  ctx.fillText(`Забегов: ${data.runs}`, px+8, py+30);
+  ctx.fillText(`Побед: ${data.wins}`, px+8, py+44);
+  ctx.fillText(`Лучший раунд: ${data.bestRound}/7`, px+8, py+58);
+  ctx.fillText(`Макс. синергий: ${data.bestSynergies}`, px+8, py+72);
+
+  const bonus = metaBonusScrap();
+  if (bonus > 0) {
+    ctx.fillStyle = '#4eff91';
+    ctx.fillText(`+ ${bonus} лома (бонус за победы)`, px+8, py+88);
+  }
+
+  // Last 3 runs mini-history
+  const recent = data.history.slice(0, 3);
+  let hy = py + 102;
+  ctx.font = '9px "Courier New",monospace';
+  for (const r of recent) {
+    ctx.fillStyle = r.win ? '#4eff91' : '#ff4444';
+    ctx.fillText(`${r.win ? '✓' : '✗'} Раунд ${r.round}/7  класс:${r.class}`, px+8, hy);
+    hy += 12;
+  }
+
+  // Reset hint
+  ctx.fillStyle = '#1a2a1a'; ctx.font = '9px "Courier New",monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('Del — сбросить рекорды', px + pw/2, py + 118);
+
+  // Delete key to reset
+  if (Keys['Delete_pressed']) {
+    metaReset();
+    Keys['Delete_pressed'] = false;
+  }
+};
+
+console.log('[WRECK PROTOCOL] Meta-progression loaded. Runs so far:', metaLoad().runs);
+</script>
+
 </body>
 </html>
