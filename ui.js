@@ -6535,6 +6535,8 @@ async function confirmCreateProject() {
   const templateSnapshot = templates.find(t => t.isDefault) || null;
 
   const proj = await ProjectManager.create(name, _projCreateHandle, templateSnapshot);
+  // Force close even if firstLaunch (guard in closeProjCreate would block it)
+  _projCreateFirstLaunch = false;
   closeProjCreate();
   await setProject(proj.id);
   toast('✅ Проект создан: ' + name, 2000);
