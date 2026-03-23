@@ -3939,7 +3939,8 @@ function _queueSnapshot() {
     if (el.type === 'checkbox' || el.type === 'radio') {
       checks[el.id] = el.checked;
     } else {
-      inputs[el.id] = el.value;
+      // Не сохранять пустые поля — экономим место в localStorage
+      if (el.value !== '') inputs[el.id] = el.value;
     }
   });
   return {
@@ -3966,9 +3967,29 @@ function _queueRestore(snap) {
 
 // ── localStorage helpers ──────────────────────────────────────────
 function _queueLoadTasks()    { try { return JSON.parse(localStorage.getItem(_QUEUE_LS_KEY)  || '[]'); } catch(e) { return []; } }
-function _queueSaveTasks(arr) { localStorage.setItem(_QUEUE_LS_KEY,  JSON.stringify(arr)); }
-function _seriesLoad()        { try { return JSON.parse(localStorage.getItem(_SERIES_LS_KEY) || '[]'); } catch(e) { return []; } }
-function _seriesSave(arr)     { localStorage.setItem(_SERIES_LS_KEY, JSON.stringify(arr)); }
+function _queueSaveTasks(arr) {
+  try {
+    localStorage.setItem(_QUEUE_LS_KEY, JSON.stringify(arr));
+  } catch(e) {
+    if (e.name === 'QuotaExceededError' || (e.code && (e.code === 22 || e.code === 1014))) {
+      alert('⚠️ localStorage переполнен — невозможно сохранить задачу.\n\nОчисти очередь («Очистить всё») или удали часть задач.');
+    } else {
+      console.error('[_queueSaveTasks]', e);
+    }
+  }
+}
+function _seriesLoad()    { try { return JSON.parse(localStorage.getItem(_SERIES_LS_KEY) || '[]'); } catch(e) { return []; } }
+function _seriesSave(arr) {
+  try {
+    localStorage.setItem(_SERIES_LS_KEY, JSON.stringify(arr));
+  } catch(e) {
+    if (e.name === 'QuotaExceededError' || (e.code && (e.code === 22 || e.code === 1014))) {
+      alert('⚠️ localStorage переполнен — невозможно сохранить серию.\n\nОчисти очередь или удали старые серии.');
+    } else {
+      console.error('[_seriesSave]', e);
+    }
+  }
+}
 
 // ── Сгенерировать краткое описание снапшота ───────────────────────
 function _queueSnapDesc(snap) {
