@@ -1321,6 +1321,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
   <button class="btn btn-go" id="rbtn" onclick="runOpt()" disabled>🚀 Запустить</button>
   <button class="btn-pause" id="pbtn" onclick="pauseOpt()" style="display:none">⏸ Пауза</button>
   <button class="btn btn-stop" id="sbtn" onclick="stopOpt()" style="display:none">⏹ Стоп</button>
+  <button id="queue-toggle-btn" onclick="toggleQueuePanel()" style="background:rgba(255,180,50,.12);border:1px solid rgba(255,180,50,.4);color:#ffb432;font-size:.8em;padding:4px 10px;border-radius:5px;cursor:pointer;margin-left:6px" title="Очередь задач TPE">📋 Очередь</button>
   <div class="mode-grp">
     <span style="font-size:.63em;color:var(--text3)">Режим:</span>
     <div class="mode-btn active" id="mode_full" onclick="setOptMode('full')" title="Полный перебор всех комбинаций">Полный</div>
@@ -1357,6 +1358,55 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
       <span id="eta-found"></span>
     </div>
     <div class="pbar-wrap"><div class="pbar-fill" id="pbar"></div></div>
+  </div>
+</div>
+
+<!-- ── Очередь задач TPE ─────────────────────────────────────────── -->
+<div id="queue-panel" style="display:none;background:var(--bg2);border:1px solid rgba(255,180,50,.3);border-radius:8px;padding:10px 14px;margin:8px 0;font-size:.82em">
+  <!-- Заголовок + кнопки управления -->
+  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+    <span style="color:#ffb432;font-weight:700;font-size:.95em">📋 Очередь задач</span>
+    <button onclick="queueAddCurrent()" style="background:rgba(255,180,50,.15);border:1px solid rgba(255,180,50,.4);color:#ffb432;border-radius:4px;padding:2px 9px;cursor:pointer;font-size:.85em" title="Сохранить текущие настройки как новую задачу">+ Задача</button>
+    <button id="queue-run-btn" onclick="runQueue()" style="background:rgba(100,255,100,.15);border:1px solid rgba(100,255,100,.4);color:#7cff7c;border-radius:4px;padding:2px 9px;cursor:pointer;font-size:.85em">▶ Запустить очередь</button>
+    <button id="queue-stop-btn" onclick="stopQueue()" style="display:none;background:rgba(255,80,80,.15);border:1px solid rgba(255,80,80,.4);color:#ff5555;border-radius:4px;padding:2px 9px;cursor:pointer;font-size:.85em">⏹ Стоп</button>
+    <button onclick="queueClearAll()" style="background:transparent;border:1px solid var(--border);color:var(--text3);border-radius:4px;padding:2px 9px;cursor:pointer;font-size:.85em" title="Очистить всю очередь">🗑 Очистить</button>
+    <span style="flex:1"></span>
+    <!-- Шаблоны (серии) -->
+    <button onclick="toggleSeriesPanel()" style="background:rgba(100,180,255,.1);border:1px solid rgba(100,180,255,.3);color:#64b5f6;border-radius:4px;padding:2px 9px;cursor:pointer;font-size:.85em" title="Сохранённые серии задач">🗂 Серии</button>
+  </div>
+
+  <!-- Прогресс очереди -->
+  <div id="queue-progress" style="display:none;color:var(--accent2);margin-bottom:6px;font-size:.85em;padding:3px 6px;background:rgba(0,212,255,.07);border-radius:4px"></div>
+
+  <!-- Форма добавления задачи -->
+  <div id="queue-add-form" style="display:none;background:var(--bg3);border:1px solid rgba(255,180,50,.2);border-radius:5px;padding:8px 10px;margin-bottom:8px">
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <input id="queue-task-name" type="text" placeholder="Название задачи..." style="flex:1;min-width:140px;background:var(--bg2);border:1px solid var(--border2);border-radius:4px;color:var(--text);padding:3px 7px;font-size:.9em">
+      <label style="display:flex;align-items:center;gap:4px;color:var(--text2)">
+        Повторов:
+        <input id="queue-task-repeats" type="number" value="3" min="1" max="999" style="width:52px;background:var(--bg2);border:1px solid var(--border2);border-radius:4px;color:var(--text);padding:2px 5px;font-size:.9em">
+      </label>
+      <button onclick="queueSaveTask()" style="background:rgba(100,255,100,.15);border:1px solid rgba(100,255,100,.4);color:#7cff7c;border-radius:4px;padding:3px 10px;cursor:pointer">✓ Сохранить</button>
+      <button onclick="document.getElementById('queue-add-form').style.display='none'" style="background:transparent;border:1px solid var(--border);color:var(--text3);border-radius:4px;padding:3px 8px;cursor:pointer">✕</button>
+    </div>
+    <div id="queue-task-preview" style="color:var(--text3);margin-top:5px;font-size:.78em"></div>
+  </div>
+
+  <!-- Список задач -->
+  <div id="queue-task-list" style="display:flex;flex-direction:column;gap:4px;max-height:260px;overflow-y:auto">
+    <div style="color:var(--text3);text-align:center;padding:10px">Очередь пуста — нажми «+ Задача» чтобы добавить</div>
+  </div>
+
+  <!-- Панель серий -->
+  <div id="series-panel" style="display:none;margin-top:10px;border-top:1px solid var(--border);padding-top:8px">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+      <span style="color:#64b5f6;font-weight:600">🗂 Серии</span>
+      <input id="series-save-name" type="text" placeholder="Название серии..." style="flex:1;background:var(--bg2);border:1px solid var(--border2);border-radius:4px;color:var(--text);padding:2px 7px;font-size:.88em">
+      <button onclick="seriesSaveCurrent()" style="background:rgba(100,180,255,.15);border:1px solid rgba(100,180,255,.3);color:#64b5f6;border-radius:4px;padding:2px 9px;cursor:pointer;font-size:.85em">💾 Сохранить очередь как серию</button>
+    </div>
+    <div id="series-list" style="display:flex;flex-direction:column;gap:3px;max-height:180px;overflow-y:auto">
+      <div style="color:var(--text3);text-align:center;padding:6px">Серий нет</div>
+    </div>
   </div>
 </div>
 

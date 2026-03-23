@@ -877,7 +877,8 @@ async function runOpt() {
     if (typeof _setSynthProgress !== 'undefined') _setSynthProgress(0, '❌ Нет данных для оптимизации');
     return;
   }
-  stopped=false; paused=false; results=[]; equities={};
+  stopped=false; paused=false;
+  if (!window._queueMode) { results=[]; equities={}; }
   try { // ── глобальный try/catch: любая ошибка отображается в UI ──────────────
   resultCache.clear();
   const _resultNames = new Set(); // П.1: дедупликация
