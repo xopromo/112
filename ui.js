@@ -109,6 +109,7 @@ let _rawDataInfo = '';  // описание источника для finfo ("�
 let NEW_DATA = null;  // Новые данные для OOS-проверки избранных
 let HAS_VOLUME = false;
 var results = []; // var (not let) so window.results = x works from other scripts
+var _archivedResults = []; // hidden archive: results removed from table but kept for future use
 let equities = {};
 let stopped = false;
 let slLogic = 'or'; // or | and
@@ -667,6 +668,31 @@ async function togglePinTpl(i) {
   await storeSave(_TBL_TPL_KEY, tpls);
   _renderQuickFilterBtns(tpls);
   openTableTplPopover(true);
+}
+
+// Move results from table to hidden archive (keeps them for future TPE use)
+function clearResults() {
+  if (!results.length) return;
+  if (!confirm(`Убрать ${results.length} результатов из таблицы?\nОни сохранятся в скрытом архиве (${_archivedResults.length} уже в архиве).`)) return;
+  _archivedResults = _archivedResults.concat(results);
+  results = [];
+  equities = {};
+  const tb = $('tb'); if (tb) tb.innerHTML = '';
+  const cnt = $('tbl-cnt-results'); if (cnt) cnt.textContent = '0';
+  console.log(`[clearResults] archived ${_archivedResults.length} total, table cleared`);
+}
+
+// Wipe everything: table + archive
+function clearAllResults() {
+  const total = results.length + _archivedResults.length;
+  if (!total) return;
+  if (!confirm(`Удалить ВСЁ: ${results.length} в таблице + ${_archivedResults.length} в архиве = ${total} результатов?\nЭто действие необратимо.`)) return;
+  results = [];
+  _archivedResults = [];
+  equities = {};
+  const tb = $('tb'); if (tb) tb.innerHTML = '';
+  const cnt = $('tbl-cnt-results'); if (cnt) cnt.textContent = '0';
+  console.log('[clearAllResults] table + archive wiped');
 }
 
 function resetAllFilters() {
@@ -6128,7 +6154,8 @@ document.addEventListener('DOMContentLoaded', function() {
     'btn-apply-parse':   applyParsedText,
     'btn-preview-parse': previewParsedText,
     'btn-close-parse':   closeParseModal,
-    'clr-btn': function(){ if(typeof clearResults==='function') clearResults(); }
+    'clr-btn':     function(){ clearResults(); },
+    'clr-btn-all': function(){ clearAllResults(); }
   };
   Object.keys(btnMap).forEach(function(id) {
     var el = document.getElementById(id);
