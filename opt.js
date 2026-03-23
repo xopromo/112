@@ -884,7 +884,8 @@ async function runOpt() {
   // П.1: дедупликация — в queueMode results не сбрасывается, поэтому инициализируем
   // именами из предыдущих прогонов, чтобы те же конфигурации не добавлялись повторно
   const _resultNames = new Set(window._queueMode ? results.map(r => r.name) : []);
-  $('tb').innerHTML=''; $('eqc').style.display='none';
+  if (!window._queueMode || results.length === 0) $('tb').innerHTML='';
+  $('eqc').style.display='none';
   // Show pause/stop, hide run
   $('rbtn').style.display='none';
   $('pbtn').style.display='inline-block'; $('pbtn').textContent='⏸ Пауза';

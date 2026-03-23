@@ -589,7 +589,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
 .btn-row { flex-wrap:wrap; gap:6px; align-items:center; }
 .btn-pause { background:rgba(255,170,0,.15); color:var(--orange); border:1px solid var(--orange); border-radius:6px; padding:7px 16px; font-family:var(--font-mono); font-size:.75em; font-weight:600; cursor:pointer; transition:all .15s; }
 .btn-pause:hover { background:rgba(255,170,0,.25); }
-.eta-wrap { display:flex; flex-direction:column; gap:3px; flex:1; min-width:200px; }
+.eta-wrap { display:flex; flex-direction:column; gap:3px; }
 .eta-line { display:flex; gap:10px; font-size:.68em; flex-wrap:wrap; }
 #eta-time { color:var(--orange); font-weight:600; }
 #eta-found { color:var(--green); }
@@ -1350,15 +1350,15 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
     <input type="range" id="snd_vol" min="0" max="1" step="0.05" value="0.5" title="Громкость">
   </div>
   <button class="tpl-ibtn" style="font-size:.68em;padding:4px 10px;border-color:var(--accent2);color:var(--accent2)" id="btn-open-parse" onclick="openParseModal()" title="Настроить из текста">📝 Из текста</button>
-  <div class="eta-wrap">
-    <div class="eta-line">
-      <span id="prog">— вар.</span>
-      <span id="mc-phase"></span>
-      <span id="eta-time"></span>
-      <span id="eta-found"></span>
-    </div>
-    <div class="pbar-wrap"><div class="pbar-fill" id="pbar"></div></div>
+</div>
+<div class="eta-wrap" style="margin:2px 0 4px;width:100%">
+  <div class="eta-line">
+    <span id="prog">— вар.</span>
+    <span id="mc-phase"></span>
+    <span id="eta-time"></span>
+    <span id="eta-found"></span>
   </div>
+  <div class="pbar-wrap"><div class="pbar-fill" id="pbar"></div></div>
 </div>
 
 <!-- ── Очередь задач TPE ─────────────────────────────────────────── -->
@@ -8129,7 +8129,8 @@ async function runOpt() {
   // П.1: дедупликация — в queueMode results не сбрасывается, поэтому инициализируем
   // именами из предыдущих прогонов, чтобы те же конфигурации не добавлялись повторно
   const _resultNames = new Set(window._queueMode ? results.map(r => r.name) : []);
-  $('tb').innerHTML=''; $('eqc').style.display='none';
+  if (!window._queueMode || results.length === 0) $('tb').innerHTML='';
+  $('eqc').style.display='none';
   // Show pause/stop, hide run
   $('rbtn').style.display='none';
   $('pbtn').style.display='inline-block'; $('pbtn').textContent='⏸ Пауза';
@@ -11320,6 +11321,19 @@ function renderResults() {
   if (window.results && Array.isArray(window.results)) {
     results = window.results;
   }
+
+  // В режиме очереди: не трогаем таблицу и фильтры — только счётчики.
+  // Таблица обновится когда пользователь кликнет сортировку или изменит фильтр.
+  if (window._queueMode) {
+    $('mass-rob-bar').style.display = results.length > 0 ? 'flex' : 'none';
+    $('mass-rob-info').textContent = `${results.length} результатов`;
+    if (typeof window._batchOOS === 'function') {
+      const _pendingOOS = results.filter(r => r.cfg && r.cfg._oos === undefined);
+      if (_pendingOOS.length > 0) setTimeout(() => window._batchOOS(), 50);
+    }
+    return;
+  }
+
   // При новом запуске оптимизации — возвращаемся в режим results
   if (_tableMode !== 'results') switchTableMode('results');
   _visibleResults = [...results]; // сброс фильтра при новом запуске
@@ -15020,6 +15034,7 @@ function queueDuplicateTask(id) {
 function queueToggleCheck(id, checked) {
   if (checked) _queueUnchecked.delete(id);
   else _queueUnchecked.add(id);
+  renderQueueTaskList();
 }
 
 function queueCheckAll(checked) {
@@ -15218,6 +15233,10 @@ async function runQueue() {
         : `✅ Готово · Все задачи выполнены · Найдено: ${total.toLocaleString()} результатов`;
       progEl.style.color = _queueStopFlag ? '#ff5555' : 'var(--accent)';
     }
+    // Финальный рендер: применяем текущие фильтры без сброса
+    if (typeof applyFilters === 'function') applyFilters();
+    $('mass-rob-bar').style.display = (window.results||[]).length > 0 ? 'flex' : 'none';
+    $('mass-rob-info').textContent = `${(window.results||[]).length} результатов`;
   }
 }
 
@@ -18849,7 +18868,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774298762624;
+window._BUILD_TS = 1774301139416;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
