@@ -3681,6 +3681,7 @@ async function runMassRobust() {
   const allFiltered = (typeof _getPreRunFiltered === 'function' ? _getPreRunFiltered() : _visibleResults.filter(r => r.cfg));
   const toTest = allFiltered.filter(r => r.robScore === undefined); // пропускаем уже протестированные
   const skippedCount = allFiltered.length - toTest.length;
+  const btn = $('btn-mass-robust');
   if (!toTest.length) {
     if (!window._queueMode) {
       if (skippedCount) alert(`Все ${skippedCount} результатов уже протестированы (robScore присвоен).\nЧтобы перетестировать — сбрось таблицу и запусти заново.`);
@@ -3692,7 +3693,6 @@ async function runMassRobust() {
   }
 
   _massRobRunning = true;
-  const btn = $('btn-mass-robust');
   if (btn) btn.textContent = '⏹ Стоп';
 
   // Инвалидируем кэш: настройки (param_spread, noise_runs и т.д.) могли измениться
