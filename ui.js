@@ -4335,6 +4335,8 @@ async function runQueue() {
         // Rob-тест после оптимизации
         if (!_queueStopFlag && task.snapshot?.checks?.['queue-task-rob']) {
           if (progEl) progEl.textContent = `🔬 Rob-тест · Задача ${ti+1}/${tasks.length} · Повтор ${rep+1}/${task.repeats} · ${(window.results||[]).length} результатов`;
+          // Сбрасываем robScore перед каждым повтором — иначе 2-й+ повтор пропустит все уже протестированные
+          (window.results || []).forEach(r => { delete r.robScore; delete r.robMax; delete r.robDetails; });
           if (typeof renderResults === 'function') renderResults();
           await yieldToUI(); // не тротлится в фоне
           if (typeof runMassRobust === 'function') await runMassRobust();
