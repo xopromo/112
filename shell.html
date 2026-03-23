@@ -1378,8 +1378,9 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
   <!-- Прогресс очереди -->
   <div id="queue-progress" style="display:none;color:var(--accent2);margin-bottom:6px;font-size:.85em;padding:3px 6px;background:rgba(0,212,255,.07);border-radius:4px"></div>
 
-  <!-- Форма добавления задачи -->
+  <!-- Форма добавления/редактирования задачи -->
   <div id="queue-add-form" style="display:none;background:var(--bg3);border:1px solid rgba(255,180,50,.2);border-radius:5px;padding:8px 10px;margin-bottom:8px">
+    <div style="color:#ffb432;font-size:.8em;font-weight:600;margin-bottom:5px"><span id="queue-form-title">+ Добавить задачу</span></div>
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
       <input id="queue-task-name" type="text" placeholder="Название задачи..." style="flex:1;min-width:140px;background:var(--bg2);border:1px solid var(--border2);border-radius:4px;color:var(--text);padding:3px 7px;font-size:.9em">
       <label style="display:flex;align-items:center;gap:4px;color:var(--text2)">
@@ -1387,9 +1388,9 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
         <input id="queue-task-repeats" type="number" value="3" min="1" max="999" style="width:52px;background:var(--bg2);border:1px solid var(--border2);border-radius:4px;color:var(--text);padding:2px 5px;font-size:.9em">
       </label>
       <button onclick="queueSaveTask()" style="background:rgba(100,255,100,.15);border:1px solid rgba(100,255,100,.4);color:#7cff7c;border-radius:4px;padding:3px 10px;cursor:pointer">✓ Сохранить</button>
-      <button onclick="document.getElementById('queue-add-form').style.display='none'" style="background:transparent;border:1px solid var(--border);color:var(--text3);border-radius:4px;padding:3px 8px;cursor:pointer">✕</button>
+      <button onclick="queueCancelForm()" style="background:transparent;border:1px solid var(--border);color:var(--text3);border-radius:4px;padding:3px 8px;cursor:pointer">✕</button>
     </div>
-    <div id="queue-task-preview" style="color:var(--text3);margin-top:5px;font-size:.78em"></div>
+    <div id="queue-task-preview" style="color:var(--text2);margin-top:5px;font-size:.78em"></div>
     <div id="queue-save-error" style="display:none;color:#ff7c7c;margin-top:5px;font-size:.78em"></div>
   </div>
 
