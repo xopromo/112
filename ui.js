@@ -713,6 +713,8 @@ function resetAllFilters() {
 }
 
 function applyFilters() {
+  // Не перерисовывать во время массового rob-теста — предотвращает рендер-цикл
+  if (typeof _massRobRunning !== 'undefined' && _massRobRunning) return;
   const fName  = $('f_name').value.trim().toLowerCase();
   const fFav   = $('f_fav').value;
   const fPnl   = parseFloat($('f_pnl').value);

@@ -3730,7 +3730,8 @@ async function runMassRobust() {
   _massRobRunning = false;
   if (btn) btn.textContent = '🔬 Тест всех видимых';
   $('mass-rob-progress').textContent = `✅ Готово: ${toTest.length} проверено`;
-  renderVisibleResults();
+  // applyFilters теперь безопасен (флаг сброшен), перерисовываем с актуальными robScore
+  if (typeof applyFilters === 'function') applyFilters(); else renderVisibleResults();
 }
 
 // Запускает тесты для одного результата, возвращает число пройденных
