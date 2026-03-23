@@ -885,7 +885,7 @@ async function runOpt() {
   // именами из предыдущих прогонов, чтобы те же конфигурации не добавлялись повторно
   const _resultNames = new Set(window._queueMode ? results.map(r => r.name) : []);
   if (!window._queueMode || results.length === 0) $('tb').innerHTML='';
-  $('eqc').style.display='none';
+  if (!window._queueMode) $('eqc').style.display='none';
   // Show pause/stop, hide run
   $('rbtn').style.display='none';
   $('pbtn').style.display='inline-block'; $('pbtn').textContent='⏸ Пауза';
@@ -3730,8 +3730,8 @@ async function runMassRobust() {
   _massRobRunning = false;
   if (btn) btn.textContent = '🔬 Тест всех видимых';
   $('mass-rob-progress').textContent = `✅ Готово: ${toTest.length} проверено`;
-  // applyFilters теперь безопасен (флаг сброшен), перерисовываем с актуальными robScore
-  if (typeof applyFilters === 'function') applyFilters(); else renderVisibleResults();
+  // В queue-режиме не трогаем фильтры/сортировку — просто перерисовываем текущий _visibleResults
+  renderVisibleResults();
 }
 
 // Запускает тесты для одного результата, возвращает число пройденных
