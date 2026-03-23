@@ -1390,6 +1390,14 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
       <button onclick="queueSaveTask()" style="background:rgba(100,255,100,.15);border:1px solid rgba(100,255,100,.4);color:#7cff7c;border-radius:4px;padding:3px 10px;cursor:pointer">✓ Сохранить</button>
       <button onclick="queueCancelForm()" style="background:transparent;border:1px solid var(--border);color:var(--text3);border-radius:4px;padding:3px 8px;cursor:pointer">✕</button>
     </div>
+    <div style="display:flex;gap:14px;margin-top:6px;align-items:center;flex-wrap:wrap">
+      <label style="display:flex;align-items:center;gap:4px;color:var(--text2);font-size:.8em;cursor:pointer" title="После оптимизации удалить результаты ниже порогов Отсечки">
+        <input type="checkbox" id="queue-task-autoclean"> 🗑 Авто-очистка по отсечке
+      </label>
+      <label style="display:flex;align-items:center;gap:4px;color:var(--text2);font-size:.8em;cursor:pointer" title="После оптимизации (и очистки) запустить Rob-тесты на оставшихся результатах">
+        <input type="checkbox" id="queue-task-rob"> 🔬 Rob-тест после опт.
+      </label>
+    </div>
     <div id="queue-task-preview" style="color:var(--text2);margin-top:5px;font-size:.78em"></div>
     <div id="queue-save-error" style="display:none;color:#ff7c7c;margin-top:5px;font-size:.78em"></div>
   </div>
@@ -15071,6 +15079,23 @@ async function runQueue() {
         if (typeof stopped !== 'undefined' && stopped && !_queueStopFlag) {
           _queueStopFlag = true; break;
         }
+
+        // Авто-очистка по порогам отсечки
+        if (!_queueStopFlag && task.snapshot?.checks?.['queue-task-autoclean']) {
+          const removed = _queueApplyCutoff();
+          if (progEl && removed > 0) {
+            progEl.textContent = `🗑 Удалено ${removed} слабых результатов · Задача ${ti+1}/${tasks.length} · Повтор ${rep+1}/${task.repeats}`;
+            await new Promise(r => setTimeout(r, 600));
+          }
+        }
+
+        // Rob-тест после оптимизации
+        if (!_queueStopFlag && task.snapshot?.checks?.['queue-task-rob']) {
+          if (progEl) progEl.textContent = `🔬 Rob-тест · Задача ${ti+1}/${tasks.length} · Повтор ${rep+1}/${task.repeats} · ${(window.results||[]).length} результатов`;
+          if (typeof renderResults === 'function') renderResults();
+          await new Promise(r => setTimeout(r, 50));
+          if (typeof runMassRobust === 'function') await runMassRobust();
+        }
       }
     }
   } finally {
@@ -15157,6 +15182,31 @@ function _getPreRunFiltered() {
     (r.sig ?? 0) >= (isNaN(minSig) ? 0 : minSig) &&
     (r.gt  ?? -2) >= (isNaN(minGT) ? 0 : minGT)
   );
+}
+
+// Фильтрует window.results по тем же порогам что _getPreRunFiltered().
+// Используется очередью после каждой оптимизации (авто-очистка мусора).
+// Возвращает кол-во удалённых результатов.
+function _queueApplyCutoff() {
+  const minPnl = parseFloat(document.getElementById('prf_minpnl')?.value);
+  const minWR  = parseFloat(document.getElementById('prf_minwr')?.value);
+  const minSig = parseFloat(document.getElementById('prf_minsig')?.value);
+  const minGT  = parseFloat(document.getElementById('prf_mingt')?.value);
+  const p = isNaN(minPnl) ? 0 : minPnl;
+  const w = isNaN(minWR)  ? 0 : minWR;
+  const s = isNaN(minSig) ? 0 : minSig;
+  const g = isNaN(minGT)  ? 0 : minGT;
+  const before = (window.results || []).length;
+  window.results = (window.results || []).filter(r =>
+    r.cfg &&
+    r.pnl >= p &&
+    r.wr  >= w &&
+    (r.sig ?? 0) >= s &&
+    (r.gt  ?? -2) >= g
+  );
+  const removed = before - window.results.length;
+  if (removed > 0 && typeof renderResults === 'function') renderResults();
+  return removed;
 }
 
 function updatePreRunCount() {
@@ -18655,7 +18705,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774282293317;
+window._BUILD_TS = 1774284162820;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;

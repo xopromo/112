@@ -4237,6 +4237,23 @@ async function runQueue() {
         if (typeof stopped !== 'undefined' && stopped && !_queueStopFlag) {
           _queueStopFlag = true; break;
         }
+
+        // Авто-очистка по порогам отсечки
+        if (!_queueStopFlag && task.snapshot?.checks?.['queue-task-autoclean']) {
+          const removed = _queueApplyCutoff();
+          if (progEl && removed > 0) {
+            progEl.textContent = `🗑 Удалено ${removed} слабых результатов · Задача ${ti+1}/${tasks.length} · Повтор ${rep+1}/${task.repeats}`;
+            await new Promise(r => setTimeout(r, 600));
+          }
+        }
+
+        // Rob-тест после оптимизации
+        if (!_queueStopFlag && task.snapshot?.checks?.['queue-task-rob']) {
+          if (progEl) progEl.textContent = `🔬 Rob-тест · Задача ${ti+1}/${tasks.length} · Повтор ${rep+1}/${task.repeats} · ${(window.results||[]).length} результатов`;
+          if (typeof renderResults === 'function') renderResults();
+          await new Promise(r => setTimeout(r, 50));
+          if (typeof runMassRobust === 'function') await runMassRobust();
+        }
       }
     }
   } finally {
@@ -4323,6 +4340,31 @@ function _getPreRunFiltered() {
     (r.sig ?? 0) >= (isNaN(minSig) ? 0 : minSig) &&
     (r.gt  ?? -2) >= (isNaN(minGT) ? 0 : minGT)
   );
+}
+
+// Фильтрует window.results по тем же порогам что _getPreRunFiltered().
+// Используется очередью после каждой оптимизации (авто-очистка мусора).
+// Возвращает кол-во удалённых результатов.
+function _queueApplyCutoff() {
+  const minPnl = parseFloat(document.getElementById('prf_minpnl')?.value);
+  const minWR  = parseFloat(document.getElementById('prf_minwr')?.value);
+  const minSig = parseFloat(document.getElementById('prf_minsig')?.value);
+  const minGT  = parseFloat(document.getElementById('prf_mingt')?.value);
+  const p = isNaN(minPnl) ? 0 : minPnl;
+  const w = isNaN(minWR)  ? 0 : minWR;
+  const s = isNaN(minSig) ? 0 : minSig;
+  const g = isNaN(minGT)  ? 0 : minGT;
+  const before = (window.results || []).length;
+  window.results = (window.results || []).filter(r =>
+    r.cfg &&
+    r.pnl >= p &&
+    r.wr  >= w &&
+    (r.sig ?? 0) >= s &&
+    (r.gt  ?? -2) >= g
+  );
+  const removed = before - window.results.length;
+  if (removed > 0 && typeof renderResults === 'function') renderResults();
+  return removed;
 }
 
 function updatePreRunCount() {
