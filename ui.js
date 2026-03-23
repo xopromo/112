@@ -712,12 +712,19 @@ function resetAllFilters() {
   applyFilters(true);
 }
 
+let _applyFiltersLastMs = 0;
 function applyFilters(_force = false) {
   // Блокируем автоматические вызовы во время queue/rob-теста — предотвращает рендер-цикл.
   // Пользовательские вызовы (сортировка, кнопки фильтров) передают _force=true и проходят.
   // finally-блок очереди вызывает applyFilters() УЖЕ после _queueMode=false — там тоже ок.
   if (!_force && window._queueMode) return;
   if (!_force && typeof _massRobRunning !== 'undefined' && _massRobRunning) return;
+  // Throttle: не чаще 1 раза в 100 мс для авто-вызовов (защита от неизвестных источников петли)
+  if (!_force) {
+    const now = Date.now();
+    if (now - _applyFiltersLastMs < 100) return;
+    _applyFiltersLastMs = now;
+  }
   const fName  = $('f_name').value.trim().toLowerCase();
   const fFav   = $('f_fav').value;
   const fPnl   = parseFloat($('f_pnl').value);
@@ -859,7 +866,11 @@ function renderResults() {
     $('mass-rob-info').textContent = `${results.length} результатов`;
     if (typeof window._batchOOS === 'function') {
       const _pendingOOS = results.filter(r => r.cfg && r.cfg._oos === undefined);
-      if (_pendingOOS.length > 0) setTimeout(() => window._batchOOS(), 50);
+      if (_pendingOOS.length > 0) {
+        // Один таймер на всё — clearTimeout предотвращает накопление при частых вызовах
+        clearTimeout(window._batchOOSTimer);
+        window._batchOOSTimer = setTimeout(() => window._batchOOS(), 50);
+      }
     }
     return;
   }
@@ -879,7 +890,9 @@ function renderResults() {
   if (typeof window._batchOOS === 'function') {
     const _pendingOOS = results.filter(r => r.cfg && r.cfg._oos === undefined);
     if (_pendingOOS.length > 0) {
-      setTimeout(async () => {
+      // Один таймер — clearTimeout предотвращает накопление нескольких одновременных вызовов
+      clearTimeout(window._batchOOSTimer);
+      window._batchOOSTimer = setTimeout(async () => {
         await window._batchOOS();
         applyFilters(); // перерисовать таблицу с заполненными TV колонками
       }, 50);
@@ -4380,7 +4393,9 @@ async function runQueue() {
         // Rob-тест после оптимизации
         if (!_queueStopFlag && task.snapshot?.checks?.['queue-task-rob']) {
           if (progEl) progEl.textContent = `🔬 Rob-тест · Задача ${ti+1}/${tasks.length} · Повтор ${rep+1}/${task.repeats} · ${(window.results||[]).length} результатов`;
-          if (typeof renderResults === 'function') renderResults();
+          // applyFilters заблокирован в queue-режиме, поэтому _visibleResults может быть устаревшим.
+          // Синхронизируем вручную — чтобы runMassRobust видел актуальные результаты.
+          _visibleResults = (window.results || results || []).filter(r => !!r.cfg);
           await yieldToUI(); // не тротлится в фоне
           if (typeof runMassRobust === 'function') await runMassRobust();
         }
