@@ -1585,6 +1585,8 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
     <button class="tbl-mode-btn" id="tbl-btn-fav" onclick="switchTableMode('fav')">Избранные <span id="tbl-cnt-fav">0</span></button>
     <button class="tbl-mode-btn oos-mode" id="tbl-btn-oos" onclick="switchTableMode('oos')" style="display:none">OOS <span id="tbl-cnt-oos">0</span></button>
     <button class="tbl-mode-btn" id="btn-reset-filters" onclick="resetAllFilters()" title="Сбросить все фильтры и сортировку" style="margin-left:auto">✕ Сброс</button>
+    <button class="tbl-mode-btn" id="clr-btn" title="Убрать результаты из таблицы в скрытый архив (не удаляет — хранится в памяти)" style="color:var(--text3)">🗑 Таблица</button>
+    <button class="tbl-mode-btn" id="clr-btn-all" title="Удалить всё: таблицу и архив" style="color:#ff4466">🗑 Всё</button>
     <span id="tbl-quick-filters"></span>
     <div style="position:relative">
       <button class="tbl-mode-btn" id="btn-tbl-tpl" onclick="openTableTplPopover()" title="Шаблоны фильтров — сохранить текущие фильтры / быстро применить сохранённый набор" style="border-color:var(--accent2);color:var(--accent)">💾 Наборы фильтров ▾</button>
