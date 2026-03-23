@@ -3674,10 +3674,9 @@ async function runMassRobust() {
   if (!tests.length) { alert('Выбери хотя бы один тест'); return; }
 
   // Снимаем СНАПШОТ результатов ДО начала теста
-  // Используем results (полный массив) а не _visibleResults (меняется при applyFilters)
-  // Фильтруем только видимые на момент нажатия — по индексам в _visibleResults
-  const toTest = _visibleResults.filter(r => r.cfg);
-  if (!toTest.length) { alert('Нет результатов с cfg'); return; }
+  // Используем pre-run фильтр (если доступен) иначе все видимые
+  const toTest = (typeof _getPreRunFiltered === 'function' ? _getPreRunFiltered() : _visibleResults.filter(r => r.cfg));
+  if (!toTest.length) { alert('Нет результатов с cfg (или все отсечены фильтром перед запуском)'); return; }
 
   _massRobRunning = true;
   const btn = $('btn-mass-robust');

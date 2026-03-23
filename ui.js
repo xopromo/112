@@ -809,6 +809,7 @@ function applyFilters() {
   $('mass-rob-bar').style.display = showMassRob ? 'flex' : 'none';
   const modeLabel = _tableMode === 'hc' ? 'соседей' : _tableMode === 'fav' ? 'избранных' : 'результатов';
   $('mass-rob-info').textContent = `${_visibleResults.length} ${modeLabel} видимо`;
+  updatePreRunCount();
 }
 
 function renderResults() {
@@ -3921,6 +3922,33 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 });
 
+// ── Отсечка перед запуском тестов ──────────────────────────────
+// Возвращает подмножество _visibleResults, прошедших пороги pre-run фильтра.
+function _getPreRunFiltered() {
+  const minPnl = parseFloat(document.getElementById('prf_minpnl')?.value) ?? 0;
+  const minWR  = parseFloat(document.getElementById('prf_minwr')?.value)  ?? 0;
+  const minSig = parseFloat(document.getElementById('prf_minsig')?.value) ?? 0;
+  const minGT  = parseFloat(document.getElementById('prf_mingt')?.value)  ?? 0;
+  return _visibleResults.filter(r =>
+    r.cfg &&
+    r.pnl >= (isNaN(minPnl) ? 0 : minPnl) &&
+    r.wr  >= (isNaN(minWR)  ? 0 : minWR)  &&
+    (r.sig ?? 0) >= (isNaN(minSig) ? 0 : minSig) &&
+    (r.gt  ?? -2) >= (isNaN(minGT) ? 0 : minGT)
+  );
+}
+
+function updatePreRunCount() {
+  const el = document.getElementById('prf-count');
+  if (!el) return;
+  const total = _visibleResults.filter(r => r.cfg).length;
+  if (total === 0) { el.textContent = ''; return; }
+  const filtered = _getPreRunFiltered();
+  el.textContent = `→ ${filtered.length} из ${total}`;
+  el.style.color = filtered.length < total ? 'var(--orange)' : 'var(--accent)';
+}
+try { window.updatePreRunCount = updatePreRunCount; } catch(e) {}
+
 // ── ИДЕЯ 3: Массовый OOS-скан всех видимых результатов
 let _oosScanRunning = false;
 async function runOOSScan() {
@@ -3931,7 +3959,7 @@ async function runOOSScan() {
   const btn = document.getElementById('btn-oos-scan');
   const status = document.getElementById('oos-scan-status');
   if (btn) btn.textContent = '⏹ Стоп';
-  const toScan = _visibleResults.filter(r => r.cfg);
+  const toScan = _getPreRunFiltered();
   const N = DATA.length, cut = Math.floor(N * 0.8);
   let done = 0, passed = 0;
   for (const r of toScan) {
