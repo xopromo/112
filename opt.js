@@ -3682,8 +3682,10 @@ async function runMassRobust() {
   const toTest = allFiltered.filter(r => r.robScore === undefined); // пропускаем уже протестированные
   const skippedCount = allFiltered.length - toTest.length;
   if (!toTest.length) {
-    if (skippedCount) alert(`Все ${skippedCount} результатов уже протестированы (robScore присвоен).\nЧтобы перетестировать — сбрось таблицу и запусти заново.`);
-    else alert('Нет результатов с cfg (или все отсечены фильтром перед запуском)');
+    if (!window._queueRunning) {
+      if (skippedCount) alert(`Все ${skippedCount} результатов уже протестированы (robScore присвоен).\nЧтобы перетестировать — сбрось таблицу и запусти заново.`);
+      else alert('Нет результатов с cfg (или все отсечены фильтром перед запуском)');
+    }
     _massRobRunning = false;
     if (btn) btn.textContent = '🔬 Тест всех видимых';
     return;
