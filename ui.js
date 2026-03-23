@@ -4110,6 +4110,17 @@ function queueEditTask(id) {
   nameEl?.focus();
 }
 
+function queueDuplicateTask(id) {
+  const tasks = _queueLoadTasks();
+  const idx = tasks.findIndex(t => t.id === id);
+  if (idx < 0) return;
+  const src = tasks[idx];
+  const copy = { ...src, id: Date.now() + Math.random(), name: src.name + ' (копия)' };
+  tasks.splice(idx + 1, 0, copy);
+  _queueSaveTasks(tasks);
+  renderQueueTaskList();
+}
+
 // ── Вспомогательные: чекбоксы задач ──────────────────────────────
 function queueToggleCheck(id, checked) {
   if (checked) _queueUnchecked.delete(id);
@@ -4215,6 +4226,7 @@ function renderQueueTaskList() {
         <div style="color:var(--text2);font-size:.75em">${desc} · ×${t.repeats} повтор${t.repeats===1?'':'ов'}</div>
       </div>
       <button onclick="queueEditTask(${t.id})" style="background:transparent;border:none;color:var(--text2);cursor:pointer;font-size:.85em;padding:1px 4px" title="Редактировать">✏</button>
+      <button onclick="queueDuplicateTask(${t.id})" style="background:transparent;border:none;color:var(--text2);cursor:pointer;font-size:.85em;padding:1px 4px" title="Дублировать">⧉</button>
       <button onclick="queueMoveTask(${t.id}, -1)" style="${i===0?'opacity:.3;pointer-events:none;':''} background:transparent;border:none;color:var(--text3);cursor:pointer;font-size:.9em;padding:1px 4px" title="Вверх">▲</button>
       <button onclick="queueMoveTask(${t.id}, 1)"  style="${i===tasks.length-1?'opacity:.3;pointer-events:none;':''} background:transparent;border:none;color:var(--text3);cursor:pointer;font-size:.9em;padding:1px 4px" title="Вниз">▼</button>
       <button onclick="queueDeleteTask(${t.id})" style="background:transparent;border:none;color:#ff5555;cursor:pointer;font-size:.9em;padding:1px 4px" title="Удалить">🗑</button>
