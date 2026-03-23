@@ -3678,8 +3678,16 @@ async function runMassRobust() {
 
   // Снимаем СНАПШОТ результатов ДО начала теста
   // Используем pre-run фильтр (если доступен) иначе все видимые
-  const toTest = (typeof _getPreRunFiltered === 'function' ? _getPreRunFiltered() : _visibleResults.filter(r => r.cfg));
-  if (!toTest.length) { alert('Нет результатов с cfg (или все отсечены фильтром перед запуском)'); return; }
+  const allFiltered = (typeof _getPreRunFiltered === 'function' ? _getPreRunFiltered() : _visibleResults.filter(r => r.cfg));
+  const toTest = allFiltered.filter(r => r.robScore === undefined); // пропускаем уже протестированные
+  const skippedCount = allFiltered.length - toTest.length;
+  if (!toTest.length) {
+    if (skippedCount) alert(`Все ${skippedCount} результатов уже протестированы (robScore присвоен).\nЧтобы перетестировать — сбрось таблицу и запусти заново.`);
+    else alert('Нет результатов с cfg (или все отсечены фильтром перед запуском)');
+    _massRobRunning = false;
+    if (btn) btn.textContent = '🔬 Тест всех видимых';
+    return;
+  }
 
   _massRobRunning = true;
   const btn = $('btn-mass-robust');
@@ -3692,7 +3700,8 @@ async function runMassRobust() {
   for (let i = 0; i < toTest.length; i++) {
     if (!_massRobRunning) break;
     const r = toTest[i];
-    $('mass-rob-progress').textContent = `⏳ ${i+1}/${toTest.length}: ${r.name.slice(0,35)}…`;
+    const skipNote = skippedCount ? ` (+${skippedCount} уже готово)` : '';
+    $('mass-rob-progress').textContent = `⏳ ${i+1}/${toTest.length}${skipNote}: ${r.name.slice(0,35)}…`;
     if (i % 5 === 0) await yieldToUI();
 
     _robSliceCache.clear(); // очищаем кэш слайсов между стратегиями

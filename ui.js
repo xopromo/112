@@ -154,6 +154,8 @@ window.onerror = function(msg, src, line, col, err) {
 // Объявляем переменные для zone и input - инициализируем после DOMContentLoaded
 let dropZone, fileInput;
 document.addEventListener('DOMContentLoaded', () => {
+  _loadPrfCutoff(); // restore cutoff fields from localStorage
+
   dropZone = document.getElementById('drop');
   fileInput = document.getElementById('fi');
   if (!dropZone || !fileInput) return;
@@ -4405,9 +4407,33 @@ function _queueApplyCutoff() {
   return removed;
 }
 
+const _PRF_LS_KEY = 'use_opt_prf_cutoff';
+const _PRF_FIELDS = ['prf_minpnl','prf_minwr','prf_minsig','prf_mingt','prf_min_oos_pnl','prf_min_retention'];
+
+function _savePrfCutoff() {
+  try {
+    const vals = {};
+    _PRF_FIELDS.forEach(id => { const el = document.getElementById(id); if (el) vals[id] = el.value; });
+    localStorage.setItem(_PRF_LS_KEY, JSON.stringify(vals));
+  } catch(e) {}
+}
+
+function _loadPrfCutoff() {
+  try {
+    const raw = localStorage.getItem(_PRF_LS_KEY);
+    if (!raw) return;
+    const vals = JSON.parse(raw);
+    _PRF_FIELDS.forEach(id => {
+      const el = document.getElementById(id);
+      if (el && vals[id] !== undefined) el.value = vals[id];
+    });
+  } catch(e) {}
+}
+
 function updatePreRunCount() {
   const el = document.getElementById('prf-count');
   if (!el) return;
+  _savePrfCutoff(); // persist on every change
   const total = _visibleResults.filter(r => r.cfg).length;
   if (total === 0) { el.textContent = ''; return; }
   const filtered = _getPreRunFiltered();
