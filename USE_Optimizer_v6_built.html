@@ -12076,10 +12076,25 @@ function _favKey() {
 }
 
 async function storeSave(key, data) {
+  const _write = () => {
+    if (window.storage) return window.storage.set(key, JSON.stringify(data));
+    localStorage.setItem(key, JSON.stringify(data));
+  };
+  const _isQuota = e => e.name === 'QuotaExceededError' || (e.code && (e.code === 22 || e.code === 1014));
   try {
-    if (window.storage) await window.storage.set(key, JSON.stringify(data));
-    else localStorage.setItem(key, JSON.stringify(data));
-  } catch(e) {}
+    await _write();
+  } catch(e) {
+    if (_isQuota(e)) {
+      // Free rob cache + rob surrogate and retry
+      try { _freeRobCache(); } catch(_) {}
+      try {
+        const keys = Object.keys(localStorage).filter(k => k.startsWith('robSurrogate_'));
+        keys.forEach(k => localStorage.removeItem(k));
+      } catch(_) {}
+      try { await _write(); }
+      catch(e2) { console.warn('[storeSave] quota exceeded after cleanup:', key, e2.message); }
+    }
+  }
 }
 async function storeLoad(key) {
   try {
@@ -14978,9 +14993,24 @@ function queueDuplicateTask(id) {
   const idx = tasks.findIndex(t => t.id === id);
   if (idx < 0) return;
   const src = tasks[idx];
-  const copy = { ...src, id: Date.now() + Math.random(), name: src.name + ' (копия)' };
+  // Deep copy snapshot so original and copy are fully independent
+  const copy = JSON.parse(JSON.stringify({ ...src, id: Date.now() + Math.random(), name: src.name + ' (копия)' }));
   tasks.splice(idx + 1, 0, copy);
-  _queueSaveTasks(tasks);
+  // Atomic save: either both tasks are saved or neither (no silent dropping of original)
+  const isQuota = e => e.name === 'QuotaExceededError' || (e.code && (e.code === 22 || e.code === 1014));
+  try {
+    localStorage.setItem(_QUEUE_LS_KEY, JSON.stringify(tasks));
+  } catch(e) {
+    if (isQuota(e)) {
+      _freeRobCache();
+      try {
+        localStorage.setItem(_QUEUE_LS_KEY, JSON.stringify(tasks));
+      } catch(e2) {
+        alert('Не удалось сохранить — недостаточно места (localStorage переполнен).');
+        return;
+      }
+    } else { return; }
+  }
   renderQueueTaskList();
 }
 
@@ -15011,19 +15041,33 @@ function queueSaveTask() {
   const repeats = Math.max(1, parseInt(document.getElementById('queue-task-repeats')?.value) || 1);
   let tasks = _queueLoadTasks();
 
+  const _isQuota = e => e.name === 'QuotaExceededError' || (e.code && (e.code === 22 || e.code === 1014));
+  const _atomicSave = (arr) => {
+    try { localStorage.setItem(_QUEUE_LS_KEY, JSON.stringify(arr)); return true; }
+    catch(e) {
+      if (!_isQuota(e)) return false;
+      _freeRobCache();
+      try { localStorage.setItem(_QUEUE_LS_KEY, JSON.stringify(arr)); return true; }
+      catch(_) { return false; }
+    }
+  };
+
+  let ok;
   if (_queueEditId !== null) {
     // Режим редактирования: заменяем задачу с совпадающим ID
+    // Используем атомарное сохранение — не дропаем соседние задачи при overflow
     const idx = tasks.findIndex(t => t.id === _queueEditId);
     if (idx >= 0) {
       tasks[idx] = { ...tasks[idx], name, repeats, snapshot: snap };
     }
     _queueEditId = null;
+    ok = _atomicSave(tasks);
   } else {
-    // Режим добавления
+    // Режим добавления: допускаем дроп старых задач если места нет
     tasks.push({ id: Date.now() + Math.random(), name, repeats, snapshot: snap });
+    ok = _queueSaveTasks(tasks);
   }
 
-  const ok = _queueSaveTasks(tasks);
   if (!ok) {
     const err = document.getElementById('queue-save-error');
     if (err) { err.textContent = '⚠️ localStorage переполнен — задача не сохранена. Очисти очередь.'; err.style.display = 'block'; }
@@ -18803,7 +18847,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774292705910;
+window._BUILD_TS = 1774294268448;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
