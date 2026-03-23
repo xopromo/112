@@ -1744,12 +1744,16 @@ async function checkPause() {
 // MessageChannel — настоящий macrotask, браузеры НЕ throttle-ят его до
 // 1000ms в фоновых вкладках (в отличие от setTimeout). Это позволяет TPE,
 // поиску соседей и тестам устойчивости работать в неактивной вкладке.
+//
+// ВАЖНО: onmessage — один слот. Если два корутина одновременно вызовут
+// yieldToUI(), второй перезапишет первый callback → первый зависнет навсегда.
+// Пример: rob-тест + _batchOOS таймер запускаются параллельно.
+// Решение: очередь резолверов. Каждый postMessage обслуживает одного ожидающего.
 const _yieldCh = new MessageChannel();
+const _yieldQueue = [];
+_yieldCh.port1.onmessage = () => { const cb = _yieldQueue.shift(); if (cb) cb(); };
 function yieldToUI() {
-  return new Promise(res => {
-    _yieldCh.port1.onmessage = res;
-    _yieldCh.port2.postMessage(0);
-  });
+  return new Promise(res => { _yieldQueue.push(res); _yieldCh.port2.postMessage(0); });
 }
 
 // --- Stop ---

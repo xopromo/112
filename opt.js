@@ -999,6 +999,10 @@ async function runOpt() {
   // _batchOOS вычисляет OOS для уже найденных результатов без OOS данных.
   window._batchOOS = async function() {
     if (!_useOOS || !results || results.length === 0) return;
+    // Не запускать во время rob-теста или HC: они сами управляют DATA и yieldToUI.
+    // Параллельный запуск приведёт к гонке в yieldToUI и конфликту DATA = slice.
+    if (typeof _massRobRunning !== 'undefined' && _massRobRunning) return;
+    if (typeof _hcRobRunning   !== 'undefined' && _hcRobRunning)   return;
     const pending = results.filter(r => !r.cfg || r.cfg._oos === undefined);
     if (pending.length === 0) return;
     if (typeof setMcPhase === 'function') setMcPhase(`⏳ OOS для ${pending.length} результатов…`);
