@@ -14798,27 +14798,51 @@ function _queueRestore(snap) {
 // ── localStorage helpers ──────────────────────────────────────────
 function _queueLoadTasks()    { try { return JSON.parse(localStorage.getItem(_QUEUE_LS_KEY)  || '[]'); } catch(e) { return []; } }
 function _queueSaveTasks(arr) {
-  try {
-    localStorage.setItem(_QUEUE_LS_KEY, JSON.stringify(arr));
-  } catch(e) {
-    if (e.name === 'QuotaExceededError' || (e.code && (e.code === 22 || e.code === 1014))) {
-      alert('⚠️ localStorage переполнен — невозможно сохранить задачу.\n\nОчисти очередь («Очистить всё») или удали часть задач.');
-    } else {
-      console.error('[_queueSaveTasks]', e);
+  const _isQuota = e => e.name === 'QuotaExceededError' || (e.code && (e.code === 22 || e.code === 1014));
+  let data = arr;
+  while (data.length > 0) {
+    try {
+      localStorage.setItem(_QUEUE_LS_KEY, JSON.stringify(data));
+      if (data.length < arr.length) {
+        console.warn(`[_queueSaveTasks] localStorage переполнен — удалено ${arr.length - data.length} старых задач`);
+      }
+      return;
+    } catch(e) {
+      if (_isQuota(e)) {
+        data = data.slice(1); // удаляем самую старую задачу
+      } else {
+        console.error('[_queueSaveTasks]', e);
+        return;
+      }
     }
   }
+  // Если даже пустой массив не влезает — очищаем другие ключи и пробуем ещё раз
+  try { localStorage.removeItem(_SERIES_LS_KEY); } catch(_) {}
+  try { localStorage.setItem(_QUEUE_LS_KEY, '[]'); } catch(_) {}
+  console.warn('[_queueSaveTasks] localStorage критически переполнен, очередь сброшена');
 }
 function _seriesLoad()    { try { return JSON.parse(localStorage.getItem(_SERIES_LS_KEY) || '[]'); } catch(e) { return []; } }
 function _seriesSave(arr) {
-  try {
-    localStorage.setItem(_SERIES_LS_KEY, JSON.stringify(arr));
-  } catch(e) {
-    if (e.name === 'QuotaExceededError' || (e.code && (e.code === 22 || e.code === 1014))) {
-      alert('⚠️ localStorage переполнен — невозможно сохранить серию.\n\nОчисти очередь или удали старые серии.');
-    } else {
-      console.error('[_seriesSave]', e);
+  const _isQuota = e => e.name === 'QuotaExceededError' || (e.code && (e.code === 22 || e.code === 1014));
+  let data = arr;
+  while (data.length > 0) {
+    try {
+      localStorage.setItem(_SERIES_LS_KEY, JSON.stringify(data));
+      if (data.length < arr.length) {
+        console.warn(`[_seriesSave] localStorage переполнен — удалено ${arr.length - data.length} старых серий`);
+      }
+      return;
+    } catch(e) {
+      if (_isQuota(e)) {
+        data = data.slice(1); // удаляем самую старую серию
+      } else {
+        console.error('[_seriesSave]', e);
+        return;
+      }
     }
   }
+  try { localStorage.setItem(_SERIES_LS_KEY, '[]'); } catch(_) {}
+  console.warn('[_seriesSave] localStorage критически переполнен, серии сброшены');
 }
 
 // ── Сгенерировать краткое описание снапшота ───────────────────────
@@ -18524,7 +18548,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774273252190;
+window._BUILD_TS = 1774273506053;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
