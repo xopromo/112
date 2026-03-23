@@ -14799,39 +14799,43 @@ function _queueRestore(snap) {
 // ── localStorage helpers ──────────────────────────────────────────
 function _queueLoadTasks()    { try { return JSON.parse(localStorage.getItem(_QUEUE_LS_KEY)  || '[]'); } catch(e) { return []; } }
 
+// Очищает rob_* кэш из localStorage чтобы освободить место
+function _freeRobCache() {
+  try {
+    const keys = Object.keys(localStorage).filter(k => k.startsWith('rob_'));
+    keys.forEach(k => localStorage.removeItem(k));
+    if (keys.length > 0) console.warn(`[_freeRobCache] удалено ${keys.length} записей rob-кэша`);
+  } catch(_) {}
+}
+
 // Возвращает true если сохранено, false если не влезло даже после очистки
 function _queueSaveTasks(arr) {
   const _isQuota = e => e.name === 'QuotaExceededError' || (e.code && (e.code === 22 || e.code === 1014));
-  // Пробуем удалять старые задачи (с начала), пока новая (в конце) не влезет
-  for (let i = 0; i <= arr.length; i++) {
-    const data = arr.slice(i);
-    try {
-      localStorage.setItem(_QUEUE_LS_KEY, JSON.stringify(data));
-      if (i > 0) console.warn(`[_queueSaveTasks] удалено ${i} старых задач для освобождения места`);
-      return true;
-    } catch(e) {
-      if (!_isQuota(e)) { console.error('[_queueSaveTasks]', e); return false; }
-    }
+  const _try = (data) => {
+    try { localStorage.setItem(_QUEUE_LS_KEY, JSON.stringify(data)); return true; }
+    catch(e) { return _isQuota(e) ? false : (console.error('[_queueSaveTasks]', e), null); }
+  };
+  // Пробуем удалять старые задачи (с начала), сохраняя новую (в конце)
+  for (let i = 0; i < arr.length; i++) {  // < не <=, никогда не сохраняем []
+    const r = _try(arr.slice(i));
+    if (r === true) { if (i > 0) console.warn(`[_queueSaveTasks] удалено ${i} старых задач`); return true; }
+    if (r === null) return false; // не-quota ошибка
   }
-  // Даже 1 задача не влезла — пробуем очистить серии и повторить
+  // Не влезает даже 1 задача — очищаем серии и rob-кэш, пробуем ещё раз
   try { localStorage.removeItem(_SERIES_LS_KEY); } catch(_) {}
-  const last = arr.slice(-1);
-  try {
-    localStorage.setItem(_QUEUE_LS_KEY, JSON.stringify(last));
-    console.warn('[_queueSaveTasks] очищены серии, сохранена только последняя задача');
-    return true;
-  } catch(_) {}
-  return false; // совсем не влезло
+  _freeRobCache();
+  const r = _try(arr.slice(-1));
+  if (r === true) { console.warn('[_queueSaveTasks] очищены серии+кэш, сохранена 1 задача'); return true; }
+  return false;
 }
 
 function _seriesLoad()    { try { return JSON.parse(localStorage.getItem(_SERIES_LS_KEY) || '[]'); } catch(e) { return []; } }
 function _seriesSave(arr) {
   const _isQuota = e => e.name === 'QuotaExceededError' || (e.code && (e.code === 22 || e.code === 1014));
-  for (let i = 0; i <= arr.length; i++) {
-    const data = arr.slice(i);
+  for (let i = 0; i < arr.length; i++) {  // < не <=
     try {
-      localStorage.setItem(_SERIES_LS_KEY, JSON.stringify(data));
-      if (i > 0) console.warn(`[_seriesSave] удалено ${i} старых серий для освобождения места`);
+      localStorage.setItem(_SERIES_LS_KEY, JSON.stringify(arr.slice(i)));
+      if (i > 0) console.warn(`[_seriesSave] удалено ${i} старых серий`);
       return true;
     } catch(e) {
       if (!_isQuota(e)) { console.error('[_seriesSave]', e); return false; }
@@ -14883,6 +14887,8 @@ function queueSaveTask() {
   const snap    = _queueSnapshot();
   const tasks   = _queueLoadTasks();
   tasks.push({ id: Date.now() + Math.random(), name, repeats, snapshot: snap });
+  const snapSize = JSON.stringify(snap).length;
+  console.log(`[queueSaveTask] snap size=${snapSize} bytes, total tasks=${tasks.length}`);
   const ok = _queueSaveTasks(tasks);
   if (!ok) {
     const err = document.getElementById('queue-save-error');
@@ -18552,7 +18558,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774274782776;
+window._BUILD_TS = 1774274978371;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
