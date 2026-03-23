@@ -1321,6 +1321,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
   <button class="btn btn-go" id="rbtn" onclick="runOpt()" disabled>🚀 Запустить</button>
   <button class="btn-pause" id="pbtn" onclick="pauseOpt()" style="display:none">⏸ Пауза</button>
   <button class="btn btn-stop" id="sbtn" onclick="stopOpt()" style="display:none">⏹ Стоп</button>
+  <button id="queue-toggle-btn" onclick="toggleQueuePanel()" style="background:rgba(255,180,50,.12);border:1px solid rgba(255,180,50,.4);color:#ffb432;font-size:.8em;padding:4px 10px;border-radius:5px;cursor:pointer;margin-left:6px" title="Очередь задач TPE">📋 Очередь</button>
   <div class="mode-grp">
     <span style="font-size:.63em;color:var(--text3)">Режим:</span>
     <div class="mode-btn active" id="mode_full" onclick="setOptMode('full')" title="Полный перебор всех комбинаций">Полный</div>
@@ -1357,6 +1358,55 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
       <span id="eta-found"></span>
     </div>
     <div class="pbar-wrap"><div class="pbar-fill" id="pbar"></div></div>
+  </div>
+</div>
+
+<!-- ── Очередь задач TPE ─────────────────────────────────────────── -->
+<div id="queue-panel" style="display:none;background:var(--bg2);border:1px solid rgba(255,180,50,.3);border-radius:8px;padding:10px 14px;margin:8px 0;font-size:.82em">
+  <!-- Заголовок + кнопки управления -->
+  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+    <span style="color:#ffb432;font-weight:700;font-size:.95em">📋 Очередь задач</span>
+    <button onclick="queueAddCurrent()" style="background:rgba(255,180,50,.15);border:1px solid rgba(255,180,50,.4);color:#ffb432;border-radius:4px;padding:2px 9px;cursor:pointer;font-size:.85em" title="Сохранить текущие настройки как новую задачу">+ Задача</button>
+    <button id="queue-run-btn" onclick="runQueue()" style="background:rgba(100,255,100,.15);border:1px solid rgba(100,255,100,.4);color:#7cff7c;border-radius:4px;padding:2px 9px;cursor:pointer;font-size:.85em">▶ Запустить очередь</button>
+    <button id="queue-stop-btn" onclick="stopQueue()" style="display:none;background:rgba(255,80,80,.15);border:1px solid rgba(255,80,80,.4);color:#ff5555;border-radius:4px;padding:2px 9px;cursor:pointer;font-size:.85em">⏹ Стоп</button>
+    <button onclick="queueClearAll()" style="background:transparent;border:1px solid var(--border);color:var(--text3);border-radius:4px;padding:2px 9px;cursor:pointer;font-size:.85em" title="Очистить всю очередь">🗑 Очистить</button>
+    <span style="flex:1"></span>
+    <!-- Шаблоны (серии) -->
+    <button onclick="toggleSeriesPanel()" style="background:rgba(100,180,255,.1);border:1px solid rgba(100,180,255,.3);color:#64b5f6;border-radius:4px;padding:2px 9px;cursor:pointer;font-size:.85em" title="Сохранённые серии задач">🗂 Серии</button>
+  </div>
+
+  <!-- Прогресс очереди -->
+  <div id="queue-progress" style="display:none;color:var(--accent2);margin-bottom:6px;font-size:.85em;padding:3px 6px;background:rgba(0,212,255,.07);border-radius:4px"></div>
+
+  <!-- Форма добавления задачи -->
+  <div id="queue-add-form" style="display:none;background:var(--bg3);border:1px solid rgba(255,180,50,.2);border-radius:5px;padding:8px 10px;margin-bottom:8px">
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <input id="queue-task-name" type="text" placeholder="Название задачи..." style="flex:1;min-width:140px;background:var(--bg2);border:1px solid var(--border2);border-radius:4px;color:var(--text);padding:3px 7px;font-size:.9em">
+      <label style="display:flex;align-items:center;gap:4px;color:var(--text2)">
+        Повторов:
+        <input id="queue-task-repeats" type="number" value="3" min="1" max="999" style="width:52px;background:var(--bg2);border:1px solid var(--border2);border-radius:4px;color:var(--text);padding:2px 5px;font-size:.9em">
+      </label>
+      <button onclick="queueSaveTask()" style="background:rgba(100,255,100,.15);border:1px solid rgba(100,255,100,.4);color:#7cff7c;border-radius:4px;padding:3px 10px;cursor:pointer">✓ Сохранить</button>
+      <button onclick="document.getElementById('queue-add-form').style.display='none'" style="background:transparent;border:1px solid var(--border);color:var(--text3);border-radius:4px;padding:3px 8px;cursor:pointer">✕</button>
+    </div>
+    <div id="queue-task-preview" style="color:var(--text3);margin-top:5px;font-size:.78em"></div>
+  </div>
+
+  <!-- Список задач -->
+  <div id="queue-task-list" style="display:flex;flex-direction:column;gap:4px;max-height:260px;overflow-y:auto">
+    <div style="color:var(--text3);text-align:center;padding:10px">Очередь пуста — нажми «+ Задача» чтобы добавить</div>
+  </div>
+
+  <!-- Панель серий -->
+  <div id="series-panel" style="display:none;margin-top:10px;border-top:1px solid var(--border);padding-top:8px">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+      <span style="color:#64b5f6;font-weight:600">🗂 Серии</span>
+      <input id="series-save-name" type="text" placeholder="Название серии..." style="flex:1;background:var(--bg2);border:1px solid var(--border2);border-radius:4px;color:var(--text);padding:2px 7px;font-size:.88em">
+      <button onclick="seriesSaveCurrent()" style="background:rgba(100,180,255,.15);border:1px solid rgba(100,180,255,.3);color:#64b5f6;border-radius:4px;padding:2px 9px;cursor:pointer;font-size:.85em">💾 Сохранить очередь как серию</button>
+    </div>
+    <div id="series-list" style="display:flex;flex-direction:column;gap:3px;max-height:180px;overflow-y:auto">
+      <div style="color:var(--text3);text-align:center;padding:6px">Серий нет</div>
+    </div>
   </div>
 </div>
 
@@ -8047,7 +8097,8 @@ async function runOpt() {
     if (typeof _setSynthProgress !== 'undefined') _setSynthProgress(0, '❌ Нет данных для оптимизации');
     return;
   }
-  stopped=false; paused=false; results=[]; equities={};
+  stopped=false; paused=false;
+  if (!window._queueMode) { results=[]; equities={}; }
   try { // ── глобальный try/catch: любая ошибка отображается в UI ──────────────
   resultCache.clear();
   const _resultNames = new Set(); // П.1: дедупликация
@@ -14701,6 +14752,267 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 });
 
+// ══════════════════════════════════════════════════════════════════
+// ── ОЧЕРЕДЬ ЗАДАЧ TPE ─────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════
+
+const _QUEUE_LS_KEY    = 'use_queue_tasks_v1';
+const _SERIES_LS_KEY   = 'use_queue_series_v1';
+let   _queueRunning    = false;
+let   _queueStopFlag   = false;
+
+// ── Снапшот текущего состояния DOM ────────────────────────────────
+function _queueSnapshot() {
+  const inputs = {}, checks = {};
+  document.querySelectorAll('input[id], select[id]').forEach(el => {
+    if (!el.id) return;
+    if (el.type === 'checkbox' || el.type === 'radio') {
+      checks[el.id] = el.checked;
+    } else {
+      inputs[el.id] = el.value;
+    }
+  });
+  return {
+    optMode: typeof optMode !== 'undefined' ? optMode : 'tpe',
+    inputs,
+    checks
+  };
+}
+
+// ── Восстановить снапшот в DOM ────────────────────────────────────
+function _queueRestore(snap) {
+  if (!snap) return;
+  if (snap.optMode && typeof setOptMode === 'function') setOptMode(snap.optMode);
+  Object.entries(snap.inputs || {}).forEach(([id, val]) => {
+    const el = document.getElementById(id);
+    if (el && el.tagName !== 'BUTTON') el.value = val;
+  });
+  Object.entries(snap.checks || {}).forEach(([id, checked]) => {
+    const el = document.getElementById(id);
+    if (el && (el.type === 'checkbox' || el.type === 'radio')) el.checked = checked;
+  });
+  if (typeof updatePreview === 'function') updatePreview();
+}
+
+// ── localStorage helpers ──────────────────────────────────────────
+function _queueLoadTasks()    { try { return JSON.parse(localStorage.getItem(_QUEUE_LS_KEY)  || '[]'); } catch(e) { return []; } }
+function _queueSaveTasks(arr) { localStorage.setItem(_QUEUE_LS_KEY,  JSON.stringify(arr)); }
+function _seriesLoad()        { try { return JSON.parse(localStorage.getItem(_SERIES_LS_KEY) || '[]'); } catch(e) { return []; } }
+function _seriesSave(arr)     { localStorage.setItem(_SERIES_LS_KEY, JSON.stringify(arr)); }
+
+// ── Сгенерировать краткое описание снапшота ───────────────────────
+function _queueSnapDesc(snap) {
+  if (!snap) return '';
+  const mode = snap.optMode || '?';
+  const target = (snap.inputs || {})['tpe_target'] || '';
+  const maxIter = (snap.inputs || {})['tpe_n'] || '';
+  return `Режим: ${mode}` + (target ? ` · Цель: ${target}` : '') + (maxIter ? ` · Макс: ${maxIter}` : '');
+}
+
+// ── UI: показать/скрыть панель ────────────────────────────────────
+function toggleQueuePanel() {
+  const p = document.getElementById('queue-panel');
+  if (!p) return;
+  const open = p.style.display !== 'none';
+  p.style.display = open ? 'none' : 'block';
+  if (!open) renderQueueTaskList();
+}
+
+function toggleSeriesPanel() {
+  const p = document.getElementById('series-panel');
+  if (!p) return;
+  p.style.display = p.style.display === 'none' ? 'block' : 'none';
+  if (p.style.display !== 'none') renderSeriesList();
+}
+
+// ── Добавить задачу (открыть форму) ──────────────────────────────
+function queueAddCurrent() {
+  const form = document.getElementById('queue-add-form');
+  if (!form) return;
+  form.style.display = 'block';
+  const prev = document.getElementById('queue-task-preview');
+  const snap = _queueSnapshot();
+  if (prev) prev.textContent = _queueSnapDesc(snap);
+  document.getElementById('queue-task-name')?.focus();
+}
+
+// ── Сохранить задачу из формы ────────────────────────────────────
+function queueSaveTask() {
+  const name    = (document.getElementById('queue-task-name')?.value || '').trim() || ('Задача ' + (_queueLoadTasks().length + 1));
+  const repeats = Math.max(1, parseInt(document.getElementById('queue-task-repeats')?.value) || 1);
+  const snap    = _queueSnapshot();
+  const tasks   = _queueLoadTasks();
+  tasks.push({ id: Date.now() + Math.random(), name, repeats, snapshot: snap });
+  _queueSaveTasks(tasks);
+  document.getElementById('queue-add-form').style.display = 'none';
+  document.getElementById('queue-task-name').value = '';
+  renderQueueTaskList();
+}
+
+// ── Удалить задачу ────────────────────────────────────────────────
+function queueDeleteTask(id) {
+  _queueSaveTasks(_queueLoadTasks().filter(t => t.id !== id));
+  renderQueueTaskList();
+}
+
+// ── Переместить задачу вверх/вниз ────────────────────────────────
+function queueMoveTask(id, dir) {
+  const tasks = _queueLoadTasks();
+  const idx   = tasks.findIndex(t => t.id === id);
+  if (idx < 0) return;
+  const newIdx = idx + dir;
+  if (newIdx < 0 || newIdx >= tasks.length) return;
+  [tasks[idx], tasks[newIdx]] = [tasks[newIdx], tasks[idx]];
+  _queueSaveTasks(tasks);
+  renderQueueTaskList();
+}
+
+// ── Очистить всю очередь ─────────────────────────────────────────
+function queueClearAll() {
+  if (!confirm('Очистить всю очередь задач?')) return;
+  _queueSaveTasks([]);
+  renderQueueTaskList();
+}
+
+// ── Отрисовать список задач ───────────────────────────────────────
+function renderQueueTaskList() {
+  const el = document.getElementById('queue-task-list');
+  if (!el) return;
+  const tasks = _queueLoadTasks();
+  if (tasks.length === 0) {
+    el.innerHTML = '<div style="color:var(--text3);text-align:center;padding:10px">Очередь пуста — нажми «+ Задача» чтобы добавить</div>';
+    return;
+  }
+  el.innerHTML = tasks.map((t, i) => {
+    const desc = _queueSnapDesc(t.snapshot);
+    return `<div style="display:flex;align-items:center;gap:6px;padding:5px 7px;background:var(--bg3);border-radius:5px;border:1px solid var(--border)">
+      <span style="color:var(--text3);font-size:.75em;min-width:16px">${i+1}.</span>
+      <div style="flex:1;overflow:hidden">
+        <div style="color:var(--text);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.name}</div>
+        <div style="color:var(--text3);font-size:.75em">${desc} · ×${t.repeats} повтор${t.repeats===1?'':'ов'}</div>
+      </div>
+      <button onclick="queueMoveTask(${t.id}, -1)" style="${i===0?'opacity:.3;pointer-events:none;':''} background:transparent;border:none;color:var(--text3);cursor:pointer;font-size:.9em;padding:1px 4px" title="Вверх">▲</button>
+      <button onclick="queueMoveTask(${t.id}, 1)"  style="${i===tasks.length-1?'opacity:.3;pointer-events:none;':''} background:transparent;border:none;color:var(--text3);cursor:pointer;font-size:.9em;padding:1px 4px" title="Вниз">▼</button>
+      <button onclick="queueDeleteTask(${t.id})" style="background:transparent;border:none;color:#ff5555;cursor:pointer;font-size:.9em;padding:1px 4px" title="Удалить">🗑</button>
+    </div>`;
+  }).join('');
+}
+
+// ── Запустить очередь ─────────────────────────────────────────────
+async function runQueue() {
+  if (_queueRunning) return;
+  const tasks = _queueLoadTasks();
+  if (tasks.length === 0) { alert('Очередь пуста'); return; }
+
+  _queueRunning  = true;
+  _queueStopFlag = false;
+  window._queueMode = true;
+
+  const runBtn  = document.getElementById('queue-run-btn');
+  const stopBtn = document.getElementById('queue-stop-btn');
+  const progEl  = document.getElementById('queue-progress');
+  if (runBtn)  runBtn.style.display  = 'none';
+  if (stopBtn) stopBtn.style.display = 'inline-block';
+  if (progEl)  progEl.style.display  = 'block';
+
+  const totalRepeats = tasks.reduce((s, t) => s + t.repeats, 0);
+  let doneRepeats = 0;
+
+  try {
+    for (let ti = 0; ti < tasks.length; ti++) {
+      if (_queueStopFlag) break;
+      const task = tasks[ti];
+
+      for (let rep = 0; rep < task.repeats; rep++) {
+        if (_queueStopFlag) break;
+
+        _queueRestore(task.snapshot);
+        // Подождать один тик чтобы DOM обновился
+        await new Promise(r => setTimeout(r, 50));
+
+        if (progEl) progEl.textContent =
+          `Задача ${ti+1}/${tasks.length} · Повтор ${rep+1}/${task.repeats} · Найдено: ${(window.results||[]).length.toLocaleString()} результатов`;
+
+        // Запустить — results НЕ сбрасываются (window._queueMode=true)
+        if (typeof window.runOpt === 'function') await window.runOpt();
+
+        doneRepeats++;
+        // Если пользователь нажал "Стоп" в runOpt — прерываем очередь
+        if (typeof stopped !== 'undefined' && stopped && !_queueStopFlag) {
+          _queueStopFlag = true; break;
+        }
+      }
+    }
+  } finally {
+    _queueRunning = false;
+    window._queueMode = false;
+    if (runBtn)  runBtn.style.display  = 'inline-block';
+    if (stopBtn) stopBtn.style.display = 'none';
+    if (progEl) {
+      const total = (window.results || []).length;
+      progEl.textContent = _queueStopFlag
+        ? `⏹ Остановлено · Найдено: ${total.toLocaleString()} результатов`
+        : `✅ Готово · Все задачи выполнены · Найдено: ${total.toLocaleString()} результатов`;
+      progEl.style.color = _queueStopFlag ? '#ff5555' : 'var(--accent)';
+    }
+  }
+}
+
+// ── Остановить очередь ────────────────────────────────────────────
+function stopQueue() {
+  _queueStopFlag = true;
+  if (typeof stopOpt === 'function') stopOpt();
+}
+
+// ── Серии ─────────────────────────────────────────────────────────
+function seriesSaveCurrent() {
+  const name = (document.getElementById('series-save-name')?.value || '').trim();
+  if (!name) { alert('Введи название серии'); return; }
+  const tasks = _queueLoadTasks();
+  if (tasks.length === 0) { alert('Очередь пуста'); return; }
+  const series = _seriesLoad();
+  series.push({ id: Date.now(), name, tasks: JSON.parse(JSON.stringify(tasks)) });
+  _seriesSave(series);
+  document.getElementById('series-save-name').value = '';
+  renderSeriesList();
+  toast('💾 Серия «' + name + '» сохранена', 1800);
+}
+
+function seriesLoad(id) {
+  const series = _seriesLoad();
+  const s = series.find(x => x.id === id);
+  if (!s) return;
+  if (_queueLoadTasks().length > 0 && !confirm('Заменить текущую очередь задачами из серии «' + s.name + '»?')) return;
+  _queueSaveTasks(JSON.parse(JSON.stringify(s.tasks)));
+  renderQueueTaskList();
+  toast('📂 Серия «' + s.name + '» загружена в очередь', 1800);
+}
+
+function seriesDelete(id) {
+  _seriesSave(_seriesLoad().filter(s => s.id !== id));
+  renderSeriesList();
+}
+
+function renderSeriesList() {
+  const el = document.getElementById('series-list');
+  if (!el) return;
+  const series = _seriesLoad();
+  if (series.length === 0) {
+    el.innerHTML = '<div style="color:var(--text3);text-align:center;padding:6px">Серий нет</div>';
+    return;
+  }
+  el.innerHTML = series.map(s =>
+    `<div style="display:flex;align-items:center;gap:6px;padding:4px 7px;background:var(--bg3);border-radius:4px;border:1px solid var(--border)">
+      <div style="flex:1">
+        <span style="color:var(--text)">${s.name}</span>
+        <span style="color:var(--text3);font-size:.75em;margin-left:6px">${s.tasks.length} задач · ${s.tasks.reduce((a,t)=>a+t.repeats,0)} повт.</span>
+      </div>
+      <button onclick="seriesLoad(${s.id})" style="background:rgba(100,180,255,.15);border:1px solid rgba(100,180,255,.3);color:#64b5f6;border-radius:3px;padding:2px 8px;cursor:pointer;font-size:.8em">Загрузить</button>
+      <button onclick="seriesDelete(${s.id})" style="background:transparent;border:none;color:#ff5555;cursor:pointer;font-size:.85em" title="Удалить серию">🗑</button>
+    </div>`
+  ).join('');
+}
+
 // ── Отсечка перед запуском тестов ──────────────────────────────
 // Возвращает подмножество _visibleResults, прошедших пороги pre-run фильтра.
 function _getPreRunFiltered() {
@@ -18191,7 +18503,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774271372990;
+window._BUILD_TS = 1774272306870;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
