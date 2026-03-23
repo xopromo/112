@@ -881,7 +881,9 @@ async function runOpt() {
   if (!window._queueMode) { results=[]; equities={}; }
   try { // ── глобальный try/catch: любая ошибка отображается в UI ──────────────
   resultCache.clear();
-  const _resultNames = new Set(); // П.1: дедупликация
+  // П.1: дедупликация — в queueMode results не сбрасывается, поэтому инициализируем
+  // именами из предыдущих прогонов, чтобы те же конфигурации не добавлялись повторно
+  const _resultNames = new Set(window._queueMode ? results.map(r => r.name) : []);
   $('tb').innerHTML=''; $('eqc').style.display='none';
   // Show pause/stop, hide run
   $('rbtn').style.display='none';
