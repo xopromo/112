@@ -2002,8 +2002,13 @@ function toggleFav(idx, event) {
   } else {
     favourites.push({ name:r.name, ns:_favNs, stats:{
       pnl:r.pnl, wr:r.wr, n:r.n, dd:r.dd, pdd:r.pdd,
-      dwr:r.dwr||0, avg:r.avg||0, p1:r.p1||0, p2:r.p2||0,
+      dwr:r.dwr||0, avg:r.avg||0, p1:r.p1||0, p2:r.p2||0, c1:r.c1||0, c2:r.c2||0,
       nL:r.nL||0, pL:r.pL||0, wrL:r.wrL, nS:r.nS||0, pS:r.pS||0, wrS:r.wrS, dwrLS:r.dwrLS,
+      sig:r.sig, gt:r.gt, cvr:r.cvr, upi:r.upi,
+      sortino:r.sortino, kRatio:r.kRatio, sqn:r.sqn,
+      omega:r.omega, pain:r.pain, burke:r.burke, serenity:r.serenity, ir:r.ir,
+      cpcvScore:r.cpcvScore,
+      eq:r.eq,
       robScore:r.robScore, robMax:r.robMax, robDetails:r.robDetails
     }, cfg:r.cfg, ts:Date.now() });
   }
@@ -3054,7 +3059,21 @@ function drawEquityData(eq, label, splitPct) {
   ctx.fillText(mx.toFixed(1)+'%',1,pad+7);
   ctx.fillText(mn.toFixed(1)+'%',1,H-pad-2);
   ctx.fillStyle='rgba(0,212,255,0.7)'; ctx.font='8px JetBrains Mono,monospace';
-  ctx.fillText((label||'').substring(0,60),pad,9);
+  // Полное название с ★ если избранное, перенос по словам
+  const _favPrefix = (typeof isFav === 'function' && isFav(label)) ? '★ ' : '';
+  const _fullLabel = _favPrefix + (label||'');
+  const _maxLabelW = W - pad - 4;
+  const _labelWords = _fullLabel.split(' ');
+  const _labelLines = [];
+  let _curLine = '';
+  for (const _w of _labelWords) {
+    const _test = _curLine ? _curLine + ' ' + _w : _w;
+    if (ctx.measureText(_test).width > _maxLabelW && _curLine) {
+      _labelLines.push(_curLine); _curLine = _w;
+    } else { _curLine = _test; }
+  }
+  if (_curLine) _labelLines.push(_curLine);
+  _labelLines.slice(0, 3).forEach((_line, _li) => ctx.fillText(_line, pad, 9 + _li * 9));
   ctx.fillStyle='rgba(255,160,40,0.6)';
   if (_isOOS) {
     ctx.fillText(`◄ IS (${splitPct}%)`, sx-38, H-4);
@@ -6146,7 +6165,14 @@ function _hcAddToFav(idx, btn) {
     const pdd = r.dd > 0 ? r.pnl / r.dd : 0;
     favourites.push({ name, cfg: x.cfg, stats: {
       pnl: r.pnl, wr: r.wr, n: r.n, dd: r.dd, pdd,
-      avg: r.avg||0, p1: r.p1||0, p2: r.p2||0
+      dwr: r.dwr||0, avg: r.avg||0, p1: r.p1||0, p2: r.p2||0, c1: r.c1||0, c2: r.c2||0,
+      nL: r.nL||0, pL: r.pL||0, wrL: r.wrL, nS: r.nS||0, pS: r.pS||0, wrS: r.wrS, dwrLS: r.dwrLS,
+      sig: r.sig, gt: r.gt, cvr: r.cvr, upi: r.upi,
+      sortino: r.sortino, kRatio: r.kRatio, sqn: r.sqn,
+      omega: r.omega, pain: r.pain, burke: r.burke, serenity: r.serenity, ir: r.ir,
+      cpcvScore: r.cpcvScore,
+      eq: r.eq,
+      robScore: x.robScore, robMax: x.robMax, robDetails: x.robDetails
     }});
     btn.textContent = '⭐ В избр.';
     btn.style.background = 'rgba(255,170,0,.2)';
