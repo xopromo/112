@@ -14380,7 +14380,7 @@ async function runMassRobust() {
   const toTest = allFiltered.filter(r => r.robScore === undefined); // пропускаем уже протестированные
   const skippedCount = allFiltered.length - toTest.length;
   if (!toTest.length) {
-    if (!window._queueRunning) {
+    if (!window._queueMode) {
       if (skippedCount) alert(`Все ${skippedCount} результатов уже протестированы (robScore присвоен).\nЧтобы перетестировать — сбрось таблицу и запусти заново.`);
       else alert('Нет результатов с cfg (или все отсечены фильтром перед запуском)');
     }
@@ -18849,7 +18849,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774297290765;
+window._BUILD_TS = 1774297614614;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
