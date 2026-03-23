@@ -4093,8 +4093,10 @@ function queueClearAll() {
 // ── Отрисовать список задач ───────────────────────────────────────
 function renderQueueTaskList() {
   const el = document.getElementById('queue-task-list');
+  console.log('[renderQueueTaskList] el=', !!el, 'raw LS=', localStorage.getItem(_QUEUE_LS_KEY)?.slice(0, 200));
   if (!el) return;
   const tasks = _queueLoadTasks();
+  console.log('[renderQueueTaskList] tasks.length=', tasks.length);
   if (tasks.length === 0) {
     el.innerHTML = '<div style="color:var(--text3);text-align:center;padding:10px">Очередь пуста — нажми «+ Задача» чтобы добавить</div>';
     return;
