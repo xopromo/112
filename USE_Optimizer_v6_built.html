@@ -15020,6 +15020,7 @@ function queueDuplicateTask(id) {
 function queueToggleCheck(id, checked) {
   if (checked) _queueUnchecked.delete(id);
   else _queueUnchecked.add(id);
+  renderQueueTaskList();
 }
 
 function queueCheckAll(checked) {
@@ -18849,7 +18850,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774298762624;
+window._BUILD_TS = 1774299947988;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;

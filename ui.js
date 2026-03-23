@@ -4155,6 +4155,7 @@ function queueDuplicateTask(id) {
 function queueToggleCheck(id, checked) {
   if (checked) _queueUnchecked.delete(id);
   else _queueUnchecked.add(id);
+  renderQueueTaskList();
 }
 
 function queueCheckAll(checked) {
