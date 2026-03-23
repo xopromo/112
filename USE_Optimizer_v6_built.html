@@ -14380,8 +14380,10 @@ async function runMassRobust() {
   const toTest = allFiltered.filter(r => r.robScore === undefined); // пропускаем уже протестированные
   const skippedCount = allFiltered.length - toTest.length;
   if (!toTest.length) {
-    if (skippedCount) alert(`Все ${skippedCount} результатов уже протестированы (robScore присвоен).\nЧтобы перетестировать — сбрось таблицу и запусти заново.`);
-    else alert('Нет результатов с cfg (или все отсечены фильтром перед запуском)');
+    if (!window._queueRunning) {
+      if (skippedCount) alert(`Все ${skippedCount} результатов уже протестированы (robScore присвоен).\nЧтобы перетестировать — сбрось таблицу и запусти заново.`);
+      else alert('Нет результатов с cfg (или все отсечены фильтром перед запуском)');
+    }
     _massRobRunning = false;
     if (btn) btn.textContent = '🔬 Тест всех видимых';
     return;
@@ -15198,8 +15200,6 @@ async function runQueue() {
         // Rob-тест после оптимизации
         if (!_queueStopFlag && task.snapshot?.checks?.['queue-task-rob']) {
           if (progEl) progEl.textContent = `🔬 Rob-тест · Задача ${ti+1}/${tasks.length} · Повтор ${rep+1}/${task.repeats} · ${(window.results||[]).length} результатов`;
-          // Сбрасываем robScore перед каждым повтором — иначе 2-й+ повтор пропустит все уже протестированные
-          (window.results || []).forEach(r => { delete r.robScore; delete r.robMax; delete r.robDetails; });
           if (typeof renderResults === 'function') renderResults();
           await yieldToUI(); // не тротлится в фоне
           if (typeof runMassRobust === 'function') await runMassRobust();
@@ -18849,7 +18849,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774296948011;
+window._BUILD_TS = 1774297180390;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
