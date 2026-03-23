@@ -3967,52 +3967,46 @@ function _queueRestore(snap) {
 
 // ── localStorage helpers ──────────────────────────────────────────
 function _queueLoadTasks()    { try { return JSON.parse(localStorage.getItem(_QUEUE_LS_KEY)  || '[]'); } catch(e) { return []; } }
+
+// Возвращает true если сохранено, false если не влезло даже после очистки
 function _queueSaveTasks(arr) {
   const _isQuota = e => e.name === 'QuotaExceededError' || (e.code && (e.code === 22 || e.code === 1014));
-  let data = arr;
-  while (data.length > 0) {
+  // Пробуем удалять старые задачи (с начала), пока новая (в конце) не влезет
+  for (let i = 0; i <= arr.length; i++) {
+    const data = arr.slice(i);
     try {
       localStorage.setItem(_QUEUE_LS_KEY, JSON.stringify(data));
-      if (data.length < arr.length) {
-        console.warn(`[_queueSaveTasks] localStorage переполнен — удалено ${arr.length - data.length} старых задач`);
-      }
-      return;
+      if (i > 0) console.warn(`[_queueSaveTasks] удалено ${i} старых задач для освобождения места`);
+      return true;
     } catch(e) {
-      if (_isQuota(e)) {
-        data = data.slice(1); // удаляем самую старую задачу
-      } else {
-        console.error('[_queueSaveTasks]', e);
-        return;
-      }
+      if (!_isQuota(e)) { console.error('[_queueSaveTasks]', e); return false; }
     }
   }
-  // Если даже пустой массив не влезает — очищаем другие ключи и пробуем ещё раз
+  // Даже 1 задача не влезла — пробуем очистить серии и повторить
   try { localStorage.removeItem(_SERIES_LS_KEY); } catch(_) {}
-  try { localStorage.setItem(_QUEUE_LS_KEY, '[]'); } catch(_) {}
-  console.warn('[_queueSaveTasks] localStorage критически переполнен, очередь сброшена');
+  const last = arr.slice(-1);
+  try {
+    localStorage.setItem(_QUEUE_LS_KEY, JSON.stringify(last));
+    console.warn('[_queueSaveTasks] очищены серии, сохранена только последняя задача');
+    return true;
+  } catch(_) {}
+  return false; // совсем не влезло
 }
+
 function _seriesLoad()    { try { return JSON.parse(localStorage.getItem(_SERIES_LS_KEY) || '[]'); } catch(e) { return []; } }
 function _seriesSave(arr) {
   const _isQuota = e => e.name === 'QuotaExceededError' || (e.code && (e.code === 22 || e.code === 1014));
-  let data = arr;
-  while (data.length > 0) {
+  for (let i = 0; i <= arr.length; i++) {
+    const data = arr.slice(i);
     try {
       localStorage.setItem(_SERIES_LS_KEY, JSON.stringify(data));
-      if (data.length < arr.length) {
-        console.warn(`[_seriesSave] localStorage переполнен — удалено ${arr.length - data.length} старых серий`);
-      }
-      return;
+      if (i > 0) console.warn(`[_seriesSave] удалено ${i} старых серий для освобождения места`);
+      return true;
     } catch(e) {
-      if (_isQuota(e)) {
-        data = data.slice(1); // удаляем самую старую серию
-      } else {
-        console.error('[_seriesSave]', e);
-        return;
-      }
+      if (!_isQuota(e)) { console.error('[_seriesSave]', e); return false; }
     }
   }
-  try { localStorage.setItem(_SERIES_LS_KEY, '[]'); } catch(_) {}
-  console.warn('[_seriesSave] localStorage критически переполнен, серии сброшены');
+  return false;
 }
 
 // ── Сгенерировать краткое описание снапшота ───────────────────────
@@ -4058,9 +4052,16 @@ function queueSaveTask() {
   const snap    = _queueSnapshot();
   const tasks   = _queueLoadTasks();
   tasks.push({ id: Date.now() + Math.random(), name, repeats, snapshot: snap });
-  _queueSaveTasks(tasks);
+  const ok = _queueSaveTasks(tasks);
+  if (!ok) {
+    const err = document.getElementById('queue-save-error');
+    if (err) { err.textContent = '⚠️ localStorage переполнен — задача не сохранена. Очисти очередь.'; err.style.display = 'block'; }
+    return; // не закрываем форму
+  }
   document.getElementById('queue-add-form').style.display = 'none';
   document.getElementById('queue-task-name').value = '';
+  const err = document.getElementById('queue-save-error');
+  if (err) err.style.display = 'none';
   renderQueueTaskList();
 }
 
