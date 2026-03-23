@@ -137,6 +137,8 @@ const ProjectManager = (() => {
     _projects.splice(idx, 1);
     await _delHandle(id);
     localStorage.removeItem(`use6_state_${id}`);
+    localStorage.removeItem(`use6_csv_${id}`);
+    localStorage.removeItem(`use6_fav_${id}`);
     if (_currentId === id) {
       _currentId = _projects[0]?.id || null;
     }
@@ -271,7 +273,27 @@ const ProjectManager = (() => {
 
   // ─── Init ──────────────────────────────────────────────────
 
-  function init() { _loadLS(); }
+  function init() {
+    _loadLS();
+    // Очищаем осиротевшие CSV/fav из localStorage (от удалённых проектов)
+    const knownIds = new Set(_projects.map(p => p.id));
+    const orphanPrefixes = ['use6_csv_', 'use6_fav_', 'use6_state_'];
+    const toRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k) continue;
+      for (const pfx of orphanPrefixes) {
+        if (k.startsWith(pfx)) {
+          const id = k.slice(pfx.length);
+          if (!knownIds.has(id)) toRemove.push(k);
+        }
+      }
+    }
+    if (toRemove.length > 0) {
+      toRemove.forEach(k => localStorage.removeItem(k));
+      console.log('[ProjectManager] очищено осиротевших ключей:', toRemove.length, toRemove);
+    }
+  }
 
   // ─── Exports ───────────────────────────────────────────────
 
