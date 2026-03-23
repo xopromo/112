@@ -3930,6 +3930,8 @@ const _QUEUE_LS_KEY    = 'use_queue_tasks_v1';
 const _SERIES_LS_KEY   = 'use_queue_series_v1';
 let   _queueRunning    = false;
 let   _queueStopFlag   = false;
+let   _queueUnchecked  = new Set(); // IDs задач, снятых с чекбокса
+let   _queueEditId     = null;      // ID редактируемой задачи (null = добавление)
 
 // ── Снапшот текущего состояния DOM ────────────────────────────────
 function _queueSnapshot() {
@@ -4040,24 +4042,85 @@ function toggleSeriesPanel() {
 
 // ── Добавить задачу (открыть форму) ──────────────────────────────
 function queueAddCurrent() {
+  _queueEditId = null;
   const form = document.getElementById('queue-add-form');
   if (!form) return;
   form.style.display = 'block';
+  const titleEl = document.getElementById('queue-form-title');
+  if (titleEl) titleEl.textContent = '+ Добавить задачу';
   const prev = document.getElementById('queue-task-preview');
-  const snap = _queueSnapshot();
-  if (prev) prev.textContent = _queueSnapDesc(snap);
+  if (prev) prev.textContent = 'Параметры сохранятся при нажатии ✓ Сохранить';
   document.getElementById('queue-task-name')?.focus();
 }
 
-// ── Сохранить задачу из формы ────────────────────────────────────
+// ── Закрыть форму (отмена) ────────────────────────────────────────
+function queueCancelForm() {
+  _queueEditId = null;
+  const form = document.getElementById('queue-add-form');
+  if (form) form.style.display = 'none';
+}
+
+// ── Редактировать существующую задачу ─────────────────────────────
+function queueEditTask(id) {
+  const tasks = _queueLoadTasks();
+  const task = tasks.find(t => t.id === id);
+  if (!task) return;
+  _queueEditId = id;
+  _queueRestore(task.snapshot);
+  const form = document.getElementById('queue-add-form');
+  if (!form) return;
+  form.style.display = 'block';
+  const titleEl = document.getElementById('queue-form-title');
+  if (titleEl) titleEl.textContent = '✏ Редактирование: ' + task.name;
+  const nameEl = document.getElementById('queue-task-name');
+  const repsEl = document.getElementById('queue-task-repeats');
+  if (nameEl) nameEl.value = task.name;
+  if (repsEl) repsEl.value = task.repeats;
+  const prev = document.getElementById('queue-task-preview');
+  if (prev) prev.textContent = 'Параметры восстановлены. Измени что нужно и нажми ✓ Сохранить';
+  form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  nameEl?.focus();
+}
+
+// ── Вспомогательные: чекбоксы задач ──────────────────────────────
+function queueToggleCheck(id, checked) {
+  if (checked) _queueUnchecked.delete(id);
+  else _queueUnchecked.add(id);
+}
+
+function queueCheckAll(checked) {
+  if (checked) {
+    _queueUnchecked.clear();
+  } else {
+    _queueLoadTasks().forEach(t => _queueUnchecked.add(t.id));
+  }
+  renderQueueTaskList();
+}
+
+// Возвращает только отмеченные (активные) задачи
+function _queueGetActive() {
+  return _queueLoadTasks().filter(t => !_queueUnchecked.has(t.id));
+}
+
+// ── Сохранить задачу из формы (добавление или редактирование) ────
 function queueSaveTask() {
+  const snap    = _queueSnapshot(); // снапшот берётся здесь — в момент сохранения!
   const name    = (document.getElementById('queue-task-name')?.value || '').trim() || ('Задача ' + (_queueLoadTasks().length + 1));
   const repeats = Math.max(1, parseInt(document.getElementById('queue-task-repeats')?.value) || 1);
-  const snap    = _queueSnapshot();
-  const tasks   = _queueLoadTasks();
-  tasks.push({ id: Date.now() + Math.random(), name, repeats, snapshot: snap });
-  const snapSize = JSON.stringify(snap).length;
-  console.log(`[queueSaveTask] snap size=${snapSize} bytes, total tasks=${tasks.length}`);
+  let tasks = _queueLoadTasks();
+
+  if (_queueEditId !== null) {
+    // Режим редактирования: заменяем задачу с совпадающим ID
+    const idx = tasks.findIndex(t => t.id === _queueEditId);
+    if (idx >= 0) {
+      tasks[idx] = { ...tasks[idx], name, repeats, snapshot: snap };
+    }
+    _queueEditId = null;
+  } else {
+    // Режим добавления
+    tasks.push({ id: Date.now() + Math.random(), name, repeats, snapshot: snap });
+  }
+
   const ok = _queueSaveTasks(tasks);
   if (!ok) {
     const err = document.getElementById('queue-save-error');
@@ -4068,11 +4131,14 @@ function queueSaveTask() {
   document.getElementById('queue-task-name').value = '';
   const err = document.getElementById('queue-save-error');
   if (err) err.style.display = 'none';
+  const titleEl = document.getElementById('queue-form-title');
+  if (titleEl) titleEl.textContent = '+ Добавить задачу';
   renderQueueTaskList();
 }
 
 // ── Удалить задачу ────────────────────────────────────────────────
 function queueDeleteTask(id) {
+  _queueUnchecked.delete(id);
   _queueSaveTasks(_queueLoadTasks().filter(t => t.id !== id));
   renderQueueTaskList();
 }
@@ -4099,22 +4165,28 @@ function queueClearAll() {
 // ── Отрисовать список задач ───────────────────────────────────────
 function renderQueueTaskList() {
   const el = document.getElementById('queue-task-list');
-  console.log('[renderQueueTaskList] el=', !!el, 'raw LS=', localStorage.getItem(_QUEUE_LS_KEY)?.slice(0, 200));
   if (!el) return;
   const tasks = _queueLoadTasks();
-  console.log('[renderQueueTaskList] tasks.length=', tasks.length);
   if (tasks.length === 0) {
     el.innerHTML = '<div style="color:var(--text3);text-align:center;padding:10px">Очередь пуста — нажми «+ Задача» чтобы добавить</div>';
     return;
   }
-  el.innerHTML = tasks.map((t, i) => {
-    const desc = _queueSnapDesc(t.snapshot);
-    return `<div style="display:flex;align-items:center;gap:6px;padding:5px 7px;background:var(--bg3);border-radius:5px;border:1px solid var(--border)">
+  const selRow = `<div style="display:flex;gap:2px;padding:0 2px;margin-bottom:2px">
+    <button onclick="queueCheckAll(true)"  style="background:transparent;border:none;color:var(--text3);cursor:pointer;font-size:.72em;padding:1px 5px" title="Выбрать все">✓ все</button>
+    <button onclick="queueCheckAll(false)" style="background:transparent;border:none;color:var(--text3);cursor:pointer;font-size:.72em;padding:1px 5px" title="Снять все">✕ все</button>
+  </div>`;
+  el.innerHTML = selRow + tasks.map((t, i) => {
+    const desc    = _queueSnapDesc(t.snapshot);
+    const checked = !_queueUnchecked.has(t.id);
+    const dimmed  = checked ? '' : 'opacity:.45;';
+    return `<div style="display:flex;align-items:center;gap:6px;padding:5px 7px;background:var(--bg3);border-radius:5px;border:1px solid var(--border);${dimmed}">
+      <input type="checkbox" ${checked ? 'checked' : ''} onchange="queueToggleCheck(${t.id}, this.checked)" style="cursor:pointer;accent-color:var(--accent);flex-shrink:0" title="Включить/отключить задачу">
       <span style="color:var(--text3);font-size:.75em;min-width:16px">${i+1}.</span>
       <div style="flex:1;overflow:hidden">
         <div style="color:var(--text);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.name}</div>
-        <div style="color:var(--text3);font-size:.75em">${desc} · ×${t.repeats} повтор${t.repeats===1?'':'ов'}</div>
+        <div style="color:var(--text2);font-size:.75em">${desc} · ×${t.repeats} повтор${t.repeats===1?'':'ов'}</div>
       </div>
+      <button onclick="queueEditTask(${t.id})" style="background:transparent;border:none;color:var(--text2);cursor:pointer;font-size:.85em;padding:1px 4px" title="Редактировать">✏</button>
       <button onclick="queueMoveTask(${t.id}, -1)" style="${i===0?'opacity:.3;pointer-events:none;':''} background:transparent;border:none;color:var(--text3);cursor:pointer;font-size:.9em;padding:1px 4px" title="Вверх">▲</button>
       <button onclick="queueMoveTask(${t.id}, 1)"  style="${i===tasks.length-1?'opacity:.3;pointer-events:none;':''} background:transparent;border:none;color:var(--text3);cursor:pointer;font-size:.9em;padding:1px 4px" title="Вниз">▼</button>
       <button onclick="queueDeleteTask(${t.id})" style="background:transparent;border:none;color:#ff5555;cursor:pointer;font-size:.9em;padding:1px 4px" title="Удалить">🗑</button>
@@ -4125,8 +4197,8 @@ function renderQueueTaskList() {
 // ── Запустить очередь ─────────────────────────────────────────────
 async function runQueue() {
   if (_queueRunning) return;
-  const tasks = _queueLoadTasks();
-  if (tasks.length === 0) { alert('Очередь пуста'); return; }
+  const tasks = _queueGetActive();
+  if (tasks.length === 0) { alert(_queueLoadTasks().length === 0 ? 'Очередь пуста' : 'Нет выбранных задач — отметь хотя бы одну'); return; }
 
   _queueRunning  = true;
   _queueStopFlag = false;
@@ -4192,8 +4264,8 @@ function stopQueue() {
 function seriesSaveCurrent() {
   const name = (document.getElementById('series-save-name')?.value || '').trim();
   if (!name) { alert('Введи название серии'); return; }
-  const tasks = _queueLoadTasks();
-  if (tasks.length === 0) { alert('Очередь пуста'); return; }
+  const tasks = _queueGetActive();
+  if (tasks.length === 0) { alert(_queueLoadTasks().length === 0 ? 'Очередь пуста' : 'Нет выбранных задач — отметь хотя бы одну'); return; }
   const series = _seriesLoad();
   series.push({ id: Date.now(), name, tasks: JSON.parse(JSON.stringify(tasks)) });
   _seriesSave(series);
