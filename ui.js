@@ -4223,8 +4223,9 @@ async function runQueue() {
         if (_queueStopFlag) break;
 
         _queueRestore(task.snapshot);
-        // Подождать один тик чтобы DOM обновился
-        await new Promise(r => setTimeout(r, 50));
+        // Один macrotask чтобы DOM-изменения применились до runOpt.
+        // yieldToUI = MessageChannel — не тротлится в фоновых вкладках.
+        await yieldToUI();
 
         if (progEl) progEl.textContent =
           `Задача ${ti+1}/${tasks.length} · Повтор ${rep+1}/${task.repeats} · Найдено: ${(window.results||[]).length.toLocaleString()} результатов`;
@@ -4243,7 +4244,7 @@ async function runQueue() {
           const removed = _queueApplyCutoff();
           if (progEl && removed > 0) {
             progEl.textContent = `🗑 Удалено ${removed} слабых результатов · Задача ${ti+1}/${tasks.length} · Повтор ${rep+1}/${task.repeats}`;
-            await new Promise(r => setTimeout(r, 600));
+            await yieldToUI(); // не тротлится в фоне
           }
         }
 
@@ -4251,7 +4252,7 @@ async function runQueue() {
         if (!_queueStopFlag && task.snapshot?.checks?.['queue-task-rob']) {
           if (progEl) progEl.textContent = `🔬 Rob-тест · Задача ${ti+1}/${tasks.length} · Повтор ${rep+1}/${task.repeats} · ${(window.results||[]).length} результатов`;
           if (typeof renderResults === 'function') renderResults();
-          await new Promise(r => setTimeout(r, 50));
+          await yieldToUI(); // не тротлится в фоне
           if (typeof runMassRobust === 'function') await runMassRobust();
         }
       }
