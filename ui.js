@@ -1242,7 +1242,7 @@ function showDetail(r) {
   filt += row('ATR расширяется',   c.useAtrExp  ? `ВКЛ · ATR > ${c.atrExpMult??1}× среднего (антифлет)` : 'ВЫКЛ',  c.useAtrExp?'on':'off');
   filt += row('RSI перекуп/перепрод', c.useRSI   ? `ВКЛ · лонг если RSI < ${c.rsiOS??0}, шорт если RSI > ${c.rsiOB??0}` : 'ВЫКЛ', c.useRSI?'on':'off');
   filt += row('Простой тренд MA',   c.useSTrend  ? `ВКЛ · окно ${c.sTrendWin??0} баров` : 'ВЫКЛ',                  c.useSTrend?'on':'off');
-  filt += row('Структура рынка HH/LL', c.useStruct ? `ВКЛ · lookback ${c.structLen??0} баров` : 'ВЫКЛ',            c.useStruct?'on':'off');
+  filt += row('Структура рынка HH/LL', c.useStruct ? `ВКЛ · L${c.strPvL||5} R${c.strPvR||2}` : 'ВЫКЛ',            c.useStruct?'on':'off');
   filt += row('Свежесть тренда',    c.useFresh   ? `ВКЛ · макс ${c.freshMax??0} баров от пересечения MA` : 'ВЫКЛ', c.useFresh?'on':'off');
   filt += row('Волатильность ATR',  c.useVolF    ? `ВКЛ · ATR < ${c.volFMult??0}× среднего` : 'ВЫКЛ',              c.useVolF?'on':'off');
   filt += row('Дистанция от MA',    c.useMaDist  ? `ВКЛ · не дальше ${c.maDistMax??0}×ATR от MA` : 'ВЫКЛ',         c.useMaDist?'on':'off');
@@ -1509,7 +1509,7 @@ function buildCopyText(r, c, slName, tpName) {
   lines.push('ATR расширяется:  ' + on(c.useAtrExp,  'ATR>' + (c.atrExpMult||1.0) + 'x среднего'));
   lines.push('RSI:              ' + on(c.useRSI,     'лонг<' + (c.rsiOS??0) + ', шорт>' + (c.rsiOB??0)));
   lines.push('Простой тренд:    ' + on(c.useSTrend,  'окно=' + (c.sTrendWin??0) + ' баров'));
-  lines.push('Структура рынка:  ' + on(c.useStruct,  'lookback=' + (c.structLen??0)));
+  lines.push('Структура рынка:  ' + on(c.useStruct,  'pvl=' + (c.strPvL||5) + ' pvr=' + (c.strPvR||2)));
   lines.push('Свежесть тренда:  ' + on(c.useFresh,   'макс=' + (c.freshMax??0) + ' баров'));
   lines.push('Волатильность ATR:' + on(c.useVolF,    'ATR<' + (c.volFMult??0) + 'x среднего'));
   lines.push('Дистанция от MA:  ' + on(c.useMaDist,  'макс=' + (c.maDistMax??0) + 'xATR'));
@@ -2706,7 +2706,12 @@ function parseTextToSettings(text) {
     if (parseStruct !== null) {
       const isOn = parseStruct.startsWith('ВКЛ');
       set('f_struct', isOn, 'chk', `Struct: ${isOn?'ВКЛ':'ВЫКЛ'}`);
-      if (isOn) { const m=parseStruct.match(/lookback=(\d+)/); if(m) set('f_strl', m[1], 'val', `Struct lookback=${m[1]}`); }
+      if (isOn) {
+        const ml=parseStruct.match(/pvl=(\d+)/), mr=parseStruct.match(/pvr=(\d+)/);
+        if(ml) set('f_strpvl', ml[1], 'val', `Struct pvl=${ml[1]}`);
+        if(mr) set('f_strpvr', mr[1], 'val', `Struct pvr=${mr[1]}`);
+        const mOld=parseStruct.match(/lookback=(\d+)/); if(mOld) set('f_strl', mOld[1], 'val', `Struct lookback=${mOld[1]}`);
+      }
     }
     const parseFresh = getVal('Свежесть тренда:');
     if (parseFresh !== null) {
@@ -6530,6 +6535,8 @@ async function confirmCreateProject() {
   const templateSnapshot = templates.find(t => t.isDefault) || null;
 
   const proj = await ProjectManager.create(name, _projCreateHandle, templateSnapshot);
+  // Force close even if firstLaunch (guard in closeProjCreate would block it)
+  _projCreateFirstLaunch = false;
   closeProjCreate();
   await setProject(proj.id);
   toast('✅ Проект создан: ' + name, 2000);
