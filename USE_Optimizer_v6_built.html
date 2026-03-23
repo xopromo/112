@@ -589,7 +589,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
 .btn-row { flex-wrap:wrap; gap:6px; align-items:center; }
 .btn-pause { background:rgba(255,170,0,.15); color:var(--orange); border:1px solid var(--orange); border-radius:6px; padding:7px 16px; font-family:var(--font-mono); font-size:.75em; font-weight:600; cursor:pointer; transition:all .15s; }
 .btn-pause:hover { background:rgba(255,170,0,.25); }
-.eta-wrap { display:flex; flex-direction:column; gap:3px; flex:1; min-width:200px; }
+.eta-wrap { display:flex; flex-direction:column; gap:3px; }
 .eta-line { display:flex; gap:10px; font-size:.68em; flex-wrap:wrap; }
 #eta-time { color:var(--orange); font-weight:600; }
 #eta-found { color:var(--green); }
@@ -1350,15 +1350,15 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
     <input type="range" id="snd_vol" min="0" max="1" step="0.05" value="0.5" title="Громкость">
   </div>
   <button class="tpl-ibtn" style="font-size:.68em;padding:4px 10px;border-color:var(--accent2);color:var(--accent2)" id="btn-open-parse" onclick="openParseModal()" title="Настроить из текста">📝 Из текста</button>
-  <div class="eta-wrap">
-    <div class="eta-line">
-      <span id="prog">— вар.</span>
-      <span id="mc-phase"></span>
-      <span id="eta-time"></span>
-      <span id="eta-found"></span>
-    </div>
-    <div class="pbar-wrap"><div class="pbar-fill" id="pbar"></div></div>
+</div>
+<div class="eta-wrap" style="margin:2px 0 4px;width:100%">
+  <div class="eta-line">
+    <span id="prog">— вар.</span>
+    <span id="mc-phase"></span>
+    <span id="eta-time"></span>
+    <span id="eta-found"></span>
   </div>
+  <div class="pbar-wrap"><div class="pbar-fill" id="pbar"></div></div>
 </div>
 
 <!-- ── Очередь задач TPE ─────────────────────────────────────────── -->
@@ -18850,7 +18850,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774299947988;
+window._BUILD_TS = 1774300417986;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
