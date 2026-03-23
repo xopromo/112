@@ -469,7 +469,7 @@ function switchTableMode(mode) {
   if (mode === 'hc' || mode === 'fav') {
     if (typeof resetAllFilters === 'function') resetAllFilters();
   } else {
-    applyFilters();
+    applyFilters(true);
   }
 }
 
@@ -542,7 +542,7 @@ function _applyTableFilters(f, visibleOnly) {
   if (f._sortCol !== null && f._sortCol !== undefined) {
     sortDirs[f._sortCol] = f._sortDir;
   }
-  applyFilters();
+  applyFilters(true);
 }
 
 function _renderQuickFilterBtns(tpls) {
@@ -709,12 +709,15 @@ function resetAllFilters() {
   });
   // Сбрасываем сортировку
   sortDirs = {};
-  applyFilters();
+  applyFilters(true);
 }
 
-function applyFilters() {
-  // Не перерисовывать во время массового rob-теста — предотвращает рендер-цикл
-  if (typeof _massRobRunning !== 'undefined' && _massRobRunning) return;
+function applyFilters(_force = false) {
+  // Блокируем автоматические вызовы во время queue/rob-теста — предотвращает рендер-цикл.
+  // Пользовательские вызовы (сортировка, кнопки фильтров) передают _force=true и проходят.
+  // finally-блок очереди вызывает applyFilters() УЖЕ после _queueMode=false — там тоже ок.
+  if (!_force && window._queueMode) return;
+  if (!_force && typeof _massRobRunning !== 'undefined' && _massRobRunning) return;
   const fName  = $('f_name').value.trim().toLowerCase();
   const fFav   = $('f_fav').value;
   const fPnl   = parseFloat($('f_pnl').value);
@@ -2032,7 +2035,7 @@ function _refreshFavStars() {
     if (starEl) starEl.textContent = isFav(r.name) ? '⭐' : '☆';
   });
   // Если мы в режиме fav — обновляем список полностью
-  if (_tableMode === 'fav') applyFilters();
+  if (_tableMode === 'fav') applyFilters(true);
 }
 function renderFavBar() {
   const bar = $('fav-bar'), sec = $('fav-section');
@@ -2231,7 +2234,7 @@ function loadSession(file) {
       renderFavBar();
       _refreshFavStars();
       _updateTableModeCounts();
-      applyFilters();
+      applyFilters(true);
       
       const nRes = results.length, nFav = s.favourites?.length || 0;
       const nsLabel = nsToLoad || 'общий';
@@ -3822,7 +3825,7 @@ function doSort(col) {
   const arr = _tableMode === 'hc'  ? _hcTableResults :
               _tableMode === 'fav' ? _getFavAsResults() :
               _tableMode === 'oos' ? _oosTableResults : results;
-  if (!arr || !arr.length) { applyFilters(); return; }
+  if (!arr || !arr.length) { applyFilters(true); return; }
 
   const detailKeys = {12:'oos', 13:'walk', 14:'param', 15:'noise', 16:'mc'};
 
@@ -3895,7 +3898,7 @@ function doSort(col) {
   }
 
   _curPage = 0;
-  applyFilters();
+  applyFilters(true);
 }
 
 // Получаем favs в формате таблицы (для сортировки)
@@ -4582,7 +4585,7 @@ async function runOOSScan() {
   if (btn) btn.textContent = '🔎 OOS-скан';
   if (status) status.textContent = `✅ ${done} проверено | ≥1🛡: ${passed} | Кэш: ${_robCache.size}`;
   _updateHCSrcCounts();
-  applyFilters();
+  applyFilters(true);
 }
 
 function _updateHCSrcCounts() {
@@ -6631,7 +6634,7 @@ function doOOSSort(key) {
     if (typeof av === 'string') return _oosSortDir * av.localeCompare(bv);
     return _oosSortDir * ((av ?? -Infinity) - (bv ?? -Infinity));
   });
-  applyFilters();
+  applyFilters(true);
 }
 
 function _getOOSSortVal(r, key) {
