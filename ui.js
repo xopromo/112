@@ -846,6 +846,19 @@ function renderResults() {
   if (window.results && Array.isArray(window.results)) {
     results = window.results;
   }
+
+  // В режиме очереди: не трогаем таблицу и фильтры — только счётчики.
+  // Таблица обновится когда пользователь кликнет сортировку или изменит фильтр.
+  if (window._queueMode) {
+    $('mass-rob-bar').style.display = results.length > 0 ? 'flex' : 'none';
+    $('mass-rob-info').textContent = `${results.length} результатов`;
+    if (typeof window._batchOOS === 'function') {
+      const _pendingOOS = results.filter(r => r.cfg && r.cfg._oos === undefined);
+      if (_pendingOOS.length > 0) setTimeout(() => window._batchOOS(), 50);
+    }
+    return;
+  }
+
   // При новом запуске оптимизации — возвращаемся в режим results
   if (_tableMode !== 'results') switchTableMode('results');
   _visibleResults = [...results]; // сброс фильтра при новом запуске
@@ -4354,6 +4367,10 @@ async function runQueue() {
         : `✅ Готово · Все задачи выполнены · Найдено: ${total.toLocaleString()} результатов`;
       progEl.style.color = _queueStopFlag ? '#ff5555' : 'var(--accent)';
     }
+    // Финальный рендер: применяем текущие фильтры без сброса
+    if (typeof applyFilters === 'function') applyFilters();
+    $('mass-rob-bar').style.display = (window.results||[]).length > 0 ? 'flex' : 'none';
+    $('mass-rob-info').textContent = `${(window.results||[]).length} результатов`;
   }
 }
 
