@@ -14924,8 +14924,10 @@ function queueClearAll() {
 // ── Отрисовать список задач ───────────────────────────────────────
 function renderQueueTaskList() {
   const el = document.getElementById('queue-task-list');
+  console.log('[renderQueueTaskList] el=', !!el, 'raw LS=', localStorage.getItem(_QUEUE_LS_KEY)?.slice(0, 200));
   if (!el) return;
   const tasks = _queueLoadTasks();
+  console.log('[renderQueueTaskList] tasks.length=', tasks.length);
   if (tasks.length === 0) {
     el.innerHTML = '<div style="color:var(--text3);text-align:center;padding:10px">Очередь пуста — нажми «+ Задача» чтобы добавить</div>';
     return;
@@ -18550,7 +18552,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774274079675;
+window._BUILD_TS = 1774274587570;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
