@@ -1544,6 +1544,16 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
           style="width:40px;background:var(--bg2);color:var(--text);border:1px solid var(--border);border-radius:3px;padding:1px 4px"
           oninput="updatePreRunCount()">
       </label>
+      <label style="display:flex;align-items:center;gap:3px;color:var(--text2)" title="OOS PnL ≥ X% (только для результатов с OOS-данными; пусто = не фильтровать)">
+        OOS PnL ≥ <input type="number" id="prf_min_oos_pnl" value="" step="1" placeholder="—"
+          style="width:46px;background:var(--bg2);color:var(--text);border:1px solid var(--border);border-radius:3px;padding:1px 4px"
+          oninput="updatePreRunCount()"> %
+      </label>
+      <label style="display:flex;align-items:center;gap:3px;color:var(--text2)" title="OOS Retention ≥ X (скорость OOS / скорость IS, -2..2; 0 = OOS не хуже IS; пусто = не фильтровать)">
+        Ret ≥ <input type="number" id="prf_min_retention" value="" step="0.1" placeholder="—"
+          style="width:44px;background:var(--bg2);color:var(--text);border:1px solid var(--border);border-radius:3px;padding:1px 4px"
+          oninput="updatePreRunCount()">
+      </label>
       <span id="prf-count" style="color:var(--accent);font-weight:600;margin-left:4px"></span>
     </div>
   </div>
@@ -15171,39 +15181,50 @@ function renderSeriesList() {
 // ── Отсечка перед запуском тестов ──────────────────────────────
 // Возвращает подмножество _visibleResults, прошедших пороги pre-run фильтра.
 function _getPreRunFiltered() {
-  const minPnl = parseFloat(document.getElementById('prf_minpnl')?.value) ?? 0;
-  const minWR  = parseFloat(document.getElementById('prf_minwr')?.value)  ?? 0;
-  const minSig = parseFloat(document.getElementById('prf_minsig')?.value) ?? 0;
-  const minGT  = parseFloat(document.getElementById('prf_mingt')?.value)  ?? 0;
-  return _visibleResults.filter(r =>
-    r.cfg &&
-    r.pnl >= (isNaN(minPnl) ? 0 : minPnl) &&
-    r.wr  >= (isNaN(minWR)  ? 0 : minWR)  &&
-    (r.sig ?? 0) >= (isNaN(minSig) ? 0 : minSig) &&
-    (r.gt  ?? -2) >= (isNaN(minGT) ? 0 : minGT)
-  );
+  const minPnl    = parseFloat(document.getElementById('prf_minpnl')?.value) ?? 0;
+  const minWR     = parseFloat(document.getElementById('prf_minwr')?.value)  ?? 0;
+  const minSig    = parseFloat(document.getElementById('prf_minsig')?.value) ?? 0;
+  const minGT     = parseFloat(document.getElementById('prf_mingt')?.value)  ?? 0;
+  const minOosPnl = parseFloat(document.getElementById('prf_min_oos_pnl')?.value);
+  const minRet    = parseFloat(document.getElementById('prf_min_retention')?.value);
+  return _visibleResults.filter(r => {
+    if (!r.cfg) return false;
+    if (r.pnl < (isNaN(minPnl) ? 0 : minPnl)) return false;
+    if (r.wr  < (isNaN(minWR)  ? 0 : minWR))  return false;
+    if ((r.sig ?? 0) < (isNaN(minSig) ? 0 : minSig)) return false;
+    if ((r.gt  ?? -2) < (isNaN(minGT) ? 0 : minGT))  return false;
+    // OOS-фильтры: применяются только если значение задано И у результата есть OOS-данные
+    const fwd = r.cfg._oos?.forward;
+    if (fwd && !isNaN(minOosPnl) && fwd.pnl    < minOosPnl) return false;
+    if (fwd && !isNaN(minRet)    && fwd.retention < minRet)  return false;
+    return true;
+  });
 }
 
 // Фильтрует window.results по тем же порогам что _getPreRunFiltered().
 // Используется очередью после каждой оптимизации (авто-очистка мусора).
 // Возвращает кол-во удалённых результатов.
 function _queueApplyCutoff() {
-  const minPnl = parseFloat(document.getElementById('prf_minpnl')?.value);
-  const minWR  = parseFloat(document.getElementById('prf_minwr')?.value);
-  const minSig = parseFloat(document.getElementById('prf_minsig')?.value);
-  const minGT  = parseFloat(document.getElementById('prf_mingt')?.value);
+  const minPnl    = parseFloat(document.getElementById('prf_minpnl')?.value);
+  const minWR     = parseFloat(document.getElementById('prf_minwr')?.value);
+  const minSig    = parseFloat(document.getElementById('prf_minsig')?.value);
+  const minGT     = parseFloat(document.getElementById('prf_mingt')?.value);
+  const minOosPnl = parseFloat(document.getElementById('prf_min_oos_pnl')?.value);
+  const minRet    = parseFloat(document.getElementById('prf_min_retention')?.value);
   const p = isNaN(minPnl) ? 0 : minPnl;
   const w = isNaN(minWR)  ? 0 : minWR;
   const s = isNaN(minSig) ? 0 : minSig;
   const g = isNaN(minGT)  ? 0 : minGT;
   const before = (window.results || []).length;
-  window.results = (window.results || []).filter(r =>
-    r.cfg &&
-    r.pnl >= p &&
-    r.wr  >= w &&
-    (r.sig ?? 0) >= s &&
-    (r.gt  ?? -2) >= g
-  );
+  window.results = (window.results || []).filter(r => {
+    if (!r.cfg) return false;
+    if (r.pnl < p || r.wr < w) return false;
+    if ((r.sig ?? 0) < s || (r.gt ?? -2) < g) return false;
+    const fwd = r.cfg._oos?.forward;
+    if (fwd && !isNaN(minOosPnl) && fwd.pnl       < minOosPnl) return false;
+    if (fwd && !isNaN(minRet)    && fwd.retention  < minRet)    return false;
+    return true;
+  });
   const removed = before - window.results.length;
   if (removed > 0 && typeof renderResults === 'function') renderResults();
   return removed;
@@ -18705,7 +18726,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774284517677;
+window._BUILD_TS = 1774284632800;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;

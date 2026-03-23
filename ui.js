@@ -4329,39 +4329,50 @@ function renderSeriesList() {
 // ── Отсечка перед запуском тестов ──────────────────────────────
 // Возвращает подмножество _visibleResults, прошедших пороги pre-run фильтра.
 function _getPreRunFiltered() {
-  const minPnl = parseFloat(document.getElementById('prf_minpnl')?.value) ?? 0;
-  const minWR  = parseFloat(document.getElementById('prf_minwr')?.value)  ?? 0;
-  const minSig = parseFloat(document.getElementById('prf_minsig')?.value) ?? 0;
-  const minGT  = parseFloat(document.getElementById('prf_mingt')?.value)  ?? 0;
-  return _visibleResults.filter(r =>
-    r.cfg &&
-    r.pnl >= (isNaN(minPnl) ? 0 : minPnl) &&
-    r.wr  >= (isNaN(minWR)  ? 0 : minWR)  &&
-    (r.sig ?? 0) >= (isNaN(minSig) ? 0 : minSig) &&
-    (r.gt  ?? -2) >= (isNaN(minGT) ? 0 : minGT)
-  );
+  const minPnl    = parseFloat(document.getElementById('prf_minpnl')?.value) ?? 0;
+  const minWR     = parseFloat(document.getElementById('prf_minwr')?.value)  ?? 0;
+  const minSig    = parseFloat(document.getElementById('prf_minsig')?.value) ?? 0;
+  const minGT     = parseFloat(document.getElementById('prf_mingt')?.value)  ?? 0;
+  const minOosPnl = parseFloat(document.getElementById('prf_min_oos_pnl')?.value);
+  const minRet    = parseFloat(document.getElementById('prf_min_retention')?.value);
+  return _visibleResults.filter(r => {
+    if (!r.cfg) return false;
+    if (r.pnl < (isNaN(minPnl) ? 0 : minPnl)) return false;
+    if (r.wr  < (isNaN(minWR)  ? 0 : minWR))  return false;
+    if ((r.sig ?? 0) < (isNaN(minSig) ? 0 : minSig)) return false;
+    if ((r.gt  ?? -2) < (isNaN(minGT) ? 0 : minGT))  return false;
+    // OOS-фильтры: применяются только если значение задано И у результата есть OOS-данные
+    const fwd = r.cfg._oos?.forward;
+    if (fwd && !isNaN(minOosPnl) && fwd.pnl    < minOosPnl) return false;
+    if (fwd && !isNaN(minRet)    && fwd.retention < minRet)  return false;
+    return true;
+  });
 }
 
 // Фильтрует window.results по тем же порогам что _getPreRunFiltered().
 // Используется очередью после каждой оптимизации (авто-очистка мусора).
 // Возвращает кол-во удалённых результатов.
 function _queueApplyCutoff() {
-  const minPnl = parseFloat(document.getElementById('prf_minpnl')?.value);
-  const minWR  = parseFloat(document.getElementById('prf_minwr')?.value);
-  const minSig = parseFloat(document.getElementById('prf_minsig')?.value);
-  const minGT  = parseFloat(document.getElementById('prf_mingt')?.value);
+  const minPnl    = parseFloat(document.getElementById('prf_minpnl')?.value);
+  const minWR     = parseFloat(document.getElementById('prf_minwr')?.value);
+  const minSig    = parseFloat(document.getElementById('prf_minsig')?.value);
+  const minGT     = parseFloat(document.getElementById('prf_mingt')?.value);
+  const minOosPnl = parseFloat(document.getElementById('prf_min_oos_pnl')?.value);
+  const minRet    = parseFloat(document.getElementById('prf_min_retention')?.value);
   const p = isNaN(minPnl) ? 0 : minPnl;
   const w = isNaN(minWR)  ? 0 : minWR;
   const s = isNaN(minSig) ? 0 : minSig;
   const g = isNaN(minGT)  ? 0 : minGT;
   const before = (window.results || []).length;
-  window.results = (window.results || []).filter(r =>
-    r.cfg &&
-    r.pnl >= p &&
-    r.wr  >= w &&
-    (r.sig ?? 0) >= s &&
-    (r.gt  ?? -2) >= g
-  );
+  window.results = (window.results || []).filter(r => {
+    if (!r.cfg) return false;
+    if (r.pnl < p || r.wr < w) return false;
+    if ((r.sig ?? 0) < s || (r.gt ?? -2) < g) return false;
+    const fwd = r.cfg._oos?.forward;
+    if (fwd && !isNaN(minOosPnl) && fwd.pnl       < minOosPnl) return false;
+    if (fwd && !isNaN(minRet)    && fwd.retention  < minRet)    return false;
+    return true;
+  });
   const removed = before - window.results.length;
   if (removed > 0 && typeof renderResults === 'function') renderResults();
   return removed;
