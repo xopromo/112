@@ -1,0 +1,96 @@
+//@version=6
+// ============================================================
+// Wick Trailing SL — тест индикатора
+// SL двигается от фитиля последней закрытой свечи
+// Визуальный тест перед внедрением в backtester
+// ============================================================
+indicator("Wick Trailing SL [TEST]", overlay=true)
+
+// ── Inputs ───────────────────────────────────────────────────
+var string G1 = "Параметры отступа"
+offset_type = input.string("ATR", "Тип отступа", options=["ATR", "% от цены", "Пункты"], group=G1)
+atr_len     = input.int(14,  "Период ATR",           minval=1,      step=1,    group=G1)
+atr_mult    = input.float(0.5, "Множитель ATR",       minval=0.0,    step=0.05, group=G1,
+                 tooltip="Отступ от фитиля = ATR × множитель")
+fixed_pct   = input.float(0.3, "Процент от цены (%)", minval=0.001,  step=0.05, group=G1)
+fixed_pts   = input.float(10.0,"Пункты",              minval=0.0001, step=1.0,  group=G1)
+
+var string G2 = "Отображение"
+show_long   = input.bool(true,  "Long SL (зелёный)",         group=G2)
+show_short  = input.bool(true,  "Short SL (красный)",        group=G2)
+show_raw    = input.bool(false, "Доп. линия без ratchet",    group=G2,
+                 tooltip="Тонкая пунктирная линия — SL без ratchet, только от фитиля текущей свечи")
+
+// ── Вычисление отступа ───────────────────────────────────────
+atr    = ta.atr(atr_len)
+offset = switch offset_type
+    "ATR"       => atr * atr_mult
+    "% от цены" => close * fixed_pct / 100.0
+    =>             fixed_pts
+
+// ── Raw уровни (фитиль последней закрытой свечи ± отступ) ────
+//   low[1]  = нижний фитиль последней закрытой свечи
+//   high[1] = верхний фитиль последней закрытой свечи
+long_sl_raw  = low[1]  - offset
+short_sl_raw = high[1] + offset
+
+// ── Ratchet версия (движется только в пользу позиции) ────────
+// Сброс: когда цена пробивает SL — уровень обновляется заново.
+// Это имитирует поведение в реальной сделке:
+//   - пока позиция жива → SL только улучшается
+//   - после срабатывания → SL сбрасывается к текущему бару
+var float long_sl  = na
+var float short_sl = na
+
+// Long: SL движется только вверх; сброс когда Low пробил уровень
+long_hit = not na(long_sl[1]) and low[1] <= long_sl[1]
+long_sl  := long_hit or na(long_sl[1]) ? long_sl_raw : math.max(long_sl[1], long_sl_raw)
+
+// Short: SL движется только вниз; сброс когда High пробил уровень
+short_hit = not na(short_sl[1]) and high[1] >= short_sl[1]
+short_sl  := short_hit or na(short_sl[1]) ? short_sl_raw : math.min(short_sl[1], short_sl_raw)
+
+// ── Визуализация сброса ──────────────────────────────────────
+bgcolor(long_hit  ? color.new(color.green, 88) : na, title="Long SL сработал")
+bgcolor(short_hit ? color.new(color.red,   88) : na, title="Short SL сработал")
+
+// ── Plots ────────────────────────────────────────────────────
+plot(show_long  ? long_sl  : na,
+     title    = "Long SL (ratchet)",
+     color    = color.new(color.lime, 0),
+     style    = plot.style_stepline,
+     linewidth = 2)
+
+plot(show_short ? short_sl : na,
+     title    = "Short SL (ratchet)",
+     color    = color.new(color.red, 0),
+     style    = plot.style_stepline,
+     linewidth = 2)
+
+// Тонкие вспомогательные линии без ratchet
+plot(show_raw and show_long  ? long_sl_raw  : na,
+     title    = "Long SL raw",
+     color    = color.new(color.lime, 65),
+     style    = plot.style_stepline_diamond,
+     linewidth = 1)
+
+plot(show_raw and show_short ? short_sl_raw : na,
+     title    = "Short SL raw",
+     color    = color.new(color.red, 65),
+     style    = plot.style_stepline_diamond,
+     linewidth = 1)
+
+// ── Подписи уровней (последний бар) ─────────────────────────
+if barstate.islast
+    if show_long and not na(long_sl)
+        label.new(bar_index, long_sl,
+             text  = "Long SL\n" + str.tostring(long_sl, format.mintick),
+             style = label.style_label_right,
+             color = color.new(color.lime, 10),
+             textcolor = color.white, size = size.small)
+    if show_short and not na(short_sl)
+        label.new(bar_index, short_sl,
+             text  = "Short SL\n" + str.tostring(short_sl, format.mintick),
+             style = label.style_label_right,
+             color = color.new(color.red, 10),
+             textcolor = color.white, size = size.small)
