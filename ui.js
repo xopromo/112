@@ -4429,8 +4429,10 @@ async function runQueue() {
         if (progEl) progEl.textContent =
           `Задача ${ti+1}/${tasks.length} · Повтор ${rep+1}/${task.repeats} · Найдено: ${(window.results||[]).length.toLocaleString()} результатов`;
 
-        // Запустить — results НЕ сбрасываются (window._queueMode=true)
-        if (typeof window.runOpt === 'function') await window.runOpt();
+        // Запустить — results НЕ сбрасываются (window._queueMode=true).
+        // runOptMultiTF читает c_tf_range из снапшота и ресэмплирует DATA.
+        const _queueRunner = typeof window.runOptMultiTF === 'function' ? window.runOptMultiTF : window.runOpt;
+        if (_queueRunner) await _queueRunner();
 
         doneRepeats++;
         // Если пользователь нажал "Стоп" в runOpt — прерываем очередь

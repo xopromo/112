@@ -3123,6 +3123,8 @@ async function runOptMultiTF() {
   const _tfMults = parseRange('c_tf_range').filter(x => Number.isInteger(x) && x >= 1);
   const _tfList  = _tfMults.length > 0 ? _tfMults : [1];
   const _masterDATA = window.DATA_1M || DATA;
+  // Сохраняем внешний _queueMode (может быть true если вызвано из очереди задач)
+  const _prevQueueMode = !!window._queueMode;
 
   for (let _tfIdx = 0; _tfIdx < _tfList.length; _tfIdx++) {
     if (stopped) break;
@@ -3136,7 +3138,9 @@ async function runOptMultiTF() {
       if (el) { el.style.display='inline'; el.textContent=`TF ${_tfIdx+1}/${_tfList.length} (×${tfMult})`; }
     }
     await runOpt();
-    window._queueMode = false;
+    // Восстанавливаем флаг: если вызвано из очереди — оставляем true,
+    // иначе — сбрасываем в false как раньше
+    window._queueMode = _prevQueueMode;
     // Между TF: скрываем кнопку «Запустить» (runOpt её показал)
     if (_tfIdx < _tfList.length - 1 && !stopped) {
       $('rbtn').style.display='none';
