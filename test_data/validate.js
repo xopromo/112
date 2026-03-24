@@ -298,11 +298,14 @@ function runBacktest(data, cfg) {
   ctx._validatePvHi   = cfg.pvHi_ || new Float64Array(data.length);
   ctx._validateAtrArr = atrArr;
 
+  // tradeLog создаём ВНУТРИ vm-контекста — иначе cross-context push тихо не работает
+  vm.runInContext('_validateCfg.tradeLog = []', ctx);
+
   const result = vm.runInContext(
     'backtest(_validatePvLo, _validatePvHi, _validateAtrArr, _validateCfg)',
     ctx
   );
-  result.tradeLog = cfg.tradeLog || [];
+  result.tradeLog = vm.runInContext('_validateCfg.tradeLog', ctx);
   return result;
 }
 
