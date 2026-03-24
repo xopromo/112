@@ -845,6 +845,9 @@ function calcTotal() {
   if(useBE){let v=0;beTrigs_ct.forEach(t=>{beOffs.forEach(o=>{if(o<t)v++;});});beCount=v||1;}
   const trTrigs=useTrail?parseRange('x_trt'):[0.5];  // Default 0.5 when Trail disabled
   const trDists=useTrail?parseRange('x_trd'):[0.5];  // Default 0.5 when Trail disabled
+  const useWickTrail=$c('x_wt');
+  const wickOffType=document.getElementById('x_wt_type')?.value||'ATR';
+  const wickMults=useWickTrail?parseRange('x_wt_mult'):[0.5];
   const timeBarsA=useTime?parseRange('x_timeb'):[0];  // Default 0 when TimeExit disabled
   const revBarsA=($c('x_rev')&&$v('x_revb'))?parseRange('x_revb'):[2];
   const revSkipA=$c('x_rev')?parseRange('x_revskip'):[0];
@@ -1190,6 +1193,9 @@ async function runOpt() {
   if(!beOffs.length) beOffs.push(0);
   const trTrigs=useTrail?parseRange('x_trt'):[0.5];  // Default 0.5 when Trail disabled
   const trDists=useTrail?parseRange('x_trd'):[0.5];  // Default 0.5 when Trail disabled
+  const useWickTrail=$c('x_wt');
+  const wickOffType=document.getElementById('x_wt_type')?.value||'ATR';
+  const wickMults=useWickTrail?parseRange('x_wt_mult'):[0.5];
   const timeBarsArr=useTime?parseRange('x_timeb'):[0];  // Default 0 when TimeExit disabled
 
   // ── SYNTHESIS MODE: расширенный перебор SL/TP ──────────────────────
@@ -1696,7 +1702,7 @@ async function runOpt() {
     (mdMaxs.length?mdMaxs:[0]), (freshMaxs.length?freshMaxs:[20]),
     (wtThreshs.length?wtThreshs:[0]), (vsaMs.length?vsaMs:[0]),
     (atrBoMults.length?atrBoMults:[2.0]), slPairs, tpPairs,
-    beOffs, beTrigs, trTrigs, trDists, (timeBarsArr.length?timeBarsArr:[50]),
+    beOffs, beTrigs, trTrigs, trDists, wickMults, (timeBarsArr.length?timeBarsArr:[50]),
     window._ipCombos,
     (tlPvLs.length?tlPvLs:[5]), (tlPvRs.length?tlPvRs:[3]),
     (confTypeArr.length?confTypeArr:['EMA']), (confHtfArr.length?confHtfArr:[1]),
@@ -1790,6 +1796,7 @@ async function runOpt() {
       const beTrig   = _dims[_d][_di[_d++]];
       const trTrig   = _dims[_d][_di[_d++]];
       const trDist   = _dims[_d][_di[_d++]];
+      const wickMult = _dims[_d][_di[_d++]];
       const timeBars = _dims[_d][_di[_d++]];
       const _ip      = _dims[_d][_di[_d++]];
       const tlPvL    = _dims[_d][_di[_d++]];
@@ -1922,6 +1929,7 @@ async function runOpt() {
         hasTPB:!!(tpPair.b),tpMultB:tpPair.b?tpPair.b.m:0,tpModeB:tpPair.b?tpPair.b.type:'rr',tpLogic,
         useBE,beTrig,beOff,
         useTrail,trTrig,trDist,
+        useWickTrail,wickOffType,wickMult,
         useRev,revBars,revMode,revAct,revSrc,revSkip,revCooldown,revNoFilters:true,
         useTime,timeBars,timeMode,
         usePartial,partRR,partPct,partBE,
@@ -1995,7 +2003,7 @@ async function runOpt() {
               waitBars:waitBars||0,waitRetrace:waitRetrace||false,waitMaxBars,waitCancelAtr,
               slPair,slLogic,tpPair,tpLogic,
               useSLPiv,slPivOff,slPivMax,slPivL,slPivR,slPivTrail,
-              useBE,beTrig,beOff,useTrail,trTrig,trDist,
+              useBE,beTrig,beOff,useTrail,trTrig,trDist,useWickTrail,wickOffType,wickMult,
               useRev,revBars,revMode,revAct,useTime,timeBars,timeMode,
               usePartial,partRR,partPct,partBE,
               useClimax:useClimaxExit&&HAS_VOLUME,clxVolMult,clxBodyMult,clxMode,
@@ -2369,7 +2377,7 @@ async function runOpt() {
               waitBars:waitBars||0,waitRetrace:waitRetrace||false,waitMaxBars,waitCancelAtr,
               slPair,slLogic,tpPair,tpLogic,
               useSLPiv,slPivOff,slPivMax,slPivL,slPivR,slPivTrail,
-              useBE,beTrig,beOff,useTrail,trTrig,trDist,
+              useBE,beTrig,beOff,useTrail,trTrig,trDist,useWickTrail,wickOffType,wickMult,
               useRev,revBars,revMode,revAct,revSrc,revSkip,revCooldown,
               useTime,timeBars,timeMode,usePartial,partRR,partPct,partBE,
               useClimax:useClimaxExit&&HAS_VOLUME,clxVolMult,clxBodyMult,clxMode,
@@ -2776,6 +2784,7 @@ async function runOpt() {
                               if(useBE && beOff >= beTrig) continue; // только классический BE
                               for(const trTrig of trTrigs) {
                                 for(const trDist of trDists) {
+                                  for(const wickMult of wickMults) {
                                   for(const timeBars of (timeBarsArr.length?timeBarsArr:[50])) {
                                     for(const tlPvL of (tlPvLs.length?tlPvLs:[5])) {
                                       for(const tlPvR of (tlPvRs.length?tlPvRs:[3])) {
@@ -2983,7 +2992,7 @@ async function runOpt() {
                                           slPair, slLogic, tpPair, tpLogic,
                                           useSLPiv, slPivOff, slPivMax, slPivL, slPivR, slPivTrail,
                                           useBE, beTrig, beOff,
-                                          useTrail, trTrig, trDist,
+                                          useTrail, trTrig, trDist, useWickTrail, wickOffType, wickMult,
                                           useRev, revBars, revMode, revAct, revSrc, revSkip, revCooldown,
                                           useTime, timeBars, timeMode,
                                           usePartial, partRR, partPct, partBE,
@@ -3031,6 +3040,7 @@ async function runOpt() {
                                       } // tlPvR
                                     } // tlPvL
                                   } // _ip combo
+                                  } // wickMult
                                 } // trDist
                               } // trTrig
                             } // beOff

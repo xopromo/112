@@ -1134,6 +1134,13 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
   </div>
 
   <div class="sep"></div>
+  <div class="cb"><input type="checkbox" id="x_wt"><label data-tip="Wick Trailing SL: SL двигается от фитиля последней закрытой свечи, только в пользу позиции (ratchet)">Wick Trailing SL</label></div>
+  <div class="g2">
+    <div class="field"><label>Тип отступа</label><select id="x_wt_type"><option value="ATR">×ATR</option><option value="pct">% цены</option><option value="pts">Пункты</option></select></div>
+    <div class="field"><label>Значение / диапазон</label><input id="x_wt_mult" value="0.3:0.8:0.1" data-tip="Отступ от фитиля. ATR: 0.3:0.8:0.1 → [0.3…0.8]. % цены: например 0.5. Пункты: например 10"></div>
+  </div>
+
+  <div class="sep"></div>
   <div class="cb"><input type="checkbox" id="x_rev" checked><label data-tip="Выход по обратному сигналу. Как sig_ex в USE. Источник, пропуск N сигналов, кулдаун — полная реализация как в индикаторе">Обратный сигнал</label></div>
   <div style="font-size:.6em;color:var(--text3);margin:2px 0 2px">Источник обратного (sig_ex_src):</div>
   <div class="xmode">

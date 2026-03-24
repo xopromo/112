@@ -1134,6 +1134,13 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
   </div>
 
   <div class="sep"></div>
+  <div class="cb"><input type="checkbox" id="x_wt"><label data-tip="Wick Trailing SL: SL двигается от фитиля последней закрытой свечи, только в пользу позиции (ratchet)">Wick Trailing SL</label></div>
+  <div class="g2">
+    <div class="field"><label>Тип отступа</label><select id="x_wt_type"><option value="ATR">×ATR</option><option value="pct">% цены</option><option value="pts">Пункты</option></select></div>
+    <div class="field"><label>Значение / диапазон</label><input id="x_wt_mult" value="0.3:0.8:0.1" data-tip="Отступ от фитиля. ATR: 0.3:0.8:0.1 → [0.3…0.8]. % цены: например 0.5. Пункты: например 10"></div>
+  </div>
+
+  <div class="sep"></div>
   <div class="cb"><input type="checkbox" id="x_rev" checked><label data-tip="Выход по обратному сигналу. Как sig_ex в USE. Источник, пропуск N сигналов, кулдаун — полная реализация как в индикаторе">Обратный сигнал</label></div>
   <div style="font-size:.6em;color:var(--text3);margin:2px 0 2px">Источник обратного (sig_ex_src):</div>
   <div class="xmode">
@@ -7164,6 +7171,7 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
   let hasSL2 = false, hasTP2 = false;
   let exitBar = -1, entryBar = -1;
   let beActive = false, trailActive = false, partialDone = false, posSize = 1.0;
+  let wickSL = NaN;
   let revSkipCount = 0, revCooldownBar = -1; // счётчики skip/cooldown для обратного сигнала
   // Отложенный вход (Bars / Retrace)
   let pendingDir = 0, pendingBar = -1, pendingSigClose = 0;
@@ -7368,6 +7376,29 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
             }
           }
         }
+
+        // Wick Trailing SL: двигается от фитиля предыдущей свечи, только в пользу позиции
+        if (cfg.useWickTrail && i > 0) {
+          const wickOffset = cfg.wickOffType === 'pct'
+            ? DATA[i].c * cfg.wickMult / 100
+            : cfg.wickOffType === 'pts'
+              ? cfg.wickMult
+              : atrArr[i] * cfg.wickMult; // ATR (default)
+          const wickRaw = dir === 1
+            ? DATA[i-1].l - wickOffset   // Long: ниже нижнего фитиля предыдущей свечи
+            : DATA[i-1].h + wickOffset;  // Short: выше верхнего фитиля
+          // Ratchet: движется только в пользу позиции
+          if (isNaN(wickSL)) {
+            wickSL = wickRaw;
+          } else {
+            wickSL = dir === 1 ? Math.max(wickSL, wickRaw) : Math.min(wickSL, wickRaw);
+          }
+          // Проверка срабатывания (параллельно с основным SL)
+          if (!hsl && !htp && !htr) {
+            if (dir === 1 && bar.l <= wickSL) { hsl = true; exitPrice = wickSL; }
+            else if (dir === -1 && bar.h >= wickSL) { hsl = true; exitPrice = wickSL; }
+          }
+        }
       }
 
       // --- Шаг 7: frc без hsl/htp/htr → выход по close (с учётом BE/trail SL) ---
@@ -7483,7 +7514,7 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
       if (doDir !== 0 && ac > 0) {
         inTrade=true; dir=doDir;
         entry=bar.c; entryBar=i;
-        beActive=false; trailActive=false; partialDone=false; posSize=1.0;
+        beActive=false; trailActive=false; partialDone=false; posSize=1.0; wickSL=NaN;
         revSkipCount=0; revCooldownBar=-1;
 
         // Compute SL levels — из SL_REGISTRY
@@ -8340,6 +8371,9 @@ function calcTotal() {
   if(useBE){let v=0;beTrigs_ct.forEach(t=>{beOffs.forEach(o=>{if(o<t)v++;});});beCount=v||1;}
   const trTrigs=useTrail?parseRange('x_trt'):[0.5];  // Default 0.5 when Trail disabled
   const trDists=useTrail?parseRange('x_trd'):[0.5];  // Default 0.5 when Trail disabled
+  const useWickTrail=$c('x_wt');
+  const wickOffType=document.getElementById('x_wt_type')?.value||'ATR';
+  const wickMults=useWickTrail?parseRange('x_wt_mult'):[0.5];
   const timeBarsA=useTime?parseRange('x_timeb'):[0];  // Default 0 when TimeExit disabled
   const revBarsA=($c('x_rev')&&$v('x_revb'))?parseRange('x_revb'):[2];
   const revSkipA=$c('x_rev')?parseRange('x_revskip'):[0];
@@ -8685,6 +8719,9 @@ async function runOpt() {
   if(!beOffs.length) beOffs.push(0);
   const trTrigs=useTrail?parseRange('x_trt'):[0.5];  // Default 0.5 when Trail disabled
   const trDists=useTrail?parseRange('x_trd'):[0.5];  // Default 0.5 when Trail disabled
+  const useWickTrail=$c('x_wt');
+  const wickOffType=document.getElementById('x_wt_type')?.value||'ATR';
+  const wickMults=useWickTrail?parseRange('x_wt_mult'):[0.5];
   const timeBarsArr=useTime?parseRange('x_timeb'):[0];  // Default 0 when TimeExit disabled
 
   // ── SYNTHESIS MODE: расширенный перебор SL/TP ──────────────────────
@@ -9191,7 +9228,7 @@ async function runOpt() {
     (mdMaxs.length?mdMaxs:[0]), (freshMaxs.length?freshMaxs:[20]),
     (wtThreshs.length?wtThreshs:[0]), (vsaMs.length?vsaMs:[0]),
     (atrBoMults.length?atrBoMults:[2.0]), slPairs, tpPairs,
-    beOffs, beTrigs, trTrigs, trDists, (timeBarsArr.length?timeBarsArr:[50]),
+    beOffs, beTrigs, trTrigs, trDists, wickMults, (timeBarsArr.length?timeBarsArr:[50]),
     window._ipCombos,
     (tlPvLs.length?tlPvLs:[5]), (tlPvRs.length?tlPvRs:[3]),
     (confTypeArr.length?confTypeArr:['EMA']), (confHtfArr.length?confHtfArr:[1]),
@@ -9285,6 +9322,7 @@ async function runOpt() {
       const beTrig   = _dims[_d][_di[_d++]];
       const trTrig   = _dims[_d][_di[_d++]];
       const trDist   = _dims[_d][_di[_d++]];
+      const wickMult = _dims[_d][_di[_d++]];
       const timeBars = _dims[_d][_di[_d++]];
       const _ip      = _dims[_d][_di[_d++]];
       const tlPvL    = _dims[_d][_di[_d++]];
@@ -9417,6 +9455,7 @@ async function runOpt() {
         hasTPB:!!(tpPair.b),tpMultB:tpPair.b?tpPair.b.m:0,tpModeB:tpPair.b?tpPair.b.type:'rr',tpLogic,
         useBE,beTrig,beOff,
         useTrail,trTrig,trDist,
+        useWickTrail,wickOffType,wickMult,
         useRev,revBars,revMode,revAct,revSrc,revSkip,revCooldown,revNoFilters:true,
         useTime,timeBars,timeMode,
         usePartial,partRR,partPct,partBE,
@@ -9490,7 +9529,7 @@ async function runOpt() {
               waitBars:waitBars||0,waitRetrace:waitRetrace||false,waitMaxBars,waitCancelAtr,
               slPair,slLogic,tpPair,tpLogic,
               useSLPiv,slPivOff,slPivMax,slPivL,slPivR,slPivTrail,
-              useBE,beTrig,beOff,useTrail,trTrig,trDist,
+              useBE,beTrig,beOff,useTrail,trTrig,trDist,useWickTrail,wickOffType,wickMult,
               useRev,revBars,revMode,revAct,useTime,timeBars,timeMode,
               usePartial,partRR,partPct,partBE,
               useClimax:useClimaxExit&&HAS_VOLUME,clxVolMult,clxBodyMult,clxMode,
@@ -9864,7 +9903,7 @@ async function runOpt() {
               waitBars:waitBars||0,waitRetrace:waitRetrace||false,waitMaxBars,waitCancelAtr,
               slPair,slLogic,tpPair,tpLogic,
               useSLPiv,slPivOff,slPivMax,slPivL,slPivR,slPivTrail,
-              useBE,beTrig,beOff,useTrail,trTrig,trDist,
+              useBE,beTrig,beOff,useTrail,trTrig,trDist,useWickTrail,wickOffType,wickMult,
               useRev,revBars,revMode,revAct,revSrc,revSkip,revCooldown,
               useTime,timeBars,timeMode,usePartial,partRR,partPct,partBE,
               useClimax:useClimaxExit&&HAS_VOLUME,clxVolMult,clxBodyMult,clxMode,
@@ -10271,6 +10310,7 @@ async function runOpt() {
                               if(useBE && beOff >= beTrig) continue; // только классический BE
                               for(const trTrig of trTrigs) {
                                 for(const trDist of trDists) {
+                                  for(const wickMult of wickMults) {
                                   for(const timeBars of (timeBarsArr.length?timeBarsArr:[50])) {
                                     for(const tlPvL of (tlPvLs.length?tlPvLs:[5])) {
                                       for(const tlPvR of (tlPvRs.length?tlPvRs:[3])) {
@@ -10478,7 +10518,7 @@ async function runOpt() {
                                           slPair, slLogic, tpPair, tpLogic,
                                           useSLPiv, slPivOff, slPivMax, slPivL, slPivR, slPivTrail,
                                           useBE, beTrig, beOff,
-                                          useTrail, trTrig, trDist,
+                                          useTrail, trTrig, trDist, useWickTrail, wickOffType, wickMult,
                                           useRev, revBars, revMode, revAct, revSrc, revSkip, revCooldown,
                                           useTime, timeBars, timeMode,
                                           usePartial, partRR, partPct, partBE,
@@ -10526,6 +10566,7 @@ async function runOpt() {
                                       } // tlPvR
                                     } // tlPvL
                                   } // _ip combo
+                                  } // wickMult
                                 } // trDist
                               } // trTrig
                             } // beOff
@@ -19310,7 +19351,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774390768819;
+window._BUILD_TS = 1774392919548;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
