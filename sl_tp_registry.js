@@ -41,6 +41,11 @@ const SL_REGISTRY = [
       if (!cfg.pivSLLo || !cfg.pivSLHi) return NaN;
       const pivLevel = dir === 1 ? cfg.pivSLLo[i] : cfg.pivSLHi[i];
       if (isNaN(pivLevel)) return NaN;
+      // Проверка свежести: как Pine (bar_index - last_pv_lo_bar) <= 30
+      if (cfg.pivSLLoAge && cfg.pivSLHiAge) {
+        const pivBar = dir === 1 ? cfg.pivSLLoAge[i] : cfg.pivSLHiAge[i];
+        if (pivBar < 0 || (i - pivBar) > 30) return NaN;
+      }
       const rawSL = dir === 1
         ? pivLevel - ac * cfg.slPivOff
         : pivLevel + ac * cfg.slPivOff;

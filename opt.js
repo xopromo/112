@@ -1849,7 +1849,7 @@ async function runOpt() {
       const matPeriod   = _ip.matPeriod   ?? window._ipDef.matPeriod;
       const matZone     = _ip.matZone     ?? window._ipDef.matZone;
       const tlZonePct   = _ip.tlZonePct   ?? window._ipDef.tlZonePct;
-      const {lo:pivSLLo, hi:pivSLHi} = useSLPiv ? _getPivSL(slPivL, slPivR) : {lo:null, hi:null};
+      const {lo:pivSLLo, hi:pivSLHi, loAge:pivSLLoAge, hiAge:pivSLHiAge} = useSLPiv ? _getPivSL(slPivL, slPivR) : {lo:null, hi:null, loAge:null, hiAge:null};
       const rsiExitArr = useRsiExit   ? (rsiExitCache[rsiExitPer]||(rsiExitCache[rsiExitPer]=calcRSI(rsiExitPer))) : null;
       const kalmanCrossArr = useKalmanCross ? (()=>{const k=kalmanCrossLen;return kalmanCrossCache[k]||(kalmanCrossCache[k]=_buildKalmanMA(closes,k));})() : null; // ##KALMAN_CROSS##
       const kalmanArr = useKalmanMA ? (()=>{return kalmanMACache[kalmanLen]||(kalmanMACache[kalmanLen]=_buildKalmanMA(closes,kalmanLen));})() : null; // ##KALMAN_MA##
@@ -1931,7 +1931,7 @@ async function runOpt() {
         useVolF:_effUseVolF&&vfM>0,atrAvg,volFMult:vfM,
         useAtrExp:_effUseAtrExp&&atrExpM>0,atrExpMult:atrExpM,
         useStruct:_effUseStruct,structBull,structBear,strPvL,strPvR,
-        useSLPiv,slPivOff,slPivMax,slPivL,slPivR,slPivTrail,pivSLLo,pivSLHi,
+        useSLPiv,slPivOff,slPivMax,slPivL,slPivR,slPivTrail,pivSLLo,pivSLHi,pivSLLoAge,pivSLHiAge,
         useConfirm:_effUseConfirm&&confN>0,confN,confMatType:_confType,confHtfRatio:_confHtf,maArrConfirm:confMAArr,
         useMaDist:_effUseMaDist&&mdMax>0,maDistMax:mdMax,
         useCandleF:_effUseCandleF,candleMin,candleMax,
@@ -2191,7 +2191,7 @@ async function runOpt() {
       const matPeriod   = _ip.matPeriod   ?? window._ipDef.matPeriod;
       const matZone     = _ip.matZone     ?? window._ipDef.matZone;
       const tlZonePct   = _ip.tlZonePct   ?? window._ipDef.tlZonePct;
-      const {lo:pivSLLo, hi:pivSLHi} = useSLPiv ? _getPivSL(slPivL, slPivR) : {lo:null, hi:null};
+      const {lo:pivSLLo, hi:pivSLHi, loAge:pivSLLoAge, hiAge:pivSLHiAge} = useSLPiv ? _getPivSL(slPivL, slPivR) : {lo:null, hi:null, loAge:null, hiAge:null};
       const rsiExitArr = useRsiExit   ? (rsiExitCache[rsiExitPer]||(rsiExitCache[rsiExitPer]=calcRSI(rsiExitPer))) : null;
       const kalmanCrossArr = useKalmanCross ? (()=>{const k=kalmanCrossLen;return kalmanCrossCache[k]||(kalmanCrossCache[k]=_buildKalmanMA(closes,k));})() : null; // ##KALMAN_CROSS##
       const kalmanArr = useKalmanMA ? (()=>{return kalmanMACache[kalmanLen]||(kalmanMACache[kalmanLen]=_buildKalmanMA(closes,kalmanLen));})() : null; // ##KALMAN_MA##
@@ -2274,7 +2274,7 @@ async function runOpt() {
         useVolF:_effUseVolF&&vfM>0,atrAvg,volFMult:vfM,
         useAtrExp:_effUseAtrExp&&atrExpM>0,atrExpMult:atrExpM,
         useStruct:_effUseStruct,structBull,structBear,strPvL,strPvR,
-        useSLPiv,slPivOff,slPivMax,slPivL,slPivR,slPivTrail,pivSLLo,pivSLHi,
+        useSLPiv,slPivOff,slPivMax,slPivL,slPivR,slPivTrail,pivSLLo,pivSLHi,pivSLLoAge,pivSLHiAge,
         useConfirm:_effUseConfirm&&confN>0,confN,confMatType:_confType,confHtfRatio:_confHtf,maArrConfirm:confMAArr,
         useMaDist:_effUseMaDist&&mdMax>0,maDistMax:mdMax,
         useCandleF:_effUseCandleF,candleMin,candleMax,useConsec:_effUseConsec,consecMax,
@@ -2790,7 +2790,7 @@ async function runOpt() {
                                     const slPivMax    = _ip.slPivMax    ?? window._ipDef.slPivMax;
                                     const slPivL      = _ip.slPivL      ?? window._ipDef.slPivL;
                                     const slPivR      = _ip.slPivR      ?? window._ipDef.slPivR;
-                                    const {lo:pivSLLo, hi:pivSLHi} = useSLPiv ? _getPivSL(slPivL, slPivR) : {lo:null, hi:null};
+                                    const {lo:pivSLLo, hi:pivSLHi, loAge:pivSLLoAge, hiAge:pivSLHiAge} = useSLPiv ? _getPivSL(slPivL, slPivR) : {lo:null, hi:null, loAge:null, hiAge:null};
                                     const rsiExitPer  = _ip.rsiExitPer  ?? window._ipDef.rsiExitPer;
                                     const rsiExitOS   = _ip.rsiExitOS   ?? window._ipDef.rsiExitOS;
                                     const rsiExitOB   = _ip.rsiExitOB   ?? window._ipDef.rsiExitOB;
@@ -2873,7 +2873,7 @@ async function runOpt() {
                                       slPctMult:slPair.p?slPair.p.m:0,
                                       slLogic,
                                       useSLPiv,slPivOff,slPivMax,slPivL,slPivR,slPivTrail,
-                                      pivSLLo:useSLPiv?pivSLLo:null,pivSLHi:useSLPiv?pivSLHi:null,
+                                      pivSLLo:useSLPiv?pivSLLo:null,pivSLHi:useSLPiv?pivSLHi:null,pivSLLoAge:useSLPiv?pivSLLoAge:null,pivSLHiAge:useSLPiv?pivSLHiAge:null,
                                       // TP
                                       hasTPA:!!tpPair.a,
                                       tpMult:tpPair.a?tpPair.a.m:0,
@@ -3377,12 +3377,12 @@ function _calcIndicators(cfg) {
   }
 
   // ── SL Pivot ──────────────────────────────────────────────
-  let pivSLLo = null, pivSLHi = null;
+  let pivSLLo = null, pivSLHi = null, pivSLLoAge = null, pivSLHiAge = null;
   if (cfg.useSLPiv) {
     const slPivL = cfg.slPivL || 3;
     const slPivR = cfg.slPivR || 1;
     const r = calcPivotLoHi(DATA, slPivL, slPivR);
-    pivSLLo = r.lo; pivSLHi = r.hi;
+    pivSLLo = r.lo; pivSLHi = r.hi; pivSLLoAge = r.loAge; pivSLHiAge = r.hiAge;
   }
 
   // ── Trendline Figures (TL touch/break, flag, triangle) ────
@@ -3484,7 +3484,7 @@ function _calcIndicators(cfg) {
     volAvgArr, bodyAvgArr,
     wtScores,
     structBull, structBear,
-    pivSLLo, pivSLHi,
+    pivSLLo, pivSLHi, pivSLLoAge, pivSLHiAge,
     tfSigL, tfSigS,
     rsiExitArr, maCrossArr,
     macdLine, macdSignal,
@@ -3666,6 +3666,8 @@ function buildBtCfg(cfg, ind) {
     slPivTrail: cfg.slPivTrail || false,
     pivSLLo:    ind.pivSLLo,
     pivSLHi:    ind.pivSLHi,
+    pivSLLoAge: ind.pivSLLoAge,
+    pivSLHiAge: ind.pivSLHiAge,
     useConfirm:    cfg.useConfirm    || false,
     confN:         cfg.confN         || 2,
     confMatType:   cfg.confMatType   || 'EMA',

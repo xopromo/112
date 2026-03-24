@@ -93,35 +93,42 @@ function calcStructPivots(data, pvL, pvR) {
 }
 // Pivot-based SL: массив pivot lo/hi для каждого бара
 function calcPivotLoHi(data, pvL, pvR) {
-  // Возвращает {lo[], hi[]} — последний pivot low/high доступный на каждом баре
+  // Возвращает {lo[], hi[], loAge[], hiAge[]}
+  // lo/hi — значение последнего пивота (fill-forward)
+  // loAge/hiAge — индекс бара пивота (для проверки свежести, как в Pine: bar_index - last_pv_lo_bar <= 30)
   const N=data.length;
   const lo=new Float64Array(N).fill(NaN);
   const hi=new Float64Array(N).fill(NaN);
-  let lastLo=NaN, lastHi=NaN;
+  const loAge=new Int32Array(N).fill(-1);  // -1 = пивота ещё не было
+  const hiAge=new Int32Array(N).fill(-1);
+  let lastLo=NaN, lastHi=NaN, lastLoBar=-1, lastHiBar=-1;
   for(let i=pvL;i<N-pvR;i++){
-    // Pivot low
+    // Pivot low: LEFT нестрогое (>, ничья = ok), RIGHT строгое (>=, ничья = fail) — как Pine ta.pivotlow
     let isL=true;
-    for(let j=1;j<=pvL;j++){if(data[i].l>=data[i-j].l){isL=false;break;}}
+    for(let j=1;j<=pvL;j++){if(data[i].l>data[i-j].l){isL=false;break;}}
     if(isL)for(let j=1;j<=pvR;j++){if(data[i].l>=data[i+j].l){isL=false;break;}}
-    if(isL) lastLo=data[i].l;
-    // Pivot high
+    if(isL){lastLo=data[i].l; lastLoBar=i;}
+    // Pivot high: LEFT нестрогое (<, ничья = ok), RIGHT строгое (<=, ничья = fail) — как Pine ta.pivothigh
     let isH=true;
-    for(let j=1;j<=pvL;j++){if(data[i].h<=data[i-j].h){isH=false;break;}}
+    for(let j=1;j<=pvL;j++){if(data[i].h<data[i-j].h){isH=false;break;}}
     if(isH)for(let j=1;j<=pvR;j++){if(data[i].h<=data[i+j].h){isH=false;break;}}
-    if(isH) lastHi=data[i].h;
+    if(isH){lastHi=data[i].h; lastHiBar=i;}
     // Заполняем с учётом задержки pvR
     const fillBar = i+pvR;
-    if(fillBar<N){lo[fillBar]=lastLo; hi[fillBar]=lastHi;}
+    if(fillBar<N){
+      lo[fillBar]=lastLo; hi[fillBar]=lastHi;
+      loAge[fillBar]=lastLoBar; hiAge[fillBar]=lastHiBar;
+    }
   }
   // Заполняем пробелы вперёд
-  let curLo=NaN, curHi=NaN;
+  let curLo=NaN, curHi=NaN, curLoBar=-1, curHiBar=-1;
   for(let i=0;i<N;i++){
-    if(!isNaN(lo[i]))curLo=lo[i];
-    else lo[i]=curLo;
-    if(!isNaN(hi[i]))curHi=hi[i];
-    else hi[i]=curHi;
+    if(!isNaN(lo[i])){curLo=lo[i]; curLoBar=loAge[i];}
+    else{lo[i]=curLo; loAge[i]=curLoBar;}
+    if(!isNaN(hi[i])){curHi=hi[i]; curHiBar=hiAge[i];}
+    else{hi[i]=curHi; hiAge[i]=curHiBar;}
   }
-  return{lo,hi};
+  return{lo,hi,loAge,hiAge};
 }
 function calcDEMA(data, period) {
   const ema1 = calcEMA(data, period);
