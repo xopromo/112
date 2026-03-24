@@ -99,8 +99,10 @@ const ENTRY_REGISTRY = [
     flag:      'useBoll',
     htmlId:    'e_bol',
     shortName: () => 'BBproboj',
-    detectL: (cfg, i) => cfg.bbB && cfg.bbD[i-1] > 0 && DATA[i-1].c > cfg.bbB[i-1]+cfg.bbD[i-1],
-    detectS: (cfg, i) => cfg.bbB && cfg.bbD[i-1] > 0 && DATA[i-1].c < cfg.bbB[i-1]-cfg.bbD[i-1],
+    // Используем полосы [i-2] (без включения сигнального бара) — как Дончиан.
+    // [i-1] было self-referential: экстремальный close[i-1] расширял свою же полосу → сигнал не срабатывал.
+    detectL: (cfg, i) => cfg.bbB && i >= 2 && cfg.bbD[i-2] > 0 && DATA[i-1].c > cfg.bbB[i-2]+cfg.bbD[i-2],
+    detectS: (cfg, i) => cfg.bbB && i >= 2 && cfg.bbD[i-2] > 0 && DATA[i-1].c < cfg.bbB[i-2]-cfg.bbD[i-2],
     pineLines: (c, b, f) => [
       `use_boll     = input.bool(${b(c.useBoll)},   "Пробой Боллинджера", group=grp_entry)`,
       `boll_len     = input.int(${Math.max(5, c.bbLen||20)}, "Боллинджер период",  minval=5, maxval=200, group=grp_entry)`,

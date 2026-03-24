@@ -1263,6 +1263,10 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
     <div class="field"><label>Период</label><input id="f_erp" value="10" data-tip="Период расчёта ER. 10 баров = смотрим эффективность движения за 10 баров"></div>
     <div class="field"><label>Мин ER</label><input id="f_ert" value="0.3" data-tip="Минимальный ER для входа. 0.3 = движение должно быть ≥30% эффективным. 0.5 = сильный тренд"></div>
   </div>
+
+  <div class="sep"></div>
+  <div class="cb"><input type="checkbox" id="f_sqzmod"><label data-tip="Squeeze Modifier: вход разрешён только если предыдущий бар был в сжатии (BB внутри KC). Аналог is_sq[1] из Ultimate Breakout — пробой именно из зоны сжатия. Параметры BB/KC берутся из блока Squeeze (BB период, KC множ ATR)">Пробой из Squeeze (SqzPrev)</label></div>
+  <div class="hint">Использует BB/KC параметры из блока Squeeze выше. Комбинируйте с пробоями BB/Донч/ATR-канал</div>
 </div>
 
 <!-- VOLUME FILTERS -->

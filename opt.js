@@ -1056,6 +1056,7 @@ async function runOpt() {
   const usePv=$c('e_pv'),useEng=$c('e_eng'),usePin=$c('e_pin');
   const useBol=$c('e_bol'),useDon=$c('e_don'),useAtrBo=$c('e_atrbo');
   const useMaT=$c('e_mat'),useSqz=$c('e_sqz');
+  const useSqzMod=$c('f_sqzmod');
 
   // Trendline figures flags
   const useTLTouch=$c('e_tl_touch');
@@ -1380,7 +1381,7 @@ async function runOpt() {
   const matPArr = useMaT ? parseRange('e_matp') : [20];
   const matZoneArr = useMaT ? parseRange('e_matz') : [0.2];
   let sqzOn=null,sqzCount=null;
-  if(useSqz) {
+  if(useSqz||useSqzMod) {
     const sbl=$n('e_sqbl')||20,skm=$n('e_sqkm')||1.5;
     const bbBasis=calcSMA(closes,sbl);
     const bbDevSqz=new Float64Array(N);
@@ -1900,7 +1901,7 @@ async function runOpt() {
         useDonch:useDon,donH,donL,
         useAtrBo,atrBoMA,atrBoATR:atrBoATR2,atrBoMult:atrBoM,
         useMaTouch:useMaT,matMA,matZone,matPeriod,
-        useSqueeze:useSqz,sqzOn,sqzCount,sqzMinBars,
+        useSqueeze:useSqz,sqzOn,sqzCount,sqzMinBars,useSqzMod,
         useTLTouch,useTLBreak,useFlag,useTri,tfSigL,tfSigS,tlPvL,tlPvR,
         useRsiExit,rsiExitArr,rsiExitPeriod:rsiExitPer,rsiExitOS,rsiExitOB,
         useKalmanCross,kalmanCrossArr,kalmanCrossLen, // ##KALMAN_CROSS##
@@ -1975,7 +1976,7 @@ async function runOpt() {
               useDonch:useDon,donLen:$n('e_donl')||20,
               useAtrBo,atrBoLen:$n('e_atbl')||14,atrBoMult:atrBoM,
               useMaTouch:useMaT,matType:$v('e_matt'),matPeriod,matZone,
-              useSqueeze:useSqz,sqzBBLen:$n('e_sqbl')||20,sqzKCMult:$n('e_sqkm')||1.5,sqzMinBars,
+              useSqueeze:useSqz,sqzBBLen:$n('e_sqbl')||20,sqzKCMult:$n('e_sqkm')||1.5,sqzMinBars,useSqzMod,
               useTLTouch,useTLBreak,useFlag,useTri,
               tlPvL,tlPvR,tlZonePct,
               flagImpMin:$n('e_flag_imp')||2.0,flagMaxBars:$n('e_flag_bars')||20,flagRetrace:$n('e_flag_ret')||0.618,
@@ -2245,7 +2246,7 @@ async function runOpt() {
         useDonch:useDon,donH,donL,
         useAtrBo,atrBoMA,atrBoATR:atrBoATR2,atrBoMult:atrBoM,
         useMaTouch:useMaT,matMA,matZone,matPeriod,
-        useSqueeze:useSqz,sqzOn,sqzCount,sqzMinBars,
+        useSqueeze:useSqz,sqzOn,sqzCount,sqzMinBars,useSqzMod,
         useTLTouch,useTLBreak,useFlag,useTri,tfSigL,tfSigS,tlPvL,tlPvR,
         useRsiExit,rsiExitArr,rsiExitPeriod:rsiExitPer,rsiExitOS,rsiExitOB,
         useKalmanCross,kalmanCrossArr,kalmanCrossLen, // ##KALMAN_CROSS##
@@ -2349,7 +2350,7 @@ async function runOpt() {
               useDonch:useDon,donLen:$n('e_donl')||20,
               useAtrBo,atrBoLen:$n('e_atbl')||14,atrBoMult:atrBoM,
               useMaTouch:useMaT,matType:$v('e_matt'),matPeriod,matZone,
-              useSqueeze:useSqz,sqzBBLen:$n('e_sqbl')||20,sqzKCMult:$n('e_sqkm')||1.5,sqzMinBars,
+              useSqueeze:useSqz,sqzBBLen:$n('e_sqbl')||20,sqzKCMult:$n('e_sqkm')||1.5,sqzMinBars,useSqzMod,
               useTLTouch,useTLBreak,useFlag,useTri,
               tlPvL,tlPvR,tlZonePct,
               flagImpMin:$n('e_flag_imp')||2.0,flagMaxBars:$n('e_flag_bars')||20,flagRetrace:$n('e_flag_ret')||0.618,
@@ -2850,7 +2851,7 @@ async function runOpt() {
                                       useDonch:useDon,donH,donL,
                                       useAtrBo,atrBoMA,atrBoATR:atrBoATR2,atrBoMult:atrBoM,
                                       useMaTouch:useMaT,matMA,matZone,matPeriod,
-                                      useSqueeze:useSqz,sqzOn,sqzCount,sqzMinBars,
+                                      useSqueeze:useSqz,sqzOn,sqzCount,sqzMinBars,useSqzMod,
                                       // Trendline Figures
                                       useTLTouch,useTLBreak,useFlag,useTri,
                                       tfSigL,tfSigS,
@@ -2962,7 +2963,7 @@ async function runOpt() {
                                           useDonch:useDon, donLen:$n('e_donl')||20,
                                           useAtrBo, atrBoLen:$n('e_atbl')||14, atrBoMult:atrBoM,
                                           useMaTouch:useMaT, matType:$v('e_matt'), matPeriod, matZone,
-                                          useSqueeze:useSqz, sqzBBLen:$n('e_sqbl')||20, sqzKCMult:$n('e_sqkm')||1.5, sqzMinBars,
+                                          useSqueeze:useSqz, sqzBBLen:$n('e_sqbl')||20, sqzKCMult:$n('e_sqkm')||1.5, sqzMinBars, useSqzMod,
                                           useTLTouch, useTLBreak, useFlag, useTri,
                                           tlPvL, tlPvR, tlZonePct,
                                           flagImpMin:$n('e_flag_imp')||2.0, flagMaxBars:$n('e_flag_bars')||20, flagRetrace:$n('e_flag_ret')||0.618,
@@ -3266,7 +3267,7 @@ function _calcIndicators(cfg) {
 
   // ── Squeeze ───────────────────────────────────────────────
   let sqzOn = null, sqzCount = null;
-  if (cfg.useSqueeze) {
+  if (cfg.useSqueeze || cfg.useSqzMod) {
     const sbl = cfg.sqzBBLen  || 20;
     const skm = cfg.sqzKCMult || 1.5;
     const bbBasis = calcSMA(closes, sbl);
@@ -3542,6 +3543,7 @@ function buildBtCfg(cfg, ind) {
     sqzOn:      ind.sqzOn,
     sqzCount:   ind.sqzCount,
     sqzMinBars: cfg.sqzMinBars || 1,
+    useSqzMod:  cfg.useSqzMod  || false,
     useTLTouch: cfg.useTLTouch || false,
     useTLBreak: cfg.useTLBreak || false,
     useFlag:    cfg.useFlag    || false,

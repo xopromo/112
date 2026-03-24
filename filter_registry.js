@@ -356,4 +356,17 @@ const FILTER_REGISTRY = [
     },
     nameLabel: (cfg) => `KalmanMA(${cfg.kalmanLen || 20})`,
   },
+
+  // ── Squeeze Modifier (пробой после сжатия) ────────────────
+  // Блокирует вход если предыдущий бар НЕ был в сжатии (BB < KC).
+  // Аналог is_sq[1] из индикатора "Ultimate Breakout":
+  //   sig_long = close > upper AND is_sq[1]  ← вход только из сжатия
+  // Использует sqzOn[] из Squeeze entry (вычисляется совместно).
+  {
+    id:       'sqzmod',
+    flag:     'useSqzMod',
+    blocksL:  (cfg, i) => !cfg.sqzOn || !cfg.sqzOn[i-1],
+    blocksS:  (cfg, i) => !cfg.sqzOn || !cfg.sqzOn[i-1],
+    nameLabel: () => 'SqzPrev',
+  },
 ];

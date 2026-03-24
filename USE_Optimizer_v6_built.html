@@ -1263,6 +1263,10 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
     <div class="field"><label>Период</label><input id="f_erp" value="10" data-tip="Период расчёта ER. 10 баров = смотрим эффективность движения за 10 баров"></div>
     <div class="field"><label>Мин ER</label><input id="f_ert" value="0.3" data-tip="Минимальный ER для входа. 0.3 = движение должно быть ≥30% эффективным. 0.5 = сильный тренд"></div>
   </div>
+
+  <div class="sep"></div>
+  <div class="cb"><input type="checkbox" id="f_sqzmod"><label data-tip="Squeeze Modifier: вход разрешён только если предыдущий бар был в сжатии (BB внутри KC). Аналог is_sq[1] из Ultimate Breakout — пробой именно из зоны сжатия. Параметры BB/KC берутся из блока Squeeze (BB период, KC множ ATR)">Пробой из Squeeze (SqzPrev)</label></div>
+  <div class="hint">Использует BB/KC параметры из блока Squeeze выше. Комбинируйте с пробоями BB/Донч/ATR-канал</div>
 </div>
 
 <!-- VOLUME FILTERS -->
@@ -5485,8 +5489,10 @@ const ENTRY_REGISTRY = [
     flag:      'useBoll',
     htmlId:    'e_bol',
     shortName: () => 'BBproboj',
-    detectL: (cfg, i) => cfg.bbB && cfg.bbD[i-1] > 0 && DATA[i-1].c > cfg.bbB[i-1]+cfg.bbD[i-1],
-    detectS: (cfg, i) => cfg.bbB && cfg.bbD[i-1] > 0 && DATA[i-1].c < cfg.bbB[i-1]-cfg.bbD[i-1],
+    // Используем полосы [i-2] (без включения сигнального бара) — как Дончиан.
+    // [i-1] было self-referential: экстремальный close[i-1] расширял свою же полосу → сигнал не срабатывал.
+    detectL: (cfg, i) => cfg.bbB && i >= 2 && cfg.bbD[i-2] > 0 && DATA[i-1].c > cfg.bbB[i-2]+cfg.bbD[i-2],
+    detectS: (cfg, i) => cfg.bbB && i >= 2 && cfg.bbD[i-2] > 0 && DATA[i-1].c < cfg.bbB[i-2]-cfg.bbD[i-2],
     pineLines: (c, b, f) => [
       `use_boll     = input.bool(${b(c.useBoll)},   "Пробой Боллинджера", group=grp_entry)`,
       `boll_len     = input.int(${Math.max(5, c.bbLen||20)}, "Боллинджер период",  minval=5, maxval=200, group=grp_entry)`,
@@ -6285,6 +6291,19 @@ const FILTER_REGISTRY = [
       return kma <= 0 || DATA[i - 1].c >= kma;
     },
     nameLabel: (cfg) => `KalmanMA(${cfg.kalmanLen || 20})`,
+  },
+
+  // ── Squeeze Modifier (пробой после сжатия) ────────────────
+  // Блокирует вход если предыдущий бар НЕ был в сжатии (BB < KC).
+  // Аналог is_sq[1] из индикатора "Ultimate Breakout":
+  //   sig_long = close > upper AND is_sq[1]  ← вход только из сжатия
+  // Использует sqzOn[] из Squeeze entry (вычисляется совместно).
+  {
+    id:       'sqzmod',
+    flag:     'useSqzMod',
+    blocksL:  (cfg, i) => !cfg.sqzOn || !cfg.sqzOn[i-1],
+    blocksS:  (cfg, i) => !cfg.sqzOn || !cfg.sqzOn[i-1],
+    nameLabel: () => 'SqzPrev',
   },
 ];
 
@@ -8325,6 +8344,7 @@ async function runOpt() {
   const usePv=$c('e_pv'),useEng=$c('e_eng'),usePin=$c('e_pin');
   const useBol=$c('e_bol'),useDon=$c('e_don'),useAtrBo=$c('e_atrbo');
   const useMaT=$c('e_mat'),useSqz=$c('e_sqz');
+  const useSqzMod=$c('f_sqzmod');
 
   // Trendline figures flags
   const useTLTouch=$c('e_tl_touch');
@@ -8649,7 +8669,7 @@ async function runOpt() {
   const matPArr = useMaT ? parseRange('e_matp') : [20];
   const matZoneArr = useMaT ? parseRange('e_matz') : [0.2];
   let sqzOn=null,sqzCount=null;
-  if(useSqz) {
+  if(useSqz||useSqzMod) {
     const sbl=$n('e_sqbl')||20,skm=$n('e_sqkm')||1.5;
     const bbBasis=calcSMA(closes,sbl);
     const bbDevSqz=new Float64Array(N);
@@ -9169,7 +9189,7 @@ async function runOpt() {
         useDonch:useDon,donH,donL,
         useAtrBo,atrBoMA,atrBoATR:atrBoATR2,atrBoMult:atrBoM,
         useMaTouch:useMaT,matMA,matZone,matPeriod,
-        useSqueeze:useSqz,sqzOn,sqzCount,sqzMinBars,
+        useSqueeze:useSqz,sqzOn,sqzCount,sqzMinBars,useSqzMod,
         useTLTouch,useTLBreak,useFlag,useTri,tfSigL,tfSigS,tlPvL,tlPvR,
         useRsiExit,rsiExitArr,rsiExitPeriod:rsiExitPer,rsiExitOS,rsiExitOB,
         useKalmanCross,kalmanCrossArr,kalmanCrossLen, // ##KALMAN_CROSS##
@@ -9244,7 +9264,7 @@ async function runOpt() {
               useDonch:useDon,donLen:$n('e_donl')||20,
               useAtrBo,atrBoLen:$n('e_atbl')||14,atrBoMult:atrBoM,
               useMaTouch:useMaT,matType:$v('e_matt'),matPeriod,matZone,
-              useSqueeze:useSqz,sqzBBLen:$n('e_sqbl')||20,sqzKCMult:$n('e_sqkm')||1.5,sqzMinBars,
+              useSqueeze:useSqz,sqzBBLen:$n('e_sqbl')||20,sqzKCMult:$n('e_sqkm')||1.5,sqzMinBars,useSqzMod,
               useTLTouch,useTLBreak,useFlag,useTri,
               tlPvL,tlPvR,tlZonePct,
               flagImpMin:$n('e_flag_imp')||2.0,flagMaxBars:$n('e_flag_bars')||20,flagRetrace:$n('e_flag_ret')||0.618,
@@ -9514,7 +9534,7 @@ async function runOpt() {
         useDonch:useDon,donH,donL,
         useAtrBo,atrBoMA,atrBoATR:atrBoATR2,atrBoMult:atrBoM,
         useMaTouch:useMaT,matMA,matZone,matPeriod,
-        useSqueeze:useSqz,sqzOn,sqzCount,sqzMinBars,
+        useSqueeze:useSqz,sqzOn,sqzCount,sqzMinBars,useSqzMod,
         useTLTouch,useTLBreak,useFlag,useTri,tfSigL,tfSigS,tlPvL,tlPvR,
         useRsiExit,rsiExitArr,rsiExitPeriod:rsiExitPer,rsiExitOS,rsiExitOB,
         useKalmanCross,kalmanCrossArr,kalmanCrossLen, // ##KALMAN_CROSS##
@@ -9618,7 +9638,7 @@ async function runOpt() {
               useDonch:useDon,donLen:$n('e_donl')||20,
               useAtrBo,atrBoLen:$n('e_atbl')||14,atrBoMult:atrBoM,
               useMaTouch:useMaT,matType:$v('e_matt'),matPeriod,matZone,
-              useSqueeze:useSqz,sqzBBLen:$n('e_sqbl')||20,sqzKCMult:$n('e_sqkm')||1.5,sqzMinBars,
+              useSqueeze:useSqz,sqzBBLen:$n('e_sqbl')||20,sqzKCMult:$n('e_sqkm')||1.5,sqzMinBars,useSqzMod,
               useTLTouch,useTLBreak,useFlag,useTri,
               tlPvL,tlPvR,tlZonePct,
               flagImpMin:$n('e_flag_imp')||2.0,flagMaxBars:$n('e_flag_bars')||20,flagRetrace:$n('e_flag_ret')||0.618,
@@ -10119,7 +10139,7 @@ async function runOpt() {
                                       useDonch:useDon,donH,donL,
                                       useAtrBo,atrBoMA,atrBoATR:atrBoATR2,atrBoMult:atrBoM,
                                       useMaTouch:useMaT,matMA,matZone,matPeriod,
-                                      useSqueeze:useSqz,sqzOn,sqzCount,sqzMinBars,
+                                      useSqueeze:useSqz,sqzOn,sqzCount,sqzMinBars,useSqzMod,
                                       // Trendline Figures
                                       useTLTouch,useTLBreak,useFlag,useTri,
                                       tfSigL,tfSigS,
@@ -10231,7 +10251,7 @@ async function runOpt() {
                                           useDonch:useDon, donLen:$n('e_donl')||20,
                                           useAtrBo, atrBoLen:$n('e_atbl')||14, atrBoMult:atrBoM,
                                           useMaTouch:useMaT, matType:$v('e_matt'), matPeriod, matZone,
-                                          useSqueeze:useSqz, sqzBBLen:$n('e_sqbl')||20, sqzKCMult:$n('e_sqkm')||1.5, sqzMinBars,
+                                          useSqueeze:useSqz, sqzBBLen:$n('e_sqbl')||20, sqzKCMult:$n('e_sqkm')||1.5, sqzMinBars, useSqzMod,
                                           useTLTouch, useTLBreak, useFlag, useTri,
                                           tlPvL, tlPvR, tlZonePct,
                                           flagImpMin:$n('e_flag_imp')||2.0, flagMaxBars:$n('e_flag_bars')||20, flagRetrace:$n('e_flag_ret')||0.618,
@@ -10535,7 +10555,7 @@ function _calcIndicators(cfg) {
 
   // ── Squeeze ───────────────────────────────────────────────
   let sqzOn = null, sqzCount = null;
-  if (cfg.useSqueeze) {
+  if (cfg.useSqueeze || cfg.useSqzMod) {
     const sbl = cfg.sqzBBLen  || 20;
     const skm = cfg.sqzKCMult || 1.5;
     const bbBasis = calcSMA(closes, sbl);
@@ -10811,6 +10831,7 @@ function buildBtCfg(cfg, ind) {
     sqzOn:      ind.sqzOn,
     sqzCount:   ind.sqzCount,
     sqzMinBars: cfg.sqzMinBars || 1,
+    useSqzMod:  cfg.useSqzMod  || false,
     useTLTouch: cfg.useTLTouch || false,
     useTLBreak: cfg.useTLBreak || false,
     useFlag:    cfg.useFlag    || false,
@@ -19079,7 +19100,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774360440466;
+window._BUILD_TS = 1774366359615;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
