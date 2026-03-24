@@ -122,6 +122,23 @@ function extractTV(rows, headers) {
 // ─────────────────────────────────────────────────────────────
 // 3. ПОСТРОЕНИЕ КОНФИГА
 // ─────────────────────────────────────────────────────────────
+// Разбирает slPair/tpPair формат оптимизатора в поля btCfg
+function expandSlTpPair(cfg) {
+  const sl = cfg.slPair;
+  const tp = cfg.tpPair;
+  if (sl) {
+    cfg.useATRSL  = !!(sl.a);  cfg.atrSLMult  = sl.a ? sl.a.m : 1.5;
+    cfg.usePercSL = !!(sl.p);  cfg.percSLMult = sl.p ? sl.p.m : 2.0;
+    cfg.slLogic   = sl.combo ? 'or' : 'single';
+  }
+  if (tp) {
+    const t1 = tp.a, t2 = tp.b;
+    cfg.hasTPA = !!(t1); cfg.tpMode  = t1 ? t1.type : 'rr'; cfg.tpMult  = t1 ? t1.m : 2;
+    cfg.hasTPB = !!(t2); cfg.tpModeB = t2 ? t2.type : 'rr'; cfg.tpMultB = t2 ? t2.m : 2;
+    cfg.tpLogic = tp.combo ? 'or' : 'single';
+  }
+}
+
 function buildDefaultCfg(tv, userCfg) {
   const N = tv.length;
 
@@ -134,16 +151,19 @@ function buildDefaultCfg(tv, userCfg) {
     useMA:      false,
     useConfirm: false,
     // SL/TP (выключены)
-    useSL:      false,  useATRSL: false, usePercSL: false, usePivotSL: false,
-    hasTPA:     false,  hasTPB: false,
+    useATRSL: false, atrSLMult: 1.5,
+    usePercSL: false, percSLMult: 2.0,
+    usePivotSL: false,
+    hasTPA: false, tpMode: 'rr', tpMult: 2,
+    hasTPB: false, tpModeB: 'rr', tpMultB: 2,
+    slLogic: 'or', tpLogic: 'or',
     // Режимы
     useRev:     false,
     useBE:      false,
     waitBars:   0,
     start:      50,
     comm:       0.04,
-    slLogic:    'or',
-    tpLogic:    'or',
+    commission: 0.04,
     revBars:    1,
     revMode:    'any',
     revAct:     'exit',
@@ -152,43 +172,47 @@ function buildDefaultCfg(tv, userCfg) {
     waitRetrace:false,
     waitMaxBars:0,
     waitCancelAtr:0,
+    atrPeriod:  14,
     pruning:    false,
     collectTrades: true,
-    // Массивы (будут заполнены ниже)
-    maArr:      null,
-    confirmArr: null,
-    pvLo:       null,
-    pvHi_:      null,
-    volAvg:     null,
-    bodyAvg:    null,
+    // Массивы
+    maArr:         null,
+    maArrConfirm:  null,
+    pvLo:          null,
+    pvHi_:         null,
+    volAvg:        null,
+    bodyAvg:       null,
     pvL:        5,
     pvR:        2,
     ...userCfg,
   };
 
-  // Инжектируем TV-computed MA values напрямую из CSV
+  // Разворачиваем slPair/tpPair если переданы
+  if (cfg.slPair || cfg.tpPair) expandSlTpPair(cfg);
+
+  // Инжектируем TV-computed MA values напрямую из CSV (если есть в колонках)
   const maCol  = tv.map(r => r.ma);
   const cmaCol = tv.map(r => r.cma);
   const hasMa  = maCol.some(v => !isNaN(v) && v > 0);
   const hasCma = cmaCol.some(v => !isNaN(v) && v > 0);
 
-  if (hasMa && cfg.useMA !== false) {
+  if (hasMa && !cfg.maArr) {
     cfg.maArr = new Float64Array(N);
     maCol.forEach((v, i) => { cfg.maArr[i] = isNaN(v) ? 0 : v; });
     cfg.useMA = true;
-    console.log(`  ✓ MA из CSV инжектирован (${maCol.filter(v => !isNaN(v) && v>0).length} значений)`);
+    console.log(`  ✓ maArr из CSV (TV-значения, ${maCol.filter(v => !isNaN(v) && v>0).length} баров)`);
   }
-  if (hasCma && cfg.useConfirm !== false) {
-    cfg.confirmArr = new Float64Array(N);
-    cmaCol.forEach((v, i) => { cfg.confirmArr[i] = isNaN(v) ? 0 : v; });
+  if (hasCma && !cfg.maArrConfirm) {
+    // ВАЖНО: поле называется maArrConfirm — именно его читает filter_registry.js
+    cfg.maArrConfirm = new Float64Array(N);
+    cmaCol.forEach((v, i) => { cfg.maArrConfirm[i] = isNaN(v) ? 0 : v; });
     cfg.useConfirm = true;
-    console.log(`  ✓ Confirm MA из CSV инжектирован (${cmaCol.filter(v => !isNaN(v) && v>0).length} значений)`);
+    console.log(`  ✓ maArrConfirm из CSV (TV-значения, ${cmaCol.filter(v => !isNaN(v) && v>0).length} баров)`);
   }
 
   // Pivot сигналы из CSV (колонки PV_HI, PV_LO)
   const hasPvSignals = tv.some(r => r.pv_hi > 0 || r.pv_lo > 0);
-  if (hasPvSignals && !userCfg.pvLo) {
-    // Переводим 0/1 колонки в массивы для pivot entry
+  if (hasPvSignals && !cfg.pvLo) {
     cfg.pvLo  = new Uint8Array(N);
     cfg.pvHi_ = new Uint8Array(N);
     tv.forEach((r, i) => { cfg.pvLo[i] = r.pv_lo; cfg.pvHi_[i] = r.pv_hi; });
@@ -206,29 +230,67 @@ function runBacktest(data, cfg) {
   ctx.DATA = data;
 
   // volAvg / bodyAvg нужны для некоторых фильтров
-  if (!cfg.volAvg) {
-    const vols = data.map(d => d.v);
-    cfg.volAvg = vm.runInContext('calcSMA(DATA.map(d=>d.v), 20)', ctx);
-  }
-  if (!cfg.bodyAvg) {
-    cfg.bodyAvg = vm.runInContext('calcBodySMA(20)', ctx);
+  if (!cfg.volAvg) cfg.volAvg = vm.runInContext('calcSMA(DATA.map(d=>d.v), 20)', ctx);
+  if (!cfg.bodyAvg) cfg.bodyAvg = vm.runInContext('calcBodySMA(20)', ctx);
+
+  // MA из конфига (если не инжектирован из CSV)
+  if (cfg.useMA && cfg.maP > 0 && !cfg.maArr) {
+    const htf = cfg.htfRatio || 1;
+    const typ = cfg.maType || 'EMA';
+    if (htf > 1) {
+      cfg.maArr = vm.runInContext(`calcHTFMA(DATA, ${htf}, ${cfg.maP}, '${typ}')`, ctx);
+      console.log(`  ✓ maArr вычислен JS: ${typ}(${cfg.maP})×${htf}tf`);
+    } else {
+      cfg.maArr = vm.runInContext(`calcMA(DATA.map(d=>d.c), ${cfg.maP}, '${typ}')`, ctx);
+      console.log(`  ✓ maArr вычислен JS: ${typ}(${cfg.maP})`);
+    }
   }
 
-  // Compute pvLo / pvHi если не инжектированы из CSV
+  // Confirm MA из конфига (если не инжектирован из CSV)
+  if (cfg.useConfirm && cfg.confN > 0 && !cfg.maArrConfirm) {
+    const htf = cfg.confHtfRatio || 1;
+    const typ = cfg.confMatType || 'EMA';
+    if (htf > 1) {
+      cfg.maArrConfirm = vm.runInContext(`calcHTFMA(DATA, ${htf}, ${cfg.confN}, '${typ}')`, ctx);
+      console.log(`  ✓ maArrConfirm вычислен JS: ${typ}(${cfg.confN})×${htf}tf`);
+    } else {
+      cfg.maArrConfirm = vm.runInContext(`calcMA(DATA.map(d=>d.c), ${cfg.confN}, '${typ}')`, ctx);
+      console.log(`  ✓ maArrConfirm вычислен JS: ${typ}(${cfg.confN})`);
+    }
+  }
+
+  // Pivot (если не инжектированы из CSV)
   if (!cfg.pvLo) {
     const pvL = cfg.pvL || 5, pvR = cfg.pvR || 2;
     cfg.pvLo  = vm.runInContext(`calcPivotLow(${pvL}, ${pvR})`,  ctx);
     cfg.pvHi_ = vm.runInContext(`calcPivotHigh(${pvL}, ${pvR})`, ctx);
+    console.log(`  ✓ Pivot вычислен JS: L${pvL} R${pvR}`);
   }
 
   // ATR
-  const atrArr = vm.runInContext('calcRMA_ATR(14)', ctx);
+  const atrPeriod = cfg.atrPeriod || 14;
+  const atrArr = vm.runInContext(`calcRMA_ATR(${atrPeriod})`, ctx);
 
-  // Передаём cfg в контекст и запускаем backtest
-  ctx._validateCfg     = cfg;
-  ctx._validatePvLo    = cfg.pvLo  || new Float64Array(data.length);
-  ctx._validatePvHi    = cfg.pvHi_ || new Float64Array(data.length);
-  ctx._validateAtrArr  = atrArr;
+  // Всегда пересчитываем start из параметров индикаторов
+  {
+    const maType = cfg.maType || 'EMA';
+    const cType  = cfg.confMatType || 'EMA';
+    const tMult  = (maType==='TEMA'||maType==='DEMA'||maType==='EMA') ? 3 : 1;
+    const cMult  = (cType==='TEMA'||cType==='DEMA'||cType==='EMA')   ? 3 : 1;
+    cfg.start = Math.max(
+      (cfg.pvL||5) + (cfg.pvR||2) + 5,
+      cfg.useMA      ? (cfg.maP||0)  * (cfg.htfRatio||1)    * tMult : 0,
+      cfg.useConfirm ? (cfg.confN||0)* (cfg.confHtfRatio||1)* cMult : 0,
+      atrPeriod * 3,
+      50
+    ) + 2;
+    console.log(`  ✓ start = ${cfg.start} баров прогрева`);
+  }
+
+  ctx._validateCfg    = cfg;
+  ctx._validatePvLo   = cfg.pvLo  || new Float64Array(data.length);
+  ctx._validatePvHi   = cfg.pvHi_ || new Float64Array(data.length);
+  ctx._validateAtrArr = atrArr;
 
   const result = vm.runInContext(
     'backtest(_validatePvLo, _validatePvHi, _validateAtrArr, _validateCfg)',
