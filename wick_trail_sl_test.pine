@@ -7,26 +7,31 @@
 indicator("Wick Trailing SL [TEST]", overlay=true)
 
 // ── Inputs ───────────────────────────────────────────────────
-var string G1 = "Параметры отступа"
-offset_type = input.string("ATR", "Тип отступа", options=["ATR", "% от цены", "Пункты"], group=G1)
-atr_len     = input.int(14,  "Период ATR",           minval=1,      step=1,    group=G1)
-atr_mult    = input.float(0.5, "Множитель ATR",       minval=0.0,    step=0.05, group=G1,
-                 tooltip="Отступ от фитиля = ATR × множитель")
-fixed_pct   = input.float(0.3, "Процент от цены (%)", minval=0.001,  step=0.05, group=G1)
-fixed_pts   = input.float(10.0,"Пункты",              minval=0.0001, step=1.0,  group=G1)
+var string G1 = "Отступ: ATR"
+use_atr  = input.bool(true,   "Включить ATR-отступ",  group=G1)
+atr_len  = input.int(14,      "Период ATR",            minval=1,      step=1,    group=G1)
+atr_mult = input.float(0.5,   "Множитель ATR",         minval=0.0,    step=0.05, group=G1,
+                tooltip="Отступ = ATR × множитель")
 
-var string G2 = "Отображение"
-show_long   = input.bool(true,  "Long SL (зелёный)",         group=G2)
-show_short  = input.bool(true,  "Short SL (красный)",        group=G2)
-show_raw    = input.bool(false, "Доп. линия без ratchet",    group=G2,
+var string G2 = "Отступ: % от цены"
+use_pct   = input.bool(false, "Включить % от цены",   group=G2)
+fixed_pct = input.float(0.3,  "Процент (%)",           minval=0.001,  step=0.05, group=G2)
+
+var string G3 = "Отступ: Пункты"
+use_pts   = input.bool(false, "Включить пункты",       group=G3)
+fixed_pts = input.float(10.0, "Пункты",                minval=0.0001, step=1.0,  group=G3)
+
+var string G4 = "Отображение"
+show_long   = input.bool(true,  "Long SL (зелёный)",         group=G4)
+show_short  = input.bool(true,  "Short SL (красный)",        group=G4)
+show_raw    = input.bool(false, "Доп. линия без ratchet",    group=G4,
                  tooltip="Тонкая пунктирная линия — SL без ratchet, только от фитиля текущей свечи")
 
-// ── Вычисление отступа ───────────────────────────────────────
+// ── Вычисление отступа (сумма включённых типов) ──────────────
 atr    = ta.atr(atr_len)
-offset = switch offset_type
-    "ATR"       => atr * atr_mult
-    "% от цены" => close * fixed_pct / 100.0
-    =>             fixed_pts
+offset = (use_atr ? atr * atr_mult         : 0.0)
+       + (use_pct ? close * fixed_pct / 100.0 : 0.0)
+       + (use_pts ? fixed_pts                  : 0.0)
 
 // ── Raw уровни (фитиль последней закрытой свечи ± отступ) ────
 //   low[1]  = нижний фитиль последней закрытой свечи
