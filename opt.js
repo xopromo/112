@@ -1056,7 +1056,7 @@ async function runOpt() {
   const usePv=$c('e_pv'),useEng=$c('e_eng'),usePin=$c('e_pin');
   const useBol=$c('e_bol'),useDon=$c('e_don'),useAtrBo=$c('e_atrbo');
   const useMaT=$c('e_mat'),useSqz=$c('e_sqz');
-  const useSqzMod=$c('f_sqzmod');
+  const useSqzMod=!!document.getElementById('f_sqzmod')?.checked;
 
   // Trendline figures flags
   const useTLTouch=$c('e_tl_touch');
