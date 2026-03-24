@@ -229,6 +229,13 @@ function generatePineScript(r) {
   lines.push(`trail_dist = input.float(${f(c.trDist||1.0,1)}, "Дистанция (×ATR)", step=0.1, group=grp_trail)`);
   lines.push(``);
 
+  // Wick Trailing SL
+  lines.push(`grp_wick = "🪝 WICK TRAILING SL"`);
+  lines.push(`use_wick_trail = input.bool(${b(c.useWickTrail)}, "Wick Trailing SL", group=grp_wick)`);
+  lines.push(`wick_off_type  = input.string("${c.wickOffType||'atr'}", "Тип отступа", options=["atr","pct","pts"], group=grp_wick)`);
+  lines.push(`wick_mult      = input.float(${f(c.wickMult??1.0, 1)}, "Множитель отступа", step=0.1, group=grp_wick)`);
+  lines.push(``);
+
   // Exits
   lines.push(`grp_exit = "🚪 ВЫХОД"`);
   lines.push(`use_sig_ex      = input.bool(${b(c.useRev)}, "Обратный сигнал", group=grp_exit)`);
@@ -879,6 +886,7 @@ function generatePineScript(r) {
     lines.push(`    var float _dtp = 0.0`);
     lines.push(`    var bool _tra = false`);
     lines.push(`    var bool _bea = false`);
+    lines.push(`    var float _wsl = float(na)`);
     lines.push(`    var int _eb = -1`);
     lines.push(`    var int _xb = -1`);
     lines.push(`    var float _mpnl = 0.0`);
@@ -983,6 +991,21 @@ function generatePineScript(r) {
     lines.push(`                                htr := true`);
     lines.push(`                                xp := ns`);
   lines.push(`                            _dsl := ns`);
+  lines.push(`            // Wick Trailing SL`);
+  lines.push(`            if use_wick_trail and _in`);
+  lines.push(`                float _woff = wick_off_type == "pct" ? close[1] * wick_mult / 100 : wick_off_type == "pts" ? wick_mult : _u * wick_mult`);
+  lines.push(`                float _wraw = _dir == 1 ? low[1] - _woff : high[1] + _woff`);
+  lines.push(`                if na(_wsl)`);
+  lines.push(`                    _wsl := _wraw`);
+  lines.push(`                else`);
+  lines.push(`                    _wsl := _dir == 1 ? math.max(_wsl, _wraw) : math.min(_wsl, _wraw)`);
+  lines.push(`                if not hsl and not htp and not htr`);
+  lines.push(`                    if _dir == 1 and low <= _wsl`);
+  lines.push(`                        hsl := true`);
+  lines.push(`                        xp  := _wsl`);
+  lines.push(`                    else if _dir == -1 and high >= _wsl`);
+  lines.push(`                        hsl := true`);
+  lines.push(`                        xp  := _wsl`);
   lines.push(`            if frc and not hsl and not htp and not htr`);
   lines.push(`                xp := close`);
   lines.push(`                if (_tra or _bea) and _dir == 1 and _dsl > _ep`);
@@ -1064,6 +1087,7 @@ function generatePineScript(r) {
     lines.push(`                    _ep := entry_price`);
     lines.push(`                    _tra := false`);
     lines.push(`                    _bea := false`);
+    lines.push(`                    _wsl := float(na)`);
     lines.push(`                    _sig_skip := 0`);
     lines.push(`                    _cd_bar := -1`);
   lines.push(`                    _dsl := _sl_over > 0 ? (entry_price - _ac * _sl_ov) : calc_sl_level(1, entry_price, _ac)`);
@@ -1076,6 +1100,7 @@ function generatePineScript(r) {
     lines.push(`                    _ep := entry_price`);
     lines.push(`                    _tra := false`);
     lines.push(`                    _bea := false`);
+    lines.push(`                    _wsl := float(na)`);
     lines.push(`                    _sig_skip := 0`);
     lines.push(`                    _cd_bar := -1`);
   lines.push(`                    _dsl := _sl_over > 0 ? (entry_price + _ac * _sl_ov) : calc_sl_level(-1, entry_price, _ac)`);
@@ -1114,6 +1139,7 @@ function generatePineScript(r) {
     lines.push(`var float v_tp = 0.0`);
     lines.push(`var bool v_tra = false`);
     lines.push(`var bool v_bea = false`);
+    lines.push(`var float v_wsl = float(na)`);
     lines.push(`var int v_sig_skip = 0`);
     lines.push(`var int v_cd_bar = -1`);
     lines.push(`var box b_trade = na`);
@@ -1256,6 +1282,21 @@ function generatePineScript(r) {
     lines.push(`                            vxp := ns`);
     lines.push(`                            vxt := "TRAIL"`);
   lines.push(`                        v_sl := ns`);
+  lines.push(`        // Wick Trailing SL`);
+  lines.push(`        if use_wick_trail and v_in`);
+  lines.push(`            float _woff_v = wick_off_type == "pct" ? close[1] * wick_mult / 100 : wick_off_type == "pts" ? wick_mult : _u * wick_mult`);
+  lines.push(`            float _wraw_v = v_dir == 1 ? low[1] - _woff_v : high[1] + _woff_v`);
+  lines.push(`            if na(v_wsl)`);
+  lines.push(`                v_wsl := _wraw_v`);
+  lines.push(`            else`);
+  lines.push(`                v_wsl := v_dir == 1 ? math.max(v_wsl, _wraw_v) : math.min(v_wsl, _wraw_v)`);
+  lines.push(`            if not hsl and not htp and not htr`);
+  lines.push(`                if v_dir == 1 and low <= v_wsl`);
+  lines.push(`                    hsl := true`);
+  lines.push(`                    vxp := v_wsl`);
+  lines.push(`                else if v_dir == -1 and high >= v_wsl`);
+  lines.push(`                    hsl := true`);
+  lines.push(`                    vxp := v_wsl`);
   lines.push(`        if frc and not hsl and not htp and not htr`);
   lines.push(`            vxp := close`);
   lines.push(`            if (v_tra or v_bea) and v_dir == 1 and v_sl > v_ep`);
@@ -1358,6 +1399,7 @@ function generatePineScript(r) {
   lines.push(`            v_ep  := entry_price`);
   lines.push(`            v_tra := false`);
   lines.push(`            v_bea := false`);
+  lines.push(`            v_wsl := float(na)`);
   lines.push(`            v_sig_skip := 0`);
   lines.push(`            v_cd_bar := -1`);
   lines.push(`            float _u = atr_v[1]`);
@@ -1628,6 +1670,7 @@ function _addActivePinev6(code) {
     ['use_kalman_f',   ['kalman_f_len']],
     ['use_kalman_cross', ['kalman_cross_len']],
     ['use_trail',      ['trail_trig','trail_dist']],
+    ['use_wick_trail', ['wick_off_type','wick_mult']],
     ['use_be',         ['be_trig','be_off']],
     ['use_partial',    ['part_rr','part_pct','part_be']],
   ];
