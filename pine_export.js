@@ -250,6 +250,11 @@ function generatePineScript(r) {
   lines.push(`c_bg      = input.color(color.new(color.black,40), "Фон", group=grp_tab)`);
   lines.push(``);
 
+  lines.push(`grp_bot = "🤖 БОТ-АЛЕРТЫ"`);
+  lines.push(`bot_fmt = input.string("text", "Формат сообщений", options=["text", "json"], tooltip="text — читаемый формат. json — для ботов (3Commas, Alertatron, Cornix и др.)", group=grp_bot)`);
+  lines.push(`bot_ticker_ov = input.string("", "Тикер (оставь пустым = авто)", tooltip="Если пусто — используется syminfo.ticker. Задай явно если бот требует конкретный символ, напр. BTCUSDT.", group=grp_bot)`);
+  lines.push(``);
+
   // ── INDICATORS & FILTERS ─────────────────────────────────
   lines.push(`// ==========================================`);
   lines.push(`// 2. ИНДИКАТОРЫ И ФИЛЬТРЫ`);
@@ -959,6 +964,7 @@ function generatePineScript(r) {
     lines.push(`bool a_se = false`);
     lines.push(`bool a_lx = false`);
     lines.push(`bool a_sx = false`);
+    lines.push(`string _bot_tkr = bot_ticker_ov != "" ? bot_ticker_ov : syminfo.ticker`);
   lines.push(``);
   // ── INTRA-BAR TP/SL BLOCK ───────────────────────────────────────────────
   // Runs on every tick (not confirmed) to fire alerts and update box immediately
@@ -976,10 +982,14 @@ function generatePineScript(r) {
   lines.push(`            box.set_bottom(b_trade, math.min(v_ep, _ib_xp))`);
   lines.push(`            box.set_right(b_trade, bar_index)`);
   lines.push(`            box.set_bgcolor(b_trade, _ib_win ? c_win : c_loss)`);
+  lines.push(`        string _ib_msg_txt_l = "XL " + _ib_xt + " @" + str.tostring(_ib_xp, "#.######")`);
+  lines.push(`        string _ib_msg_json_l = '{"action":"sell","side":"long","ticker":"' + _bot_tkr + '","price":' + str.tostring(_ib_xp, "#.######") + ',"reason":"' + _ib_xt + '"}'`);
+  lines.push(`        string _ib_msg_txt_s = "XS " + _ib_xt + " @" + str.tostring(_ib_xp, "#.######")`);
+  lines.push(`        string _ib_msg_json_s = '{"action":"sell","side":"short","ticker":"' + _bot_tkr + '","price":' + str.tostring(_ib_xp, "#.######") + ',"reason":"' + _ib_xt + '"}'`);
   lines.push(`        if v_dir == 1`);
-  lines.push(`            alert("XL " + _ib_xt + " @" + str.tostring(_ib_xp, "#.####"), alert.freq_once_per_bar)`);
+  lines.push(`            alert(bot_fmt == "json" ? _ib_msg_json_l : _ib_msg_txt_l, alert.freq_once_per_bar)`);
   lines.push(`        else`);
-  lines.push(`            alert("XS " + _ib_xt + " @" + str.tostring(_ib_xp, "#.####"), alert.freq_once_per_bar)`);
+  lines.push(`            alert(bot_fmt == "json" ? _ib_msg_json_s : _ib_msg_txt_s, alert.freq_once_per_bar)`);
   lines.push(``);
   lines.push(`if bar_index > (last_bar_index - max_bars) and confirmed`);
   lines.push(`    if v_in and bar_index > v_eb`);
@@ -1101,12 +1111,16 @@ function generatePineScript(r) {
     lines.push(`                box.set_bottom(b_trade, math.min(v_ep, close))`);
   lines.push(`        if frc or hsl or htp or htr`);
   lines.push(`            float vtr = (v_dir == 1 ? (vxp - v_ep)/v_ep*100 : (v_ep - vxp)/v_ep*100) - total_cost`);
+  lines.push(`            string _xmsg_txt_l  = "XL " + vxt + " @" + str.tostring(vxp,"#.######") + " entry:" + str.tostring(v_ep,"#.######") + " pnl:" + str.tostring(vtr,"#.##") + "%"`);
+  lines.push(`            string _xmsg_json_l = '{"action":"sell","side":"long","ticker":"' + _bot_tkr + '","price":' + str.tostring(vxp,"#.######") + ',"entry":' + str.tostring(v_ep,"#.######") + ',"pnl":' + str.tostring(vtr,"#.##") + ',"reason":"' + vxt + '"}'`);
+  lines.push(`            string _xmsg_txt_s  = "XS " + vxt + " @" + str.tostring(vxp,"#.######") + " entry:" + str.tostring(v_ep,"#.######") + " pnl:" + str.tostring(vtr,"#.##") + "%"`);
+  lines.push(`            string _xmsg_json_s = '{"action":"buy","side":"short","ticker":"' + _bot_tkr + '","price":' + str.tostring(vxp,"#.######") + ',"entry":' + str.tostring(v_ep,"#.######") + ',"pnl":' + str.tostring(vtr,"#.##") + ',"reason":"' + vxt + '"}'`);
   lines.push(`            if v_dir == 1`);
     lines.push(`                a_lx := true`);
-    lines.push(`                alert("XL " + vxt + " @" + str.tostring(vxp,"#.####"), alert.freq_once_per_bar)`);
+    lines.push(`                alert(bot_fmt == "json" ? _xmsg_json_l : _xmsg_txt_l, alert.freq_once_per_bar)`);
   lines.push(`            else`);
     lines.push(`                a_sx := true`);
-    lines.push(`                alert("XS " + vxt + " @" + str.tostring(vxp,"#.####"), alert.freq_once_per_bar)`);
+    lines.push(`                alert(bot_fmt == "json" ? _xmsg_json_s : _xmsg_txt_s, alert.freq_once_per_bar)`);
   lines.push(`            if show_tr`);
   lines.push(`                bool win = v_dir == 1 ? vxp > v_ep : vxp < v_ep`);
     lines.push(`                box.set_top(b_trade, math.max(v_ep, vxp))`);
@@ -1186,12 +1200,16 @@ function generatePineScript(r) {
   lines.push(`            float sl_d = math.abs(entry_price - v_sl)`);
   lines.push(`            v_tp := calc_tp_level(v_dir, entry_price, _u, sl_d)`);
   lines.push(`            v_eb := bar_index`);
+  lines.push(`            string _emsg_txt_l  = "LONG @" + str.tostring(entry_price,"#.######") + " SL:" + str.tostring(v_sl,"#.######") + " TP:" + str.tostring(v_tp,"#.######")`);
+  lines.push(`            string _emsg_json_l = '{"action":"buy","side":"long","ticker":"' + _bot_tkr + '","price":' + str.tostring(entry_price,"#.######") + ',"sl":' + str.tostring(v_sl,"#.######") + ',"tp":' + str.tostring(v_tp,"#.######") + '}'`);
+  lines.push(`            string _emsg_txt_s  = "SHORT @" + str.tostring(entry_price,"#.######") + " SL:" + str.tostring(v_sl,"#.######") + " TP:" + str.tostring(v_tp,"#.######")`);
+  lines.push(`            string _emsg_json_s = '{"action":"sell","side":"short","ticker":"' + _bot_tkr + '","price":' + str.tostring(entry_price,"#.######") + ',"sl":' + str.tostring(v_sl,"#.######") + ',"tp":' + str.tostring(v_tp,"#.######") + '}'`);
   lines.push(`            if v_dir == 1`);
     lines.push(`                a_le := true`);
-    lines.push(`                alert("LONG @" + str.tostring(entry_price,"#.####") + " SL:" + str.tostring(v_sl,"#.####") + " TP:" + str.tostring(v_tp,"#.####"), alert.freq_once_per_bar)`);
+    lines.push(`                alert(bot_fmt == "json" ? _emsg_json_l : _emsg_txt_l, alert.freq_once_per_bar)`);
   lines.push(`            else`);
     lines.push(`                a_se := true`);
-    lines.push(`                alert("SHORT @" + str.tostring(entry_price,"#.####") + " SL:" + str.tostring(v_sl,"#.####") + " TP:" + str.tostring(v_tp,"#.####"), alert.freq_once_per_bar)`);
+    lines.push(`                alert(bot_fmt == "json" ? _emsg_json_s : _emsg_txt_s, alert.freq_once_per_bar)`);
   lines.push(`            if show_tr`);
   lines.push(`                bool is_pv = (v_dir == 1 and pivot_l) or (v_dir == -1 and pivot_s)`);
   lines.push(`                string elbl = is_pv ? (v_dir == 1 ? "PvL" : "PvS") : (v_dir == 1 ? "L" : "S")`);
@@ -1280,14 +1298,19 @@ function generatePineScript(r) {
   lines.push(`// ==========================================`);
   lines.push(`// 8. АЛЕРТЫ`);
   lines.push(`// ==========================================`);
-  lines.push(`alertcondition(a_le, "Long Entry",  "Long Entry")`);
-  lines.push(`alertcondition(a_se, "Short Entry", "Short Entry")`);
-  lines.push(`alertcondition(a_lx, "Exit Long",   "Exit Long")`);
-  lines.push(`alertcondition(a_sx, "Exit Short",  "Exit Short")`);
-  lines.push(`plotshape(a_lx, "XL", shape.xcross,      location.abovebar, color.new(color.red,0),   size=size.tiny)`);
-  lines.push(`plotshape(a_sx, "XS", shape.xcross,      location.belowbar, color.new(color.blue,0),  size=size.tiny)`);
-  lines.push(`plotshape(a_le, "EL", shape.triangleup,  location.belowbar, color.new(color.green,0), size=size.tiny)`);
-  lines.push(`plotshape(a_se, "ES", shape.triangledown, location.abovebar, color.new(color.fuchsia,0), size=size.tiny)`);
+  lines.push(`alertcondition(a_le, "▲ Long Entry",  "Long Entry — USE Optimizer")`);
+  lines.push(`alertcondition(a_se, "▼ Short Entry", "Short Entry — USE Optimizer")`);
+  lines.push(`alertcondition(a_lx, "✖ Exit Long",   "Exit Long — USE Optimizer")`);
+  lines.push(`alertcondition(a_sx, "✖ Exit Short",  "Exit Short — USE Optimizer")`);
+  lines.push(`alertcondition(a_le or a_se, "⚡ Any Entry", "Entry signal — USE Optimizer")`);
+  lines.push(`alertcondition(a_lx or a_sx, "⚡ Any Exit",  "Exit signal — USE Optimizer")`);
+  lines.push(`// ── ТОЧКИ ВХОДА/ВЫХОДА НА ГРАФИКЕ ─────────────────────────`);
+  lines.push(`// Входы: большие цветные треугольники`);
+  lines.push(`plotshape(a_le, "▲ Long Entry",  shape.triangleup,   location.belowbar, color.new(color.green,0),   size=size.small, text="L", textcolor=color.white)`);
+  lines.push(`plotshape(a_se, "▼ Short Entry", shape.triangledown, location.abovebar, color.new(color.red,0),     size=size.small, text="S", textcolor=color.white)`);
+  lines.push(`// Выходы: маленькие крестики`);
+  lines.push(`plotshape(a_lx, "✖ Exit Long",   shape.xcross,       location.abovebar, color.new(color.orange,0),  size=size.tiny)`);
+  lines.push(`plotshape(a_sx, "✖ Exit Short",  shape.xcross,       location.belowbar, color.new(color.aqua,0),    size=size.tiny)`);
 
   const rawCode = lines.join('\n');
   // Фаза 1: исправляем известные ошибки
