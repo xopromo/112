@@ -1934,6 +1934,7 @@ function applySettings(s) {
   // Восстанавливаем фильтры таблицы
   if (s.tableFilters && typeof _applyTableFilters === 'function') _applyTableFilters(s.tableFilters, false);
   updatePreview();
+  applyMaxBars(); // синхронизируем DATA с c_maxbars из шаблона
 }
 
 function saveTpl() {
