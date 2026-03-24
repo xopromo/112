@@ -3288,9 +3288,12 @@ function _runTVcompare(tvRows, resultsEl) {
   // Warmup: skip first N bars where indicators aren't settled (MA, pivots)
   const _maTypeW = c.useMA ? (c.maType || 'EMA') : '';
   const _temaMult = (_maTypeW === 'TEMA' || _maTypeW === 'DEMA' || _maTypeW === 'EMA') ? 3 : 1;
+  const _confTypeW = c.useConfirm ? (c.confMatType || 'EMA') : '';
+  const _confMult = (_confTypeW === 'TEMA' || _confTypeW === 'DEMA' || _confTypeW === 'EMA') ? 3 : 1;
   const warmupN = Math.max(
     (c.pvL || 5) + (c.pvR || 2) + 5,
     c.useMA ? (c.maP || 0) * (c.htfRatio || 1) * _temaMult : 0,
+    c.useConfirm ? (c.confN || 0) * (c.confHtfRatio || 1) * _confMult : 0,
     (c.atrPeriod || 14) * 3,
     50
   );
@@ -3569,7 +3572,7 @@ function copyTVdiag() {
   // Post-warmup section
   if (statsPost) {
     lines.push(`=== ПОСТ-ПРОГРЕВ (бар ${warmupN}+, ${statsPost.n} баров) ===`);
-    lines.push(`Прогрев пропускает первые ${warmupN} баров (MA=${c.useMA?`${c.maType||'EMA'}(${c.maP||0})×${c.htfRatio||1}tf`:'off'}, pvL+pvR+5=${(c.pvL||5)+(c.pvR||2)+5}, ATR×3=${(c.atrPeriod||14)*3})`);
+    lines.push(`Прогрев пропускает первые ${warmupN} баров (MA=${c.useMA?`${c.maType||'EMA'}(${c.maP||0})×${c.htfRatio||1}tf`:'off'}, Conf=${c.useConfirm?`${c.confMatType||'EMA'}(${c.confN||0})×${c.confHtfRatio||1}tf`:'off'}, pvL+pvR+5=${(c.pvL||5)+(c.pvR||2)+5}, ATR×3=${(c.atrPeriod||14)*3})`);
     lines.push(`Корреляция: ${(statsPost.corr*100).toFixed(2)}%  RMSE: ${statsPost.rmse.toFixed(2)}%`);
     lines.push(`JS итог: ${statsPost.jsLast.toFixed(2)}%  TV итог: ${statsPost.tvLast.toFixed(2)}%  Δ: ${statsPost.finalDiff>=0?'+':''}${statsPost.finalDiff.toFixed(2)}%`);
     if (statsPost.firstDiv >= 0)
