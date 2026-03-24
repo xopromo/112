@@ -1627,6 +1627,15 @@ let _favNs = '';   // неймспейс избранных: 'BTC_1h', 'ETH_4h' 
 let resultCache = new Map();
 let _t0 = 0;
 
+// Очищает rob_* кэш из localStorage чтобы освободить место (используется в storeSave)
+function _freeRobCache() {
+  try {
+    const keys = Object.keys(localStorage).filter(k => k.startsWith('rob_'));
+    keys.forEach(k => localStorage.removeItem(k));
+    if (keys.length > 0) console.warn(`[_freeRobCache] удалено ${keys.length} записей rob-кэша`);
+  } catch(_) {}
+}
+
 // --- Persistent storage helpers (window.storage API) ---
 // Returns the storage key for the current project's favourites
 function _favKey() {
@@ -1669,6 +1678,7 @@ async function storeLoad(key) {
 
 // Загружаем при старте
 window.addEventListener('load', async () => {
+  _idbInit(); // IndexedDB для задач/серий — запускаем async, не блокируем
   templates = (await storeLoad('use6_tpl')) || [];
   const def = templates.find(t => t.isDefault);
   if (def) applySettings(def.settings);
@@ -4075,51 +4085,73 @@ function _queueRestore(snap) {
 }
 
 // ── localStorage helpers ──────────────────────────────────────────
-function _queueLoadTasks()    { try { return JSON.parse(localStorage.getItem(_QUEUE_LS_KEY)  || '[]'); } catch(e) { return []; } }
+// ── IndexedDB backend (задачи + серии) ───────────────────────────
+// Кардинальная замена localStorage (~5MB) → IndexedDB (~GB).
+// Синхронный API сохраняется через in-memory кэши (_tasksCache, _seriesCache).
+// IndexedDB: запись async (fire-and-forget), чтение — из кэша (мгновенно).
+let _tasksCache  = [];
+let _seriesCache = [];
+let _idb         = null;  // null = IDB недоступен, fallback на localStorage
 
-// Очищает rob_* кэш из localStorage чтобы освободить место
-function _freeRobCache() {
+async function _idbInit() {
   try {
-    const keys = Object.keys(localStorage).filter(k => k.startsWith('rob_'));
-    keys.forEach(k => localStorage.removeItem(k));
-    if (keys.length > 0) console.warn(`[_freeRobCache] удалено ${keys.length} записей rob-кэша`);
-  } catch(_) {}
+    _idb = await new Promise((res, rej) => {
+      const req = indexedDB.open('use_optimizer_v1', 1);
+      req.onupgradeneeded = e => {
+        if (!e.target.result.objectStoreNames.contains('blobs'))
+          e.target.result.createObjectStore('blobs', { keyPath: 'k' });
+      };
+      req.onsuccess = e => res(e.target.result);
+      req.onerror   = e => rej(e.target.error);
+    });
+    const _idbGet = k => new Promise((res, rej) => {
+      const req = _idb.transaction('blobs','readonly').objectStore('blobs').get(k);
+      req.onsuccess = e => res(e.target.result?.v ?? null);
+      req.onerror   = e => rej(e.target.error);
+    });
+    // Однократная миграция из localStorage → IDB
+    const lsTasks  = localStorage.getItem(_QUEUE_LS_KEY);
+    const lsSeries = localStorage.getItem(_SERIES_LS_KEY);
+    if (lsTasks  !== null) { await _idbWrite('tasks',  JSON.parse(lsTasks  || '[]')); localStorage.removeItem(_QUEUE_LS_KEY); }
+    if (lsSeries !== null) { await _idbWrite('series', JSON.parse(lsSeries || '[]')); localStorage.removeItem(_SERIES_LS_KEY); }
+    _tasksCache  = (await _idbGet('tasks'))  || [];
+    _seriesCache = (await _idbGet('series')) || [];
+    // Обновляем UI если панель уже открыта
+    if (document.getElementById('queue-panel')?.style.display  !== 'none') renderQueueTaskList();
+    if (document.getElementById('series-panel')?.style.display !== 'none') renderSeriesList();
+  } catch(e) {
+    console.warn('[_idbInit] IndexedDB недоступен, fallback на localStorage:', e);
+    _idb = null;
+    try { _tasksCache  = JSON.parse(localStorage.getItem(_QUEUE_LS_KEY)  || '[]'); } catch(_) {}
+    try { _seriesCache = JSON.parse(localStorage.getItem(_SERIES_LS_KEY) || '[]'); } catch(_) {}
+  }
 }
 
-// Возвращает true если сохранено, false если не влезло даже после очистки
+function _idbWrite(key, val) {
+  if (!_idb) {
+    // localStorage fallback
+    try { localStorage.setItem(key === 'tasks' ? _QUEUE_LS_KEY : _SERIES_LS_KEY, JSON.stringify(val)); } catch(_) {}
+    return Promise.resolve();
+  }
+  return new Promise((res, rej) => {
+    const tx = _idb.transaction('blobs', 'readwrite');
+    tx.objectStore('blobs').put({ k: key, v: val });
+    tx.oncomplete = () => res();
+    tx.onerror    = e => rej(e.target.error);
+  });
+}
+
+function _queueLoadTasks()    { return _tasksCache; }
 function _queueSaveTasks(arr) {
-  const _isQuota = e => e.name === 'QuotaExceededError' || (e.code && (e.code === 22 || e.code === 1014));
-  const _try = (data) => {
-    try { localStorage.setItem(_QUEUE_LS_KEY, JSON.stringify(data)); return true; }
-    catch(e) { return _isQuota(e) ? false : (console.error('[_queueSaveTasks]', e), null); }
-  };
-  // Пробуем удалять старые задачи (с начала), сохраняя новую (в конце)
-  for (let i = 0; i < arr.length; i++) {  // < не <=, никогда не сохраняем []
-    const r = _try(arr.slice(i));
-    if (r === true) { if (i > 0) console.warn(`[_queueSaveTasks] удалено ${i} старых задач`); return true; }
-    if (r === null) return false; // не-quota ошибка
-  }
-  // Не влезает даже 1 задача — очищаем серии и rob-кэш, пробуем ещё раз
-  try { localStorage.removeItem(_SERIES_LS_KEY); } catch(_) {}
-  _freeRobCache();
-  const r = _try(arr.slice(-1));
-  if (r === true) { console.warn('[_queueSaveTasks] очищены серии+кэш, сохранена 1 задача'); return true; }
-  return false;
+  _tasksCache = arr;
+  _idbWrite('tasks', arr).catch(e => console.error('[_queueSaveTasks] IDB:', e));
+  return true;
 }
-
-function _seriesLoad()    { try { return JSON.parse(localStorage.getItem(_SERIES_LS_KEY) || '[]'); } catch(e) { return []; } }
+function _seriesLoad()    { return _seriesCache; }
 function _seriesSave(arr) {
-  const _isQuota = e => e.name === 'QuotaExceededError' || (e.code && (e.code === 22 || e.code === 1014));
-  for (let i = 0; i < arr.length; i++) {  // < не <=
-    try {
-      localStorage.setItem(_SERIES_LS_KEY, JSON.stringify(arr.slice(i)));
-      if (i > 0) console.warn(`[_seriesSave] удалено ${i} старых серий`);
-      return true;
-    } catch(e) {
-      if (!_isQuota(e)) { console.error('[_seriesSave]', e); return false; }
-    }
-  }
-  return false;
+  _seriesCache = arr;
+  _idbWrite('series', arr).catch(e => console.error('[_seriesSave] IDB:', e));
+  return true;
 }
 
 // ── Сгенерировать краткое описание снапшота ───────────────────────
@@ -4197,21 +4229,7 @@ function queueDuplicateTask(id) {
   // Deep copy snapshot so original and copy are fully independent
   const copy = JSON.parse(JSON.stringify({ ...src, id: Date.now() + Math.random(), name: src.name + ' (копия)' }));
   tasks.splice(idx + 1, 0, copy);
-  // Atomic save: either both tasks are saved or neither (no silent dropping of original)
-  const isQuota = e => e.name === 'QuotaExceededError' || (e.code && (e.code === 22 || e.code === 1014));
-  try {
-    localStorage.setItem(_QUEUE_LS_KEY, JSON.stringify(tasks));
-  } catch(e) {
-    if (isQuota(e)) {
-      _freeRobCache();
-      try {
-        localStorage.setItem(_QUEUE_LS_KEY, JSON.stringify(tasks));
-      } catch(e2) {
-        alert('Не удалось сохранить — недостаточно места (localStorage переполнен).');
-        return;
-      }
-    } else { return; }
-  }
+  _queueSaveTasks(tasks);
   renderQueueTaskList();
 }
 
@@ -4243,42 +4261,17 @@ function queueSaveTask() {
   const repeats = Math.max(1, parseInt(document.getElementById('queue-task-repeats')?.value) || 1);
   let tasks = _queueLoadTasks();
 
-  const _isQuota = e => e.name === 'QuotaExceededError' || (e.code && (e.code === 22 || e.code === 1014));
-  const _atomicSave = (arr) => {
-    try { localStorage.setItem(_QUEUE_LS_KEY, JSON.stringify(arr)); return true; }
-    catch(e) {
-      if (!_isQuota(e)) return false;
-      _freeRobCache();
-      try { localStorage.setItem(_QUEUE_LS_KEY, JSON.stringify(arr)); return true; }
-      catch(_) { return false; }
-    }
-  };
-
-  let ok;
   if (_queueEditId !== null) {
-    // Режим редактирования: заменяем задачу с совпадающим ID
-    // Используем атомарное сохранение — не дропаем соседние задачи при overflow
     const idx = tasks.findIndex(t => t.id === _queueEditId);
-    if (idx >= 0) {
-      tasks[idx] = { ...tasks[idx], name, repeats, snapshot: snap };
-    }
+    if (idx >= 0) tasks[idx] = { ...tasks[idx], name, repeats, snapshot: snap };
     _queueEditId = null;
-    ok = _atomicSave(tasks);
   } else {
-    // Режим добавления: допускаем дроп старых задач если места нет
     tasks.push({ id: Date.now() + Math.random(), name, repeats, snapshot: snap });
-    ok = _queueSaveTasks(tasks);
   }
+  _queueSaveTasks(tasks);
 
-  if (!ok) {
-    const err = document.getElementById('queue-save-error');
-    if (err) { err.textContent = '⚠️ localStorage переполнен — задача не сохранена. Очисти очередь.'; err.style.display = 'block'; }
-    return; // не закрываем форму
-  }
   document.getElementById('queue-add-form').style.display = 'none';
   document.getElementById('queue-task-name').value = '';
-  const err = document.getElementById('queue-save-error');
-  if (err) err.style.display = 'none';
   const titleEl = document.getElementById('queue-form-title');
   if (titleEl) titleEl.textContent = '+ Добавить задачу';
   renderQueueTaskList();
