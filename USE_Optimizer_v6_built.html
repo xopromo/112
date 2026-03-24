@@ -2141,8 +2141,9 @@ Pivot left=5 right=2
 // Возвращает строку — готовый Pine Script v6 индикатор
 //
 // ── ПОКРЫТИЕ ФИЛЬТРОВ (читается test/pine_check.js) ─────────
-// PINE_EXPORTED_FILTERS: useMA, useConfirm, useMaDist, useADX, useVolF, useAtrExp, useCandleF, useStruct, useVSA, useLiq, useVolDir, useSTrend
-// PINE_NOT_EXPORTED: useRSI, useConsec, useFresh, useWT, useFat
+// PINE_EXPORTED_FILTERS: useMA, useConfirm, useMaDist, useADX, useVolF, useAtrExp, useCandleF, useStruct, useVSA, useLiq, useVolDir, useSTrend, useRSI, useConsec, useFresh, useFat, useER, useKalmanMA, useSqzMod, useMacdFilter
+// PINE_NOT_EXPORTED: useWT
+// PINE_ENTRY_EXPORTED: all (incl. useSqueeze, useKalmanCross — ранее отсутствовали в pat_l/s)
 // ─────────────────────────────────────────────────────────────
 // ============================================================
 
@@ -2275,6 +2276,48 @@ function generatePineScript(r) {
   lines.push(`struct_pv_r  = input.int(${Math.max(1, c.strPvR||2)}, "Pivot right", minval=1, maxval=5,   group=grp_struct)`);
   lines.push(``);
 
+  lines.push(`grp_rsi_f = "📊 RSI ФИЛЬТР"`);
+  lines.push(`use_rsi_f  = input.bool(${b(c.useRSI)}, "RSI зоны (вход при экстремумах)", group=grp_rsi_f)`);
+  lines.push(`rsi_f_len  = input.int(${c.rsiLen||14}, "  Период RSI",         minval=2, maxval=50,  group=grp_rsi_f)`);
+  lines.push(`rsi_f_os   = input.int(${c.rsiOS||30}, "  Перепроданность ≤ (Long)", minval=5, maxval=49,  group=grp_rsi_f)`);
+  lines.push(`rsi_f_ob   = input.int(${c.rsiOB||70}, "  Перекупленность ≥ (Short)", minval=51, maxval=95, group=grp_rsi_f)`);
+  lines.push(``);
+
+  lines.push(`grp_consec_f = "🔢 ПОДРЯД ИДУЩИЕ СВЕЧИ"`);
+  lines.push(`use_consec_f = input.bool(${b(c.useConsec)}, "Блок подряд идущих свечей", tooltip="Блокирует вход если N или более свечей подряд идут в сторону сигнала — перекупленность", group=grp_consec_f)`);
+  lines.push(`consec_max_v = input.int(${c.consecMax||3}, "  Макс подряд", minval=2, maxval=10, group=grp_consec_f)`);
+  lines.push(``);
+
+  lines.push(`grp_fresh_f = "🌱 СВЕЖЕСТЬ ТРЕНДА"`);
+  lines.push(`use_fresh_f = input.bool(${b(c.useFresh)}, "Тренд слишком 'старый'", tooltip="Блокирует вход если N+ баров подряд цена выше/ниже MA — тренд устарел, вход рискован", group=grp_fresh_f)`);
+  lines.push(`fresh_max_v = input.int(${c.freshMax||20}, "  Макс баров тренда", minval=3, maxval=100, group=grp_fresh_f)`);
+  lines.push(``);
+
+  lines.push(`grp_fat_f = "💀 ИСТОЩЕНИЕ ОБЪЁМА"`);
+  lines.push(`use_fat_f    = input.bool(${b(c.useFat)}, "Fat: истощение (объём+серия)", tooltip="Блокирует вход если серия свечей в тренде при падающем объёме — признак истощения", group=grp_fat_f)`);
+  lines.push(`fat_consec_v = input.int(${c.fatConsec||3}, "  Подряд свечей тренда", minval=2, maxval=10, group=grp_fat_f)`);
+  lines.push(`fat_vol_drop = input.float(${f(c.fatVolDrop||0.7, 2)}, "  Объём упал до × среднего", step=0.05, minval=0.1, maxval=1.5, group=grp_fat_f)`);
+  lines.push(``);
+
+  lines.push(`grp_er_f = "⚡ EFFICIENCY RATIO (ER)"`);
+  lines.push(`use_er_f    = input.bool(${b(c.useER)}, "ER Kaufman (качество тренда)", tooltip="ER=1 = чистый тренд, ER=0 = хаос. Блокирует вход если ER ниже порога.", group=grp_er_f)`);
+  lines.push(`er_period_v = input.int(${c.erPeriod||10}, "  Период ER", minval=2, maxval=50, group=grp_er_f)`);
+  lines.push(`er_thresh_v = input.float(${f(c.erThresh||0.3, 2)}, "  Порог ER (0–1)", step=0.01, minval=0, maxval=1, group=grp_er_f)`);
+  lines.push(``);
+
+  lines.push(`grp_kalman_f = "🌊 KALMAN MA ФИЛЬТР"`);
+  lines.push(`use_kalman_f = input.bool(${b(c.useKalmanMA)}, "Kalman MA направление (фильтр)", tooltip="Адаптивная MA — фильтр тренда. Быстрее при высокой волатильности.", group=grp_kalman_f)`);
+  lines.push(`kalman_f_len = input.int(${c.kalmanLen||20}, "  Период Kalman", minval=5, maxval=500, group=grp_kalman_f)`);
+  lines.push(``);
+
+  lines.push(`grp_sqzmod_f = "🔲 МОДИФИКАТОР СЖАТИЯ"`);
+  lines.push(`use_sqz_mod  = input.bool(${b(c.useSqzMod)}, "Вход только из Squeeze", tooltip="Блокирует вход если предыдущий бар НЕ был в сжатии (BB < KC). Требует включённого Squeeze входа.", group=grp_sqzmod_f)`);
+  lines.push(``);
+
+  lines.push(`grp_macd_f = "📉 MACD ФИЛЬТР"`);
+  lines.push(`use_macd_f = input.bool(${b(c.useMacdFilter)}, "MACD направление (фильтр)", tooltip="Long только если MACD line > signal. Short только если MACD line < signal. Использует те же параметры что MACD-вход.", group=grp_macd_f)`);
+  lines.push(``);
+
   // SL / TP
   lines.push(`// ===== СТОП-ЛОССЫ =====`);
   lines.push(`grp_sl = "🛑 STOP LOSS"`);
@@ -2378,6 +2421,11 @@ function generatePineScript(r) {
   lines.push(`pos_main  = input.string(position.top_right, "Позиция", group=grp_tab)`);
   lines.push(`table_sz  = input.string(size.small, "Размер", options=[size.tiny,size.small,size.normal], group=grp_tab)`);
   lines.push(`c_bg      = input.color(color.new(color.black,40), "Фон", group=grp_tab)`);
+  lines.push(``);
+
+  lines.push(`grp_bot = "🤖 БОТ-АЛЕРТЫ"`);
+  lines.push(`bot_fmt = input.string("text", "Формат сообщений", options=["text", "json"], tooltip="text — читаемый формат. json — для ботов (3Commas, Alertatron, Cornix и др.)", group=grp_bot)`);
+  lines.push(`bot_ticker_ov = input.string("", "Тикер (оставь пустым = авто)", tooltip="Если пусто — используется syminfo.ticker. Задай явно если бот требует конкретный символ, напр. BTCUSDT.", group=grp_bot)`);
   lines.push(``);
 
   // ── INDICATORS & FILTERS ─────────────────────────────────
@@ -2504,6 +2552,94 @@ function generatePineScript(r) {
   lines.push(`        bear_vol += volume[i]`);
   lines.push(`bool vol_dir_ok_l = not use_vol_dir or bull_vol > bear_vol`);
   lines.push(`bool vol_dir_ok_s = not use_vol_dir or bear_vol > bull_vol`);
+  lines.push(``);
+
+  // ── Дополнительные фильтры ────────────────────────────────
+  // RSI Filter
+  lines.push(`// ── RSI Filter ──`);
+  lines.push(`float rsi_f_val = ta.rsi(close, rsi_f_len)`);
+  lines.push(`bool rsi_f_ok_l = not use_rsi_f or rsi_f_val[1] < rsi_f_os`);
+  lines.push(`bool rsi_f_ok_s = not use_rsi_f or rsi_f_val[1] > rsi_f_ob`);
+  lines.push(``);
+
+  // Consecutive bars filter
+  lines.push(`// ── Consecutive Bars Filter ──`);
+  lines.push(`int consec_bull_cnt = 0`);
+  lines.push(`int consec_bear_cnt = 0`);
+  lines.push(`if use_consec_f`);
+  lines.push(`    for _ci = 1 to consec_max_v + 1`);
+  lines.push(`        if close[_ci] > open[_ci]`);
+  lines.push(`            consec_bull_cnt += 1`);
+  lines.push(`        else`);
+  lines.push(`            break`);
+  lines.push(`    for _ci2 = 1 to consec_max_v + 1`);
+  lines.push(`        if close[_ci2] < open[_ci2]`);
+  lines.push(`            consec_bear_cnt += 1`);
+  lines.push(`        else`);
+  lines.push(`            break`);
+  lines.push(`bool consec_ok_l = not use_consec_f or consec_bull_cnt < consec_max_v`);
+  lines.push(`bool consec_ok_s = not use_consec_f or consec_bear_cnt < consec_max_v`);
+  lines.push(``);
+
+  // Trend Freshness filter (reuses ma_val)
+  lines.push(`// ── Trend Freshness Filter ──`);
+  lines.push(`int fresh_bull_cnt = 0`);
+  lines.push(`int fresh_bear_cnt = 0`);
+  lines.push(`if use_fresh_f and use_int_ma`);
+  lines.push(`    for _fi = 1 to fresh_max_v + 1`);
+  lines.push(`        if close[_fi] > ma_val[_fi]`);
+  lines.push(`            fresh_bull_cnt += 1`);
+  lines.push(`        else`);
+  lines.push(`            break`);
+  lines.push(`    for _fi2 = 1 to fresh_max_v + 1`);
+  lines.push(`        if close[_fi2] < ma_val[_fi2]`);
+  lines.push(`            fresh_bear_cnt += 1`);
+  lines.push(`        else`);
+  lines.push(`            break`);
+  lines.push(`bool fresh_ok_l = not use_fresh_f or not use_int_ma or fresh_bull_cnt < fresh_max_v`);
+  lines.push(`bool fresh_ok_s = not use_fresh_f or not use_int_ma or fresh_bear_cnt < fresh_max_v`);
+  lines.push(``);
+
+  // Fat Volume Exhaustion filter
+  lines.push(`// ── Fat Volume Exhaustion Filter ──`);
+  lines.push(`float fat_vol_rec = (volume + volume[1] + volume[2]) / 3`);
+  lines.push(`float fat_vol_avg = ta.sma(volume, 10)`);
+  lines.push(`bool fat_vol_exhausted = fat_vol_rec < fat_vol_avg * fat_vol_drop`);
+  lines.push(`int fat_bull_cnt = 0`);
+  lines.push(`int fat_bear_cnt = 0`);
+  lines.push(`if use_fat_f`);
+  lines.push(`    for _fti = 1 to fat_consec_v + 1`);
+  lines.push(`        if close[_fti] > open[_fti]`);
+  lines.push(`            fat_bull_cnt += 1`);
+  lines.push(`        else`);
+  lines.push(`            break`);
+  lines.push(`    for _fti2 = 1 to fat_consec_v + 1`);
+  lines.push(`        if close[_fti2] < open[_fti2]`);
+  lines.push(`            fat_bear_cnt += 1`);
+  lines.push(`        else`);
+  lines.push(`            break`);
+  lines.push(`bool fat_ok_l = not use_fat_f or not (fat_bull_cnt >= fat_consec_v and fat_vol_exhausted)`);
+  lines.push(`bool fat_ok_s = not use_fat_f or not (fat_bear_cnt >= fat_consec_v and fat_vol_exhausted)`);
+  lines.push(``);
+
+  // Efficiency Ratio filter
+  lines.push(`// ── Efficiency Ratio (Kaufman) Filter ──`);
+  lines.push(`float er_net = math.abs(close - close[er_period_v])`);
+  lines.push(`float er_path = 0.0`);
+  lines.push(`for _eri = 0 to er_period_v - 1`);
+  lines.push(`    er_path += math.abs(close[_eri] - close[_eri + 1])`);
+  lines.push(`float er_val = er_path > 0 ? er_net / er_path : 0`);
+  lines.push(`bool er_ok = not use_er_f or er_val[1] >= er_thresh_v`);
+  lines.push(``);
+
+  // Kalman MA Direction filter
+  lines.push(`// ── Kalman MA Direction Filter ──`);
+  lines.push(`var float _kf_v = 0.0`);
+  lines.push(`var float _kf_c = 0.0`);
+  lines.push(`_kf_v := _kf_v + (close - _kf_c) * (1.0 / kalman_f_len)`);
+  lines.push(`_kf_c := _kf_c + _kf_v`);
+  lines.push(`bool kalman_f_ok_l = not use_kalman_f or _kf_c[1] <= 0 or close[1] > _kf_c[1]`);
+  lines.push(`bool kalman_f_ok_s = not use_kalman_f or _kf_c[1] <= 0 or close[1] < _kf_c[1]`);
   lines.push(``);
 
   // Entry patterns logic
@@ -2713,8 +2849,42 @@ function generatePineScript(r) {
   lines.push(`bool st_s = use_supertrend and st_flip_bear`);
   lines.push(``);
 
-  lines.push(`bool pat_l = pivot_l or (use_engulf and bull_engulf[1]) or (use_pinbar and bull_pin[1]) or donch_l or boll_l or atr_bo_l or (use_ma_touch and ma_touch_l) or tl_touch_l or tl_break_l or flag_l or tri_l or rsix_l or macr_l or free_l or macd_l or stx_l or volmv_l or inb_l or nrev_l or st_l`);
-  lines.push(`bool pat_s = pivot_s or (use_engulf and bear_engulf[1]) or (use_pinbar and bear_pin[1]) or donch_s or boll_s or atr_bo_s or (use_ma_touch and ma_touch_s) or tl_touch_s or tl_break_s or flag_s or tri_s or rsix_s or macr_s or free_s or macd_s or stx_s or volmv_s or inb_s or nrev_s or st_s`);
+  // ── Squeeze Breakout entry ────────────────────────────────
+  lines.push(`// ── Squeeze Breakout ──`);
+  lines.push(`float _sqz_bb_b = ta.sma(close, sqz_bb_len)`);
+  lines.push(`float _sqz_bb_d = ta.stdev(close, sqz_bb_len) * 2`);
+  lines.push(`float _sqz_kc_a = ta.atr(sqz_bb_len)`);
+  lines.push(`bool sqz_on = (_sqz_bb_b + _sqz_bb_d) < (_sqz_bb_b + _sqz_kc_a * sqz_kc_mult) and (_sqz_bb_b - _sqz_bb_d) > (_sqz_bb_b - _sqz_kc_a * sqz_kc_mult)`);
+  lines.push(`int sqz_prev_len = 0`);
+  lines.push(`for _si = 1 to math.max(sqz_min_bars, 1) + 1`);
+  lines.push(`    if sqz_on[_si]`);
+  lines.push(`        sqz_prev_len += 1`);
+  lines.push(`    else`);
+  lines.push(`        break`);
+  lines.push(`bool sqz_l = use_squeeze and not sqz_on and sqz_on[1] and sqz_prev_len >= sqz_min_bars and close > open`);
+  lines.push(`bool sqz_s = use_squeeze and not sqz_on and sqz_on[1] and sqz_prev_len >= sqz_min_bars and close < open`);
+  lines.push(`// Squeeze Modifier filter (requires squeeze computed above)`);
+  lines.push(`bool sqz_mod_ok = not use_sqz_mod or sqz_on[1]`);
+  lines.push(``);
+
+  // ── Kalman Cross entry ────────────────────────────────────
+  lines.push(`// ── Kalman Cross entry ──`);
+  lines.push(`var float _kx_v = 0.0`);
+  lines.push(`var float _kx_c = 0.0`);
+  lines.push(`_kx_v := _kx_v + (close - _kx_c) * (1.0 / kalman_cross_len)`);
+  lines.push(`_kx_c := _kx_c + _kx_v`);
+  lines.push(`bool kalman_x_l = use_kalman_cross and _kx_c[2] > 0 and close[2] <= _kx_c[2] and close[1] > _kx_c[1]`);
+  lines.push(`bool kalman_x_s = use_kalman_cross and _kx_c[2] > 0 and close[2] >= _kx_c[2] and close[1] < _kx_c[1]`);
+  lines.push(``);
+
+  // ── MACD Direction filter (reuses macd_line_val/macd_sig_val) ──
+  lines.push(`// ── MACD Direction Filter ──`);
+  lines.push(`bool macd_f_ok_l = not use_macd_f or macd_line_val[1] > macd_sig_val[1]`);
+  lines.push(`bool macd_f_ok_s = not use_macd_f or macd_line_val[1] < macd_sig_val[1]`);
+  lines.push(``);
+
+  lines.push(`bool pat_l = pivot_l or (use_engulf and bull_engulf[1]) or (use_pinbar and bull_pin[1]) or donch_l or boll_l or atr_bo_l or (use_ma_touch and ma_touch_l) or tl_touch_l or tl_break_l or flag_l or tri_l or rsix_l or macr_l or free_l or macd_l or stx_l or volmv_l or inb_l or nrev_l or st_l or sqz_l or kalman_x_l`);
+  lines.push(`bool pat_s = pivot_s or (use_engulf and bear_engulf[1]) or (use_pinbar and bear_pin[1]) or donch_s or boll_s or atr_bo_s or (use_ma_touch and ma_touch_s) or tl_touch_s or tl_break_s or flag_s or tri_s or rsix_s or macr_s or free_s or macd_s or stx_s or volmv_s or inb_s or nrev_s or st_s or sqz_s or kalman_x_s`);
   lines.push(``);
   lines.push(`// SL pivot for dynamic SL`);
   lines.push(`sl_pv_lo = ta.pivotlow(low,  sl_piv_look, sl_piv_right_v)`);
@@ -2733,8 +2903,8 @@ function generatePineScript(r) {
   lines.push(`float dyn_sl_short_raw = use_sl_piv and not na(last_pv_hi) and (bar_index - last_pv_hi_bar) <= 30 ? last_pv_hi + atr_v * sl_piv_off : na`);
   lines.push(``);
   lines.push(`// All filters combined`);
-  lines.push(`bool all_filt_l = ma_ok_l and conf_ok_l and ma_dist_ok and adx_ok and vol_f_ok and atr_exp_ok and candle_f_ok and struct_ok_l and (not use_vsa or is_whale) and liq_ok and vol_dir_ok_l and st_ok_l`);
-  lines.push(`bool all_filt_s = ma_ok_s and conf_ok_s and ma_dist_ok and adx_ok and vol_f_ok and atr_exp_ok and candle_f_ok and struct_ok_s and (not use_vsa or is_whale) and liq_ok and vol_dir_ok_s and st_ok_s`);
+  lines.push(`bool all_filt_l = ma_ok_l and conf_ok_l and ma_dist_ok and adx_ok and vol_f_ok and atr_exp_ok and candle_f_ok and struct_ok_l and (not use_vsa or is_whale) and liq_ok and vol_dir_ok_l and st_ok_l and rsi_f_ok_l and consec_ok_l and fresh_ok_l and fat_ok_l and er_ok and kalman_f_ok_l and sqz_mod_ok and macd_f_ok_l`);
+  lines.push(`bool all_filt_s = ma_ok_s and conf_ok_s and ma_dist_ok and adx_ok and vol_f_ok and atr_exp_ok and candle_f_ok and struct_ok_s and (not use_vsa or is_whale) and liq_ok and vol_dir_ok_s and st_ok_s and rsi_f_ok_s and consec_ok_s and fresh_ok_s and fat_ok_s and er_ok and kalman_f_ok_s and sqz_mod_ok and macd_f_ok_s`);
   lines.push(``);
   lines.push(`// ПРАВИЛО: сигнал только на закрытии подтверждённой свечи`);
   lines.push(`bool confirmed = barstate.isconfirmed`);
@@ -3089,6 +3259,7 @@ function generatePineScript(r) {
     lines.push(`bool a_se = false`);
     lines.push(`bool a_lx = false`);
     lines.push(`bool a_sx = false`);
+    lines.push(`string _bot_tkr = bot_ticker_ov != "" ? bot_ticker_ov : syminfo.ticker`);
   lines.push(``);
   // ── INTRA-BAR TP/SL BLOCK ───────────────────────────────────────────────
   // Runs on every tick (not confirmed) to fire alerts and update box immediately
@@ -3106,10 +3277,14 @@ function generatePineScript(r) {
   lines.push(`            box.set_bottom(b_trade, math.min(v_ep, _ib_xp))`);
   lines.push(`            box.set_right(b_trade, bar_index)`);
   lines.push(`            box.set_bgcolor(b_trade, _ib_win ? c_win : c_loss)`);
+  lines.push(`        string _ib_msg_txt_l = "XL " + _ib_xt + " @" + str.tostring(_ib_xp, "#.######")`);
+  lines.push(`        string _ib_msg_json_l = '{"action":"sell","side":"long","ticker":"' + _bot_tkr + '","price":' + str.tostring(_ib_xp, "#.######") + ',"reason":"' + _ib_xt + '"}'`);
+  lines.push(`        string _ib_msg_txt_s = "XS " + _ib_xt + " @" + str.tostring(_ib_xp, "#.######")`);
+  lines.push(`        string _ib_msg_json_s = '{"action":"sell","side":"short","ticker":"' + _bot_tkr + '","price":' + str.tostring(_ib_xp, "#.######") + ',"reason":"' + _ib_xt + '"}'`);
   lines.push(`        if v_dir == 1`);
-  lines.push(`            alert("XL " + _ib_xt + " @" + str.tostring(_ib_xp, "#.####"), alert.freq_once_per_bar)`);
+  lines.push(`            alert(bot_fmt == "json" ? _ib_msg_json_l : _ib_msg_txt_l, alert.freq_once_per_bar)`);
   lines.push(`        else`);
-  lines.push(`            alert("XS " + _ib_xt + " @" + str.tostring(_ib_xp, "#.####"), alert.freq_once_per_bar)`);
+  lines.push(`            alert(bot_fmt == "json" ? _ib_msg_json_s : _ib_msg_txt_s, alert.freq_once_per_bar)`);
   lines.push(``);
   lines.push(`if bar_index > (last_bar_index - max_bars) and confirmed`);
   lines.push(`    if v_in and bar_index > v_eb`);
@@ -3231,12 +3406,16 @@ function generatePineScript(r) {
     lines.push(`                box.set_bottom(b_trade, math.min(v_ep, close))`);
   lines.push(`        if frc or hsl or htp or htr`);
   lines.push(`            float vtr = (v_dir == 1 ? (vxp - v_ep)/v_ep*100 : (v_ep - vxp)/v_ep*100) - total_cost`);
+  lines.push(`            string _xmsg_txt_l  = "XL " + vxt + " @" + str.tostring(vxp,"#.######") + " entry:" + str.tostring(v_ep,"#.######") + " pnl:" + str.tostring(vtr,"#.##") + "%"`);
+  lines.push(`            string _xmsg_json_l = '{"action":"sell","side":"long","ticker":"' + _bot_tkr + '","price":' + str.tostring(vxp,"#.######") + ',"entry":' + str.tostring(v_ep,"#.######") + ',"pnl":' + str.tostring(vtr,"#.##") + ',"reason":"' + vxt + '"}'`);
+  lines.push(`            string _xmsg_txt_s  = "XS " + vxt + " @" + str.tostring(vxp,"#.######") + " entry:" + str.tostring(v_ep,"#.######") + " pnl:" + str.tostring(vtr,"#.##") + "%"`);
+  lines.push(`            string _xmsg_json_s = '{"action":"buy","side":"short","ticker":"' + _bot_tkr + '","price":' + str.tostring(vxp,"#.######") + ',"entry":' + str.tostring(v_ep,"#.######") + ',"pnl":' + str.tostring(vtr,"#.##") + ',"reason":"' + vxt + '"}'`);
   lines.push(`            if v_dir == 1`);
     lines.push(`                a_lx := true`);
-    lines.push(`                alert("XL " + vxt + " @" + str.tostring(vxp,"#.####"), alert.freq_once_per_bar)`);
+    lines.push(`                alert(bot_fmt == "json" ? _xmsg_json_l : _xmsg_txt_l, alert.freq_once_per_bar)`);
   lines.push(`            else`);
     lines.push(`                a_sx := true`);
-    lines.push(`                alert("XS " + vxt + " @" + str.tostring(vxp,"#.####"), alert.freq_once_per_bar)`);
+    lines.push(`                alert(bot_fmt == "json" ? _xmsg_json_s : _xmsg_txt_s, alert.freq_once_per_bar)`);
   lines.push(`            if show_tr`);
   lines.push(`                bool win = v_dir == 1 ? vxp > v_ep : vxp < v_ep`);
     lines.push(`                box.set_top(b_trade, math.max(v_ep, vxp))`);
@@ -3316,12 +3495,16 @@ function generatePineScript(r) {
   lines.push(`            float sl_d = math.abs(entry_price - v_sl)`);
   lines.push(`            v_tp := calc_tp_level(v_dir, entry_price, _u, sl_d)`);
   lines.push(`            v_eb := bar_index`);
+  lines.push(`            string _emsg_txt_l  = "LONG @" + str.tostring(entry_price,"#.######") + " SL:" + str.tostring(v_sl,"#.######") + " TP:" + str.tostring(v_tp,"#.######")`);
+  lines.push(`            string _emsg_json_l = '{"action":"buy","side":"long","ticker":"' + _bot_tkr + '","price":' + str.tostring(entry_price,"#.######") + ',"sl":' + str.tostring(v_sl,"#.######") + ',"tp":' + str.tostring(v_tp,"#.######") + '}'`);
+  lines.push(`            string _emsg_txt_s  = "SHORT @" + str.tostring(entry_price,"#.######") + " SL:" + str.tostring(v_sl,"#.######") + " TP:" + str.tostring(v_tp,"#.######")`);
+  lines.push(`            string _emsg_json_s = '{"action":"sell","side":"short","ticker":"' + _bot_tkr + '","price":' + str.tostring(entry_price,"#.######") + ',"sl":' + str.tostring(v_sl,"#.######") + ',"tp":' + str.tostring(v_tp,"#.######") + '}'`);
   lines.push(`            if v_dir == 1`);
     lines.push(`                a_le := true`);
-    lines.push(`                alert("LONG @" + str.tostring(entry_price,"#.####") + " SL:" + str.tostring(v_sl,"#.####") + " TP:" + str.tostring(v_tp,"#.####"), alert.freq_once_per_bar)`);
+    lines.push(`                alert(bot_fmt == "json" ? _emsg_json_l : _emsg_txt_l, alert.freq_once_per_bar)`);
   lines.push(`            else`);
     lines.push(`                a_se := true`);
-    lines.push(`                alert("SHORT @" + str.tostring(entry_price,"#.####") + " SL:" + str.tostring(v_sl,"#.####") + " TP:" + str.tostring(v_tp,"#.####"), alert.freq_once_per_bar)`);
+    lines.push(`                alert(bot_fmt == "json" ? _emsg_json_s : _emsg_txt_s, alert.freq_once_per_bar)`);
   lines.push(`            if show_tr`);
   lines.push(`                bool is_pv = (v_dir == 1 and pivot_l) or (v_dir == -1 and pivot_s)`);
   lines.push(`                string elbl = is_pv ? (v_dir == 1 ? "PvL" : "PvS") : (v_dir == 1 ? "L" : "S")`);
@@ -3410,14 +3593,19 @@ function generatePineScript(r) {
   lines.push(`// ==========================================`);
   lines.push(`// 8. АЛЕРТЫ`);
   lines.push(`// ==========================================`);
-  lines.push(`alertcondition(a_le, "Long Entry",  "Long Entry")`);
-  lines.push(`alertcondition(a_se, "Short Entry", "Short Entry")`);
-  lines.push(`alertcondition(a_lx, "Exit Long",   "Exit Long")`);
-  lines.push(`alertcondition(a_sx, "Exit Short",  "Exit Short")`);
-  lines.push(`plotshape(a_lx, "XL", shape.xcross,      location.abovebar, color.new(color.red,0),   size=size.tiny)`);
-  lines.push(`plotshape(a_sx, "XS", shape.xcross,      location.belowbar, color.new(color.blue,0),  size=size.tiny)`);
-  lines.push(`plotshape(a_le, "EL", shape.triangleup,  location.belowbar, color.new(color.green,0), size=size.tiny)`);
-  lines.push(`plotshape(a_se, "ES", shape.triangledown, location.abovebar, color.new(color.fuchsia,0), size=size.tiny)`);
+  lines.push(`alertcondition(a_le, "▲ Long Entry",  "Long Entry — USE Optimizer")`);
+  lines.push(`alertcondition(a_se, "▼ Short Entry", "Short Entry — USE Optimizer")`);
+  lines.push(`alertcondition(a_lx, "✖ Exit Long",   "Exit Long — USE Optimizer")`);
+  lines.push(`alertcondition(a_sx, "✖ Exit Short",  "Exit Short — USE Optimizer")`);
+  lines.push(`alertcondition(a_le or a_se, "⚡ Any Entry", "Entry signal — USE Optimizer")`);
+  lines.push(`alertcondition(a_lx or a_sx, "⚡ Any Exit",  "Exit signal — USE Optimizer")`);
+  lines.push(`// ── ТОЧКИ ВХОДА/ВЫХОДА НА ГРАФИКЕ ─────────────────────────`);
+  lines.push(`// Входы: большие цветные треугольники`);
+  lines.push(`plotshape(a_le, "▲ Long Entry",  shape.triangleup,   location.belowbar, color.new(color.green,0),   size=size.small, text="L", textcolor=color.white)`);
+  lines.push(`plotshape(a_se, "▼ Short Entry", shape.triangledown, location.abovebar, color.new(color.red,0),     size=size.small, text="S", textcolor=color.white)`);
+  lines.push(`// Выходы: маленькие крестики`);
+  lines.push(`plotshape(a_lx, "✖ Exit Long",   shape.xcross,       location.abovebar, color.new(color.orange,0),  size=size.tiny)`);
+  lines.push(`plotshape(a_sx, "✖ Exit Short",  shape.xcross,       location.belowbar, color.new(color.aqua,0),    size=size.tiny)`);
 
   const rawCode = lines.join('\n');
   // Фаза 1: исправляем известные ошибки
@@ -3562,6 +3750,13 @@ function _addActivePinev6(code) {
     ['use_adx',        ['adx_thresh','adx_len']],
     ['use_vol_filter', ['vol_mult']],
     ['use_squeeze',    ['sqz_bb_len','sqz_kc_mult','sqz_min_bars']],
+    ['use_rsi_f',      ['rsi_f_len','rsi_f_os','rsi_f_ob']],
+    ['use_consec_f',   ['consec_max_v']],
+    ['use_fresh_f',    ['fresh_max_v']],
+    ['use_fat_f',      ['fat_consec_v','fat_vol_drop']],
+    ['use_er_f',       ['er_period_v','er_thresh_v']],
+    ['use_kalman_f',   ['kalman_f_len']],
+    ['use_kalman_cross', ['kalman_cross_len']],
     ['use_trail',      ['trail_trig','trail_dist']],
     ['use_be',         ['be_trig','be_off']],
     ['use_partial',    ['part_rr','part_pct','part_be']],
@@ -5572,8 +5767,11 @@ const ENTRY_REGISTRY = [
       const minBars = cfg.sqzMinBars || 1;
       return !cfg.sqzOn[i] && cfg.sqzCount[i-1] >= minBars && DATA[i].c < DATA[i].o;
     },
-    pineLines: (c, b) => [
-      `use_squeeze  = input.bool(${b(c.useSqueeze)}, "Squeeze (BB+Keltner)", group=grp_entry)`,
+    pineLines: (c, b, f) => [
+      `use_squeeze   = input.bool(${b(c.useSqueeze)}, "Squeeze (BB+Keltner)", group=grp_entry)`,
+      `sqz_bb_len    = input.int(${c.sqzBBLen||20}, "  Squeeze BB период", minval=5, maxval=200, group=grp_entry)`,
+      `sqz_kc_mult   = input.float(${f(c.sqzKCMult||1.5,1)}, "  KC множитель", step=0.1, group=grp_entry)`,
+      `sqz_min_bars  = input.int(${c.sqzMinBars||1}, "  Мин баров в сжатии", minval=1, maxval=20, group=grp_entry)`,
     ],
   },
 
@@ -19112,7 +19310,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774384997420;
+window._BUILD_TS = 1774390417987;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;

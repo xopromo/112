@@ -183,8 +183,11 @@ const ENTRY_REGISTRY = [
       const minBars = cfg.sqzMinBars || 1;
       return !cfg.sqzOn[i] && cfg.sqzCount[i-1] >= minBars && DATA[i].c < DATA[i].o;
     },
-    pineLines: (c, b) => [
-      `use_squeeze  = input.bool(${b(c.useSqueeze)}, "Squeeze (BB+Keltner)", group=grp_entry)`,
+    pineLines: (c, b, f) => [
+      `use_squeeze   = input.bool(${b(c.useSqueeze)}, "Squeeze (BB+Keltner)", group=grp_entry)`,
+      `sqz_bb_len    = input.int(${c.sqzBBLen||20}, "  Squeeze BB период", minval=5, maxval=200, group=grp_entry)`,
+      `sqz_kc_mult   = input.float(${f(c.sqzKCMult||1.5,1)}, "  KC множитель", step=0.1, group=grp_entry)`,
+      `sqz_min_bars  = input.int(${c.sqzMinBars||1}, "  Мин баров в сжатии", minval=1, maxval=20, group=grp_entry)`,
     ],
   },
 
