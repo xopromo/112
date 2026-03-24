@@ -4427,6 +4427,7 @@ async function runQueue() {
         // Один macrotask чтобы DOM-изменения применились до runOpt.
         // yieldToUI = MessageChannel — не тротлится в фоновых вкладках.
         await yieldToUI();
+        if (_queueStopFlag) break;
 
         if (progEl) progEl.textContent =
           `Задача ${ti+1}/${tasks.length} · Повтор ${rep+1}/${task.repeats} · Найдено: ${(window.results||[]).length.toLocaleString()} результатов`;
@@ -4485,6 +4486,9 @@ async function runQueue() {
 function stopQueue() {
   _queueStopFlag = true;
   if (typeof stopOpt === 'function') stopOpt();
+  // Останавливаем rob-тест если он сейчас работает
+  if (typeof _massRobRunning !== 'undefined') _massRobRunning = false;
+  if (typeof _hcRobRunning   !== 'undefined') _hcRobRunning   = false;
 }
 
 // ── Серии ─────────────────────────────────────────────────────────
