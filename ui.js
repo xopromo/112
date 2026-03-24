@@ -3283,6 +3283,19 @@ function _runTVcompare(tvRows, resultsEl) {
     return;
   }
 
+  const c = r.cfg || {};
+
+  // Warmup: skip first N bars where indicators aren't settled (MA, pivots)
+  const _maTypeW = c.useMA ? (c.maType || 'EMA') : '';
+  const _temaMult = (_maTypeW === 'TEMA' || _maTypeW === 'DEMA' || _maTypeW === 'EMA') ? 3 : 1;
+  const warmupN = Math.max(
+    (c.pvL || 5) + (c.pvR || 2) + 5,
+    c.useMA ? (c.maP || 0) * (c.htfRatio || 1) * _temaMult : 0,
+    (c.atrPeriod || 14) * 3,
+    50
+  );
+  const pairsPost = pairs.filter(p => p.i >= warmupN);
+
   const jsArr = pairs.map(p => p.jsEq);
   const tvArr = pairs.map(p => p.tvEq);
 
@@ -3316,6 +3329,25 @@ function _runTVcompare(tvRows, resultsEl) {
   const tvLast = tvArr[tvArr.length - 1];
   const finalDiff = jsLast - tvLast;
 
+  // Post-warmup stats (skip first warmupN bars — MA/pivot not settled yet)
+  let statsPost = null;
+  if (pairsPost.length >= 5) {
+    const jsAP = pairsPost.map(p => p.jsEq), tvAP = pairsPost.map(p => p.tvEq);
+    const jsMeanP = jsAP.reduce((s,v)=>s+v,0)/jsAP.length, tvMeanP = tvAP.reduce((s,v)=>s+v,0)/tvAP.length;
+    let nP=0, djP=0, dtP=0;
+    for (let k=0; k<jsAP.length; k++) { const a=jsAP[k]-jsMeanP, b=tvAP[k]-tvMeanP; nP+=a*b; djP+=a*a; dtP+=b*b; }
+    const corrP = (djP>0&&dtP>0) ? nP/Math.sqrt(djP*dtP) : 0;
+    const rmseP = Math.sqrt(pairsPost.reduce((s,p)=>s+Math.pow(p.jsEq-p.tvEq,2),0)/pairsPost.length);
+    let fdP=-1, ftP='', mdP=0, mbP=0, mtP='';
+    for (const p of pairsPost) {
+      const d = Math.abs(p.jsEq-p.tvEq);
+      if (fdP<0 && d>0.5) { fdP=p.i; ftP=DATA[p.i]?.t||''; }
+      if (d>mdP) { mdP=d; mbP=p.i; mtP=DATA[p.i]?.t||''; }
+    }
+    const jLP=jsAP[jsAP.length-1], tLP=tvAP[tvAP.length-1];
+    statsPost = { corr:corrP, rmse:rmseP, firstDiv:fdP, firstTime:ftP, maxDiff:mdP, maxBar:mbP, maxTime:mtP, jsLast:jLP, tvLast:tLP, finalDiff:jLP-tLP, n:pairsPost.length };
+  }
+
   // Signal stats
   const hasSigs = pairs[0]?.tvRow.el !== null;
   let tvSigCount = 0;
@@ -3333,7 +3365,7 @@ function _runTVcompare(tvRows, resultsEl) {
   const fdC   = Math.abs(finalDiff) < 1 ? 'pos' : Math.abs(finalDiff) < 5 ? 'warn' : 'neg';
 
   // Сохраняем диагностику для copyTVdiag()
-  _tvCmpDiag = { r, pairs, corr, rmse, finalDiff, jsLast, tvLast, firstDivBar, firstDivTime, maxDiff, maxDiffBar, maxDiffTime, hasSigs, tvSigCount, fullEq, isFullRun, missingEnd, jsFullFinal, fullRunErr };
+  _tvCmpDiag = { r, pairs, corr, rmse, finalDiff, jsLast, tvLast, firstDivBar, firstDivTime, maxDiff, maxDiffBar, maxDiffTime, hasSigs, tvSigCount, fullEq, isFullRun, missingEnd, jsFullFinal, fullRunErr, warmupN, statsPost };
 
   let html = '';
   html += row('Режим сравнения', isFullRun
@@ -3356,6 +3388,13 @@ function _runTVcompare(tvRows, resultsEl) {
   }
   html += row('Макс. расхождение', `${maxDiff.toFixed(2)}% · бар #${maxDiffBar} · ${maxDiffTime}`, 'muted');
   if (hasSigs) html += row('TV сигналов (EL/ES/XL/XS)', `${tvSigCount} из ${pairs.length} совпавших баров`, 'muted');
+  if (statsPost) {
+    const spC = statsPost.corr >= 0.99 ? 'pos' : statsPost.corr >= 0.95 ? 'warn' : 'neg';
+    const srC = statsPost.rmse < 1 ? 'pos' : statsPost.rmse < 5 ? 'warn' : 'neg';
+    const sfC = Math.abs(statsPost.finalDiff) < 1 ? 'pos' : Math.abs(statsPost.finalDiff) < 5 ? 'warn' : 'neg';
+    html += row(`После прогрева (бар ${warmupN}+, ${statsPost.n} баров)`,
+      `Корр: <span class="${spC}">${(statsPost.corr*100).toFixed(1)}%</span>${statsPost.corr>=0.99?' ✅':statsPost.corr<0.95?' ⚠️':''} · RMSE: <span class="${srC}">${statsPost.rmse.toFixed(2)}%</span> · Δ итог: <span class="${sfC}">${statsPost.finalDiff>=0?'+':''}${statsPost.finalDiff.toFixed(1)}%</span>`, 'muted');
+  }
 
   resultsEl.innerHTML = html;
 
@@ -3406,7 +3445,7 @@ function copyTVdiag() {
   if (!d) { alert('Нет данных диагностики — сначала загрузи TV CSV'); return; }
   const { r, pairs, corr, rmse, finalDiff, jsLast, tvLast,
           firstDivBar, firstDivTime, maxDiff, maxDiffBar, maxDiffTime, hasSigs, isFullRun,
-          missingEnd, jsFullFinal, fullRunErr } = d;
+          missingEnd, jsFullFinal, fullRunErr, warmupN, statsPost } = d;
   const c = r.cfg;
   const lastPairBar2 = pairs.length > 0 ? pairs[pairs.length - 1].i : -1;
 
@@ -3527,6 +3566,24 @@ function copyTVdiag() {
     if (pm) lines.push(`  JS_eq: ${pm.jsEq.toFixed(3)}%  TV_eq: ${pm.tvEq.toFixed(3)}%`);
   }
   lines.push('');
+  // Post-warmup section
+  if (statsPost) {
+    lines.push(`=== ПОСТ-ПРОГРЕВ (бар ${warmupN}+, ${statsPost.n} баров) ===`);
+    lines.push(`Прогрев пропускает первые ${warmupN} баров (MA=${c.useMA?`${c.maType||'EMA'}(${c.maP||0})×${c.htfRatio||1}tf`:'off'}, pvL+pvR+5=${(c.pvL||5)+(c.pvR||2)+5}, ATR×3=${(c.atrPeriod||14)*3})`);
+    lines.push(`Корреляция: ${(statsPost.corr*100).toFixed(2)}%  RMSE: ${statsPost.rmse.toFixed(2)}%`);
+    lines.push(`JS итог: ${statsPost.jsLast.toFixed(2)}%  TV итог: ${statsPost.tvLast.toFixed(2)}%  Δ: ${statsPost.finalDiff>=0?'+':''}${statsPost.finalDiff.toFixed(2)}%`);
+    if (statsPost.firstDiv >= 0)
+      lines.push(`Первое расхождение >0.5% (пост-прогрев): бар #${statsPost.firstDiv} (${statsPost.firstTime})`);
+    else
+      lines.push(`Первое расхождение >0.5% (пост-прогрев): не обнаружено ✅`);
+    lines.push(`Макс. расхождение (пост-прогрев): ${statsPost.maxDiff.toFixed(2)}% на баре #${statsPost.maxBar}`);
+    const verdict = statsPost.corr >= 0.99 ? '✅ ПРОГРЕВ БЫЛ ПРИЧИНОЙ — пост-warmup корреляция отличная' :
+                    statsPost.corr >= 0.95 ? '⚠️ Улучшилось после прогрева, но есть остаточное расхождение' :
+                    statsPost.corr >= 0 ?    '❌ Расхождение сохраняется после прогрева — есть баг в логике' :
+                                             '❌❌ Отрицательная корреляция даже после прогрева — серьёзный баг';
+    lines.push(verdict);
+    lines.push('');
+  }
   // Автоматический анализ первичной причины
   lines.push('=== АВТО-ДИАГНОЗ ===');
   // Ищем TV EL/ES сигнал в окне [firstDivBar-6 .. firstDivBar] — он мог быть чуть раньше
