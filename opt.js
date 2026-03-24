@@ -1949,8 +1949,8 @@ async function runOpt() {
         useER:_fCombo.useER??useER,erArr,erPeriod:erPeriod||10,erThresh,
         useKalmanMA:_fCombo.useKalmanMA??useKalmanMA,kalmanArr,kalmanLen, // ##KALMAN_MA##
         start:Math.max(
-          (_effUseMa&&maP>0?(maP||0)*(htfRatio||1):0),
-          (_effUseConfirm&&confN>0?(confN||0)*(_confHtf||1):0),
+          (_effUseMa&&maP>0?(maP||0)*(htfRatio||1)*(_mType==='EMA'||_mType==='DEMA'||_mType==='TEMA'?3:1):0),
+          (_effUseConfirm&&confN>0?(confN||0)*(_confHtf||1)*(_confType==='EMA'||_confType==='DEMA'||_confType==='TEMA'?3:1):0),
           50)+2,
         pruning:false, maxDDLimit:maxDD
       };
@@ -2288,8 +2288,8 @@ async function runOpt() {
         useER:_fCombo.useER??useER,erArr,erPeriod:erPeriod||10,erThresh,
         useKalmanMA:_fCombo.useKalmanMA??useKalmanMA,kalmanArr,kalmanLen, // ##KALMAN_MA##
         start:Math.max(
-          (_effUseMa&&maP>0?(maP||0)*(htfRatio||1):0),
-          (_effUseConfirm&&confN>0?(confN||0)*(_confHtf||1):0),
+          (_effUseMa&&maP>0?(maP||0)*(htfRatio||1)*(_mType==='EMA'||_mType==='DEMA'||_mType==='TEMA'?3:1):0),
+          (_effUseConfirm&&confN>0?(confN||0)*(_confHtf||1)*(_confType==='EMA'||_confType==='DEMA'||_confType==='TEMA'?3:1):0),
           50)+2,pruning:false,maxDDLimit:maxDD
       };
 
@@ -2913,8 +2913,8 @@ async function runOpt() {
                                       useMacdFilter,useER,erArr:erArrEx,erPeriod:erPArr[0]||10,erThresh,
                                       bodyAvg:bodyAvgArr,
                                       start:Math.max(
-                                        (useMa&&maP>0?(maP||0)*(htfRatio||1):0),
-                                        (useConfirm&&confN>0?(confN||0)*(_confHtf||1):0),
+                                        (useMa&&maP>0?(maP||0)*(htfRatio||1)*(mType==='EMA'||mType==='DEMA'||mType==='TEMA'?3:1):0),
+                                        (useConfirm&&confN>0?(confN||0)*(_confHtf||1)*(_confType==='EMA'||_confType==='DEMA'||_confType==='TEMA'?3:1):0),
                                         50)+2,
                                       // Pruning
                                       pruning:optMode==='prune',maxDDLimit:maxDD
@@ -3717,8 +3717,8 @@ function buildBtCfg(cfg, ind) {
     kalmanCrossLen: cfg.kalmanCrossLen || 20,
 
     start: Math.max(
-      (cfg.useMA      ? (maP || 0)       * (cfg.htfRatio     || 1) : 0),
-      (cfg.useConfirm ? (cfg.confN || 0) * (cfg.confHtfRatio || 1) : 0),
+      (cfg.useMA      ? (maP || 0)       * (cfg.htfRatio     || 1) * (maType==='EMA'||maType==='DEMA'||maType==='TEMA'?3:1) : 0),
+      (cfg.useConfirm ? (cfg.confN || 0) * (cfg.confHtfRatio || 1) * ((cfg.confMatType||'EMA')==='EMA'||(cfg.confMatType||'EMA')==='DEMA'||(cfg.confMatType||'EMA')==='TEMA'?3:1) : 0),
       50) + 2,
     pruning: false,
     maxDDLimit: 300,
