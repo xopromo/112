@@ -507,6 +507,7 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
   let hasSL2 = false, hasTP2 = false;
   let exitBar = -1, entryBar = -1;
   let beActive = false, trailActive = false, partialDone = false, posSize = 1.0;
+  let wickSL = NaN;
   let revSkipCount = 0, revCooldownBar = -1; // счётчики skip/cooldown для обратного сигнала
   // Отложенный вход (Bars / Retrace)
   let pendingDir = 0, pendingBar = -1, pendingSigClose = 0;
@@ -711,6 +712,29 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
             }
           }
         }
+
+        // Wick Trailing SL: двигается от фитиля предыдущей свечи, только в пользу позиции
+        if (cfg.useWickTrail && i > 0) {
+          const wickOffset = cfg.wickOffType === 'pct'
+            ? DATA[i].c * cfg.wickMult / 100
+            : cfg.wickOffType === 'pts'
+              ? cfg.wickMult
+              : atrArr[i] * cfg.wickMult; // ATR (default)
+          const wickRaw = dir === 1
+            ? DATA[i-1].l - wickOffset   // Long: ниже нижнего фитиля предыдущей свечи
+            : DATA[i-1].h + wickOffset;  // Short: выше верхнего фитиля
+          // Ratchet: движется только в пользу позиции
+          if (isNaN(wickSL)) {
+            wickSL = wickRaw;
+          } else {
+            wickSL = dir === 1 ? Math.max(wickSL, wickRaw) : Math.min(wickSL, wickRaw);
+          }
+          // Проверка срабатывания (параллельно с основным SL)
+          if (!hsl && !htp && !htr) {
+            if (dir === 1 && bar.l <= wickSL) { hsl = true; exitPrice = wickSL; }
+            else if (dir === -1 && bar.h >= wickSL) { hsl = true; exitPrice = wickSL; }
+          }
+        }
       }
 
       // --- Шаг 7: frc без hsl/htp/htr → выход по close (с учётом BE/trail SL) ---
@@ -826,7 +850,7 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
       if (doDir !== 0 && ac > 0) {
         inTrade=true; dir=doDir;
         entry=bar.c; entryBar=i;
-        beActive=false; trailActive=false; partialDone=false; posSize=1.0;
+        beActive=false; trailActive=false; partialDone=false; posSize=1.0; wickSL=NaN;
         revSkipCount=0; revCooldownBar=-1;
 
         // Compute SL levels — из SL_REGISTRY
