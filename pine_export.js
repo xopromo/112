@@ -972,10 +972,6 @@ function generatePineScript(r) {
   lines.push(`            box.set_bottom(b_trade, math.min(v_ep, _ib_xp))`);
   lines.push(`            box.set_right(b_trade, bar_index)`);
   lines.push(`            box.set_bgcolor(b_trade, _ib_win ? c_win : c_loss)`);
-  lines.push(`            line.delete(l_tp)`);
-  lines.push(`            line.delete(l_sl)`);
-  lines.push(`            l_tp := na`);
-  lines.push(`            l_sl := na`);
   lines.push(`            float _ib_pct = v_dir == 1 ? (_ib_xp - v_ep)/v_ep*100 : (v_ep - _ib_xp)/v_ep*100`);
   lines.push(`            label.new(bar_index, v_dir == 1 ? _ib_xp + atr_v[1] * lbl_off_m : _ib_xp - atr_v[1] * lbl_off_m, _ib_xt + " " + str.tostring(_ib_pct, "#.#") + "%", color=_ib_win ? color.green : color.red, style=v_dir == 1 ? label.style_label_down : label.style_label_up, size=size.tiny, textcolor=color.white)`);
   lines.push(`        if v_dir == 1`);
