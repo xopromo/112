@@ -882,6 +882,11 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
       style="width:72px;font-size:.65em;padding:2px 5px;background:var(--bg3);border:1px solid var(--border2);border-radius:3px;color:var(--text1);text-align:right"
       oninput="applyMaxBars()">
     <span id="c_maxbars_info" style="font-size:.6em;color:var(--text3)"></span>
+    <label style="font-size:.65em;color:var(--text3);margin-left:6px" for="c_tf_range">TF×:</label>
+    <input id="c_tf_range" value="1"
+      title="Диапазон TF-множителей для перебора (целые числа). Загружай 1m данные и указывай диапазон: 1:5:1 → тест на 1m,2m,3m,4m,5m. Формат: от:до:шаг или 2,3,5. Значение 1 = без ресэмплинга."
+      style="width:68px;font-size:.65em;padding:2px 5px;background:var(--bg3);border:1px solid var(--border2);border-radius:3px;color:var(--text1);text-align:right"
+      oninput="updatePreview()">
   </div>
   <div id="finfo-append" style="font-size:.6em;color:var(--text3);margin-top:2px"></div>
   <div style="margin-top:5px;display:flex;gap:5px;align-items:center;flex-wrap:wrap">
@@ -1318,7 +1323,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
 </div><!-- end panels -->
 
 <div class="btn-row">
-  <button class="btn btn-go" id="rbtn" onclick="runOpt()" disabled>🚀 Запустить</button>
+  <button class="btn btn-go" id="rbtn" onclick="runOptMultiTF()" disabled>🚀 Запустить</button>
   <button class="btn-pause" id="pbtn" onclick="pauseOpt()" style="display:none">⏸ Пауза</button>
   <button class="btn btn-stop" id="sbtn" onclick="stopOpt()" style="display:none">⏹ Стоп</button>
   <button id="queue-toggle-btn" onclick="toggleQueuePanel()" style="background:rgba(255,180,50,.12);border:1px solid rgba(255,180,50,.4);color:#ffb432;font-size:.8em;padding:4px 10px;border-radius:5px;cursor:pointer;margin-left:6px" title="Очередь задач TPE">📋 Очередь</button>

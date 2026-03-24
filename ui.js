@@ -231,6 +231,8 @@ function applyMaxBars() {
   const n = parseInt($('c_maxbars')?.value) || 0;
   const total = _rawDATA.length;
   DATA = (n > 0 && n < total) ? _rawDATA.slice(total - n) : _rawDATA;
+  // Сохраняем мастер-копию для ресэмплинга в multi-TF режиме
+  window.DATA_1M = DATA.slice();
   const used = DATA.length;
   const suffix = used < total ? ` ⤵ ${used}` : '';
   if ($('finfo')) $('finfo').textContent = _rawDataInfo + ': ' + total + ' баров' + suffix;
@@ -1932,6 +1934,7 @@ function applySettings(s) {
   // Восстанавливаем фильтры таблицы
   if (s.tableFilters && typeof _applyTableFilters === 'function') _applyTableFilters(s.tableFilters, false);
   updatePreview();
+  applyMaxBars(); // синхронизируем DATA с c_maxbars из шаблона
 }
 
 function saveTpl() {
