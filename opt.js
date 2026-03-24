@@ -2140,6 +2140,7 @@ async function runOpt() {
       const beTrig   = _dims[_d][dimIndices[_d++]];
       const trTrig   = _dims[_d][dimIndices[_d++]];
       const trDist   = _dims[_d][dimIndices[_d++]];
+      const wickMult = _dims[_d][dimIndices[_d++]];
       const timeBars = _dims[_d][dimIndices[_d++]];
       const _ip      = _dims[_d][dimIndices[_d++]];
       const tlPvL    = _dims[_d][dimIndices[_d++]];
@@ -2273,7 +2274,7 @@ async function runOpt() {
         hasSLA:!!(slPair.a),slMult:slPair.a?slPair.a.m:0,hasSLB:!!(slPair.p),slPctMult:slPair.p?slPair.p.m:0,slLogic,
         hasTPA:!!(tpPair.a),tpMult:tpPair.a?tpPair.a.m:0,tpMode:tpPair.a?tpPair.a.type:'rr',
         hasTPB:!!(tpPair.b),tpMultB:tpPair.b?tpPair.b.m:0,tpModeB:tpPair.b?tpPair.b.type:'rr',tpLogic,
-        useBE,beTrig,beOff,useTrail,trTrig,trDist,
+        useBE,beTrig,beOff,useTrail,trTrig,trDist,useWickTrail,wickOffType,wickMult,
         useRev,revBars,revMode,revAct,revSrc,revSkip,revCooldown,revNoFilters:true,
         useTime,timeBars,timeMode,usePartial,partRR,partPct,partBE,
         useClimax:useClimaxExit&&HAS_VOLUME,clxVolMult,clxBodyMult,clxMode,
@@ -2894,7 +2895,7 @@ async function runOpt() {
                                       tpLogic,
                                       // Exits
                                       useBE,beTrig,beOff,
-                                      useTrail,trTrig,trDist,
+                                      useTrail,trTrig,trDist,useWickTrail,wickOffType,wickMult,
                                       useRev,revBars,revMode,revAct,revSrc,revSkip,revCooldown,revNoFilters:true,
                                       useTime,timeBars,timeMode,
                                       usePartial,partRR,partPct,partBE,
