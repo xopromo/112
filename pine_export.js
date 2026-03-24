@@ -218,11 +218,16 @@ function generatePineScript(r) {
   lines.push(`atr_len    = input.int(${atrP}, "Период ATR", group=grp_strat)`);
   lines.push(`atr_step   = input.int(2, "Шаг вариаций ATR", group=grp_strat)`);
   // Align max_bars with optimizer's dataset: subtract MA/confirm warmup so TV starts from same bar
-  const _maWarmup   = (c.useMA      && c.maP   > 0) ? c.maP   * (c.htfRatio     || 1) : 0;
-  const _confWarmup = (c.useConfirm && c.confN  > 0) ? c.confN * (c.confHtfRatio || 1) : 0;
+  const _maTypeW    = c.useMA      ? (c.maType   || 'EMA') : '';
+  const _confTypeW  = c.useConfirm ? (c.confType || 'EMA') : '';
+  const _temaMult   = (_maTypeW   === 'TEMA' || _maTypeW   === 'DEMA' || _maTypeW   === 'EMA') ? 3 : 1;
+  const _confTMult  = (_confTypeW === 'TEMA' || _confTypeW === 'DEMA' || _confTypeW === 'EMA') ? 3 : 1;
+  const _maWarmup   = (c.useMA      && c.maP   > 0) ? c.maP   * (c.htfRatio     || 1) * _temaMult  : 0;
+  const _confWarmup = (c.useConfirm && c.confN  > 0) ? c.confN * (c.confHtfRatio || 1) * _confTMult : 0;
   const _effWarmup  = Math.max(_maWarmup, _confWarmup, 50) + 2;
   const _dataN      = typeof DATA !== 'undefined' && DATA.length > 0 ? DATA.length : 50000;
-  const _maxBars    = Math.max(100, _dataN - _effWarmup);
+  const _htfR       = c.htfRatio || 1;
+  const _maxBars    = Math.max(100, Math.floor((_dataN - _effWarmup) / _htfR));
   lines.push(`max_bars   = input.int(${_maxBars}, "Глубина теста", minval=100, maxval=500000, group=grp_strat)`);
   lines.push(``);
 
