@@ -180,7 +180,9 @@ function calcHTFMA(data, htfRatio, period, type) {
       const lastHTF = Math.floor((i + 1) / htfRatio) - 1;
       aligned[i] = lastHTF >= 0 ? htfMA[lastHTF] : 0;
     }
-    return aligned;
+    const shifted = new Float64Array(N);
+    for (let i = 0; i + 1 < N; i++) shifted[i] = aligned[i + 1];
+    return shifted;
   }
 
   // Шаг 1: группируем base-бары по HTF-периодам через timestamp
@@ -215,7 +217,11 @@ function calcHTFMA(data, htfRatio, period, type) {
     const visibleHtf = ki - 1;
     aligned[i] = visibleHtf >= 0 ? htfMA[visibleHtf] : 0;
   }
-  return aligned;
+  // Фикс Pine-выравнивания: фильтр в JS обращается к maArr[i-1], но Pine сравнивает
+  // close[1] > ma_val[i] = aligned[i]. Сдвигаем на 1 влево: arr[i-1] = aligned[i].
+  const shifted = new Float64Array(N);
+  for (let i = 0; i + 1 < N; i++) shifted[i] = aligned[i + 1];
+  return shifted;
 }
 function calcHTFADX(data, htfRatio, period) {
   const N = data.length;
@@ -255,7 +261,9 @@ function calcHTFADX(data, htfRatio, period) {
       const last = Math.floor((i+1)/htfRatio)-1;
       aligned[i] = last >= 0 ? htfADX[last] : 0;
     }
-    return aligned;
+    const shifted = new Float64Array(N);
+    for (let i = 0; i + 1 < N; i++) shifted[i] = aligned[i + 1];
+    return shifted;
   }
 
   // Group bars into HTF periods by timestamp
@@ -303,7 +311,9 @@ function calcHTFADX(data, htfRatio, period) {
     const visibleHtf = ki - 1;
     aligned[i] = visibleHtf >= 0 ? htfADX[visibleHtf] : 0;
   }
-  return aligned;
+  const shifted = new Float64Array(N);
+  for (let i = 0; i + 1 < N; i++) shifted[i] = aligned[i + 1];
+  return shifted;
 }
 // RMA (Wilder's smoothing) — как в Pine ta.rma: seed=SMA первых period баров, alpha=1/period
 function calcRMA(data, period) {
