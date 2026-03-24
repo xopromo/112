@@ -1,0 +1,7 @@
+{
+  "usePivot": true, "pvL": 7, "pvR": 2, "waitBars": 3,
+  "hasSLB": true, "slPctMult": 10.0,
+  "hasTPA": true, "tpMode": "pct", "tpMult": 2.0,
+  "slLogic": "or", "tpLogic": "or",
+  "comm": 0.04, "commission": 0.04
+}
