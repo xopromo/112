@@ -15094,6 +15094,8 @@ function _queueRestore(snap) {
     const el = document.getElementById(id);
     if (el && (el.type === 'checkbox' || el.type === 'radio')) el.checked = checked;
   });
+  // Применяем срез баров из снапшота (c_maxbars влияет на DATA/DATA_1M)
+  if (typeof applyMaxBars === 'function') applyMaxBars();
   if (typeof updatePreview === 'function') updatePreview();
 }
 
@@ -19070,7 +19072,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774358169283;
+window._BUILD_TS = 1774358641913;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;

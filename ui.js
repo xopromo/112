@@ -4138,6 +4138,8 @@ function _queueRestore(snap) {
     const el = document.getElementById(id);
     if (el && (el.type === 'checkbox' || el.type === 'radio')) el.checked = checked;
   });
+  // Применяем срез баров из снапшота (c_maxbars влияет на DATA/DATA_1M)
+  if (typeof applyMaxBars === 'function') applyMaxBars();
   if (typeof updatePreview === 'function') updatePreview();
 }
 
