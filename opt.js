@@ -3717,7 +3717,7 @@ function buildBtCfg(cfg, ind) {
     kalmanCrossLen: cfg.kalmanCrossLen || 20,
 
     start: Math.max(
-      (cfg.useMA      ? (maP || 0)       * (cfg.htfRatio     || 1) * (maType==='EMA'||maType==='DEMA'||maType==='TEMA'?3:1) : 0),
+      (cfg.useMA      ? (maP || 0)       * (cfg.htfRatio     || 1) * (cfg.maType==='EMA'||cfg.maType==='DEMA'||cfg.maType==='TEMA'?3:1) : 0),
       (cfg.useConfirm ? (cfg.confN || 0) * (cfg.confHtfRatio || 1) * ((cfg.confMatType||'EMA')==='EMA'||(cfg.confMatType||'EMA')==='DEMA'||(cfg.confMatType||'EMA')==='TEMA'?3:1) : 0),
       50) + 2,
     pruning: false,
