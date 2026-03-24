@@ -36,6 +36,25 @@ function parseRange(id) {
   return v.split(',').map(x => parseFloat(x.trim())).filter(x => !isNaN(x));
 }
 
+// Ресэмплинг: объединяет mult баров в один (1m→Xm)
+function resampleData(data, mult) {
+  if (mult <= 1) return data;
+  const out = [];
+  for (let i = 0; i < data.length; i += mult) {
+    const s = data.slice(i, Math.min(i + mult, data.length));
+    if (!s.length) break;
+    out.push({
+      o: s[0].o,
+      h: Math.max(...s.map(x => x.h)),
+      l: Math.min(...s.map(x => x.l)),
+      c: s[s.length - 1].c,
+      t: s[0].t,
+      v: s.reduce((a, x) => a + x.v, 0)
+    });
+  }
+  return out;
+}
+
 // ##SECTION_B##
 // ── Statistical Significance (Hyp 3) ─────────────────────────
 // z-тест win rate: уверенность что WR > 50% не случайна.
@@ -856,14 +875,15 @@ function calcTotal() {
   const _useTF=$c('e_tl_touch')||$c('e_tl_break')||$c('e_flag')||$c('e_tri');
   const _ctTlPvL=_useTF?parseRange('e_tl_pvl'):[5];
   const _ctTlPvR=_useTF?parseRange('e_tl_pvr'):[3];
-  return pvLs.length*pvRs.length*atrPs.length*(maPs.length||1)*
+  const _tfMulCount = (()=>{ const m=parseRange('c_tf_range').filter(x=>x>=1); return m.length>0?m.length:1; })();
+  return (pvLs.length*pvRs.length*atrPs.length*(maPs.length||1)*
     (adxTs.length||1)*(_ctAdxL.length||1)*(_ctAdxHtf.length||1)*rsiCount*(vfMs.length||1)*(_ctAtrExpMs.length||1)*(mdMaxs.length||1)*
     slCount*tpCount*beCount*(trTrigs.length||1)*(trDists.length||1)*
     (timeBarsA.length||1)*(freshMaxs.length||1)*(wtTs.length||1)*
     (vsaMs.length||1)*(atrBoMs.length||1)*(revBarsA.length||1)*
     (revSkipA.length||1)*(revCooldownA.length||1)*
     (_ctConf.length||1)*(_ctStw.length||1)*
-    (_ctTlPvL.length||1)*(_ctTlPvR.length||1);
+    (_ctTlPvL.length||1)*(_ctTlPvR.length||1)) * _tfMulCount;
 }
 
 function updatePreview() {
@@ -1946,7 +1966,8 @@ async function runOpt() {
         let slDesc = slPair.combo ? `SL(ATR×${slPair.a.m}${slLogic==='or'?'|OR|':'|AND|'}${slPair.p.m}%)` : slPair.a ? `SL×${slPair.a.m}ATR` : `SL${slPair.p.m}%`;
         if(useSLPiv) slDesc+=`+SPiv(L${slPivL}/R${slPivR}×${slPivOff})`;
         let tpDesc = tpPair.combo ? (()=>{const n1=tpPair.a.type==='rr'?`RR${tpPair.a.m}`:tpPair.a.type==='atr'?`TP×${tpPair.a.m}ATR`:`TP${tpPair.a.m}%`;const n2=tpPair.b.type==='rr'?`RR${tpPair.b.m}`:tpPair.b.type==='atr'?`TP×${tpPair.b.m}ATR`:`TP${tpPair.b.m}%`;return `TP(${n1}${tpLogic==='or'?'|OR|':'|AND|'}${n2})`;})() : tpPair.a ? (tpPair.a.type==='rr'?`RR×${tpPair.a.m}`:tpPair.a.type==='atr'?`TP×${tpPair.a.m}ATR`:`TP${tpPair.a.m}%`) : '';
-        const name = buildName(btCfg, pvL, pvR, slDesc, tpDesc, {}, {maP, maType:_mType, htfRatio, stw:sTrendWin, atrP, adxL, adxHtfRatio});
+        const _tfPfxMc = window._currentTFMult > 1 ? `TF×${window._currentTFMult} · ` : '';
+        const name = _tfPfxMc + buildName(btCfg, pvL, pvR, slDesc, tpDesc, {}, {maP, maType:_mType, htfRatio, stw:sTrendWin, atrP, adxL, adxHtfRatio});
         if (!_resultNames.has(name)) {
           _resultNames.add(name);
           const _cfg = {usePivot:usePv,pvL,pvR,useEngulf:useEng,usePinBar:usePin,pinRatio,
@@ -2319,7 +2340,8 @@ async function runOpt() {
         let slDesc = slPair.combo ? `SL(ATR×${slPair.a.m}${slLogic==='or'?'|OR|':'|AND|'}${slPair.p.m}%)` : slPair.a ? `SL×${slPair.a.m}ATR` : `SL${slPair.p.m}%`;
         if(useSLPiv) slDesc+=`+SPiv(L${slPivL}/R${slPivR}×${slPivOff})`;
         let tpDesc = tpPair.combo ? (()=>{const n1=tpPair.a.type==='rr'?`RR${tpPair.a.m}`:tpPair.a.type==='atr'?`TP×${tpPair.a.m}ATR`:`TP${tpPair.a.m}%`;const n2=tpPair.b.type==='rr'?`RR${tpPair.b.m}`:tpPair.b.type==='atr'?`TP×${tpPair.b.m}ATR`:`TP${tpPair.b.m}%`;return `TP(${n1}${tpLogic==='or'?'|OR|':'|AND|'}${n2})`;})() : tpPair.a ? (tpPair.a.type==='rr'?`RR×${tpPair.a.m}`:tpPair.a.type==='atr'?`TP×${tpPair.a.m}ATR`:`TP${tpPair.a.m}%`) : '';
-        const name = buildName(btCfg, pvL, pvR, slDesc, tpDesc, {}, {maP, maType:_mType, htfRatio, stw:sTrendWin, atrP, adxL, adxHtfRatio});
+        const _tfPfxTpe = window._currentTFMult > 1 ? `TF×${window._currentTFMult} · ` : '';
+        const name = _tfPfxTpe + buildName(btCfg, pvL, pvR, slDesc, tpDesc, {}, {maP, maType:_mType, htfRatio, stw:sTrendWin, atrP, adxL, adxHtfRatio});
         if (!_resultNames.has(name)) {
           _resultNames.add(name);
           const _cfg_tpe = {usePivot:usePv,pvL,pvR,useEngulf:useEng,usePinBar:usePin,pinRatio,
@@ -2926,7 +2948,8 @@ async function runOpt() {
                                       } else if(tpPair.a) {
                                         tpDesc=tpPair.a.type==='rr'?`RR×${tpPair.a.m}`:tpPair.a.type==='atr'?`TP×${tpPair.a.m}ATR`:`TP${tpPair.a.m}%`;
                                       }
-                                      const name=buildName(btCfg,pvL,pvR,slDesc,tpDesc,{},{
+                                      const _tfPfxEx = window._currentTFMult > 1 ? `TF×${window._currentTFMult} · ` : '';
+                                      const name=_tfPfxEx+buildName(btCfg,pvL,pvR,slDesc,tpDesc,{},{
                                         maP,maType:mType,htfRatio,stw:sTrendWin,atrP,adxL,adxHtfRatio
                                       });
                                       if (_resultNames.has(name)) { /* дубль — пропускаем */ } else {
@@ -3089,6 +3112,40 @@ async function runOpt() {
       $('rbtn').style.display=''; $('rbtn').disabled=false;
     } catch(_) {}
   }
+}
+
+// ============================================================
+// Multi-TF обёртка: перебирает TF-множители из c_tf_range,
+// ресэмплирует DATA_1M и запускает runOpt() для каждого TF.
+// ============================================================
+async function runOptMultiTF() {
+  if (!DATA) return;
+  const _tfMults = parseRange('c_tf_range').filter(x => Number.isInteger(x) && x >= 1);
+  const _tfList  = _tfMults.length > 0 ? _tfMults : [1];
+  const _masterDATA = window.DATA_1M || DATA;
+
+  for (let _tfIdx = 0; _tfIdx < _tfList.length; _tfIdx++) {
+    if (stopped) break;
+    const tfMult = _tfList[_tfIdx];
+    DATA = (tfMult > 1 && window.DATA_1M) ? resampleData(window.DATA_1M, tfMult) : _masterDATA;
+    window._currentTFMult = tfMult;
+    // 2-й и последующий TF: не сбрасываем results/equities
+    if (_tfIdx > 0) window._queueMode = true;
+    if (_tfList.length > 1) {
+      const el = $('mc-phase');
+      if (el) { el.style.display='inline'; el.textContent=`TF ${_tfIdx+1}/${_tfList.length} (×${tfMult})`; }
+    }
+    await runOpt();
+    window._queueMode = false;
+    // Между TF: скрываем кнопку «Запустить» (runOpt её показал)
+    if (_tfIdx < _tfList.length - 1 && !stopped) {
+      $('rbtn').style.display='none';
+      $('sbtn').style.display='inline-block';
+    }
+  }
+
+  DATA = _masterDATA;
+  window._currentTFMult = null;
 }
 
 // ============================================================
