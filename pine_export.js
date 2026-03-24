@@ -226,8 +226,7 @@ function generatePineScript(r) {
   const _confWarmup = (c.useConfirm && c.confN  > 0) ? c.confN * (c.confHtfRatio || 1) * _confTMult : 0;
   const _effWarmup  = Math.max(_maWarmup, _confWarmup, 50) + 2;
   const _dataN      = typeof DATA !== 'undefined' && DATA.length > 0 ? DATA.length : 50000;
-  const _htfR       = c.htfRatio || 1;
-  const _maxBars    = Math.max(100, Math.floor((_dataN - _effWarmup) / _htfR));
+  const _maxBars    = Math.max(100, _dataN - _effWarmup);
   lines.push(`max_bars   = input.int(${_maxBars}, "Глубина теста", minval=100, maxval=500000, group=grp_strat)`);
   lines.push(``);
 
