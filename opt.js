@@ -3120,6 +3120,9 @@ async function runOpt() {
 // ============================================================
 async function runOptMultiTF() {
   if (!DATA) return;
+  // Сбрасываем stopped/paused: могли остаться true после предыдущей остановки (stopOpt/stopQueue).
+  // runOpt() тоже сбрасывает их, но это нужно сделать до проверки `if (stopped) break` в цикле.
+  stopped = false; paused = false;
   const _tfMults = parseRange('c_tf_range').filter(x => Number.isInteger(x) && x >= 1);
   const _tfList  = _tfMults.length > 0 ? _tfMults : [1];
   const _masterDATA = window.DATA_1M || DATA;
