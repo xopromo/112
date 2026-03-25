@@ -8191,30 +8191,25 @@ function _calcRegimePerf(cfg, hmm) {
 // ─────────────────────────────────────────────────────────────────
 
 // ── Kalman MA Builder — Tier 3 ────────────────────────────────────
-// Скалярный Kalman фильтр для адаптивной MA.
-// Q (process noise) адаптируется к ATR: при высокой волатильности → K↑ (быстрее).
-// При низкой → K↓ (больше сглаживания). Параметр R (measurement noise) фиксирован.
+// Соответствует Pine Script f_kalman(s, len):
+//   _kq = 1/(len*len), фиксированный process noise
+//   _kk = P/(P+1), _kx обновляется по Байесу, _kp убывает
 // Возвращает Float64Array той же длины что prices.
 // Откат: удалить функцию + kalmanArr в _calcIndicators/buildBtCfg + фильтр в filter_registry.js
 function _buildKalmanMA(prices, baseLen) {
   const N = prices.length;
   const kArr = new Float64Array(N);
-  if (N < 10) return kArr;
-  let x = prices[0], P = 1.0;
-  const halfL = Math.max(Math.floor(baseLen / 2), 2);
+  if (N === 0) return kArr;
+  let kx = NaN;
+  let kp = 1.0;
+  const kq = 1.0 / Math.max(baseLen * baseLen, 1.0);
   for (let i = 0; i < N; i++) {
-    const w = Math.min(i, halfL);
-    let sumSq = 0;
-    for (let j = i - w; j < i; j++) {
-      const ret = (prices[j + 1] - prices[j]) / (prices[j] || 1);
-      sumSq += ret * ret;
-    }
-    const Q = w > 0 ? sumSq / w : 0.001;
-    P += Q;
-    const K = P / (P + 1); // R normalised to 1
-    x += K * (prices[i] - x);
-    P *= (1 - K);
-    kArr[i] = x;
+    const s = prices[i];
+    if (isNaN(kx)) kx = s;
+    const kk = kp / (kp + 1.0);
+    kx = kx + kk * (s - kx);
+    kp = (1.0 - kk) * kp + kq;
+    kArr[i] = kx;
   }
   return kArr;
 }
@@ -19606,7 +19601,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774467845693;
+window._BUILD_TS = 1774470727587;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
