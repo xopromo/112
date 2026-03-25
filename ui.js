@@ -1554,6 +1554,16 @@ function buildCopyText(r, c, slName, tpName) {
   lines.push('ATR-канал пробой:   ' + on(c.useAtrBo,  'EMA=' + c.atrBoLen + ', mult=' + c.atrBoMult));
   lines.push('Касание MA:         ' + on(c.useMaTouch,'тип=' + c.matType + ', период=' + c.matPeriod + ', зона=' + c.matZone + '%'));
   lines.push('Squeeze:            ' + on(c.useSqueeze,'BB=' + c.sqzBBLen + ', KC mult=' + c.sqzKCMult + ', мин=' + c.sqzMinBars + ' баров'));
+  if (c.usePChg) {
+    const htfA = (c.pChgHtfA||1) > 1 ? ` HTF×${c.pChgHtfA}` : '';
+    lines.push('% изм. цены (A):    ВКЛ · ≥' + (c.pChgPctA||1) + '% за ' + (c.pChgPeriodA||10) + ' св.' + htfA);
+    if (c.usePChgB) {
+      const htfB = (c.pChgHtfB||1) > 1 ? ` HTF×${c.pChgHtfB}` : '';
+      lines.push('% изм. цены (B AND):ВКЛ · ≥' + (c.pChgPctB||1) + '% за ' + (c.pChgPeriodB||20) + ' св.' + htfB);
+    }
+  } else {
+    lines.push('% изменения цены:   ВЫКЛ');
+  }
   lines.push('');
   lines.push('--- СТОП-ЛОСС / ТЕЙК-ПРОФИТ ---');
   lines.push('Stop Loss:    ' + slName(c.slPair));

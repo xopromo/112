@@ -1041,15 +1041,15 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
   <div class="cb"><input type="checkbox" id="e_nrev"><label data-tip="Разворот после N свечей: N последовательных медвежьих свечей, затем бычья = лонг. N последовательных бычьих свечей, затем медвежья = шорт">N-Candle Reversal</label></div>
   <div class="field"><label>N свечей</label><input id="e_nrev_n" value="3" data-tip="Количество последовательных направленных свечей перед разворотом"></div>
 
-  <div class="cb"><input type="checkbox" id="e_pchg"><label data-tip="% изменения цены за N свечей. Лонг: цена выросла ≥ порога за период. Шорт: цена упала ≥ порога. Поддерживает HTF (умножает период) и 2 условия AND.">% Price Change</label></div>
+  <div class="cb"><input type="checkbox" id="e_pchg"><label data-tip="% изменения цены за N свечей. Положительное значение = движение в сторону входа (лонг: вверх). Отрицательное = противоположное (лонг: откат вниз). Поддерживает 2 условия AND.">% Price Change</label></div>
   <div class="g2">
-    <div class="field"><label>Мин.% (A)</label><input id="e_pchg_pct_a" value="1.0" data-tip="Минимальное % изменение цены для условия A. Диапазон: 0.5,1,2"></div>
+    <div class="field"><label>% (A)</label><input id="e_pchg_pct_a" value="1.0" data-tip="+N%: цена выросла ≥N% (лонг: тренд вверх). -N%: цена упала ≥N% (лонг: откат вниз). Диапазон: 0.5,1,2 или -3:-1:1"></div>
     <div class="field"><label>Период A (св.)</label><input id="e_pchg_per_a" value="10" data-tip="Количество свечей для условия A. Диапазон: 5,10,20"></div>
   </div>
   <div class="field"><label>HTF A (×)</label><input id="e_pchg_htf_a" value="1" data-tip="HTF множитель для условия A. 1 = тот же TF, 4 = 4× выше. Итоговый lookback = Период × HTF"></div>
-  <div class="cb"><input type="checkbox" id="e_pchgb"><label data-tip="Второе условие % изменения цены (AND с первым). Оба должны выполниться одновременно.">  + Условие B (AND)</label></div>
+  <div class="cb"><input type="checkbox" id="e_pchgb"><label data-tip="Второе условие % изменения цены (AND с первым). Оба должны выполниться одновременно. Пример: A=+5% тренд, B=-2% откат">  + Условие B (AND)</label></div>
   <div class="g2">
-    <div class="field"><label>Мин.% (B)</label><input id="e_pchg_pct_b" value="1.0" data-tip="Минимальное % изменение цены для условия B. Диапазон: 0.5,1,2"></div>
+    <div class="field"><label>% (B)</label><input id="e_pchg_pct_b" value="1.0" data-tip="+N%: цена выросла ≥N%. -N%: цена упала ≥N% (откат). Диапазон: -3:-1:1 или 0.5,1,2"></div>
     <div class="field"><label>Период B (св.)</label><input id="e_pchg_per_b" value="20" data-tip="Количество свечей для условия B. Диапазон: 10,20,50"></div>
   </div>
   <div class="field"><label>HTF B (×)</label><input id="e_pchg_htf_b" value="1" data-tip="HTF множитель для условия B. 1 = тот же TF, 4 = 4× выше."></div>
@@ -2867,6 +2867,19 @@ function generatePineScript(r) {
   lines.push(`bool nrev_s = use_n_reversal and close[1] < open[1] and nrev_bull`);
   lines.push(``);
 
+  // ── % Price Change ────────────────────────────────────
+  // pct > 0: price went UP by >=pct% | pct < 0: price went DOWN by >=|pct|%
+  // Short mirrors Long by negating threshold
+  lines.push(`float pchg_val_a = close[1 + pchg_per_a * pchg_htf_a] != 0 ? (close[1] - close[1 + pchg_per_a * pchg_htf_a]) / math.abs(close[1 + pchg_per_a * pchg_htf_a]) * 100 : 0`);
+  lines.push(`float pchg_val_b = close[1 + pchg_per_b * pchg_htf_b] != 0 ? (close[1] - close[1 + pchg_per_b * pchg_htf_b]) / math.abs(close[1 + pchg_per_b * pchg_htf_b]) * 100 : 0`);
+  lines.push(`bool pchg_a_l    = pchg_pct_a >= 0 ? pchg_val_a >= pchg_pct_a : pchg_val_a <= pchg_pct_a`);
+  lines.push(`bool pchg_a_s    = pchg_pct_a >= 0 ? pchg_val_a <= -pchg_pct_a : pchg_val_a >= -pchg_pct_a`);
+  lines.push(`bool pchg_b_l    = not use_pchg_b or (pchg_pct_b >= 0 ? pchg_val_b >= pchg_pct_b : pchg_val_b <= pchg_pct_b)`);
+  lines.push(`bool pchg_b_s    = not use_pchg_b or (pchg_pct_b >= 0 ? pchg_val_b <= -pchg_pct_b : pchg_val_b >= -pchg_pct_b)`);
+  lines.push(`bool pchg_l      = use_pchg and pchg_a_l and pchg_b_l`);
+  lines.push(`bool pchg_s      = use_pchg and pchg_a_s and pchg_b_s`);
+  lines.push(``);
+
   // ── Supertrend ────────────────────────────────────────────
   lines.push(`[st_val, st_dir_raw] = ta.supertrend(st_mult, st_atr_p)`);
   lines.push(`bool st_bull = st_dir_raw < 0  // Pine: -1 = bullish, +1 = bearish`);
@@ -2910,8 +2923,8 @@ function generatePineScript(r) {
   lines.push(`bool macd_f_ok_s = not use_macd_f or macd_line_val[1] < macd_sig_val[1]`);
   lines.push(``);
 
-  lines.push(`bool pat_l = pivot_l or (use_engulf and bull_engulf[1]) or (use_pinbar and bull_pin[1]) or donch_l or boll_l or atr_bo_l or (use_ma_touch and ma_touch_l) or tl_touch_l or tl_break_l or flag_l or tri_l or rsix_l or macr_l or free_l or macd_l or stx_l or volmv_l or inb_l or nrev_l or st_l or sqz_l or kalman_x_l`);
-  lines.push(`bool pat_s = pivot_s or (use_engulf and bear_engulf[1]) or (use_pinbar and bear_pin[1]) or donch_s or boll_s or atr_bo_s or (use_ma_touch and ma_touch_s) or tl_touch_s or tl_break_s or flag_s or tri_s or rsix_s or macr_s or free_s or macd_s or stx_s or volmv_s or inb_s or nrev_s or st_s or sqz_s or kalman_x_s`);
+  lines.push(`bool pat_l = pivot_l or (use_engulf and bull_engulf[1]) or (use_pinbar and bull_pin[1]) or donch_l or boll_l or atr_bo_l or (use_ma_touch and ma_touch_l) or tl_touch_l or tl_break_l or flag_l or tri_l or rsix_l or macr_l or free_l or macd_l or stx_l or volmv_l or inb_l or nrev_l or st_l or sqz_l or kalman_x_l or pchg_l`);
+  lines.push(`bool pat_s = pivot_s or (use_engulf and bear_engulf[1]) or (use_pinbar and bear_pin[1]) or donch_s or boll_s or atr_bo_s or (use_ma_touch and ma_touch_s) or tl_touch_s or tl_break_s or flag_s or tri_s or rsix_s or macr_s or free_s or macd_s or stx_s or volmv_s or inb_s or nrev_s or st_s or sqz_s or kalman_x_s or pchg_s`);
   lines.push(``);
   lines.push(`// SL pivot for dynamic SL`);
   lines.push(`sl_pv_lo = ta.pivotlow(low,  sl_piv_look, sl_piv_right_v)`);
@@ -6210,46 +6223,45 @@ const ENTRY_REGISTRY = [
       return `PChg(${a}+${b})`;
     },
     detectL: (cfg, i) => {
+      // thr > 0: price went UP by >=thr% | thr < 0: price went DOWN by >=|thr|%
+      const _ok = (chg, thr) => thr >= 0 ? chg >= thr : chg <= thr;
       const lookA = (cfg.pChgPeriodA || 10) * (cfg.pChgHtfA || 1);
       if (i <= lookA) return false;
       const chgA = (DATA[i-1].c - DATA[i-1-lookA].c) / DATA[i-1-lookA].c * 100;
-      if (chgA < (cfg.pChgPctA || 1)) return false;
+      if (!_ok(chgA, cfg.pChgPctA || 1)) return false;
       if (cfg.usePChgB) {
         const lookB = (cfg.pChgPeriodB || 20) * (cfg.pChgHtfB || 1);
         if (i <= lookB) return false;
         const chgB = (DATA[i-1].c - DATA[i-1-lookB].c) / DATA[i-1-lookB].c * 100;
-        if (chgB < (cfg.pChgPctB || 1)) return false;
+        if (!_ok(chgB, cfg.pChgPctB || 1)) return false;
       }
       return true;
     },
     detectS: (cfg, i) => {
+      // Short mirrors Long: negate threshold (up→down, down→up)
+      const _ok = (chg, thr) => thr >= 0 ? chg >= thr : chg <= thr;
       const lookA = (cfg.pChgPeriodA || 10) * (cfg.pChgHtfA || 1);
       if (i <= lookA) return false;
       const chgA = (DATA[i-1].c - DATA[i-1-lookA].c) / DATA[i-1-lookA].c * 100;
-      if (chgA > -(cfg.pChgPctA || 1)) return false;
+      if (!_ok(chgA, -(cfg.pChgPctA || 1))) return false;
       if (cfg.usePChgB) {
         const lookB = (cfg.pChgPeriodB || 20) * (cfg.pChgHtfB || 1);
         if (i <= lookB) return false;
         const chgB = (DATA[i-1].c - DATA[i-1-lookB].c) / DATA[i-1-lookB].c * 100;
-        if (chgB > -(cfg.pChgPctB || 1)) return false;
+        if (!_ok(chgB, -(cfg.pChgPctB || 1))) return false;
       }
       return true;
     },
-    pineLines: (c, b) => {
-      const lines = [
-        `use_pchg     = input.bool(${b(c.usePChg)}, "% Price Change Entry", group=grp_entry)`,
-        `pchg_pct_a   = input.float(${c.pChgPctA||1}, "  А: мин.% изм.", step=0.1, minval=0.01, group=grp_entry)`,
-        `pchg_per_a   = input.int(${c.pChgPeriodA||10}, "  А: период (свечей)", minval=1, group=grp_entry)`,
-        `pchg_htf_a   = input.int(${c.pChgHtfA||1}, "  А: HTF множитель", minval=1, group=grp_entry)`,
-      ];
-      if (c.usePChgB) {
-        lines.push(`use_pchg_b   = input.bool(${b(c.usePChgB)}, "  Условие B (AND)", group=grp_entry)`);
-        lines.push(`pchg_pct_b   = input.float(${c.pChgPctB||1}, "  B: мин.% изм.", step=0.1, minval=0.01, group=grp_entry)`);
-        lines.push(`pchg_per_b   = input.int(${c.pChgPeriodB||20}, "  B: период (свечей)", minval=1, group=grp_entry)`);
-        lines.push(`pchg_htf_b   = input.int(${c.pChgHtfB||1}, "  B: HTF множитель", minval=1, group=grp_entry)`);
-      }
-      return lines;
-    },
+    pineLines: (c, b) => [
+      `use_pchg     = input.bool(${b(c.usePChg)}, "% Price Change Entry", group=grp_entry)`,
+      `pchg_pct_a   = input.float(${c.pChgPctA||1}, "  А: мин.% изм. (+вверх/-вниз)", step=0.1, group=grp_entry)`,
+      `pchg_per_a   = input.int(${c.pChgPeriodA||10}, "  А: период (свечей)", minval=1, group=grp_entry)`,
+      `pchg_htf_a   = input.int(${c.pChgHtfA||1}, "  А: HTF множитель", minval=1, group=grp_entry)`,
+      `use_pchg_b   = input.bool(${b(c.usePChgB)}, "  Условие B (AND)", group=grp_entry)`,
+      `pchg_pct_b   = input.float(${c.pChgPctB||1}, "  B: мин.% изм. (+вверх/-вниз)", step=0.1, group=grp_entry)`,
+      `pchg_per_b   = input.int(${c.pChgPeriodB||20}, "  B: период (свечей)", minval=1, group=grp_entry)`,
+      `pchg_htf_b   = input.int(${c.pChgHtfB||1}, "  B: HTF множитель", minval=1, group=grp_entry)`,
+    ],
   },
 ];
 
@@ -12558,6 +12570,16 @@ function buildCopyText(r, c, slName, tpName) {
   lines.push('ATR-канал пробой:   ' + on(c.useAtrBo,  'EMA=' + c.atrBoLen + ', mult=' + c.atrBoMult));
   lines.push('Касание MA:         ' + on(c.useMaTouch,'тип=' + c.matType + ', период=' + c.matPeriod + ', зона=' + c.matZone + '%'));
   lines.push('Squeeze:            ' + on(c.useSqueeze,'BB=' + c.sqzBBLen + ', KC mult=' + c.sqzKCMult + ', мин=' + c.sqzMinBars + ' баров'));
+  if (c.usePChg) {
+    const htfA = (c.pChgHtfA||1) > 1 ? ` HTF×${c.pChgHtfA}` : '';
+    lines.push('% изм. цены (A):    ВКЛ · ≥' + (c.pChgPctA||1) + '% за ' + (c.pChgPeriodA||10) + ' св.' + htfA);
+    if (c.usePChgB) {
+      const htfB = (c.pChgHtfB||1) > 1 ? ` HTF×${c.pChgHtfB}` : '';
+      lines.push('% изм. цены (B AND):ВКЛ · ≥' + (c.pChgPctB||1) + '% за ' + (c.pChgPeriodB||20) + ' св.' + htfB);
+    }
+  } else {
+    lines.push('% изменения цены:   ВЫКЛ');
+  }
   lines.push('');
   lines.push('--- СТОП-ЛОСС / ТЕЙК-ПРОФИТ ---');
   lines.push('Stop Loss:    ' + slName(c.slPair));
@@ -19584,7 +19606,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774457348091;
+window._BUILD_TS = 1774467144480;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
