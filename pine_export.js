@@ -1531,6 +1531,11 @@ function generatePineScript(r) {
   lines.push(`// Выходы: маленькие крестики`);
   lines.push(`plotshape(a_lx, "✖ Exit Long",   shape.xcross,       location.abovebar, color.new(color.orange,0),  size=size.tiny)`);
   lines.push(`plotshape(a_sx, "✖ Exit Short",  shape.xcross,       location.belowbar, color.new(color.aqua,0),    size=size.tiny)`);
+  lines.push(`// Числовые серии сигналов для экспорта CSV (Data Window only)`);
+  lines.push(`plot(a_le ? 1 : 0, "EL", display=display.data_window)`);
+  lines.push(`plot(a_se ? 1 : 0, "ES", display=display.data_window)`);
+  lines.push(`plot(a_lx ? 1 : 0, "XL", display=display.data_window)`);
+  lines.push(`plot(a_sx ? 1 : 0, "XS", display=display.data_window)`);
 
   const rawCode = lines.join('\n');
   // Фаза 1: исправляем известные ошибки

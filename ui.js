@@ -3204,6 +3204,8 @@ function _parseTVcsv(text) {
   const esIdx = hdrs.indexOf('es');
   const xlIdx = hdrs.indexOf('xl');
   const xsIdx = hdrs.indexOf('xs');
+  const maIdx = hdrs.indexOf('ma'); // exact match, не попадает в 'confirm ma'
+  const confIdx = hdrs.findIndex(h => h.includes('confirm'));
 
   if (eqIdx < 0) return null;
 
@@ -3220,6 +3222,8 @@ function _parseTVcsv(text) {
       es: esIdx >= 0 ? (parseFloat(cols[esIdx]) || 0) : null,
       xl: xlIdx >= 0 ? (parseFloat(cols[xlIdx]) || 0) : null,
       xs: xsIdx >= 0 ? (parseFloat(cols[xsIdx]) || 0) : null,
+      ma: maIdx >= 0 ? parseFloat(cols[maIdx]) : NaN,
+      confMa: confIdx >= 0 ? parseFloat(cols[confIdx]) : NaN,
     });
   }
   return rows.length >= 2 ? rows : null;
