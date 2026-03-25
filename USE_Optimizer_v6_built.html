@@ -11200,6 +11200,9 @@ function buildBtCfg(cfg, ind) {
     useTrail: cfg.useTrail || false,
     trTrig:   cfg.trTrig   || 1,
     trDist:   cfg.trDist   || 0.5,
+    useWickTrail: cfg.useWickTrail || false,
+    wickOffType:  cfg.wickOffType  || 'ATR',
+    wickMult:     cfg.wickMult     || 1,
     useRev:   cfg.useRev   || false,
     revBars:  cfg.revBars  || 2,
     revMode:  cfg.revMode  || 'any',
@@ -19397,7 +19400,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774427438925;
+window._BUILD_TS = 1774431202859;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
