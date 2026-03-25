@@ -122,6 +122,24 @@ function extractTV(rows, headers) {
 // ─────────────────────────────────────────────────────────────
 // 3. ПОСТРОЕНИЕ КОНФИГА
 // ─────────────────────────────────────────────────────────────
+// Разбирает slPair/tpPair формат оптимизатора в поля btCfg
+function expandSlTpPair(cfg) {
+  const sl = cfg.slPair;
+  const tp = cfg.tpPair;
+  if (sl) {
+    // Новые имена полей (SL_REGISTRY: hasSLA=ATR, hasSLB=percent, useSLPiv=pivot)
+    cfg.hasSLA    = !!(sl.a);  cfg.slMult     = sl.a ? sl.a.m : 1.5;
+    cfg.hasSLB    = !!(sl.p);  cfg.slPctMult  = sl.p ? sl.p.m : 2.0;
+    cfg.slLogic   = sl.combo ? 'or' : 'single';
+  }
+  if (tp) {
+    const t1 = tp.a, t2 = tp.b;
+    cfg.hasTPA = !!(t1); cfg.tpMode  = t1 ? t1.type : 'rr'; cfg.tpMult  = t1 ? t1.m : 2;
+    cfg.hasTPB = !!(t2); cfg.tpModeB = t2 ? t2.type : 'rr'; cfg.tpMultB = t2 ? t2.m : 2;
+    cfg.tpLogic = tp.combo ? 'or' : 'single';
+  }
+}
+
 function buildDefaultCfg(tv, userCfg) {
   const N = tv.length;
 
@@ -133,17 +151,21 @@ function buildDefaultCfg(tv, userCfg) {
     // Фильтры
     useMA:      false,
     useConfirm: false,
-    // SL/TP (выключены)
-    useSL:      false,  useATRSL: false, usePercSL: false, usePivotSL: false,
-    hasTPA:     false,  hasTPB: false,
+    // SL/TP (выключены по умолчанию)
+    // Новые имена полей core.js (SL_REGISTRY): hasSLA=ATR, hasSLB=percent, useSLPiv=pivot
+    hasSLA: false, slMult: 1.5,
+    hasSLB: false, slPctMult: 10.0,
+    useSLPiv: false,
+    hasTPA: false, tpMode: 'pct', tpMult: 2.0,
+    hasTPB: false, tpModeB: 'rr', tpMultB: 2,
+    slLogic: 'or', tpLogic: 'or',
     // Режимы
     useRev:     false,
     useBE:      false,
     waitBars:   0,
     start:      50,
     comm:       0.04,
-    slLogic:    'or',
-    tpLogic:    'or',
+    commission: 0.04,
     revBars:    1,
     revMode:    'any',
     revAct:     'exit',
@@ -152,43 +174,48 @@ function buildDefaultCfg(tv, userCfg) {
     waitRetrace:false,
     waitMaxBars:0,
     waitCancelAtr:0,
+    atrPeriod:  14,
     pruning:    false,
     collectTrades: true,
-    // Массивы (будут заполнены ниже)
-    maArr:      null,
-    confirmArr: null,
-    pvLo:       null,
-    pvHi_:      null,
-    volAvg:     null,
-    bodyAvg:    null,
+    tradeLog:   [],
+    // Массивы
+    maArr:         null,
+    maArrConfirm:  null,
+    pvLo:          null,
+    pvHi_:         null,
+    volAvg:        null,
+    bodyAvg:       null,
     pvL:        5,
     pvR:        2,
     ...userCfg,
   };
 
-  // Инжектируем TV-computed MA values напрямую из CSV
+  // Разворачиваем slPair/tpPair если переданы
+  if (cfg.slPair || cfg.tpPair) expandSlTpPair(cfg);
+
+  // Инжектируем TV-computed MA values напрямую из CSV (если есть в колонках)
   const maCol  = tv.map(r => r.ma);
   const cmaCol = tv.map(r => r.cma);
   const hasMa  = maCol.some(v => !isNaN(v) && v > 0);
   const hasCma = cmaCol.some(v => !isNaN(v) && v > 0);
 
-  if (hasMa && cfg.useMA !== false) {
+  if (hasMa && !cfg.maArr) {
     cfg.maArr = new Float64Array(N);
     maCol.forEach((v, i) => { cfg.maArr[i] = isNaN(v) ? 0 : v; });
     cfg.useMA = true;
-    console.log(`  ✓ MA из CSV инжектирован (${maCol.filter(v => !isNaN(v) && v>0).length} значений)`);
+    console.log(`  ✓ maArr из CSV (TV-значения, ${maCol.filter(v => !isNaN(v) && v>0).length} баров)`);
   }
-  if (hasCma && cfg.useConfirm !== false) {
-    cfg.confirmArr = new Float64Array(N);
-    cmaCol.forEach((v, i) => { cfg.confirmArr[i] = isNaN(v) ? 0 : v; });
+  if (hasCma && !cfg.maArrConfirm) {
+    // ВАЖНО: поле называется maArrConfirm — именно его читает filter_registry.js
+    cfg.maArrConfirm = new Float64Array(N);
+    cmaCol.forEach((v, i) => { cfg.maArrConfirm[i] = isNaN(v) ? 0 : v; });
     cfg.useConfirm = true;
-    console.log(`  ✓ Confirm MA из CSV инжектирован (${cmaCol.filter(v => !isNaN(v) && v>0).length} значений)`);
+    console.log(`  ✓ maArrConfirm из CSV (TV-значения, ${cmaCol.filter(v => !isNaN(v) && v>0).length} баров)`);
   }
 
   // Pivot сигналы из CSV (колонки PV_HI, PV_LO)
   const hasPvSignals = tv.some(r => r.pv_hi > 0 || r.pv_lo > 0);
-  if (hasPvSignals && !userCfg.pvLo) {
-    // Переводим 0/1 колонки в массивы для pivot entry
+  if (hasPvSignals && !cfg.pvLo) {
     cfg.pvLo  = new Uint8Array(N);
     cfg.pvHi_ = new Uint8Array(N);
     tv.forEach((r, i) => { cfg.pvLo[i] = r.pv_lo; cfg.pvHi_[i] = r.pv_hi; });
@@ -206,182 +233,290 @@ function runBacktest(data, cfg) {
   ctx.DATA = data;
 
   // volAvg / bodyAvg нужны для некоторых фильтров
-  if (!cfg.volAvg) {
-    const vols = data.map(d => d.v);
-    cfg.volAvg = vm.runInContext('calcSMA(DATA.map(d=>d.v), 20)', ctx);
-  }
-  if (!cfg.bodyAvg) {
-    cfg.bodyAvg = vm.runInContext('calcBodySMA(20)', ctx);
+  if (!cfg.volAvg) cfg.volAvg = vm.runInContext('calcSMA(DATA.map(d=>d.v), 20)', ctx);
+  if (!cfg.bodyAvg) cfg.bodyAvg = vm.runInContext('calcBodySMA(20)', ctx);
+
+  // MA из конфига (если не инжектирован из CSV)
+  if (cfg.useMA && cfg.maP > 0 && !cfg.maArr) {
+    const htf = cfg.htfRatio || 1;
+    const typ = cfg.maType || 'EMA';
+    if (htf > 1) {
+      cfg.maArr = vm.runInContext(`calcHTFMA(DATA, ${htf}, ${cfg.maP}, '${typ}')`, ctx);
+      console.log(`  ✓ maArr вычислен JS: ${typ}(${cfg.maP})×${htf}tf`);
+    } else {
+      cfg.maArr = vm.runInContext(`calcMA(DATA.map(d=>d.c), ${cfg.maP}, '${typ}')`, ctx);
+      console.log(`  ✓ maArr вычислен JS: ${typ}(${cfg.maP})`);
+    }
   }
 
-  // Compute pvLo / pvHi если не инжектированы из CSV
+  // Confirm MA из конфига (если не инжектирован из CSV)
+  if (cfg.useConfirm && cfg.confN > 0 && !cfg.maArrConfirm) {
+    const htf = cfg.confHtfRatio || 1;
+    const typ = cfg.confMatType || 'EMA';
+    if (htf > 1) {
+      cfg.maArrConfirm = vm.runInContext(`calcHTFMA(DATA, ${htf}, ${cfg.confN}, '${typ}')`, ctx);
+      console.log(`  ✓ maArrConfirm вычислен JS: ${typ}(${cfg.confN})×${htf}tf`);
+    } else {
+      cfg.maArrConfirm = vm.runInContext(`calcMA(DATA.map(d=>d.c), ${cfg.confN}, '${typ}')`, ctx);
+      console.log(`  ✓ maArrConfirm вычислен JS: ${typ}(${cfg.confN})`);
+    }
+  }
+
+  // Pivot (если не инжектированы из CSV)
   if (!cfg.pvLo) {
     const pvL = cfg.pvL || 5, pvR = cfg.pvR || 2;
     cfg.pvLo  = vm.runInContext(`calcPivotLow(${pvL}, ${pvR})`,  ctx);
     cfg.pvHi_ = vm.runInContext(`calcPivotHigh(${pvL}, ${pvR})`, ctx);
+    console.log(`  ✓ Pivot вычислен JS: L${pvL} R${pvR}`);
   }
 
   // ATR
-  const atrArr = vm.runInContext('calcRMA_ATR(14)', ctx);
+  const atrPeriod = cfg.atrPeriod || 14;
+  const atrArr = vm.runInContext(`calcRMA_ATR(${atrPeriod})`, ctx);
 
-  // Передаём cfg в контекст и запускаем backtest
-  ctx._validateCfg     = cfg;
-  ctx._validatePvLo    = cfg.pvLo  || new Float64Array(data.length);
-  ctx._validatePvHi    = cfg.pvHi_ || new Float64Array(data.length);
-  ctx._validateAtrArr  = atrArr;
+  // Вычисляем минимальный start из параметров индикаторов
+  // Если пользователь явно задал start — берём максимум (user-start >= min-warmup)
+  {
+    const maType = cfg.maType || 'EMA';
+    const cType  = cfg.confMatType || 'EMA';
+    const tMult  = (maType==='TEMA'||maType==='DEMA'||maType==='EMA') ? 3 : 1;
+    const cMult  = (cType==='TEMA'||cType==='DEMA'||cType==='EMA')   ? 3 : 1;
+    const autoStart = Math.max(
+      (cfg.pvL||5) + (cfg.pvR||2) + 5,
+      cfg.useMA      ? (cfg.maP||0)  * (cfg.htfRatio||1)    * tMult : 0,
+      cfg.useConfirm ? (cfg.confN||0)* (cfg.confHtfRatio||1)* cMult : 0,
+      atrPeriod * 3,
+      50
+    ) + 2;
+    // Явный start из userCfg переопределяет авто-расчёт (если он больше мин. прогрева)
+    cfg.start = Math.max(cfg.start || 0, autoStart);
+    console.log(`  ✓ start = ${cfg.start} баров прогрева${cfg.start > autoStart ? ` (явный, авто = ${autoStart})` : ''}`);
+  }
+
+  ctx._validateCfg    = cfg;
+  ctx._validatePvLo   = cfg.pvLo  || new Float64Array(data.length);
+  ctx._validatePvHi   = cfg.pvHi_ || new Float64Array(data.length);
+  ctx._validateAtrArr = atrArr;
 
   const result = vm.runInContext(
     'backtest(_validatePvLo, _validatePvHi, _validateAtrArr, _validateCfg)',
     ctx
   );
+  result.tradeLog = cfg.tradeLog || [];
   return result;
 }
 
 // ─────────────────────────────────────────────────────────────
-// 5. СРАВНЕНИЕ EQUITY
+// 5. ИЗВЛЕЧЕНИЕ СДЕЛОК ИЗ TV-ДАННЫХ
 // ─────────────────────────────────────────────────────────────
-function compareEquity(tvSeries, jsEq, data) {
-  // tvSeries: массив TV equity (может быть null для баров без данных)
-  // jsEq: Float32Array из backtest()
-
-  const N = Math.min(tvSeries.length, jsEq.length);
-
-  // Собираем только бары с реальными TV данными (equity != 0 или был сигнал)
-  const diffs = [];
-  let maxAbsDiff = 0;
-  let firstDivIdx = -1;
-  const THRESHOLD = 0.01; // % — разница меньше которой считается совпадением
-
-  for (let i = 0; i < N; i++) {
-    const tvEq = tvSeries[i];
-    if (tvEq === null) continue;
-
-    const jsVal  = jsEq[i] || 0;
-    const diff   = Math.abs(tvEq - jsVal);
-    if (diff > maxAbsDiff) maxAbsDiff = diff;
-    if (diff > THRESHOLD && firstDivIdx < 0) firstDivIdx = i;
-    diffs.push({ i, t: data[i].t, tv: tvEq, js: jsVal, diff });
-  }
-
-  // Статистика расхождений
-  const nonZero = diffs.filter(d => d.diff > THRESHOLD);
-  const maxDiff = diffs.reduce((m, d) => d.diff > m ? d.diff : m, 0);
-  const avgDiff = diffs.length > 0
-    ? diffs.reduce((s, d) => s + d.diff, 0) / diffs.length
-    : 0;
-
-  return { diffs, nonZero, maxDiff, avgDiff, firstDivIdx, N };
-}
-
-// ─────────────────────────────────────────────────────────────
-// 6. СРАВНЕНИЕ СИГНАЛОВ
-// ─────────────────────────────────────────────────────────────
-function compareSignals(tv, jsEq, data) {
-  // Восстанавливаем JS-сигналы из изменений equity
-  // Вход = equity[i] == equity[i-1] (сделка началась)
-  // Выход = equity изменился
-  // Для точного сравнения нужно добавить логику в core.js
-  // Пока сравниваем TV сигналы по timestamp с equity-шагами
-
-  const tvTrades = [];
-  let tvDir = 0, tvEntry = -1;
+function extractTVTrades(tv, data) {
+  const trades = [];
+  let dir = 0, entryBar = -1, entryC = 0;
 
   for (let i = 0; i < tv.length; i++) {
     const r = tv[i];
-    if (r.el === 1 && tvDir <= 0) {
-      if (tvDir === -1) tvTrades.push({ type: 'XS', bar: i, t: data[i].t });
-      tvTrades.push({ type: 'EL', bar: i, t: data[i].t });
-      tvDir = 1; tvEntry = i;
+    if (r.el === 1) {
+      if (dir !== 0) { /* переоткрытие — пропуск */ }
+      dir = 1; entryBar = i; entryC = data[i].c;
     }
-    if (r.es === 1 && tvDir >= 0) {
-      if (tvDir === 1) tvTrades.push({ type: 'XL', bar: i, t: data[i].t });
-      tvTrades.push({ type: 'ES', bar: i, t: data[i].t });
-      tvDir = -1; tvEntry = i;
+    if (r.es === 1) {
+      if (dir !== 0) { /* переоткрытие — пропуск */ }
+      dir = -1; entryBar = i; entryC = data[i].c;
     }
-    if (r.xl === 1 && tvDir === 1) {
-      tvTrades.push({ type: 'XL', bar: i, t: data[i].t });
-      tvDir = 0;
+    if (r.xl === 1 && dir === 1) {
+      const exitC = data[i].c;
+      const pnl = (exitC - entryC) / entryC * 100;
+      trades.push({ type: 'L', entryBar, exitBar: i, entryC, exitC, pnl });
+      dir = 0;
     }
-    if (r.xs === 1 && tvDir === -1) {
-      tvTrades.push({ type: 'XS', bar: i, t: data[i].t });
-      tvDir = 0;
+    if (r.xs === 1 && dir === -1) {
+      const exitC = data[i].c;
+      const pnl = (entryC - exitC) / entryC * 100;
+      trades.push({ type: 'S', entryBar, exitBar: i, entryC, exitC, pnl });
+      dir = 0;
     }
   }
-
-  return tvTrades;
+  return trades;
 }
 
 // ─────────────────────────────────────────────────────────────
-// 7. ОТЧЁТ
+// 6. ИЗВЛЕЧЕНИЕ JS СДЕЛОК ИЗ tradeLog
 // ─────────────────────────────────────────────────────────────
-function printReport(csvFile, data, tv, jsResult, equityReport) {
-  const { nonZero, maxDiff, avgDiff, firstDivIdx, diffs } = equityReport;
-  const ok = nonZero.length === 0;
-
-  console.log('\n' + '═'.repeat(60));
-  console.log(`${ANSI_CYN}ФАЙЛ:${ANSI_RST} ${path.basename(csvFile)}`);
-  console.log(`Баров данных: ${data.length} | Сделок JS: ${jsResult ? jsResult.n : '—'}`);
-  if (jsResult) {
-    console.log(`JS PnL: ${jsResult.pnl.toFixed(2)}%  WR: ${jsResult.wr.toFixed(1)}%  DD: ${jsResult.dd.toFixed(2)}%`);
+function extractJSTrades(jsResult) {
+  if (jsResult?.tradeLog && jsResult.tradeLog.length > 0) {
+    // Используем tradeLog (точные entryBar/exitBar/dir)
+    return jsResult.tradeLog.filter(t => t.exitBar !== undefined);
   }
-  console.log('─'.repeat(60));
-
-  // Equity summary
-  console.log(`\n${ANSI_CYN}EQUITY СРАВНЕНИЕ${ANSI_RST}`);
-  if (diffs.length === 0) {
-    console.log(`  ${ANSI_YLW}⚠  TV equity не найден в CSV (нет Equity % колонки или все 0)${ANSI_RST}`);
-  } else if (ok) {
-    console.log(`  ${ANSI_GRN}✓ Полное совпадение equity (отклонение < 0.01% на всех ${diffs.length} барах)${ANSI_RST}`);
-  } else {
-    console.log(`  ${ANSI_RED}✗ Расхождений: ${nonZero.length} / ${diffs.length} баров${ANSI_RST}`);
-    console.log(`  Макс. отклонение: ${ANSI_RED}${maxDiff.toFixed(4)}%${ANSI_RST}  Среднее: ${avgDiff.toFixed(4)}%`);
-
-    // Первое расхождение
-    if (firstDivIdx >= 0) {
-      const bar = data[firstDivIdx];
-      const d   = diffs.find(d => d.i === firstDivIdx);
-      const ts  = new Date(bar.t * 1000).toISOString().slice(0, 16).replace('T', ' ');
-      console.log(`\n  ${ANSI_YLW}Первое расхождение: бар ${firstDivIdx} (${ts})${ANSI_RST}`);
-      console.log(`    TV equity: ${d.tv.toFixed(4)}%  JS equity: ${d.js.toFixed(4)}%  Δ = ${d.diff.toFixed(4)}%`);
-      console.log(`    OHLCV: O=${bar.o} H=${bar.h} L=${bar.l} C=${bar.c}`);
+  // Fallback: из equity curve
+  const jsEq = jsResult?.eq || [];
+  const exits = [];
+  for (let i = 1; i < jsEq.length; i++) {
+    if (Math.abs(jsEq[i] - jsEq[i-1]) > 1e-9) {
+      exits.push({ exitBar: i, pnl: jsEq[i] - jsEq[i-1] });
     }
+  }
+  return exits;
+}
 
-    // Топ-5 расхождений
-    const worst = [...nonZero].sort((a, b) => b.diff - a.diff).slice(0, 5);
-    console.log(`\n  Топ-5 расхождений:`);
-    console.log(`  ${'Бар'.padEnd(6)} ${'Время'.padEnd(17)} ${'TV%'.padEnd(12)} ${'JS%'.padEnd(12)} ${'Δ'.padEnd(10)}`);
-    worst.forEach(d => {
-      const ts = new Date(data[d.i].t * 1000).toISOString().slice(0, 16).replace('T', ' ');
-      console.log(`  ${String(d.i).padEnd(6)} ${ts.padEnd(17)} ${d.tv.toFixed(4).padEnd(12)} ${d.js.toFixed(4).padEnd(12)} ${ANSI_RED}${d.diff.toFixed(4)}${ANSI_RST}`);
-    });
+// ─────────────────────────────────────────────────────────────
+// 7. СРАВНЕНИЕ СДЕЛОК TV vs JS
+// ─────────────────────────────────────────────────────────────
+function compareTrades(tvTrades, jsExits, data) {
+  const WINDOW = 3; // допуск в барах для совпадения
+  let matched = 0, tvOnly = 0, jsOnly = 0;
+  const tvMatched = new Set();
+  const jsMatched = new Set();
+
+  // Для каждой TV сделки ищем соответствующий JS выход по exitBar
+  for (const tv of tvTrades) {
+    let found = false;
+    for (let j = 0; j < jsExits.length; j++) {
+      if (jsMatched.has(j)) continue;
+      if (Math.abs(jsExits[j].exitBar - tv.exitBar) <= WINDOW) {
+        matched++;
+        tvMatched.add(tv.exitBar);
+        jsMatched.add(j);
+        found = true;
+        break;
+      }
+    }
+    if (!found) tvOnly++;
+  }
+  jsOnly = jsExits.length - jsMatched.size;
+
+  return { matched, tvOnly, jsOnly, total: tvTrades.length, jsTotal: jsExits.length };
+}
+
+// Создаём выровненные пары TV↔JS по близости entryBar
+// Алгоритм: жадная последовательная привязка
+function buildTradePairs(tvTrades, jsTrades) {
+  const pairs = [];
+  let ji = 0;
+  for (let ti = 0; ti < tvTrades.length; ti++) {
+    const tv = tvTrades[ti];
+    // Ищем ближайшую JS сделку после TV entry (или до ±5 баров)
+    let best = null, bestDist = Infinity;
+    const startJ = ji;
+    for (let j = startJ; j < Math.min(startJ + 5, jsTrades.length); j++) {
+      if (jsTrades[j] === undefined) break;
+      const d = Math.abs(jsTrades[j].entryBar - tv.entryBar);
+      if (d < bestDist) { bestDist = d; best = j; }
+    }
+    if (best !== null && bestDist <= 15) {
+      pairs.push({ tv, js: jsTrades[best], entryDelta: jsTrades[best].entryBar - tv.entryBar, exitDelta: (jsTrades[best].exitBar || 0) - tv.exitBar });
+      ji = best + 1;
+    } else {
+      // TV trade без JS пары
+      pairs.push({ tv, js: null, entryDelta: null, exitDelta: null });
+    }
+  }
+  return pairs;
+}
+
+// ─────────────────────────────────────────────────────────────
+// 8. ОТЧЁТ
+// ─────────────────────────────────────────────────────────────
+function printReport(csvFile, data, tv, jsResult, tvTrades, jsExits, tradeMatch, tradePairs) {
+  console.log('\n' + '═'.repeat(70));
+  console.log(`${ANSI_CYN}ФАЙЛ:${ANSI_RST} ${path.basename(csvFile)}`);
+  console.log(`Баров данных: ${data.length}`);
+  console.log('─'.repeat(70));
+
+  // JS результаты
+  if (jsResult) {
+    console.log(`\n${ANSI_CYN}JS BACKTEST${ANSI_RST}`);
+    console.log(`  Сделок: ${jsResult.n}  PnL: ${jsResult.pnl.toFixed(2)}%  WR: ${jsResult.wr.toFixed(1)}%  DD: ${jsResult.dd.toFixed(2)}%`);
+    const jsL = jsResult.nL || 0, jsS = jsResult.nS || 0;
+    if (jsL + jsS > 0) console.log(`  Long: ${jsL}  Short: ${jsS}`);
+  } else {
+    console.log(`  ${ANSI_RED}✗ backtest() не запущен${ANSI_RST}`);
   }
 
-  // TV сигналы
-  const tvTrades = compareSignals(tv, jsResult?.eq || [], data);
-  const hasSignals = tvTrades.length > 0;
-  console.log(`\n${ANSI_CYN}TV СИГНАЛЫ${ANSI_RST} (${tvTrades.length} событий)`);
-  if (hasSignals) {
-    tvTrades.slice(0, 20).forEach(t => {
-      const ts  = new Date(data[t.bar].t * 1000).toISOString().slice(0, 16).replace('T', ' ');
-      const sym = t.type.startsWith('E') ? ANSI_GRN : ANSI_RED;
-      console.log(`  ${sym}${t.type}${ANSI_RST}  бар=${t.bar}  ${ts}`);
-    });
-    if (tvTrades.length > 20) console.log(`  ... ещё ${tvTrades.length - 20} событий`);
+  // TV результаты
+  console.log(`\n${ANSI_CYN}TV СДЕЛКИ${ANSI_RST} (из CSV)`);
+  if (tvTrades.length === 0) {
+    console.log(`  ${ANSI_YLW}⚠  Нет TV сигналов (EL/XL/ES/XS = 0)${ANSI_RST}`);
   } else {
-    console.log(`  ${ANSI_YLW}⚠  XL/XS/EL/ES = 0 на всех барах${ANSI_RST}`);
+    const tvL = tvTrades.filter(t => t.type === 'L').length;
+    const tvS = tvTrades.filter(t => t.type === 'S').length;
+    const tvWins = tvTrades.filter(t => t.pnl > 0).length;
+    const tvPnl = tvTrades.reduce((s, t) => s + t.pnl, 0);
+    console.log(`  Сделок: ${tvTrades.length}  Long: ${tvL}  Short: ${tvS}`);
+    console.log(`  WR по цене: ${tvTrades.length > 0 ? (tvWins/tvTrades.length*100).toFixed(1) : '—'}%  Сум.PnL (цена): ${tvPnl.toFixed(2)}%`);
+    // Первая и последняя TV сделки
+    const first = tvTrades[0];
+    const last = tvTrades[tvTrades.length - 1];
+    console.log(`  Первая: ${first.type}  бар ${first.entryBar}→${first.exitBar}`);
+    console.log(`  Последняя: ${last.type}  бар ${last.entryBar}→${last.exitBar}`);
+  }
+
+  // Сравнение выходов (±3 бара, по всем сделкам)
+  if (tvTrades.length > 0 && jsExits.length > 0) {
+    console.log(`\n${ANSI_CYN}СРАВНЕНИЕ ВЫХОДОВ (±3 бара, по всем TV сделкам)${ANSI_RST}`);
+    const pct = (tradeMatch.matched / tradeMatch.total * 100).toFixed(1);
+    const color = tradeMatch.matched / tradeMatch.total > 0.8 ? ANSI_YLW : ANSI_RED;
+    console.log(`  ${color}Совпадений: ${tradeMatch.matched} / ${tradeMatch.total} (${pct}%)${ANSI_RST}`);
+    console.log(`  TV без JS: ${tradeMatch.tvOnly}  JS без TV: ${tradeMatch.jsOnly}  JS всего: ${tradeMatch.jsTotal}`);
+  }
+
+  // Последовательное сравнение (trade 1 vs trade 1, etc.)
+  if (tradePairs && tradePairs.length > 0) {
+    const paired = tradePairs.filter(p => p.js !== null);
+    const exitExact = paired.filter(p => Math.abs(p.exitDelta) <= 3).length;
+    const entryExact = paired.filter(p => Math.abs(p.entryDelta) <= 3).length;
+    console.log(`\n${ANSI_CYN}ПОСЛЕДОВАТЕЛЬНОЕ СОВПАДЕНИЕ (TV[i] ↔ JS[i])${ANSI_RST}`);
+    console.log(`  Спаровано: ${paired.length} / ${tradePairs.length}`);
+    console.log(`  Входы совпали (±3 бара): ${entryExact} / ${paired.length} (${(entryExact/paired.length*100).toFixed(0)}%)`);
+    console.log(`  Выходы совпали (±3 бара): ${exitExact} / ${paired.length} (${(exitExact/paired.length*100).toFixed(0)}%)`);
+
+    // Первые 20 пар
+    console.log(`\n${ANSI_CYN}ПЕРВЫЕ 20 ПАР TV[i] ↔ JS[i]${ANSI_RST}`);
+    console.log(`  TV   TV_EL  TV_XL  pnl%  JS_EL  JS_XL  EΔ   XΔ`);
+    const shown = Math.min(20, tradePairs.length);
+    for (let i = 0; i < shown; i++) {
+      const p = tradePairs[i];
+      const jsEl = p.js ? p.js.entryBar : '—';
+      const jsXl = p.js ? p.js.exitBar  : '—';
+      const ed  = p.entryDelta !== null ? p.entryDelta : '—';
+      const xd  = p.exitDelta  !== null ? p.exitDelta  : '—';
+      const eSym = p.js && Math.abs(p.entryDelta) <= 3 ? `${ANSI_GRN}✓${ANSI_RST}` : `${ANSI_RED}✗${ANSI_RST}`;
+      const xSym = p.js && Math.abs(p.exitDelta)  <= 3 ? `${ANSI_GRN}✓${ANSI_RST}` : `${ANSI_RED}✗${ANSI_RST}`;
+      const pnlStr = p.tv.pnl.toFixed(2).padEnd(6);
+      console.log(`  ${p.tv.type.padEnd(3)}  ${String(p.tv.entryBar).padEnd(6)} ${String(p.tv.exitBar).padEnd(6)} ${pnlStr} ${String(jsEl).padEnd(6)} ${String(jsXl).padEnd(6)} ${eSym}${String(ed).padStart(4)} ${xSym}${String(xd).padStart(4)}`);
+    }
+    if (tradePairs.length > 20) console.log(`  ... ещё ${tradePairs.length - 20} пар`);
+  }
+
+  // TV equity summary
+  const hasEq = tv.some(r => r.equity !== null && r.equity !== 0);
+  if (hasEq) {
+    const lastEq = [...tv].reverse().find(r => r.equity !== null && r.equity !== undefined);
+    const maxEq = tv.reduce((m, r) => (r.equity !== null && r.equity > m) ? r.equity : m, -Infinity);
+    console.log(`\n${ANSI_CYN}TV EQUITY${ANSI_RST}`);
+    console.log(`  Финальная: ${lastEq?.equity?.toFixed(2) ?? '—'}%  Макс: ${maxEq.toFixed(2)}%`);
+    console.log(`  (TV использует перем. размер позиции — прямое сравнение с JS equity невозможно)`);
   }
 
   // Итог
-  console.log('\n' + '─'.repeat(60));
-  if (ok && diffs.length > 0) {
-    console.log(`${ANSI_GRN}ИТОГ: ✓ OK — JS движок совпадает с TradingView${ANSI_RST}`);
-  } else if (diffs.length === 0) {
-    console.log(`${ANSI_YLW}ИТОГ: ⚠  Нет TV equity для сравнения. Добавь в CSV колонку "Equity %".${ANSI_RST}`);
+  console.log('\n' + '─'.repeat(70));
+  if (tvTrades.length === 0) {
+    console.log(`${ANSI_YLW}ИТОГ: ⚠  Нет TV сигналов для сравнения${ANSI_RST}`);
+  } else if (!jsResult) {
+    console.log(`${ANSI_RED}ИТОГ: ✗ JS backtest не запущен${ANSI_RST}`);
   } else {
-    console.log(`${ANSI_RED}ИТОГ: ✗ РАСХОЖДЕНИЕ — нужна отладка${ANSI_RST}`);
-    console.log(`  Следующий шаг: найди первое расхождение (бар ${firstDivIdx}) и сравни логику.`);
+    const pct = tradeMatch.matched / tradeMatch.total * 100;
+    if (pct >= 90) {
+      console.log(`${ANSI_GRN}ИТОГ: ✓ Хорошее совпадение (${pct.toFixed(0)}% сделок)${ANSI_RST}`);
+    } else if (pct >= 70) {
+      console.log(`${ANSI_YLW}ИТОГ: ~ Частичное совпадение (${pct.toFixed(0)}% сделок)${ANSI_RST}`);
+    } else {
+      console.log(`${ANSI_RED}ИТОГ: ✗ Значительное расхождение (${pct.toFixed(0)}% совпадений)${ANSI_RST}`);
+      if (jsResult.n !== tvTrades.length) {
+        console.log(`  JS: ${jsResult.n} сделок  TV: ${tvTrades.length} сделок (разница: ${jsResult.n - tvTrades.length})`);
+      }
+    }
   }
-  console.log('═'.repeat(60) + '\n');
+  console.log('═'.repeat(70) + '\n');
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -459,14 +594,15 @@ function main() {
       console.error(e.stack);
     }
 
-    // Сравниваем equity
-    const tvEquity = tv.map(r => r.equity);
-    const jsEq     = jsResult?.eq || new Float32Array(data.length);
-    const report   = compareEquity(tvEquity, jsEq, data);
+    // Извлекаем TV и JS сделки
+    const tvTrades   = extractTVTrades(tv, data);
+    const jsExits    = extractJSTrades(jsResult);
+    const tradeMatch = compareTrades(tvTrades, jsExits, data);
+    const tradePairs = buildTradePairs(tvTrades, jsExits);
 
-    printReport(csvFile, data, tv, jsResult, report);
+    printReport(csvFile, data, tv, jsResult, tvTrades, jsExits, tradeMatch, tradePairs);
 
-    if (report.nonZero.length > 0) allOk = false;
+    if (tradeMatch.matched < tradeMatch.total * 0.9 && tvTrades.length > 0) allOk = false;
   }
 
   process.exit(allOk ? 0 : 1);

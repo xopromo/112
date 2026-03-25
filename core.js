@@ -750,6 +750,7 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
         pnl += tradePnl; trades++;
         sumPnl2 += tradePnl * tradePnl; // ##SQN_HOT##
         if (_trPnl) _trPnl.push(tradePnl); // ##SQN_LAZY##
+        if (cfg.tradeLog && cfg.tradeLog.length) { const tl=cfg.tradeLog[cfg.tradeLog.length-1]; tl.exitBar=i; tl.exit=exitPrice; tl.pnl=tradePnl; }
         if (tradePnl > 0) wins++;
         if (i <= split) { p1+=tradePnl; c1++; if(tradePnl>0) w1++; }
         else { p2+=tradePnl; c2++; if(tradePnl>0) w2++; }
@@ -852,6 +853,7 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
         entry=bar.c; entryBar=i;
         beActive=false; trailActive=false; partialDone=false; posSize=1.0; wickSL=NaN;
         revSkipCount=0; revCooldownBar=-1;
+        if (cfg.tradeLog) cfg.tradeLog.push({ entryBar: i, dir, entry: bar.c });
 
         // Compute SL levels — из SL_REGISTRY
         const slCandidates = SL_REGISTRY

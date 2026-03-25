@@ -393,7 +393,7 @@ function generatePineScript(r) {
   lines.push(`float conf_ma_val = conf_ma_raw`);
   lines.push(`bool conf_ok_l = not use_conf_ma or (not na(conf_ma_val) and close[1] > conf_ma_val)`);
   lines.push(`bool conf_ok_s = not use_conf_ma or (not na(conf_ma_val) and close[1] < conf_ma_val)`);
-  lines.push(`plot(use_int_ma ? ma_val : na, "MA", color=color.new(color.blue,50), linewidth=2)`);
+  lines.push(`plot(ma_val, "MA", color=color.new(color.blue,50), linewidth=2, display=use_int_ma ? display.all : display.data_window)`);
   lines.push(`plot(use_conf_ma ? conf_ma_val : na, "Confirm MA", color=color.new(color.orange,50), linewidth=1)`);
   lines.push(``);
   lines.push(`// Simple trend`);

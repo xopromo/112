@@ -1,0 +1,14 @@
+{
+  "usePivot": true, "pvL": 7, "pvR": 2,
+  "waitBars": 2,
+  "hasSLA": true, "slMult": 4,
+  "hasSLB": true, "slPctMult": 5,
+  "slLogic": "or",
+  "hasTPA": true, "tpMode": "rr", "tpMult": 8,
+  "hasTPB": true, "tpModeB": "atr", "tpMultB": 2,
+  "tpLogic": "or",
+  "atrPeriod": 27,
+  "comm": 0.1, "commission": 0.1,
+  "useMA": true, "maType": "TEMA", "maP": 45, "htfRatio": 3,
+  "useConfirm": true, "confN": 100, "confMatType": "SMA", "confHtfRatio": 12
+}
