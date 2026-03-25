@@ -155,7 +155,7 @@ function generatePineScript(r) {
 
   lines.push(`grp_consec_f = "🔢 ПОДРЯД ИДУЩИЕ СВЕЧИ"`);
   lines.push(`use_consec_f = input.bool(${b(c.useConsec)}, "Блок подряд идущих свечей", tooltip="Блокирует вход если N или более свечей подряд идут в сторону сигнала — перекупленность", group=grp_consec_f)`);
-  lines.push(`consec_max_v = input.int(${c.consecMax||3}, "  Макс подряд", minval=2, maxval=10, group=grp_consec_f)`);
+  lines.push(`consec_max_v = input.int(${Math.max(c.consecMax||3, 2)}, "  Макс подряд", minval=2, maxval=10, group=grp_consec_f)`);
   lines.push(``);
 
   lines.push(`grp_fresh_f = "🌱 СВЕЖЕСТЬ ТРЕНДА"`);
