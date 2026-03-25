@@ -3681,6 +3681,11 @@ function generatePineScript(r) {
   lines.push(`// Выходы: маленькие крестики`);
   lines.push(`plotshape(a_lx, "✖ Exit Long",   shape.xcross,       location.abovebar, color.new(color.orange,0),  size=size.tiny)`);
   lines.push(`plotshape(a_sx, "✖ Exit Short",  shape.xcross,       location.belowbar, color.new(color.aqua,0),    size=size.tiny)`);
+  lines.push(`// Числовые серии сигналов для экспорта CSV (Data Window only)`);
+  lines.push(`plot(a_le ? 1 : 0, "EL", display=display.data_window)`);
+  lines.push(`plot(a_se ? 1 : 0, "ES", display=display.data_window)`);
+  lines.push(`plot(a_lx ? 1 : 0, "XL", display=display.data_window)`);
+  lines.push(`plot(a_sx ? 1 : 0, "XS", display=display.data_window)`);
 
   const rawCode = lines.join('\n');
   // Фаза 1: исправляем известные ошибки
@@ -14215,6 +14220,8 @@ function _parseTVcsv(text) {
   const esIdx = hdrs.indexOf('es');
   const xlIdx = hdrs.indexOf('xl');
   const xsIdx = hdrs.indexOf('xs');
+  const maIdx = hdrs.indexOf('ma'); // exact match, не попадает в 'confirm ma'
+  const confIdx = hdrs.findIndex(h => h.includes('confirm'));
 
   if (eqIdx < 0) return null;
 
@@ -14231,6 +14238,8 @@ function _parseTVcsv(text) {
       es: esIdx >= 0 ? (parseFloat(cols[esIdx]) || 0) : null,
       xl: xlIdx >= 0 ? (parseFloat(cols[xlIdx]) || 0) : null,
       xs: xsIdx >= 0 ? (parseFloat(cols[xsIdx]) || 0) : null,
+      ma: maIdx >= 0 ? parseFloat(cols[maIdx]) : NaN,
+      confMa: confIdx >= 0 ? parseFloat(cols[confIdx]) : NaN,
     });
   }
   return rows.length >= 2 ? rows : null;
@@ -19601,7 +19610,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774470970569;
+window._BUILD_TS = 1774473152774;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
