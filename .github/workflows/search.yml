@@ -294,6 +294,8 @@ jobs:
                           continue
                       data = resp.json()
                       if 'choices' in data:
+                          usage = data.get('usage', {})
+                          print(f"    Groq tokens: {usage.get('prompt_tokens',0)} in / {usage.get('completion_tokens',0)} out")
                           return data['choices'][0]['message']['content']
                       err_msg = data.get('error', {})
                       if isinstance(err_msg, dict) and err_msg.get('type') == 'tokens':
@@ -363,6 +365,8 @@ jobs:
                                   continue
                               data = resp.json()
                               if 'choices' in data:
+                                  usage = data.get('usage', {})
+                                  print(f"    Groq tokens: {usage.get('prompt_tokens',0)} in / {usage.get('completion_tokens',0)} out")
                                   item['detail'] = data['choices'][0]['message']['content']
                                   print(f"    {len(item['detail'])} chars detail generated")
                               break
@@ -401,6 +405,7 @@ jobs:
           print(f"\nDone: {len(all_results)} found ({len(new_results)} new), "
                 f"{len(results_to_process)} fetched, {groq_count} summarized, "
                 f"{detail_count} deep-dived")
+          # Token summary is visible per-call above (search for "Groq tokens:")
           PYEOF
         env:
           SEARCH_QUERY:   ${{ inputs.query }}
