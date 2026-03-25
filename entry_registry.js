@@ -588,20 +588,15 @@ const ENTRY_REGISTRY = [
       }
       return true;
     },
-    pineLines: (c, b) => {
-      const lines = [
-        `use_pchg     = input.bool(${b(c.usePChg)}, "% Price Change Entry", group=grp_entry)`,
-        `pchg_pct_a   = input.float(${c.pChgPctA||1}, "  А: мин.% изм.", step=0.1, minval=0.01, group=grp_entry)`,
-        `pchg_per_a   = input.int(${c.pChgPeriodA||10}, "  А: период (свечей)", minval=1, group=grp_entry)`,
-        `pchg_htf_a   = input.int(${c.pChgHtfA||1}, "  А: HTF множитель", minval=1, group=grp_entry)`,
-      ];
-      if (c.usePChgB) {
-        lines.push(`use_pchg_b   = input.bool(${b(c.usePChgB)}, "  Условие B (AND)", group=grp_entry)`);
-        lines.push(`pchg_pct_b   = input.float(${c.pChgPctB||1}, "  B: мин.% изм.", step=0.1, minval=0.01, group=grp_entry)`);
-        lines.push(`pchg_per_b   = input.int(${c.pChgPeriodB||20}, "  B: период (свечей)", minval=1, group=grp_entry)`);
-        lines.push(`pchg_htf_b   = input.int(${c.pChgHtfB||1}, "  B: HTF множитель", minval=1, group=grp_entry)`);
-      }
-      return lines;
-    },
+    pineLines: (c, b) => [
+      `use_pchg     = input.bool(${b(c.usePChg)}, "% Price Change Entry", group=grp_entry)`,
+      `pchg_pct_a   = input.float(${c.pChgPctA||1}, "  А: мин.% изм.", step=0.1, minval=0.01, group=grp_entry)`,
+      `pchg_per_a   = input.int(${c.pChgPeriodA||10}, "  А: период (свечей)", minval=1, group=grp_entry)`,
+      `pchg_htf_a   = input.int(${c.pChgHtfA||1}, "  А: HTF множитель", minval=1, group=grp_entry)`,
+      `use_pchg_b   = input.bool(${b(c.usePChgB)}, "  Условие B (AND)", group=grp_entry)`,
+      `pchg_pct_b   = input.float(${c.pChgPctB||1}, "  B: мин.% изм.", step=0.1, minval=0.01, group=grp_entry)`,
+      `pchg_per_b   = input.int(${c.pChgPeriodB||20}, "  B: период (свечей)", minval=1, group=grp_entry)`,
+      `pchg_htf_b   = input.int(${c.pChgHtfB||1}, "  B: HTF множитель", minval=1, group=grp_entry)`,
+    ],
   },
 ];

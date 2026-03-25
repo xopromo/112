@@ -717,6 +717,15 @@ function generatePineScript(r) {
   lines.push(`bool nrev_s = use_n_reversal and close[1] < open[1] and nrev_bull`);
   lines.push(``);
 
+  // ── % Price Change ────────────────────────────────────
+  lines.push(`float pchg_val_a = close[1] != 0 ? (close[1] - close[1 + pchg_per_a * pchg_htf_a]) / math.abs(close[1 + pchg_per_a * pchg_htf_a]) * 100 : 0`);
+  lines.push(`float pchg_val_b = close[1] != 0 ? (close[1] - close[1 + pchg_per_b * pchg_htf_b]) / math.abs(close[1 + pchg_per_b * pchg_htf_b]) * 100 : 0`);
+  lines.push(`bool pchg_b_l    = not use_pchg_b or pchg_val_b >= pchg_pct_b`);
+  lines.push(`bool pchg_b_s    = not use_pchg_b or pchg_val_b <= -pchg_pct_b`);
+  lines.push(`bool pchg_l      = use_pchg and pchg_val_a >= pchg_pct_a and pchg_b_l`);
+  lines.push(`bool pchg_s      = use_pchg and pchg_val_a <= -pchg_pct_a and pchg_b_s`);
+  lines.push(``);
+
   // ── Supertrend ────────────────────────────────────────────
   lines.push(`[st_val, st_dir_raw] = ta.supertrend(st_mult, st_atr_p)`);
   lines.push(`bool st_bull = st_dir_raw < 0  // Pine: -1 = bullish, +1 = bearish`);
@@ -760,8 +769,8 @@ function generatePineScript(r) {
   lines.push(`bool macd_f_ok_s = not use_macd_f or macd_line_val[1] < macd_sig_val[1]`);
   lines.push(``);
 
-  lines.push(`bool pat_l = pivot_l or (use_engulf and bull_engulf[1]) or (use_pinbar and bull_pin[1]) or donch_l or boll_l or atr_bo_l or (use_ma_touch and ma_touch_l) or tl_touch_l or tl_break_l or flag_l or tri_l or rsix_l or macr_l or free_l or macd_l or stx_l or volmv_l or inb_l or nrev_l or st_l or sqz_l or kalman_x_l`);
-  lines.push(`bool pat_s = pivot_s or (use_engulf and bear_engulf[1]) or (use_pinbar and bear_pin[1]) or donch_s or boll_s or atr_bo_s or (use_ma_touch and ma_touch_s) or tl_touch_s or tl_break_s or flag_s or tri_s or rsix_s or macr_s or free_s or macd_s or stx_s or volmv_s or inb_s or nrev_s or st_s or sqz_s or kalman_x_s`);
+  lines.push(`bool pat_l = pivot_l or (use_engulf and bull_engulf[1]) or (use_pinbar and bull_pin[1]) or donch_l or boll_l or atr_bo_l or (use_ma_touch and ma_touch_l) or tl_touch_l or tl_break_l or flag_l or tri_l or rsix_l or macr_l or free_l or macd_l or stx_l or volmv_l or inb_l or nrev_l or st_l or sqz_l or kalman_x_l or pchg_l`);
+  lines.push(`bool pat_s = pivot_s or (use_engulf and bear_engulf[1]) or (use_pinbar and bear_pin[1]) or donch_s or boll_s or atr_bo_s or (use_ma_touch and ma_touch_s) or tl_touch_s or tl_break_s or flag_s or tri_s or rsix_s or macr_s or free_s or macd_s or stx_s or volmv_s or inb_s or nrev_s or st_s or sqz_s or kalman_x_s or pchg_s`);
   lines.push(``);
   lines.push(`// SL pivot for dynamic SL`);
   lines.push(`sl_pv_lo = ta.pivotlow(low,  sl_piv_look, sl_piv_right_v)`);
