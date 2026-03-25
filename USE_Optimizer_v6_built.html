@@ -14415,7 +14415,7 @@ function copyTVdiag() {
     lines.push(`btCfg пересчитан: pvLo=${pvLo?'✅':'❌'} maArr=${maArr?'✅':'❌'} confArr=${confArr?'✅':'—'}`);
   } catch(e) { lines.push(`⚠️ Не удалось пересчитать btCfg: ${e.message}`); }
   const confLabel = c.useConfirm ? `Conf(i-1)` : null;
-  lines.push('Бар# | Дата              | Open     | High     | Low      | Close    | JS_eq%   | TV_eq%   | Δeq%  | TV:EL ES XL XS | pvLo pvHi | MA(i-1)   | MA_blk   | ATR(i)   ' + (confLabel ? `| ${confLabel.padEnd(10)} | Cf_blk` : ''));
+  lines.push('Бар# | Дата              | Open     | High     | Low      | Close    | JS_eq%   | TV_eq%   | Δeq%  | TV:EL ES XL XS | pvLo pvHi | JS_MA(i-1) | TV_MA(i-1) | MA_Δ%    | MA_blk   | ATR(i)   ' + (confLabel ? `| ${confLabel.padEnd(10)} | Cf_blk` : ''));
   lines.push('-'.repeat(confLabel ? 175 : 150));
   for (let i = fromBar; i <= toBar; i++) {
     const bar  = DATA[i] || {};
@@ -14448,6 +14448,12 @@ function copyTVdiag() {
       }
       confPart = ` | ${cmaStr.padStart(10)} | ${cfBlock}`;
     }
+    // TV MA from CSV (p.tvRow.ma is the MA value exported by the TV indicator)
+    const tvMaRaw = (p && !isNaN(p.tvRow?.ma) && p.tvRow.ma > 0) ? p.tvRow.ma : null;
+    const tvMaStr = tvMaRaw != null ? tvMaRaw.toFixed(6) : (p ? 'empty' : 'NO_TV');
+    // Difference JS_MA vs TV_MA in percent
+    const maDiffPct = (maVal != null && tvMaRaw != null && maVal > 0)
+      ? ((maVal - tvMaRaw) / tvMaRaw * 100).toFixed(3) : '—';
     const atrVal = (atrArr && atrArr[i] > 0) ? atrArr[i].toFixed(5) : '—';
     const marker = i === firstDivBar ? ' ◄ ПЕРВОЕ' : i === maxDiffBar ? ' ◄ МАКС' : '';
     // Show actual JS equity for bars without TV data (where p is null)
@@ -14458,7 +14464,7 @@ function copyTVdiag() {
       `${String(i).padStart(5)} | ${t} | ${(bar.o||0).toFixed(4).padStart(8)} | ${(bar.h||0).toFixed(4).padStart(8)} | ` +
       `${(bar.l||0).toFixed(6).padStart(10)} | ${(bar.c||0).toFixed(6).padStart(10)} | ` +
       `${String(jsEqActual).padStart(8)} | ${tvEqStr} | ${String(diff).padStart(6)} | ${sigs.padEnd(14)} | ` +
-      `${String(pvLoVal).padStart(4)}  ${String(pvHiVal).padStart(4)} | ${maStr.padStart(10)} | ${maBlock.padEnd(7)} | ${String(atrVal).padStart(8)}${confPart}${marker}`
+      `${String(pvLoVal).padStart(4)}  ${String(pvHiVal).padStart(4)} | ${maStr.padStart(11)} | ${tvMaStr.padStart(11)} | ${String(maDiffPct).padStart(8)} | ${maBlock.padEnd(7)} | ${String(atrVal).padStart(8)}${confPart}${marker}`
     );
   }
   lines.push('');
@@ -19449,7 +19455,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774434856654;
+window._BUILD_TS = 1774434899814;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
