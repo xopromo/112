@@ -1227,7 +1227,7 @@ async function runOpt() {
       else slPairs.push({a:null,p:s,combo:false});
     });
   }
-  if(slPairs.length===0) slPairs=[{a:{type:'atr',m:1.5},p:null,combo:false}];
+  if(slPairs.length===0) slPairs=[useWickTrail ? {a:null,p:null,combo:false} : {a:{type:'atr',m:1.5},p:null,combo:false}];
 
   // TP configs — same approach
   let tpCfgs=[];

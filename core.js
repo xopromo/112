@@ -873,10 +873,10 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
           }
           hasSL2 = slCandidates.length >= 2;
         } else if (slCandidates.length===1) { sl1=slCandidates[0]; hasSL2=false; }
-        else { sl1=entry-dir*ac*1.5; hasSL2=false; }
+        else { sl1 = cfg.useWickTrail ? NaN : entry-dir*ac*1.5; hasSL2=false; }
 
         // Compute TP levels — через _calcTP из sl_tp_registry.js
-        const slDist = Math.abs(entry-sl1);
+        const slDist = !isNaN(sl1) ? Math.abs(entry-sl1) : ac; // fallback to 1×ATR for R:R TP when no fixed SL
         let tpA = NaN, tpB = NaN;
         if (cfg.hasTPA) tpA = _calcTP(entry, dir, slDist, ac, cfg.tpMode,  cfg.tpMult);
         if (cfg.hasTPB) tpB = _calcTP(entry, dir, slDist, ac, cfg.tpModeB, cfg.tpMultB);
