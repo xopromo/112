@@ -1078,6 +1078,8 @@ async function runOpt() {
   const useVolMove    = HAS_VOLUME && $c('e_volmv');
   const useInsideBar  = $c('e_inb');
   const useNReversal  = $c('e_nrev');
+  const usePChg       = $c('e_pchg');
+  const usePChgB      = usePChg && $c('e_pchgb');
   const useSupertrend = $c('e_st');
   const useStExit     = $c('x_st');
   const useWaitEntry  = $c('e_wait_on');
@@ -1427,6 +1429,12 @@ async function runOpt() {
   const stochOBA     = useStochExit  ? parseRange('e_stx_ob')  : [$n('e_stx_ob') ||80];
   const volMoveMultA = useVolMove     ? parseRange('e_volmv_m') : [$n('e_volmv_m')||1.5];
   const nRevNArr     = useNReversal  ? parseRange('e_nrev_n')  : [$n('e_nrev_n') ||3];
+  const pChgPctAArr  = usePChg  ? parseRange('e_pchg_pct_a') : [$n('e_pchg_pct_a') || 1.0];
+  const pChgPerAArr  = usePChg  ? parseRange('e_pchg_per_a') : [$n('e_pchg_per_a') || 10];
+  const pChgHtfAArr  = usePChg  ? parseRange('e_pchg_htf_a') : [$n('e_pchg_htf_a') || 1];
+  const pChgPctBArr  = usePChgB ? parseRange('e_pchg_pct_b') : [$n('e_pchg_pct_b') || 1.0];
+  const pChgPerBArr  = usePChgB ? parseRange('e_pchg_per_b') : [$n('e_pchg_per_b') || 20];
+  const pChgHtfBArr  = usePChgB ? parseRange('e_pchg_htf_b') : [$n('e_pchg_htf_b') || 1];
   const stAtrPArr    = (useSupertrend||useStExit) ? parseRange('e_st_atrp') : [$n('e_st_atrp')||10];
   const stMultArr    = (useSupertrend||useStExit) ? parseRange('e_st_mult') : [$n('e_st_mult')||3.0];
   // Отложенный вход
@@ -1653,6 +1661,12 @@ async function runOpt() {
       ['stochOB',     (Array.isArray(stochOBA) && stochOBA.length > 0) ? stochOBA : [80]],
       ['volMoveMult', (Array.isArray(volMoveMultA) && volMoveMultA.length > 0) ? volMoveMultA : [1.5]],
       ['nReversalN',  (Array.isArray(nRevNArr) && nRevNArr.length > 0) ? nRevNArr : [3]],
+      ['pChgPctA',    (Array.isArray(pChgPctAArr) && pChgPctAArr.length > 0) ? pChgPctAArr : [1.0]],
+      ['pChgPeriodA', (Array.isArray(pChgPerAArr) && pChgPerAArr.length > 0) ? pChgPerAArr : [10]],
+      ['pChgHtfA',    (Array.isArray(pChgHtfAArr) && pChgHtfAArr.length > 0) ? pChgHtfAArr : [1]],
+      ['pChgPctB',    (Array.isArray(pChgPctBArr) && pChgPctBArr.length > 0) ? pChgPctBArr : [1.0]],
+      ['pChgPeriodB', (Array.isArray(pChgPerBArr) && pChgPerBArr.length > 0) ? pChgPerBArr : [20]],
+      ['pChgHtfB',    (Array.isArray(pChgHtfBArr) && pChgHtfBArr.length > 0) ? pChgHtfBArr : [1]],
       ['stAtrP',      (Array.isArray(stAtrPArr) && stAtrPArr.length > 0) ? stAtrPArr : [10]],
       ['stMult',      (Array.isArray(stMultArr) && stMultArr.length > 0) ? stMultArr : [3.0]],
       ['waitBars',    (Array.isArray(waitBarsArr) && waitBarsArr.length > 0) ? waitBarsArr : [0]],
@@ -1684,6 +1698,7 @@ async function runOpt() {
       slPivOff: 0, slPivMax: 50, slPivL: 5, slPivR: 3, rsiExitPer: 14, rsiExitOS: 30,
       rsiExitOB: 70, maCrossP: 50, macdFast: 12, macdSlow: 26, macdSigP: 9,
       stochKP: 14, stochDP: 3, stochOS: 20, stochOB: 80, volMoveMult: 1.5, nReversalN: 3,
+      pChgPctA: 1.0, pChgPeriodA: 10, pChgHtfA: 1, pChgPctB: 1.0, pChgPeriodB: 20, pChgHtfB: 1,
       stAtrP: 10, stMult: 3.0, waitBars: 0, waitRetrace: 0.618, eisPeriod: 20, erPeriod: 10,
       kalmanCrossLen: 20, // ##KALMAN_CROSS##
       pinRatio: 2, matPeriod: 20, matZone: 0.2, tlZonePct: 0.3
@@ -1846,6 +1861,12 @@ async function runOpt() {
       const stochOB     = _ip.stochOB     ?? window._ipDef.stochOB;
       const volMoveMult = _ip.volMoveMult ?? window._ipDef.volMoveMult;
       const nReversalN  = _ip.nReversalN  ?? window._ipDef.nReversalN;
+      const pChgPctA   = _ip.pChgPctA   ?? window._ipDef.pChgPctA;
+      const pChgPeriodA = _ip.pChgPeriodA ?? window._ipDef.pChgPeriodA;
+      const pChgHtfA   = _ip.pChgHtfA   ?? window._ipDef.pChgHtfA;
+      const pChgPctB   = _ip.pChgPctB   ?? window._ipDef.pChgPctB;
+      const pChgPeriodB = _ip.pChgPeriodB ?? window._ipDef.pChgPeriodB;
+      const pChgHtfB   = _ip.pChgHtfB   ?? window._ipDef.pChgHtfB;
       const stAtrP      = _ip.stAtrP      ?? window._ipDef.stAtrP;
       const stMult      = _ip.stMult      ?? window._ipDef.stMult;
       const waitBars    = _ip.waitBars    ?? window._ipDef.waitBars;
@@ -1919,6 +1940,7 @@ async function runOpt() {
         useVolMove,volMoveMult,
         useInsideBar,
         useNReversal,nReversalN,
+        usePChg,pChgPctA,pChgPeriodA,pChgHtfA,usePChgB,pChgPctB,pChgPeriodB,pChgHtfB,
         useSupertrend,stDir,stAtrP,stMult,
         useEIS,eisEMAArr,eisHistArr,eisPeriod:eisPeriod||13,
         useSoldiers,
@@ -1998,6 +2020,7 @@ async function runOpt() {
               useVolMove,volMoveMult,
               useInsideBar,
               useNReversal,nReversalN,
+        usePChg,pChgPctA,pChgPeriodA,pChgHtfA,usePChgB,pChgPctB,pChgPeriodB,pChgHtfB,
               useSupertrend,stAtrP,stMult,
               useStExit,
               waitBars:waitBars||0,waitRetrace:waitRetrace||false,waitMaxBars,waitCancelAtr,
@@ -2190,6 +2213,12 @@ async function runOpt() {
       const stochOB     = _ip.stochOB     ?? window._ipDef.stochOB;
       const volMoveMult = _ip.volMoveMult ?? window._ipDef.volMoveMult;
       const nReversalN  = _ip.nReversalN  ?? window._ipDef.nReversalN;
+      const pChgPctA   = _ip.pChgPctA   ?? window._ipDef.pChgPctA;
+      const pChgPeriodA = _ip.pChgPeriodA ?? window._ipDef.pChgPeriodA;
+      const pChgHtfA   = _ip.pChgHtfA   ?? window._ipDef.pChgHtfA;
+      const pChgPctB   = _ip.pChgPctB   ?? window._ipDef.pChgPctB;
+      const pChgPeriodB = _ip.pChgPeriodB ?? window._ipDef.pChgPeriodB;
+      const pChgHtfB   = _ip.pChgHtfB   ?? window._ipDef.pChgHtfB;
       const stAtrP      = _ip.stAtrP      ?? window._ipDef.stAtrP;
       const stMult      = _ip.stMult      ?? window._ipDef.stMult;
       const waitBars    = _ip.waitBars    ?? window._ipDef.waitBars;
@@ -2266,6 +2295,7 @@ async function runOpt() {
         useVolMove,volMoveMult,
         useInsideBar,
         useNReversal,nReversalN,
+        usePChg,pChgPctA,pChgPeriodA,pChgHtfA,usePChgB,pChgPctB,pChgPeriodB,pChgHtfB,
         useSupertrend,stDir,stAtrP,stMult,
         useEIS,eisEMAArr,eisHistArr,eisPeriod:eisPeriod||13,
         useSoldiers,
@@ -2373,6 +2403,7 @@ async function runOpt() {
               useVolMove,volMoveMult,
               useInsideBar,
               useNReversal,nReversalN,
+        usePChg,pChgPctA,pChgPeriodA,pChgHtfA,usePChgB,pChgPctB,pChgPeriodB,pChgHtfB,
               useSupertrend,stAtrP,stMult,
               useStExit,
               waitBars:waitBars||0,waitRetrace:waitRetrace||false,waitMaxBars,waitCancelAtr,
@@ -2815,6 +2846,12 @@ async function runOpt() {
                                     const stochOB     = _ip.stochOB     ?? window._ipDef.stochOB;
                                     const volMoveMult = _ip.volMoveMult ?? window._ipDef.volMoveMult;
                                     const nReversalN  = _ip.nReversalN  ?? window._ipDef.nReversalN;
+                                    const pChgPctA   = _ip.pChgPctA   ?? window._ipDef.pChgPctA;
+                                    const pChgPeriodA = _ip.pChgPeriodA ?? window._ipDef.pChgPeriodA;
+                                    const pChgHtfA   = _ip.pChgHtfA   ?? window._ipDef.pChgHtfA;
+                                    const pChgPctB   = _ip.pChgPctB   ?? window._ipDef.pChgPctB;
+                                    const pChgPeriodB = _ip.pChgPeriodB ?? window._ipDef.pChgPeriodB;
+                                    const pChgHtfB   = _ip.pChgHtfB   ?? window._ipDef.pChgHtfB;
                                     const stAtrP      = _ip.stAtrP      ?? window._ipDef.stAtrP;
                                     const stMult      = _ip.stMult      ?? window._ipDef.stMult;
                                     const waitBars    = _ip.waitBars    ?? window._ipDef.waitBars;
@@ -2874,6 +2911,7 @@ async function runOpt() {
                                       useVolMove,volMoveMult,
                                       useInsideBar,
                                       useNReversal,nReversalN,
+        usePChg,pChgPctA,pChgPeriodA,pChgHtfA,usePChgB,pChgPctB,pChgPeriodB,pChgHtfB,
                                       useSupertrend,stDir,stAtrP,stMult,
                                       useStExit,
                                       waitBars:waitBars||0,waitRetrace:waitRetrace||false,waitMaxBars,waitCancelAtr,
@@ -2987,6 +3025,7 @@ async function runOpt() {
                                           useVolMove,volMoveMult,
                                           useInsideBar,
                                           useNReversal,nReversalN,
+        usePChg,pChgPctA,pChgPeriodA,pChgHtfA,usePChgB,pChgPctB,pChgPeriodB,pChgHtfB,
                                           useSupertrend,stAtrP,stMult,
                                           useStExit,
                                           waitBars:waitBars||0,waitRetrace:waitRetrace||false,waitMaxBars,waitCancelAtr,
@@ -3600,6 +3639,14 @@ function buildBtCfg(cfg, ind) {
     useInsideBar:  cfg.useInsideBar  || false,
     useNReversal:  cfg.useNReversal  || false,
     nReversalN:    cfg.nReversalN    || 3,
+    usePChg:       cfg.usePChg       || false,
+    usePChgB:      cfg.usePChgB      || false,
+    pChgPctA:      cfg.pChgPctA      || 1.0,
+    pChgPeriodA:   cfg.pChgPeriodA   || 10,
+    pChgHtfA:      cfg.pChgHtfA      || 1,
+    pChgPctB:      cfg.pChgPctB      || 1.0,
+    pChgPeriodB:   cfg.pChgPeriodB   || 20,
+    pChgHtfB:      cfg.pChgHtfB      || 1,
     useSupertrend: cfg.useSupertrend || false,
     stDir:         ind.stDir,
     stAtrP:        cfg.stAtrP        || 10,
