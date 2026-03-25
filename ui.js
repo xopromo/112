@@ -3369,8 +3369,20 @@ function _runTVcompare(tvRows, resultsEl) {
   const rmseC = rmse < 1 ? 'pos' : rmse < 5 ? 'warn' : 'neg';
   const fdC   = Math.abs(finalDiff) < 1 ? 'pos' : Math.abs(finalDiff) < 5 ? 'warn' : 'neg';
 
+  // Compute JS tradeLog for diagnostic (separate lightweight run with collectTrades=true)
+  let jsTradeLog = [];
+  try {
+    const _tli = typeof _calcIndicators === 'function' ? _calcIndicators(r.cfg) : null;
+    const _tlC = (_tli && typeof buildBtCfg === 'function') ? buildBtCfg(r.cfg, _tli) : null;
+    if (_tlC && typeof backtest === 'function') {
+      _tlC.collectTrades = true; _tlC.tradeLog = [];
+      backtest(_tli.pvLo, _tli.pvHi, _tli.atrArr, _tlC);
+      jsTradeLog = _tlC.tradeLog || [];
+    }
+  } catch(e) {}
+
   // Сохраняем диагностику для copyTVdiag()
-  _tvCmpDiag = { r, pairs, corr, rmse, finalDiff, jsLast, tvLast, firstDivBar, firstDivTime, maxDiff, maxDiffBar, maxDiffTime, hasSigs, tvSigCount, fullEq, isFullRun, missingEnd, jsFullFinal, fullRunErr, warmupN, statsPost };
+  _tvCmpDiag = { r, pairs, corr, rmse, finalDiff, jsLast, tvLast, firstDivBar, firstDivTime, maxDiff, maxDiffBar, maxDiffTime, hasSigs, tvSigCount, fullEq, isFullRun, missingEnd, jsFullFinal, fullRunErr, warmupN, statsPost, jsTradeLog };
 
   let html = '';
   html += row('Режим сравнения', isFullRun
@@ -3450,7 +3462,7 @@ function copyTVdiag() {
   if (!d) { alert('Нет данных диагностики — сначала загрузи TV CSV'); return; }
   const { r, pairs, corr, rmse, finalDiff, jsLast, tvLast,
           firstDivBar, firstDivTime, maxDiff, maxDiffBar, maxDiffTime, hasSigs, isFullRun,
-          missingEnd, jsFullFinal, fullRunErr, warmupN, statsPost } = d;
+          missingEnd, jsFullFinal, fullRunErr, warmupN, statsPost, jsTradeLog, fullEq } = d;
   const c = r.cfg;
   const lastPairBar2 = pairs.length > 0 ? pairs[pairs.length - 1].i : -1;
 
@@ -3518,7 +3530,7 @@ function copyTVdiag() {
     lines.push(`btCfg пересчитан: pvLo=${pvLo?'✅':'❌'} maArr=${maArr?'✅':'❌'} confArr=${confArr?'✅':'—'}`);
   } catch(e) { lines.push(`⚠️ Не удалось пересчитать btCfg: ${e.message}`); }
   const confLabel = c.useConfirm ? `Conf(i-1)` : null;
-  lines.push('Бар# | Дата              | Open     | High     | Low      | Close    | JS_eq%   | TV_eq%   | Δeq%  | TV:EL ES XL XS | pvLo pvHi | MA(i-1)   | MA_blk  ' + (confLabel ? `| ${confLabel.padEnd(10)} | Cf_blk` : ''));
+  lines.push('Бар# | Дата              | Open     | High     | Low      | Close    | JS_eq%   | TV_eq%   | Δeq%  | TV:EL ES XL XS | pvLo pvHi | MA(i-1)   | MA_blk   | ATR(i)   ' + (confLabel ? `| ${confLabel.padEnd(10)} | Cf_blk` : ''));
   lines.push('-'.repeat(confLabel ? 175 : 150));
   for (let i = fromBar; i <= toBar; i++) {
     const bar  = DATA[i] || {};
@@ -3551,16 +3563,51 @@ function copyTVdiag() {
       }
       confPart = ` | ${cmaStr.padStart(10)} | ${cfBlock}`;
     }
+    const atrVal = (atrArr && atrArr[i] > 0) ? atrArr[i].toFixed(5) : '—';
     const marker = i === firstDivBar ? ' ◄ ПЕРВОЕ' : i === maxDiffBar ? ' ◄ МАКС' : '';
+    // Show actual JS equity for bars without TV data (where p is null)
+    const jsEqActual = (!p && fullEq && fullEq[i] !== undefined) ? fullEq[i].toFixed(3) : jsEq;
+    const tvEqStr = !p ? 'NO_TV  ' : String(tvEq).padStart(8);
     const t = String(bar.t || '—').padEnd(18);
     lines.push(
       `${String(i).padStart(5)} | ${t} | ${(bar.o||0).toFixed(4).padStart(8)} | ${(bar.h||0).toFixed(4).padStart(8)} | ` +
       `${(bar.l||0).toFixed(6).padStart(10)} | ${(bar.c||0).toFixed(6).padStart(10)} | ` +
-      `${String(jsEq).padStart(8)} | ${String(tvEq).padStart(8)} | ${String(diff).padStart(6)} | ${sigs.padEnd(14)} | ` +
-      `${String(pvLoVal).padStart(4)}  ${String(pvHiVal).padStart(4)} | ${maStr.padStart(10)} | ${maBlock.padEnd(7)}${confPart}${marker}`
+      `${String(jsEqActual).padStart(8)} | ${tvEqStr} | ${String(diff).padStart(6)} | ${sigs.padEnd(14)} | ` +
+      `${String(pvLoVal).padStart(4)}  ${String(pvHiVal).padStart(4)} | ${maStr.padStart(10)} | ${maBlock.padEnd(7)} | ${String(atrVal).padStart(8)}${confPart}${marker}`
     );
   }
   lines.push('');
+
+  // JS сделки вокруг первого расхождения
+  const _tLog = jsTradeLog || [];
+  const _win = 60;
+  const _trNear = _tLog.filter(t =>
+    (t.exitBar  != null && t.exitBar  >= firstDivBar - _win && t.exitBar  <= firstDivBar + 10) ||
+    (t.entryBar != null && t.entryBar >= firstDivBar - _win && t.entryBar <= firstDivBar + 10)
+  );
+  if (_trNear.length > 0) {
+    lines.push(`=== JS СДЕЛКИ ВОКРУГ БАР #${firstDivBar} (окно ±${_win}) ===`);
+    lines.push(`  # | Вход  | Выход | Тип   | Цена вх    | Цена вых   | ATR вх   | PnL%    | Причина`);
+    lines.push('-'.repeat(95));
+    _trNear.forEach((t, k) => {
+      const dir    = t.dir === 1 ? 'LONG' : 'SHORT';
+      const atrE   = (atrArr && t.entryBar != null && atrArr[t.entryBar] > 0) ? atrArr[t.entryBar].toFixed(5) : '—';
+      const exitB  = t.exitBar  != null ? String(t.exitBar).padStart(5)  : '  —  ';
+      const entryB = t.entryBar != null ? String(t.entryBar).padStart(5) : '  —  ';
+      lines.push(
+        `${String(k+1).padStart(3)} | ${entryB} | ${exitB} | ${dir.padEnd(5)} | ` +
+        `${(t.entry||0).toFixed(6)} | ${(t.exit||0).toFixed(6)} | ${String(atrE).padStart(8)} | ` +
+        `${((t.pnl||0)).toFixed(3).padStart(7)}% | ${t.reason||'—'}`
+      );
+    });
+    lines.push('');
+  } else if (_tLog.length === 0) {
+    lines.push(`=== JS СДЕЛКИ: tradeLog пуст — collectTrades не включён ===`);
+    lines.push('');
+  } else {
+    lines.push(`=== JS СДЕЛКИ: нет в окне [${firstDivBar-_win}..${firstDivBar+10}] · всего JS сделок: ${_tLog.length} ===`);
+    lines.push('');
+  }
 
   // Also show 5 bars before first divergence where they still matched (last matching bars)
   let lastMatchBar = -1;
