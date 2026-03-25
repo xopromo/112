@@ -545,4 +545,63 @@ const ENTRY_REGISTRY = [
       `n_reversal_n  = input.int(${c.nReversalN||3}, "  Мин свечей серии", minval=2, maxval=20, group=grp_entry)`,
     ],
   },
+
+  // ── % изменения цены за N свечей ─────────────────────────────
+  // Лонг: close вырос на ≥ pct% за последние period×htf свечей
+  // Шорт: close упал на ≥ pct% за последние period×htf свечей
+  // Поддерживает 2 условия (AND): A и B с разными параметрами/HTF
+  {
+    id:        'pchg',
+    flag:      'usePChg',
+    htmlId:    'e_pchg',
+    shortName: c => {
+      const htfA = c.pChgHtfA > 1 ? `×${c.pChgHtfA}` : '';
+      const a = `${c.pChgPctA||1}%/${c.pChgPeriodA||10}b${htfA}`;
+      if (!c.usePChgB) return `PChg(${a})`;
+      const htfB = c.pChgHtfB > 1 ? `×${c.pChgHtfB}` : '';
+      const b = `${c.pChgPctB||1}%/${c.pChgPeriodB||20}b${htfB}`;
+      return `PChg(${a}+${b})`;
+    },
+    detectL: (cfg, i) => {
+      const lookA = (cfg.pChgPeriodA || 10) * (cfg.pChgHtfA || 1);
+      if (i <= lookA) return false;
+      const chgA = (DATA[i-1].c - DATA[i-1-lookA].c) / DATA[i-1-lookA].c * 100;
+      if (chgA < (cfg.pChgPctA || 1)) return false;
+      if (cfg.usePChgB) {
+        const lookB = (cfg.pChgPeriodB || 20) * (cfg.pChgHtfB || 1);
+        if (i <= lookB) return false;
+        const chgB = (DATA[i-1].c - DATA[i-1-lookB].c) / DATA[i-1-lookB].c * 100;
+        if (chgB < (cfg.pChgPctB || 1)) return false;
+      }
+      return true;
+    },
+    detectS: (cfg, i) => {
+      const lookA = (cfg.pChgPeriodA || 10) * (cfg.pChgHtfA || 1);
+      if (i <= lookA) return false;
+      const chgA = (DATA[i-1].c - DATA[i-1-lookA].c) / DATA[i-1-lookA].c * 100;
+      if (chgA > -(cfg.pChgPctA || 1)) return false;
+      if (cfg.usePChgB) {
+        const lookB = (cfg.pChgPeriodB || 20) * (cfg.pChgHtfB || 1);
+        if (i <= lookB) return false;
+        const chgB = (DATA[i-1].c - DATA[i-1-lookB].c) / DATA[i-1-lookB].c * 100;
+        if (chgB > -(cfg.pChgPctB || 1)) return false;
+      }
+      return true;
+    },
+    pineLines: (c, b) => {
+      const lines = [
+        `use_pchg     = input.bool(${b(c.usePChg)}, "% Price Change Entry", group=grp_entry)`,
+        `pchg_pct_a   = input.float(${c.pChgPctA||1}, "  А: мин.% изм.", step=0.1, minval=0.01, group=grp_entry)`,
+        `pchg_per_a   = input.int(${c.pChgPeriodA||10}, "  А: период (свечей)", minval=1, group=grp_entry)`,
+        `pchg_htf_a   = input.int(${c.pChgHtfA||1}, "  А: HTF множитель", minval=1, group=grp_entry)`,
+      ];
+      if (c.usePChgB) {
+        lines.push(`use_pchg_b   = input.bool(${b(c.usePChgB)}, "  Условие B (AND)", group=grp_entry)`);
+        lines.push(`pchg_pct_b   = input.float(${c.pChgPctB||1}, "  B: мин.% изм.", step=0.1, minval=0.01, group=grp_entry)`);
+        lines.push(`pchg_per_b   = input.int(${c.pChgPeriodB||20}, "  B: период (свечей)", minval=1, group=grp_entry)`);
+        lines.push(`pchg_htf_b   = input.int(${c.pChgHtfB||1}, "  B: HTF множитель", minval=1, group=grp_entry)`);
+      }
+      return lines;
+    },
+  },
 ];

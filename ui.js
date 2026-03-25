@@ -1267,6 +1267,16 @@ function showDetail(r) {
   ent += row('Объём + движение',    c.useVolMove  ? `ВКЛ · объём ≥ ${c.volMoveMult||1.5}×avg` : 'ВЫКЛ', c.useVolMove?'on':'off');
   ent += row('Inside Bar пробой',   c.useInsideBar? 'ВКЛ' : 'ВЫКЛ', c.useInsideBar?'on':'off');
   ent += row('Разворот N свечей',   c.useNReversal? `ВКЛ · серия ≥ ${c.nReversalN||3} свечей` : 'ВЫКЛ', c.useNReversal?'on':'off');
+  if (c.usePChg) {
+    const htfA = (c.pChgHtfA||1) > 1 ? ` · HTF×${c.pChgHtfA}` : '';
+    ent += row('% изменения цены A', `ВКЛ · ≥${c.pChgPctA||1}% за ${c.pChgPeriodA||10} св.${htfA}`, 'on');
+    if (c.usePChgB) {
+      const htfB = (c.pChgHtfB||1) > 1 ? ` · HTF×${c.pChgHtfB}` : '';
+      ent += row('% изменения цены B (AND)', `ВКЛ · ≥${c.pChgPctB||1}% за ${c.pChgPeriodB||20} св.${htfB}`, 'on');
+    }
+  } else {
+    ent += row('% изменения цены', 'ВЫКЛ', 'off');
+  }
   html += section('🎯', 'ПАТТЕРНЫ ВХОДА', ent);
 
   // 2. SL / TP
