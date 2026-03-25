@@ -718,12 +718,16 @@ function generatePineScript(r) {
   lines.push(``);
 
   // ── % Price Change ────────────────────────────────────
-  lines.push(`float pchg_val_a = close[1] != 0 ? (close[1] - close[1 + pchg_per_a * pchg_htf_a]) / math.abs(close[1 + pchg_per_a * pchg_htf_a]) * 100 : 0`);
-  lines.push(`float pchg_val_b = close[1] != 0 ? (close[1] - close[1 + pchg_per_b * pchg_htf_b]) / math.abs(close[1 + pchg_per_b * pchg_htf_b]) * 100 : 0`);
-  lines.push(`bool pchg_b_l    = not use_pchg_b or pchg_val_b >= pchg_pct_b`);
-  lines.push(`bool pchg_b_s    = not use_pchg_b or pchg_val_b <= -pchg_pct_b`);
-  lines.push(`bool pchg_l      = use_pchg and pchg_val_a >= pchg_pct_a and pchg_b_l`);
-  lines.push(`bool pchg_s      = use_pchg and pchg_val_a <= -pchg_pct_a and pchg_b_s`);
+  // pct > 0: price went UP by >=pct% | pct < 0: price went DOWN by >=|pct|%
+  // Short mirrors Long by negating threshold
+  lines.push(`float pchg_val_a = close[1 + pchg_per_a * pchg_htf_a] != 0 ? (close[1] - close[1 + pchg_per_a * pchg_htf_a]) / math.abs(close[1 + pchg_per_a * pchg_htf_a]) * 100 : 0`);
+  lines.push(`float pchg_val_b = close[1 + pchg_per_b * pchg_htf_b] != 0 ? (close[1] - close[1 + pchg_per_b * pchg_htf_b]) / math.abs(close[1 + pchg_per_b * pchg_htf_b]) * 100 : 0`);
+  lines.push(`bool pchg_a_l    = pchg_pct_a >= 0 ? pchg_val_a >= pchg_pct_a : pchg_val_a <= pchg_pct_a`);
+  lines.push(`bool pchg_a_s    = pchg_pct_a >= 0 ? pchg_val_a <= -pchg_pct_a : pchg_val_a >= -pchg_pct_a`);
+  lines.push(`bool pchg_b_l    = not use_pchg_b or (pchg_pct_b >= 0 ? pchg_val_b >= pchg_pct_b : pchg_val_b <= pchg_pct_b)`);
+  lines.push(`bool pchg_b_s    = not use_pchg_b or (pchg_pct_b >= 0 ? pchg_val_b <= -pchg_pct_b : pchg_val_b >= -pchg_pct_b)`);
+  lines.push(`bool pchg_l      = use_pchg and pchg_a_l and pchg_b_l`);
+  lines.push(`bool pchg_s      = use_pchg and pchg_a_s and pchg_b_s`);
   lines.push(``);
 
   // ── Supertrend ────────────────────────────────────────────

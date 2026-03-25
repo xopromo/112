@@ -1041,15 +1041,15 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
   <div class="cb"><input type="checkbox" id="e_nrev"><label data-tip="Разворот после N свечей: N последовательных медвежьих свечей, затем бычья = лонг. N последовательных бычьих свечей, затем медвежья = шорт">N-Candle Reversal</label></div>
   <div class="field"><label>N свечей</label><input id="e_nrev_n" value="3" data-tip="Количество последовательных направленных свечей перед разворотом"></div>
 
-  <div class="cb"><input type="checkbox" id="e_pchg"><label data-tip="% изменения цены за N свечей. Лонг: цена выросла ≥ порога за период. Шорт: цена упала ≥ порога. Поддерживает HTF (умножает период) и 2 условия AND.">% Price Change</label></div>
+  <div class="cb"><input type="checkbox" id="e_pchg"><label data-tip="% изменения цены за N свечей. Положительное значение = движение в сторону входа (лонг: вверх). Отрицательное = противоположное (лонг: откат вниз). Поддерживает 2 условия AND.">% Price Change</label></div>
   <div class="g2">
-    <div class="field"><label>Мин.% (A)</label><input id="e_pchg_pct_a" value="1.0" data-tip="Минимальное % изменение цены для условия A. Диапазон: 0.5,1,2"></div>
+    <div class="field"><label>% (A)</label><input id="e_pchg_pct_a" value="1.0" data-tip="+N%: цена выросла ≥N% (лонг: тренд вверх). -N%: цена упала ≥N% (лонг: откат вниз). Диапазон: 0.5,1,2 или -3:-1:1"></div>
     <div class="field"><label>Период A (св.)</label><input id="e_pchg_per_a" value="10" data-tip="Количество свечей для условия A. Диапазон: 5,10,20"></div>
   </div>
   <div class="field"><label>HTF A (×)</label><input id="e_pchg_htf_a" value="1" data-tip="HTF множитель для условия A. 1 = тот же TF, 4 = 4× выше. Итоговый lookback = Период × HTF"></div>
-  <div class="cb"><input type="checkbox" id="e_pchgb"><label data-tip="Второе условие % изменения цены (AND с первым). Оба должны выполниться одновременно.">  + Условие B (AND)</label></div>
+  <div class="cb"><input type="checkbox" id="e_pchgb"><label data-tip="Второе условие % изменения цены (AND с первым). Оба должны выполниться одновременно. Пример: A=+5% тренд, B=-2% откат">  + Условие B (AND)</label></div>
   <div class="g2">
-    <div class="field"><label>Мин.% (B)</label><input id="e_pchg_pct_b" value="1.0" data-tip="Минимальное % изменение цены для условия B. Диапазон: 0.5,1,2"></div>
+    <div class="field"><label>% (B)</label><input id="e_pchg_pct_b" value="1.0" data-tip="+N%: цена выросла ≥N%. -N%: цена упала ≥N% (откат). Диапазон: -3:-1:1 или 0.5,1,2"></div>
     <div class="field"><label>Период B (св.)</label><input id="e_pchg_per_b" value="20" data-tip="Количество свечей для условия B. Диапазон: 10,20,50"></div>
   </div>
   <div class="field"><label>HTF B (×)</label><input id="e_pchg_htf_b" value="1" data-tip="HTF множитель для условия B. 1 = тот же TF, 4 = 4× выше."></div>

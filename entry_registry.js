@@ -563,38 +563,42 @@ const ENTRY_REGISTRY = [
       return `PChg(${a}+${b})`;
     },
     detectL: (cfg, i) => {
+      // thr > 0: price went UP by >=thr% | thr < 0: price went DOWN by >=|thr|%
+      const _ok = (chg, thr) => thr >= 0 ? chg >= thr : chg <= thr;
       const lookA = (cfg.pChgPeriodA || 10) * (cfg.pChgHtfA || 1);
       if (i <= lookA) return false;
       const chgA = (DATA[i-1].c - DATA[i-1-lookA].c) / DATA[i-1-lookA].c * 100;
-      if (chgA < (cfg.pChgPctA || 1)) return false;
+      if (!_ok(chgA, cfg.pChgPctA || 1)) return false;
       if (cfg.usePChgB) {
         const lookB = (cfg.pChgPeriodB || 20) * (cfg.pChgHtfB || 1);
         if (i <= lookB) return false;
         const chgB = (DATA[i-1].c - DATA[i-1-lookB].c) / DATA[i-1-lookB].c * 100;
-        if (chgB < (cfg.pChgPctB || 1)) return false;
+        if (!_ok(chgB, cfg.pChgPctB || 1)) return false;
       }
       return true;
     },
     detectS: (cfg, i) => {
+      // Short mirrors Long: negate threshold (up→down, down→up)
+      const _ok = (chg, thr) => thr >= 0 ? chg >= thr : chg <= thr;
       const lookA = (cfg.pChgPeriodA || 10) * (cfg.pChgHtfA || 1);
       if (i <= lookA) return false;
       const chgA = (DATA[i-1].c - DATA[i-1-lookA].c) / DATA[i-1-lookA].c * 100;
-      if (chgA > -(cfg.pChgPctA || 1)) return false;
+      if (!_ok(chgA, -(cfg.pChgPctA || 1))) return false;
       if (cfg.usePChgB) {
         const lookB = (cfg.pChgPeriodB || 20) * (cfg.pChgHtfB || 1);
         if (i <= lookB) return false;
         const chgB = (DATA[i-1].c - DATA[i-1-lookB].c) / DATA[i-1-lookB].c * 100;
-        if (chgB > -(cfg.pChgPctB || 1)) return false;
+        if (!_ok(chgB, -(cfg.pChgPctB || 1))) return false;
       }
       return true;
     },
     pineLines: (c, b) => [
       `use_pchg     = input.bool(${b(c.usePChg)}, "% Price Change Entry", group=grp_entry)`,
-      `pchg_pct_a   = input.float(${c.pChgPctA||1}, "  А: мин.% изм.", step=0.1, minval=0.01, group=grp_entry)`,
+      `pchg_pct_a   = input.float(${c.pChgPctA||1}, "  А: мин.% изм. (+вверх/-вниз)", step=0.1, group=grp_entry)`,
       `pchg_per_a   = input.int(${c.pChgPeriodA||10}, "  А: период (свечей)", minval=1, group=grp_entry)`,
       `pchg_htf_a   = input.int(${c.pChgHtfA||1}, "  А: HTF множитель", minval=1, group=grp_entry)`,
       `use_pchg_b   = input.bool(${b(c.usePChgB)}, "  Условие B (AND)", group=grp_entry)`,
-      `pchg_pct_b   = input.float(${c.pChgPctB||1}, "  B: мин.% изм.", step=0.1, minval=0.01, group=grp_entry)`,
+      `pchg_pct_b   = input.float(${c.pChgPctB||1}, "  B: мин.% изм. (+вверх/-вниз)", step=0.1, group=grp_entry)`,
       `pchg_per_b   = input.int(${c.pChgPeriodB||20}, "  B: период (свечей)", minval=1, group=grp_entry)`,
       `pchg_htf_b   = input.int(${c.pChgHtfB||1}, "  B: HTF множитель", minval=1, group=grp_entry)`,
     ],
