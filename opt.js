@@ -1972,7 +1972,7 @@ async function runOpt() {
         const pdd = r.dd>0 ? r.pnl/r.dd : 0;
         const sig = _calcStatSig(r);
         const gt = _calcGTScore(r);
-        let slDesc = slPair.combo ? `SL(ATR×${slPair.a.m}${slLogic==='or'?'|OR|':'|AND|'}${slPair.p.m}%)` : slPair.a ? `SL×${slPair.a.m}ATR` : `SL${slPair.p.m}%`;
+        let slDesc = slPair.combo ? `SL(ATR×${slPair.a.m}${slLogic==='or'?'|OR|':'|AND|'}${slPair.p.m}%)` : slPair.a ? `SL×${slPair.a.m}ATR` : slPair.p ? `SL${slPair.p.m}%` : `noSL`;
         if(useSLPiv) slDesc+=`+SPiv(L${slPivL}/R${slPivR}×${slPivOff})`;
         let tpDesc = tpPair.combo ? (()=>{const n1=tpPair.a.type==='rr'?`RR${tpPair.a.m}`:tpPair.a.type==='atr'?`TP×${tpPair.a.m}ATR`:`TP${tpPair.a.m}%`;const n2=tpPair.b.type==='rr'?`RR${tpPair.b.m}`:tpPair.b.type==='atr'?`TP×${tpPair.b.m}ATR`:`TP${tpPair.b.m}%`;return `TP(${n1}${tpLogic==='or'?'|OR|':'|AND|'}${n2})`;})() : tpPair.a ? (tpPair.a.type==='rr'?`RR×${tpPair.a.m}`:tpPair.a.type==='atr'?`TP×${tpPair.a.m}ATR`:`TP${tpPair.a.m}%`) : '';
         const _tfPfxMc = window._currentTFMult > 1 ? `TF×${window._currentTFMult} · ` : '';
@@ -2347,7 +2347,7 @@ async function runOpt() {
 
       // Проверяем все ограничения: минимум трейдов, максимум DD, минимум WR, минимум Sig%
       if (r && r.n >= minTrades && r.dd <= maxDD && r.wr >= minWR && sig >= minSig) {
-        let slDesc = slPair.combo ? `SL(ATR×${slPair.a.m}${slLogic==='or'?'|OR|':'|AND|'}${slPair.p.m}%)` : slPair.a ? `SL×${slPair.a.m}ATR` : `SL${slPair.p.m}%`;
+        let slDesc = slPair.combo ? `SL(ATR×${slPair.a.m}${slLogic==='or'?'|OR|':'|AND|'}${slPair.p.m}%)` : slPair.a ? `SL×${slPair.a.m}ATR` : slPair.p ? `SL${slPair.p.m}%` : `noSL`;
         if(useSLPiv) slDesc+=`+SPiv(L${slPivL}/R${slPivR}×${slPivOff})`;
         let tpDesc = tpPair.combo ? (()=>{const n1=tpPair.a.type==='rr'?`RR${tpPair.a.m}`:tpPair.a.type==='atr'?`TP×${tpPair.a.m}ATR`:`TP${tpPair.a.m}%`;const n2=tpPair.b.type==='rr'?`RR${tpPair.b.m}`:tpPair.b.type==='atr'?`TP×${tpPair.b.m}ATR`:`TP${tpPair.b.m}%`;return `TP(${n1}${tpLogic==='or'?'|OR|':'|AND|'}${n2})`;})() : tpPair.a ? (tpPair.a.type==='rr'?`RR×${tpPair.a.m}`:tpPair.a.type==='atr'?`TP×${tpPair.a.m}ATR`:`TP${tpPair.a.m}%`) : '';
         const _tfPfxTpe = window._currentTFMult > 1 ? `TF×${window._currentTFMult} · ` : '';
@@ -2947,7 +2947,7 @@ async function runOpt() {
                                       } else if(slPair.a) {
                                         slDesc=`SL×${slPair.a.m}ATR`;
                                       } else {
-                                        slDesc=`SL${slPair.p.m}%`;
+                                        slDesc=slPair.p ? `SL${slPair.p.m}%` : `noSL`;
                                       }
                                       if(useSLPiv) slDesc+=`+SPiv(L${slPivL}/R${slPivR}×${slPivOff})`;
                                       // Build TP description
