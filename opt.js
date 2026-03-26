@@ -1039,8 +1039,10 @@ async function runOpt() {
   const comm=$n('c_comm')||0.08;
   const spread=($n('c_spread')||0)/2; // спред делим на 2 стороны (как комиссия)
   const commTotal = comm + spread; // итоговая стоимость одной стороны сделки
-  const minTrades=$n('c_mint')||30;
-  const maxDD=$n('c_maxdd')||300;
+  // В режиме 'single' фильтры не применяются — результат добавляется всегда
+  const _isSingleMode = optMode === 'single';
+  const minTrades = _isSingleMode ? 0   : ($n('c_mint')||30);
+  const maxDD     = _isSingleMode ? 9999: ($n('c_maxdd')||300);
   // Получаем ограничения из synthesis режима если доступны
   const minWR = _isSynthMode && typeof synthesisModeOptions !== 'undefined'
     ? (synthesisModeOptions.minWR || 0)

@@ -1354,6 +1354,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
   <div class="mode-grp">
     <span style="font-size:.63em;color:var(--text3)">Режим:</span>
     <div class="mode-btn active" id="mode_full" onclick="setOptMode('full')" title="Полный перебор всех комбинаций">Полный</div>
+    <div class="mode-btn" id="mode_single" onclick="setOptMode('single')" title="Точечный запуск: один бэктест с текущими настройками. Фильтры MinTrades/MaxDD не применяются — результат всегда попадает в таблицу. Удобно для воспроизведения конкретного результата." style="border-color:rgba(255,200,50,.6);color:#fcd34d">▶ Точечный</div>
     <div class="mode-btn" id="mode_prune" onclick="setOptMode('prune')" title="Пропускает явно плохие ветки по DD на 25% данных">Pruning</div>
     <div class="mode-btn" id="mode_mc" onclick="setOptMode('mc')" title="Случайная выборка N комбинаций">Monte Carlo</div>
     <input id="mc_n" value="5000" style="width:55px;display:none;background:var(--bg);border:1px solid var(--border2);border-radius:4px;color:var(--text);font-size:.65em;padding:3px 5px;font-family:var(--font-mono)" title="Кол-во случайных проб">
@@ -8699,8 +8700,10 @@ async function runOpt() {
   const comm=$n('c_comm')||0.08;
   const spread=($n('c_spread')||0)/2; // спред делим на 2 стороны (как комиссия)
   const commTotal = comm + spread; // итоговая стоимость одной стороны сделки
-  const minTrades=$n('c_mint')||30;
-  const maxDD=$n('c_maxdd')||300;
+  // В режиме 'single' фильтры не применяются — результат добавляется всегда
+  const _isSingleMode = optMode === 'single';
+  const minTrades = _isSingleMode ? 0   : ($n('c_mint')||30);
+  const maxDD     = _isSingleMode ? 9999: ($n('c_maxdd')||300);
   // Получаем ограничения из synthesis режима если доступны
   const minWR = _isSynthMode && typeof synthesisModeOptions !== 'undefined'
     ? (synthesisModeOptions.minWR || 0)
@@ -12939,7 +12942,7 @@ window.addEventListener('load', async () => {
 // --- Mode buttons ---
 function setOptMode(m) {
   optMode = m;
-  ['full','prune','mc','tpe','bo'].forEach(x => { const el=document.getElementById('mode_'+x); if(el) el.classList.toggle('active', x===m); });
+  ['full','prune','mc','tpe','bo','single'].forEach(x => { const el=document.getElementById('mode_'+x); if(el) el.classList.toggle('active', x===m); });
   document.getElementById('mc_n').style.display = m==='mc' ? 'inline-block' : 'none';
   const _tpeInputsEl = document.getElementById('tpe_inputs'); if(_tpeInputsEl) _tpeInputsEl.style.display = m==='tpe' ? 'inline-flex' : 'none';
   const _boInputsEl  = document.getElementById('bo_inputs');  if(_boInputsEl)  _boInputsEl.style.display  = m==='bo'  ? 'inline-flex' : 'none'; // ##BAYES_OPT
@@ -19857,7 +19860,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774528118719;
+window._BUILD_TS = 1774528485026;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;

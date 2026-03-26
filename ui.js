@@ -1923,7 +1923,7 @@ window.addEventListener('load', async () => {
 // --- Mode buttons ---
 function setOptMode(m) {
   optMode = m;
-  ['full','prune','mc','tpe','bo'].forEach(x => { const el=document.getElementById('mode_'+x); if(el) el.classList.toggle('active', x===m); });
+  ['full','prune','mc','tpe','bo','single'].forEach(x => { const el=document.getElementById('mode_'+x); if(el) el.classList.toggle('active', x===m); });
   document.getElementById('mc_n').style.display = m==='mc' ? 'inline-block' : 'none';
   const _tpeInputsEl = document.getElementById('tpe_inputs'); if(_tpeInputsEl) _tpeInputsEl.style.display = m==='tpe' ? 'inline-flex' : 'none';
   const _boInputsEl  = document.getElementById('bo_inputs');  if(_boInputsEl)  _boInputsEl.style.display  = m==='bo'  ? 'inline-flex' : 'none'; // ##BAYES_OPT
