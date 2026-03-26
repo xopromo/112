@@ -12550,6 +12550,173 @@ function showDetail(r) {
   $('detail-panel').classList.add('open');
 }
 
+// Карта: поле cfg → {id: HTML-элемент, type: 'chk'|'val'|'sel'}
+// Используется для автоматического восстановления настроек из JSON блока
+const CFG_HTML_MAP = {
+  // ── Паттерны входа ─────────────────────────────────────────────────────────
+  usePivot:       {id:'e_pv',            type:'chk'},
+  pvL:            {id:'e_pvl',           type:'val'},
+  pvR:            {id:'e_pvr',           type:'val'},
+  useEngulf:      {id:'e_eng',           type:'chk'},
+  usePinBar:      {id:'e_pin',           type:'chk'},
+  pinRatio:       {id:'e_pinr',          type:'val'},
+  useBoll:        {id:'e_bol',           type:'chk'},
+  bbLen:          {id:'e_bbl',           type:'val'},
+  bbMult:         {id:'e_bbm',           type:'val'},
+  useDonch:       {id:'e_don',           type:'chk'},
+  donLen:         {id:'e_donl',          type:'val'},
+  useAtrBo:       {id:'e_atrbo',         type:'chk'},
+  atrBoLen:       {id:'e_atbl',          type:'val'},
+  atrBoMult:      {id:'e_atbm',          type:'val'},
+  useMaTouch:     {id:'e_mat',           type:'chk'},
+  matType:        {id:'e_matt',          type:'sel'},
+  matPeriod:      {id:'e_matp',          type:'val'},
+  matZone:        {id:'e_matz',          type:'val'},
+  useSqueeze:     {id:'e_sqz',           type:'chk'},
+  sqzBBLen:       {id:'e_sqbl',          type:'val'},
+  sqzKCMult:      {id:'e_sqkm',          type:'val'},
+  sqzMinBars:     {id:'e_sqzb',          type:'val'},
+  useTLTouch:     {id:'e_tl_touch',      type:'chk'},
+  useTLBreak:     {id:'e_tl_break',      type:'chk'},
+  useFlag:        {id:'e_flag',          type:'chk'},
+  useTri:         {id:'e_tri',           type:'chk'},
+  useRsiExit:     {id:'e_rsix',          type:'chk'},
+  rsiExitPeriod:  {id:'e_rsix_p',        type:'val'},
+  rsiExitOS:      {id:'e_rsix_os',       type:'val'},
+  rsiExitOB:      {id:'e_rsix_ob',       type:'val'},
+  useKalmanCross: {id:'e_kalcr',         type:'chk'},
+  kalmanCrossLen: {id:'e_kalcrl',        type:'val'},
+  useMaCross:     {id:'e_macr',          type:'chk'},
+  maCrossP:       {id:'e_macr_p',        type:'val'},
+  maCrossType:    {id:'e_macr_t',        type:'sel'},
+  useFreeEntry:   {id:'e_free',          type:'chk'},
+  useMacd:        {id:'e_macd',          type:'chk'},
+  macdFast:       {id:'e_macd_f',        type:'val'},
+  macdSlow:       {id:'e_macd_s',        type:'val'},
+  macdSignalP:    {id:'e_macd_sg',       type:'val'},
+  useEIS:         {id:'e_eis',           type:'chk'},
+  eisPeriod:      {id:'e_eis_p',         type:'val'},
+  useSoldiers:    {id:'e_soldiers',      type:'chk'},
+  useStochExit:   {id:'e_stx',           type:'chk'},
+  stochKP:        {id:'e_stx_k',         type:'val'},
+  stochDP:        {id:'e_stx_d',         type:'val'},
+  stochOS:        {id:'e_stx_os',        type:'val'},
+  stochOB:        {id:'e_stx_ob',        type:'val'},
+  useVolMove:     {id:'e_volmv',         type:'chk'},
+  volMoveMult:    {id:'e_volmv_m',       type:'val'},
+  useInsideBar:   {id:'e_inb',           type:'chk'},
+  useNReversal:   {id:'e_nrev',          type:'chk'},
+  nReversalN:     {id:'e_nrev_n',        type:'val'},
+  usePChg:        {id:'e_pchg',          type:'chk'},
+  pChgPctA:       {id:'e_pchg_pct_a',    type:'val'},
+  pChgPeriodA:    {id:'e_pchg_per_a',    type:'val'},
+  pChgHtfA:       {id:'e_pchg_htf_a',    type:'val'},
+  usePChgB:       {id:'e_pchgb',         type:'chk'},
+  pChgPctB:       {id:'e_pchg_pct_b',    type:'val'},
+  pChgPeriodB:    {id:'e_pchg_per_b',    type:'val'},
+  pChgHtfB:       {id:'e_pchg_htf_b',    type:'val'},
+  useSupertrend:  {id:'e_st',            type:'chk'},
+  stAtrP:         {id:'e_st_atrp',       type:'val'},
+  stMult:         {id:'e_st_mult',       type:'val'},
+  useStExit:      {id:'x_st',            type:'chk'},
+  useWaitEntry:   {id:'e_wait_on',       type:'chk'},
+  waitBars:       {id:'e_wait_bars',     type:'val'},
+  useWaitRetrace: {id:'e_wait_retrace',  type:'chk'},
+  waitMaxBars:    {id:'e_wait_maxb',     type:'val'},
+  waitCancelAtr:  {id:'e_wait_catr',     type:'val'},
+  // ── SL/TP специфика ────────────────────────────────────────────────────────
+  useSLPiv:       {id:'s_piv',           type:'chk'},
+  slPivTrail:     {id:'s_pivtr',         type:'chk'},
+  slPivOff:       {id:'s_pivoff',        type:'val'},
+  slPivMax:       {id:'s_pivmax',        type:'val'},
+  slPivL:         {id:'s_pivl',          type:'val'},
+  slPivR:         {id:'s_pivr',          type:'val'},
+  // ── Механики выхода ────────────────────────────────────────────────────────
+  useBE:          {id:'x_be',            type:'chk'},
+  beTrig:         {id:'x_bet',           type:'val'},
+  beOff:          {id:'x_beo',           type:'val'},
+  useTrail:       {id:'x_tr',            type:'chk'},
+  trTrig:         {id:'x_trt',           type:'val'},
+  trDist:         {id:'x_trd',           type:'val'},
+  useWickTrail:   {id:'x_wt',            type:'chk'},
+  wickMult:       {id:'x_wt_mult',       type:'val'},
+  wickOffType:    {id:'x_wt_type',       type:'sel'},
+  useRev:         {id:'x_rev',           type:'chk'},
+  revBars:        {id:'x_revb',          type:'val'},
+  revSkip:        {id:'x_revskip',       type:'val'},
+  revCooldown:    {id:'x_revcd',         type:'val'},
+  useTime:        {id:'x_time',          type:'chk'},
+  timeBars:       {id:'x_timeb',         type:'val'},
+  usePartial:     {id:'x_part',          type:'chk'},
+  partRR:         {id:'x_partr',         type:'val'},
+  partPct:        {id:'x_partp',         type:'val'},
+  partBE:         {id:'x_partbe',        type:'chk'},
+  useClimax:      {id:'f_clx',           type:'chk'},
+  clxVolMult:     {id:'f_clxm',          type:'val'},
+  clxBodyMult:    {id:'f_clxb',          type:'val'},
+  // ── Фильтры тренда ─────────────────────────────────────────────────────────
+  useMA:          {id:'f_ma',            type:'chk'},
+  maType:         {id:'f_mat',           type:'sel'},
+  maP:            {id:'f_map',           type:'val'},
+  htfRatio:       {id:'f_ma_htf',        type:'val'},
+  useADX:         {id:'f_adx',           type:'chk'},
+  adxThresh:      {id:'f_adxt',          type:'val'},
+  adxLen:         {id:'f_adxl',          type:'val'},
+  adxHtfRatio:    {id:'f_adx_htf',       type:'val'},
+  useAdxSlope:    {id:'f_adx_slope',     type:'chk'},
+  adxSlopeBars:   {id:'f_adx_slope_bars',type:'val'},
+  useRSI:         {id:'f_rsi',           type:'chk'},
+  rsiOS:          {id:'f_rsios',         type:'val'},
+  rsiOB:          {id:'f_rsiob',         type:'val'},
+  useAtrExp:      {id:'f_atrexp',        type:'chk'},
+  atrExpMult:     {id:'f_atrexpm',       type:'val'},
+  useSTrend:      {id:'f_strend',        type:'chk'},
+  sTrendWin:      {id:'f_stw',           type:'val'},
+  useStruct:      {id:'f_struct',        type:'chk'},
+  strPvL:         {id:'f_strpvl',        type:'val'},
+  strPvR:         {id:'f_strpvr',        type:'val'},
+  useFresh:       {id:'f_fresh',         type:'chk'},
+  freshMax:       {id:'f_freshm',        type:'val'},
+  useVolF:        {id:'f_volf',          type:'chk'},
+  volFMult:       {id:'f_vfm',           type:'val'},
+  useMaDist:      {id:'f_madist',        type:'chk'},
+  maDistMax:      {id:'f_madv',          type:'val'},
+  useCandleF:     {id:'f_candle',        type:'chk'},
+  candleMin:      {id:'f_cmin',          type:'val'},
+  candleMax:      {id:'f_cmax',          type:'val'},
+  useConsec:      {id:'f_consec',        type:'chk'},
+  consecMax:      {id:'f_concm',         type:'val'},
+  useConfirm:     {id:'f_confirm',       type:'chk'},
+  confN:          {id:'f_confn',         type:'val'},
+  confMatType:    {id:'f_conf_mat',      type:'sel'},
+  confHtfRatio:   {id:'f_conf_htf',      type:'val'},
+  // ── Объёмные фильтры ───────────────────────────────────────────────────────
+  useVSA:         {id:'f_vsa',           type:'chk'},
+  vsaMult:        {id:'f_vsam',          type:'val'},
+  vsaPeriod:      {id:'f_vsap',          type:'val'},
+  useLiq:         {id:'f_liq',           type:'chk'},
+  liqMin:         {id:'f_liqm',          type:'val'},
+  useVolDir:      {id:'f_vdir',          type:'chk'},
+  volDirPeriod:   {id:'f_vdirp',         type:'val'},
+  useWT:          {id:'f_wt',            type:'chk'},
+  wtThresh:       {id:'f_wtt',           type:'val'},
+  wtN:            {id:'f_wtn',           type:'val'},
+  wtVolW:         {id:'f_wtv',           type:'val'},
+  wtBodyW:        {id:'f_wtb',           type:'val'},
+  wtUseDist:      {id:'f_wtdist',        type:'chk'},
+  useFat:         {id:'f_fat',           type:'chk'},
+  fatConsec:      {id:'f_fatc',          type:'val'},
+  fatVolDrop:     {id:'f_fatv',          type:'val'},
+  useKalmanMA:    {id:'f_kalman',        type:'chk'},
+  kalmanLen:      {id:'f_kalmanl',       type:'val'},
+  useMacdFilter:  {id:'f_macd',          type:'chk'},
+  useER:          {id:'f_er',            type:'chk'},
+  erPeriod:       {id:'f_erp',           type:'val'},
+  erThresh:       {id:'f_ert',           type:'val'},
+  // ── Общие настройки ────────────────────────────────────────────────────────
+  atrPeriod:      {id:'c_atr',           type:'val'},
+};
+
 function buildCopyText(r, c, slName, tpName) {
   const lines = [];
   const on = (flag, text) => flag ? ('ВКЛ' + (text ? ', ' + text : '')) : 'ВЫКЛ';
@@ -12629,6 +12796,26 @@ function buildCopyText(r, c, slName, tpName) {
   const _cc = (c.baseComm !== undefined ? c.baseComm : c.commission) ?? 0;
   const _sp = (c.spreadVal !== undefined ? c.spreadVal : 0) ?? 0;
   lines.push('Комиссия: ' + _cc.toFixed(3) + '% (1 ст.) = ' + (_cc*2).toFixed(3) + '% (round-trip)' + (_sp>0 ? ', Спред: ' + _sp.toFixed(3) + '% (r/t)' : ''));
+
+  // ── JSON блок для точного восстановления всех настроек ────────────────────
+  // Сериализуем все скалярные поля cfg + объекты slPair/tpPair
+  // Массивы (Float64Array, Uint8Array, обычные) намеренно исключаем — они runtime-кэш
+  const _jsonCfg = {};
+  for (const [k, v] of Object.entries(c)) {
+    if (v === null || v === undefined) continue;
+    if (typeof v === 'boolean' || typeof v === 'number' || typeof v === 'string') {
+      _jsonCfg[k] = v;
+    } else if (typeof v === 'object' && !Array.isArray(v) &&
+               !(v instanceof Float64Array) && !(v instanceof Uint8Array) &&
+               !(v instanceof Int8Array) && !(v instanceof Int32Array)) {
+      // Включаем plain объекты: slPair, tpPair и т.д.
+      _jsonCfg[k] = v;
+    }
+  }
+  lines.push('');
+  lines.push('--- CFG JSON ---');
+  lines.push(JSON.stringify(_jsonCfg));
+  lines.push('--- /CFG JSON ---');
   return lines.join('\n');
 }
 function closeDetail() {
@@ -13606,6 +13793,61 @@ function openParseModal() {
 function closeParseModal() { $('parse-overlay').classList.remove('open'); }
 
 function parseTextToSettings(text) {
+  // ── РЕЖИМ 0: JSON блок (buildCopyText формат с CFG JSON) ────────────────
+  // Если текст содержит --- CFG JSON --- блок — используем точное восстановление
+  const _jsonBlockMatch = text.match(/---\s*CFG JSON\s*---\s*\n([\s\S]*?)\n---\s*\/CFG JSON\s*---/);
+  if (_jsonBlockMatch) {
+    try {
+      const j = JSON.parse(_jsonBlockMatch[1]);
+      const ch = [];
+      const _s = (id, value, type, label) => ch.push({id, value, type, label});
+      // 1. Все поля из CFG_HTML_MAP
+      for (const [field, {id, type}] of Object.entries(CFG_HTML_MAP)) {
+        if (j[field] !== undefined) {
+          _s(id, type === 'val' ? String(j[field]) : j[field], type, `${field}=${j[field]}`);
+        }
+      }
+      // 2. SL пара (slPair)
+      const slPair = j.slPair || {};
+      const slA = slPair.a, slP = slPair.p;
+      const hasSlAtr = !!(slA && slA.type === 'atr');
+      const hasSlPct = !!(slA && slA.type === 'pct') || !!(slP && slP.type === 'pct');
+      _s('s_atr', hasSlAtr, 'chk', 'SL ATR: ' + (hasSlAtr ? 'ВКЛ' : 'ВЫКЛ'));
+      if (hasSlAtr) _s('s_atrv', String(slA.m), 'val', `SL ATR=${slA.m}`);
+      _s('s_pct', hasSlPct, 'chk', 'SL %: ' + (hasSlPct ? 'ВКЛ' : 'ВЫКЛ'));
+      const _slPctSrc = (slA && slA.type === 'pct') ? slA : slP;
+      if (hasSlPct && _slPctSrc) _s('s_pctv', String(_slPctSrc.m), 'val', `SL %=${_slPctSrc.m}`);
+      if (j.slLogic) ch.push({id:'_slLogic', value:j.slLogic, type:'logic', label:`SL логика=${j.slLogic}`});
+      // 3. TP пара (tpPair)
+      const tpPair = j.tpPair || {};
+      const tpA = tpPair.a, tpB = tpPair.b;
+      const hasTpRR  = !!(tpA && tpA.type === 'rr')  || !!(tpB && tpB.type === 'rr');
+      const hasTpAtr = !!(tpA && tpA.type === 'atr') || !!(tpB && tpB.type === 'atr');
+      const hasTpPct = !!(tpA && tpA.type === 'pct') || !!(tpB && tpB.type === 'pct');
+      _s('t_rr',  hasTpRR,  'chk', 'TP RR: '  + (hasTpRR  ? 'ВКЛ' : 'ВЫКЛ'));
+      _s('t_atr', hasTpAtr, 'chk', 'TP ATR: ' + (hasTpAtr ? 'ВКЛ' : 'ВЫКЛ'));
+      _s('t_pct', hasTpPct, 'chk', 'TP %: '   + (hasTpPct ? 'ВКЛ' : 'ВЫКЛ'));
+      const _rrSrc  = (tpA && tpA.type==='rr')  ? tpA : tpB;
+      const _atrSrc = (tpA && tpA.type==='atr') ? tpA : tpB;
+      const _pctSrc = (tpA && tpA.type==='pct') ? tpA : tpB;
+      if (hasTpRR  && _rrSrc)  _s('t_rrv',  String(_rrSrc.m),  'val', `TP RR=${_rrSrc.m}`);
+      if (hasTpAtr && _atrSrc) _s('t_atrv', String(_atrSrc.m), 'val', `TP ATR=${_atrSrc.m}`);
+      if (hasTpPct && _pctSrc) _s('t_pctv', String(_pctSrc.m), 'val', `TP %=${_pctSrc.m}`);
+      if (j.tpLogic) ch.push({id:'_tpLogic', value:j.tpLogic, type:'logic', label:`TP логика=${j.tpLogic}`});
+      // 4. xmode кнопки (revMode, revAct, revSrc, timeMode, clxMode)
+      if (j.revMode)  ch.push({id:'_xm_rev',     value:j.revMode,  type:'xmode', xmodeType:'rev',    label:`revMode=${j.revMode}`});
+      if (j.revAct)   ch.push({id:'_xm_revact',  value:j.revAct,   type:'xmode', xmodeType:'revact', label:`revAct=${j.revAct}`});
+      if (j.revSrc)   ch.push({id:'_xm_revsrc',  value:j.revSrc,   type:'xmode', xmodeType:'revsrc', label:`revSrc=${j.revSrc}`});
+      if (j.timeMode) ch.push({id:'_xm_time',    value:j.timeMode, type:'xmode', xmodeType:'time',   label:`timeMode=${j.timeMode}`});
+      if (j.clxMode)  ch.push({id:'_xm_clx',     value:j.clxMode,  type:'xmode', xmodeType:'clx',    label:`clxMode=${j.clxMode}`});
+      // 5. Комиссия (baseComm = per-leg, не умножаем)
+      const _comm = j.baseComm !== undefined ? j.baseComm : j.commission;
+      if (_comm !== undefined) _s('c_comm', String(_comm), 'val', `Комиссия=${_comm}`);
+      if (j.spreadVal !== undefined) _s('c_spread', String(j.spreadVal), 'val', `Спред=${j.spreadVal}`);
+      if (ch.length) return ch;
+    } catch(e) { /* fall through to legacy parsing */ }
+  }
+
   const changes = [];
   const lines = text.split('\n');
 
@@ -14036,6 +14278,11 @@ function applyParsedText() {
       const prefix = c.id === '_slLogic' ? 's_lg' : 't_lg';
       const radio = document.querySelector(`input[name="${prefix}"][value="${c.value}"]`);
       if (radio) { radio.checked = true; changed_ids.add(prefix); }
+      return;
+    }
+    if (c.type === 'xmode') {
+      // Кнопки режима (revMode, revAct, revSrc, timeMode, clxMode)
+      if (typeof setXMode === 'function') { setXMode(c.xmodeType, c.value); changed_ids.add(c.xmodeType); }
       return;
     }
     const el = $(c.id);
@@ -19610,7 +19857,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774527718046;
+window._BUILD_TS = 1774528118719;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
