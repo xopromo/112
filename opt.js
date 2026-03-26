@@ -27,8 +27,13 @@ function parseRange(id) {
     const parts = v.split(':').map(Number);
     if (parts.length >= 3 && parts[2] > 0) {
       const arr = [];
-      for (let x = parts[0]; x <= parts[1] + parts[2] * 0.0001; x += parts[2])
-        arr.push(Math.round(x * 10000) / 10000);
+      if (parts[0] <= parts[1]) {
+        for (let x = parts[0]; x <= parts[1] + parts[2] * 0.0001; x += parts[2])
+          arr.push(Math.round(x * 10000) / 10000);
+      } else {
+        for (let x = parts[0]; x >= parts[1] - parts[2] * 0.0001; x -= parts[2])
+          arr.push(Math.round(x * 10000) / 10000);
+      }
       return arr;
     }
     return parts.filter(x => !isNaN(x));
