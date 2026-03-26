@@ -541,11 +541,9 @@ function _calcRegimePerf(cfg, hmm) {
 // ─────────────────────────────────────────────────────────────────
 
 // ── Kalman MA Builder — Tier 3 ────────────────────────────────────
-// Соответствует Pine Script f_kalman(s, len):
-//   _kq = 1/(len*len), фиксированный process noise
-//   _kk = P/(P+1), _kx обновляется по Байесу, _kp убывает
-// Возвращает Float64Array той же длины что prices.
-// Откат: удалить функцию + kalmanArr в _calcIndicators/buildBtCfg + фильтр в filter_registry.js
+// Соответствует Pine Script f_kalman(s, len) — байесовский Калман.
+// Используется только для maType:"Kalman" (основная MA и confirm MA).
+// Откат: удалить функцию + ##KALMAN_TYPE## в core.js
 function _buildKalmanMA(prices, baseLen) {
   const N = prices.length;
   const kArr = new Float64Array(N);
@@ -560,6 +558,26 @@ function _buildKalmanMA(prices, baseLen) {
     kx = kx + kk * (s - kx);
     kp = (1.0 - kk) * kp + kq;
     kArr[i] = kx;
+  }
+  return kArr;
+}
+
+// Velocity-Kalman — для фильтра направления (useKalmanMA) и Kalman Cross входа.
+// Соответствует Pine Script:
+//   _kf_v := _kf_v + (close - _kf_c) * (1.0 / len)
+//   _kf_c := _kf_c + _kf_v
+// Откат: удалить функцию + kalmanArr/kalmanCrossArr в _calcIndicators/buildBtCfg
+function _buildKalmanVelocity(prices, len) {
+  const N = prices.length;
+  const kArr = new Float64Array(N);
+  if (N === 0) return kArr;
+  let kv = 0.0;
+  let kc = 0.0;
+  const inv = 1.0 / Math.max(len, 1);
+  for (let i = 0; i < N; i++) {
+    kv += (prices[i] - kc) * inv;
+    kc += kv;
+    kArr[i] = kc;
   }
   return kArr;
 }
@@ -1882,8 +1900,8 @@ async function runOpt() {
       const tlZonePct   = _ip.tlZonePct   ?? window._ipDef.tlZonePct;
       const {lo:pivSLLo, hi:pivSLHi, loAge:pivSLLoAge, hiAge:pivSLHiAge} = useSLPiv ? _getPivSL(slPivL, slPivR) : {lo:null, hi:null, loAge:null, hiAge:null};
       const rsiExitArr = useRsiExit   ? (rsiExitCache[rsiExitPer]||(rsiExitCache[rsiExitPer]=calcRSI(rsiExitPer))) : null;
-      const kalmanCrossArr = useKalmanCross ? (()=>{const k=kalmanCrossLen;return kalmanCrossCache[k]||(kalmanCrossCache[k]=_buildKalmanMA(closes,k));})() : null; // ##KALMAN_CROSS##
-      const kalmanArr = useKalmanMA ? (()=>{return kalmanMACache[kalmanLen]||(kalmanMACache[kalmanLen]=_buildKalmanMA(closes,kalmanLen));})() : null; // ##KALMAN_MA##
+      const kalmanCrossArr = useKalmanCross ? (()=>{const k=kalmanCrossLen;return kalmanCrossCache[k]||(kalmanCrossCache[k]=_buildKalmanVelocity(closes,k));})() : null; // ##KALMAN_CROSS##
+      const kalmanArr = useKalmanMA ? (()=>{return kalmanMACache[kalmanLen]||(kalmanMACache[kalmanLen]=_buildKalmanVelocity(closes,kalmanLen));})() : null; // ##KALMAN_MA##
       const maCrossArr = useMaCross   ? (()=>{const k=_mCrossType+'_'+maCrossP;return maCrossNewCache[k]||(maCrossNewCache[k]=calcMA(closes,maCrossP,_mCrossType));})() : null;
       const stDir      = (useSupertrend||useStExit) ? (()=>{const k=stAtrP+'_'+stMult;return stDirCache[k]||(stDirCache[k]=calcSupertrend(stAtrP,stMult));})() : null;
       const matMA      = useMaT ? (()=>{const k=$v('e_matt')+'_'+matPeriod;return matMACache[k]||(matMACache[k]=calcMA(closes,matPeriod,$v('e_matt')));})() : null;
@@ -2234,8 +2252,8 @@ async function runOpt() {
       const tlZonePct   = _ip.tlZonePct   ?? window._ipDef.tlZonePct;
       const {lo:pivSLLo, hi:pivSLHi, loAge:pivSLLoAge, hiAge:pivSLHiAge} = useSLPiv ? _getPivSL(slPivL, slPivR) : {lo:null, hi:null, loAge:null, hiAge:null};
       const rsiExitArr = useRsiExit   ? (rsiExitCache[rsiExitPer]||(rsiExitCache[rsiExitPer]=calcRSI(rsiExitPer))) : null;
-      const kalmanCrossArr = useKalmanCross ? (()=>{const k=kalmanCrossLen;return kalmanCrossCache[k]||(kalmanCrossCache[k]=_buildKalmanMA(closes,k));})() : null; // ##KALMAN_CROSS##
-      const kalmanArr = useKalmanMA ? (()=>{return kalmanMACache[kalmanLen]||(kalmanMACache[kalmanLen]=_buildKalmanMA(closes,kalmanLen));})() : null; // ##KALMAN_MA##
+      const kalmanCrossArr = useKalmanCross ? (()=>{const k=kalmanCrossLen;return kalmanCrossCache[k]||(kalmanCrossCache[k]=_buildKalmanVelocity(closes,k));})() : null; // ##KALMAN_CROSS##
+      const kalmanArr = useKalmanMA ? (()=>{return kalmanMACache[kalmanLen]||(kalmanMACache[kalmanLen]=_buildKalmanVelocity(closes,kalmanLen));})() : null; // ##KALMAN_MA##
       const maCrossArr = useMaCross   ? (()=>{const k=_mCrossType+'_'+maCrossP;return maCrossNewCache[k]||(maCrossNewCache[k]=calcMA(closes,maCrossP,_mCrossType));})() : null;
       const stDir      = (useSupertrend||useStExit) ? (()=>{const k=stAtrP+'_'+stMult;return stDirCache[k]||(stDirCache[k]=calcSupertrend(stAtrP,stMult));})() : null;
       const matMA      = useMaT ? (()=>{const k=$v('e_matt')+'_'+matPeriod;return matMACache[k]||(matMACache[k]=calcMA(closes,matPeriod,$v('e_matt')));})() : null;
@@ -2865,8 +2883,8 @@ async function runOpt() {
                                     const matZone     = _ip.matZone     ?? window._ipDef.matZone;
                                     const tlZonePct   = _ip.tlZonePct   ?? window._ipDef.tlZonePct;
                                     const rsiExitArr = useRsiExit   ? (rsiExitCache[rsiExitPer]||(rsiExitCache[rsiExitPer]=calcRSI(rsiExitPer))) : null;
-                                    const kalmanCrossArr = useKalmanCross ? (()=>{const k=kalmanCrossLen;return kalmanCrossCache[k]||(kalmanCrossCache[k]=_buildKalmanMA(closes,k));})() : null; // ##KALMAN_CROSS##
-                                    const kalmanArr = useKalmanMA ? (()=>{return kalmanMACache[kalmanLen]||(kalmanMACache[kalmanLen]=_buildKalmanMA(closes,kalmanLen));})() : null; // ##KALMAN_MA##
+                                    const kalmanCrossArr = useKalmanCross ? (()=>{const k=kalmanCrossLen;return kalmanCrossCache[k]||(kalmanCrossCache[k]=_buildKalmanVelocity(closes,k));})() : null; // ##KALMAN_CROSS##
+                                    const kalmanArr = useKalmanMA ? (()=>{return kalmanMACache[kalmanLen]||(kalmanMACache[kalmanLen]=_buildKalmanVelocity(closes,kalmanLen));})() : null; // ##KALMAN_MA##
                                     const _mCrossType0 = maCrossTypeArr[0]||maCrossType;
                                     const maCrossArr = useMaCross   ? (()=>{const k=_mCrossType0+'_'+maCrossP;return maCrossNewCache[k]||(maCrossNewCache[k]=calcMA(closes,maCrossP,_mCrossType0));})() : null;
                                     const stDir      = (useSupertrend||useStExit) ? (()=>{const k=stAtrP+'_'+stMult;return stDirCache[k]||(stDirCache[k]=calcSupertrend(stAtrP,stMult));})() : null;
@@ -3248,12 +3266,12 @@ function _calcIndicators(cfg) {
   // ── Kalman MA (адаптивная MA) ────────────────────────────────
   // ##KALMAN_MA## — Откат: удалить 2 строки + kalmanArr из return + buildBtCfg + filter_registry.js
   const kalmanLen = cfg.kalmanLen || 20;
-  const kalmanArr = cfg.useKalmanMA ? _buildKalmanMA(closes, kalmanLen) : null;
+  const kalmanArr = cfg.useKalmanMA ? _buildKalmanVelocity(closes, kalmanLen) : null;
 
   // ── Kalman Crossover ─────────────────────────────────────────
   // ##KALMAN_CROSS## — Откат: удалить 2 строки + kalmanCrossArr из return + buildBtCfg + entry_registry.js
   const kalmanCrossLenInd = cfg.kalmanCrossLen || 20;
-  const kalmanCrossArr = cfg.useKalmanCross ? _buildKalmanMA(closes, kalmanCrossLenInd) : null;
+  const kalmanCrossArr = cfg.useKalmanCross ? _buildKalmanVelocity(closes, kalmanCrossLenInd) : null;
 
   // ── Confirm MA ────────────────────────────────────────────
   const confN = cfg.confN || 0;
