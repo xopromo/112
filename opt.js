@@ -2833,6 +2833,7 @@ async function runOpt() {
                                     const rsiExitPer  = _ip.rsiExitPer  ?? window._ipDef.rsiExitPer;
                                     const rsiExitOS   = _ip.rsiExitOS   ?? window._ipDef.rsiExitOS;
                                     const rsiExitOB   = _ip.rsiExitOB   ?? window._ipDef.rsiExitOB;
+                                    const eisPeriod   = _ip.eisPeriod   ?? window._ipDef.eisPeriod;
                                     const maCrossP    = _ip.maCrossP    ?? window._ipDef.maCrossP;
                                     const macdFast    = _ip.macdFast    ?? window._ipDef.macdFast;
                                     const macdSlow    = _ip.macdSlow    ?? window._ipDef.macdSlow;
