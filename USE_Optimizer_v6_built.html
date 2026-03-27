@@ -7609,37 +7609,6 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
       }
     }
 
-    // ===== REVERSE ON OPPOSITE SIGNAL (matches Pine strategy.entry default) =====
-    if (inTrade && i > entryBar) {
-      let rSigL = false, rSigS = false;
-      for (let _ei = 0; _ei < activeEntries.length; _ei++) {
-        const _e = activeEntries[_ei];
-        if (!rSigL && _e.detectL(cfg, i)) rSigL = true;
-        if (!rSigS && _e.detectS(cfg, i)) rSigS = true;
-      }
-      for (let _fi = 0; _fi < activeFilters.length && (rSigL || rSigS); _fi++) {
-        const _f = activeFilters[_fi];
-        if (rSigL && _f.blocksL(cfg, i, ac)) rSigL = false;
-        if (rSigS && _f.blocksS(cfg, i, ac)) rSigS = false;
-      }
-      const oppSignal = (dir === 1 && rSigS && !cfg.longOnly) || (dir === -1 && rSigL && !cfg.shortOnly);
-      if (oppSignal) {
-        const tradePnl = (dir * (bar.c - entry) / entry * 100 - comm) * posSize;
-        pnl += tradePnl; trades++;
-        sumPnl2 += tradePnl * tradePnl;
-        if (_trPnl) _trPnl.push(tradePnl);
-        if (cfg.tradeLog && cfg.tradeLog.length) { const tl=cfg.tradeLog[cfg.tradeLog.length-1]; tl.exitBar=i; tl.exit=bar.c; tl.pnl=tradePnl; }
-        if (tradePnl > 0) wins++;
-        if (i <= split) { p1+=tradePnl; c1++; if(tradePnl>0) w1++; }
-        else             { p2+=tradePnl; c2++; if(tradePnl>0) w2++; }
-        if (dir===1)     { pL+=tradePnl; nL++; if(tradePnl>0) wL++; }
-        else             { pS+=tradePnl; nS++; if(tradePnl>0) wS++; }
-        maxPnl = Math.max(maxPnl, pnl); dd = Math.max(dd, maxPnl - pnl);
-        inTrade = false; exitBar = i - 1; // i-1 allows same-bar re-entry
-        revSkipCount = 0; revCooldownBar = -1;
-      }
-    }
-
     // ===== ENTRY =====
     if (!inTrade && i > exitBar) {
       let doDir = 0; // направление входа: 0 = нет, 1 = лонг, -1 = шорт
@@ -19931,7 +19900,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774626612327;
+window._BUILD_TS = 1774626858314;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
