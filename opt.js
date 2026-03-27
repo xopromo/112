@@ -1074,6 +1074,7 @@ async function runOpt() {
     ? (synthesisModeOptions.minSig || 0)
     : (parseFloat($('c_minsig')?.value) || 0);
   const _useGT = $c('c_use_gt');
+  const _mkm   = $c('c_mkm');
 
   // Entry flags
   const usePv=$c('e_pv'),useEng=$c('e_eng'),usePin=$c('e_pin');
@@ -2068,7 +2069,7 @@ async function runOpt() {
               useMacdFilter:_fCombo.useMacdFilter??useMacdFilter,
               useER:_fCombo.useER??useER,erPeriod:erPeriod||10,erThresh,
               atrPeriod:atrP,commission:commTotal,baseComm:comm,spreadVal:spread*2,
-              revSkip,revCooldown,revSrc};
+              revSkip,revCooldown,revSrc,markToMarket:_mkm};
           results.push({name,pnl:r.pnl,wr:r.wr,n:r.n,dd:r.dd,pdd,avg:r.avg,sig,gt,
             p1:r.p1,p2:r.p2,dwr:r.dwr,c1:r.c1,c2:r.c2,nL:r.nL||0,pL:r.pL||0,wrL:r.wrL,nS:r.nS||0,pS:r.pS||0,wrS:r.wrS,dwrLS:r.dwrLS,
             cvr:_calcCVR(r.eq),upi:_calcUlcerIdx(r.eq),sortino:_calcSortino(r.eq),kRatio:_calcKRatio(r.eq),sqn:r.sqn??null,
@@ -2450,7 +2451,7 @@ async function runOpt() {
               useKalmanMA:_fCombo.useKalmanMA??useKalmanMA,kalmanLen, // ##KALMAN_MA##
               useMacdFilter:_fCombo.useMacdFilter??useMacdFilter,
               useER:_fCombo.useER??useER,erPeriod:erPeriod||10,erThresh,
-              atrPeriod:atrP,commission:commTotal,baseComm:comm,spreadVal:spread*2};
+              atrPeriod:atrP,commission:commTotal,baseComm:comm,spreadVal:spread*2,markToMarket:_mkm};
           // OOS и тяжёлые метрики НЕ вызываем здесь — это горячий цикл
           // CVR/UPI/Sortino/kRatio вычислятся батчем после завершения TPE
           results.push({name,pnl:r.pnl,wr:r.wr,n:r.n,dd:r.dd,pdd,avg:r.avg,sig,gt,
@@ -3077,7 +3078,8 @@ async function runOpt() {
                                           useFat, fatConsec, fatVolDrop,
                                           useKalmanMA, kalmanLen, // ##KALMAN_MA##
                                           useMacdFilter, useER, erPeriod:erPArr[0]||10, erThresh,
-                                          atrPeriod:atrP, commission:commTotal, baseComm:comm, spreadVal:spread*2
+                                          atrPeriod:atrP, commission:commTotal, baseComm:comm, spreadVal:spread*2,
+                                          markToMarket:_mkm
                                         };
                                       results.push({name,pnl:r.pnl,wr:r.wr,n:r.n,dd:r.dd,pdd,avg:r.avg,sig,gt,
                                         p1:r.p1,p2:r.p2,dwr:r.dwr,c1:r.c1,c2:r.c2,nL:r.nL||0,pL:r.pL||0,wrL:r.wrL,nS:r.nS||0,pS:r.pS||0,wrS:r.wrS,dwrLS:r.dwrLS,
@@ -3589,6 +3591,7 @@ function buildBtCfg(cfg, ind) {
 
   return {
     comm: cfg.commission || 0,
+    markToMarket: cfg.markToMarket || false,
 
     // ── Входные паттерны ──────────────────────────────────────
     usePivot:   cfg.usePivot   || false,

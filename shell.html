@@ -926,6 +926,10 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
     <label data-tip="GT-Score = (P/DD) × sig_mult × consistency_mult. Штрафует за малое число сделок (z-тест) и нестабильный WR между половинами. Помогает TPE находить надёжные стратегии, а не overfitted.">Оптимизировать по GT-Score (анти-overfitting)</label>
   </div>
   <div class="cb" style="margin-top:4px">
+    <input type="checkbox" id="c_mkm">
+    <label data-tip="Mark-to-Market: equity учитывает нереализованный PnL открытой позиции на каждом баре — как TradingView. По умолчанию выкл: equity обновляется только при закрытии сделки (быстрее, подходит для IS/OOS). Включать для точного совпадения кривой equity с TV-индикатором.">Equity mark-to-market (как TV)</label>
+  </div>
+  <div class="cb" style="margin-top:4px">
     <input type="checkbox" id="c_powerset">
     <label data-tip="Перебирает все комбинации включённых фильтров (2^N вариантов). Например, если активны MA+ADX+RSI — тестирует {MA}, {ADX}, {RSI}, {MA+ADX}, {MA+RSI}, {ADX+RSI}, {MA+ADX+RSI} и без фильтров. Позволяет понять какие фильтры реально помогают входу.">Перебор комбо фильтров (powerset)</label>
   </div>

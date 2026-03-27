@@ -926,6 +926,10 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
     <label data-tip="GT-Score = (P/DD) × sig_mult × consistency_mult. Штрафует за малое число сделок (z-тест) и нестабильный WR между половинами. Помогает TPE находить надёжные стратегии, а не overfitted.">Оптимизировать по GT-Score (анти-overfitting)</label>
   </div>
   <div class="cb" style="margin-top:4px">
+    <input type="checkbox" id="c_mkm">
+    <label data-tip="Mark-to-Market: equity учитывает нереализованный PnL открытой позиции на каждом баре — как TradingView. По умолчанию выкл: equity обновляется только при закрытии сделки (быстрее, подходит для IS/OOS). Включать для точного совпадения кривой equity с TV-индикатором.">Equity mark-to-market (как TV)</label>
+  </div>
+  <div class="cb" style="margin-top:4px">
     <input type="checkbox" id="c_powerset">
     <label data-tip="Перебирает все комбинации включённых фильтров (2^N вариантов). Например, если активны MA+ADX+RSI — тестирует {MA}, {ADX}, {RSI}, {MA+ADX}, {MA+RSI}, {ADX+RSI}, {MA+ADX+RSI} и без фильтров. Позволяет понять какие фильтры реально помогают входу.">Перебор комбо фильтров (powerset)</label>
   </div>
@@ -7715,8 +7719,11 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
       }
     }
     // DD tracked only at trade close (matches Pine solve_core: _mpnl/_dd updated on exit).
-    // Closed-equity DD is consistent with what the TV USE indicator shows.
-    eq[i] = pnl;
+    // markToMarket=true: eq includes unrealized PnL, matches TV indicator plot.
+    // markToMarket=false (default): eq updates only on trade close (faster, consistent IS/OOS DD).
+    eq[i] = (cfg.markToMarket && inTrade)
+      ? pnl + (dir * (bar.c - entry) / entry * 100) * posSize
+      : pnl;
   }
 
   const wr=trades>0?wins/trades*100:0;
@@ -8751,6 +8758,7 @@ async function runOpt() {
     ? (synthesisModeOptions.minSig || 0)
     : (parseFloat($('c_minsig')?.value) || 0);
   const _useGT = $c('c_use_gt');
+  const _mkm   = $c('c_mkm');
 
   // Entry flags
   const usePv=$c('e_pv'),useEng=$c('e_eng'),usePin=$c('e_pin');
@@ -9745,7 +9753,7 @@ async function runOpt() {
               useMacdFilter:_fCombo.useMacdFilter??useMacdFilter,
               useER:_fCombo.useER??useER,erPeriod:erPeriod||10,erThresh,
               atrPeriod:atrP,commission:commTotal,baseComm:comm,spreadVal:spread*2,
-              revSkip,revCooldown,revSrc};
+              revSkip,revCooldown,revSrc,markToMarket:_mkm};
           results.push({name,pnl:r.pnl,wr:r.wr,n:r.n,dd:r.dd,pdd,avg:r.avg,sig,gt,
             p1:r.p1,p2:r.p2,dwr:r.dwr,c1:r.c1,c2:r.c2,nL:r.nL||0,pL:r.pL||0,wrL:r.wrL,nS:r.nS||0,pS:r.pS||0,wrS:r.wrS,dwrLS:r.dwrLS,
             cvr:_calcCVR(r.eq),upi:_calcUlcerIdx(r.eq),sortino:_calcSortino(r.eq),kRatio:_calcKRatio(r.eq),sqn:r.sqn??null,
@@ -10127,7 +10135,7 @@ async function runOpt() {
               useKalmanMA:_fCombo.useKalmanMA??useKalmanMA,kalmanLen, // ##KALMAN_MA##
               useMacdFilter:_fCombo.useMacdFilter??useMacdFilter,
               useER:_fCombo.useER??useER,erPeriod:erPeriod||10,erThresh,
-              atrPeriod:atrP,commission:commTotal,baseComm:comm,spreadVal:spread*2};
+              atrPeriod:atrP,commission:commTotal,baseComm:comm,spreadVal:spread*2,markToMarket:_mkm};
           // OOS и тяжёлые метрики НЕ вызываем здесь — это горячий цикл
           // CVR/UPI/Sortino/kRatio вычислятся батчем после завершения TPE
           results.push({name,pnl:r.pnl,wr:r.wr,n:r.n,dd:r.dd,pdd,avg:r.avg,sig,gt,
@@ -10754,7 +10762,8 @@ async function runOpt() {
                                           useFat, fatConsec, fatVolDrop,
                                           useKalmanMA, kalmanLen, // ##KALMAN_MA##
                                           useMacdFilter, useER, erPeriod:erPArr[0]||10, erThresh,
-                                          atrPeriod:atrP, commission:commTotal, baseComm:comm, spreadVal:spread*2
+                                          atrPeriod:atrP, commission:commTotal, baseComm:comm, spreadVal:spread*2,
+                                          markToMarket:_mkm
                                         };
                                       results.push({name,pnl:r.pnl,wr:r.wr,n:r.n,dd:r.dd,pdd,avg:r.avg,sig,gt,
                                         p1:r.p1,p2:r.p2,dwr:r.dwr,c1:r.c1,c2:r.c2,nL:r.nL||0,pL:r.pL||0,wrL:r.wrL,nS:r.nS||0,pS:r.pS||0,wrS:r.wrS,dwrLS:r.dwrLS,
@@ -11266,6 +11275,7 @@ function buildBtCfg(cfg, ind) {
 
   return {
     comm: cfg.commission || 0,
+    markToMarket: cfg.markToMarket || false,
 
     // ── Входные паттерны ──────────────────────────────────────
     usePivot:   cfg.usePivot   || false,
@@ -19900,7 +19910,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774626858314;
+window._BUILD_TS = 1774631696075;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;

@@ -913,8 +913,11 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
       }
     }
     // DD tracked only at trade close (matches Pine solve_core: _mpnl/_dd updated on exit).
-    // Closed-equity DD is consistent with what the TV USE indicator shows.
-    eq[i] = pnl;
+    // markToMarket=true: eq includes unrealized PnL, matches TV indicator plot.
+    // markToMarket=false (default): eq updates only on trade close (faster, consistent IS/OOS DD).
+    eq[i] = (cfg.markToMarket && inTrade)
+      ? pnl + (dir * (bar.c - entry) / entry * 100) * posSize
+      : pnl;
   }
 
   const wr=trades>0?wins/trades*100:0;
