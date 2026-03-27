@@ -66,7 +66,17 @@ function calcWMA(data, period) {
   }
   return r;
 }
-// Pivot-based расчёт структуры рынка (как в Pine USE)
+// HMA(n) = WMA(2*WMA(n/2) - WMA(n), floor(sqrt(n)))
+function calcHMA(data, period) {
+  const half  = Math.max(1, Math.floor(period / 2));
+  const sqrtP = Math.max(1, Math.floor(Math.sqrt(period)));
+  const wma1  = calcWMA(data, half);
+  const wma2  = calcWMA(data, period);
+  const N = data.length;
+  const diff = new Float64Array(N);
+  for (let i = 0; i < N; i++) diff[i] = 2 * wma1[i] - wma2[i];
+  return calcWMA(diff, sqrtP);
+}
 function calcStructPivots(data, pvL, pvR) {
   const N=data.length;
   const bull=new Uint8Array(N), bear=new Uint8Array(N);
@@ -148,6 +158,7 @@ function calcTEMA(data, period) {
 function calcMA(data, period, type) {
   if (type === 'SMA') return calcSMA(data, period);
   if (type === 'WMA') return calcWMA(data, period);
+  if (type === 'HMA') return calcHMA(data, period);
   if (type === 'DEMA') return calcDEMA(data, period);
   if (type === 'TEMA') return calcTEMA(data, period);
   if (type === 'Kalman') return _buildKalmanMA(data, period); // ##KALMAN_TYPE##
@@ -891,7 +902,7 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
           }
           hasSL2 = slCandidates.length >= 2;
         } else if (slCandidates.length===1) { sl1=slCandidates[0]; hasSL2=false; }
-        else { sl1 = cfg.useWickTrail ? NaN : entry-dir*ac*1.5; hasSL2=false; }
+        else { sl1 = NaN; hasSL2=false; } // noSL: no exit, matches Pine na
 
         // Compute TP levels — через _calcTP из sl_tp_registry.js
         const slDist = !isNaN(sl1) ? Math.abs(entry-sl1) : ac; // fallback to 1×ATR for R:R TP when no fixed SL
@@ -909,7 +920,7 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
           hasTP2=true;
         } else if (!isNaN(tpA)) { tp1=tpA; hasTP2=false; }
         else if (!isNaN(tpB)) { tp1=tpB; hasTP2=false; }
-        else { tp1=entry+dir*slDist*2; hasTP2=false; }
+        else { tp1=NaN; hasTP2=false; } // noTP: no exit, matches Pine na
       }
     }
     // DD tracked only at trade close (matches Pine solve_core: _mpnl/_dd updated on exit).
