@@ -804,6 +804,7 @@ function buildName(cfg, pvL, pvR, slDesc, tpDesc, filters, extras) {
   const exits = [];
   if (cfg.useBE) exits.push(`BE(t${cfg.beTrig}o${cfg.beOff})`);
   if (cfg.useTrail) exits.push(`Trail(t${cfg.trTrig}d${cfg.trDist})`);
+  if (cfg.useWickTrail) exits.push(`WickSL×${cfg.wickMult}`);
   if (cfg.useRev) { let _rs=`RevSig(mb${cfg.revBars})`; if(cfg.revSkip) _rs+=`sk${cfg.revSkip}`; if(cfg.revCooldown) _rs+=`cd${cfg.revCooldown}`; exits.push(_rs); }
   if (cfg.useTime) exits.push(`Time${cfg.timeBars}`);
   if (cfg.usePartial) exits.push(`Partial${cfg.partPct}%`);

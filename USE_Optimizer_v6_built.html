@@ -2424,7 +2424,7 @@ function generatePineScript(r) {
   lines.push(`atr_step   = input.int(2, "Шаг вариаций ATR", group=grp_strat)`);
   // Align max_bars with optimizer's dataset: subtract MA/confirm warmup so TV starts from same bar
   const _maTypeW    = c.useMA      ? (c.maType   || 'EMA') : '';
-  const _confTypeW  = c.useConfirm ? (c.confType || 'EMA') : '';
+  const _confTypeW  = c.useConfirm ? (c.confMatType || c.confType || 'WMA') : '';
   const _temaMult   = (_maTypeW   === 'TEMA' || _maTypeW   === 'DEMA' || _maTypeW   === 'EMA') ? 3 : 1;
   const _confTMult  = (_confTypeW === 'TEMA' || _confTypeW === 'DEMA' || _confTypeW === 'EMA') ? 3 : 1;
   const _maWarmup   = (c.useMA      && c.maP   > 0) ? c.maP   * (c.htfRatio     || 1) * _temaMult  : 0;
@@ -8499,6 +8499,7 @@ function buildName(cfg, pvL, pvR, slDesc, tpDesc, filters, extras) {
   const exits = [];
   if (cfg.useBE) exits.push(`BE(t${cfg.beTrig}o${cfg.beOff})`);
   if (cfg.useTrail) exits.push(`Trail(t${cfg.trTrig}d${cfg.trDist})`);
+  if (cfg.useWickTrail) exits.push(`WickSL×${cfg.wickMult}`);
   if (cfg.useRev) { let _rs=`RevSig(mb${cfg.revBars})`; if(cfg.revSkip) _rs+=`sk${cfg.revSkip}`; if(cfg.revCooldown) _rs+=`cd${cfg.revCooldown}`; exits.push(_rs); }
   if (cfg.useTime) exits.push(`Time${cfg.timeBars}`);
   if (cfg.usePartial) exits.push(`Partial${cfg.partPct}%`);
@@ -14847,6 +14848,7 @@ function copyTVdiag() {
   lines.push(`useSTrend: ${!!c.useSTrend}  sTrendWin: ${c.sTrendWin||10}`);
   lines.push(`useBE: ${!!c.useBE}  beTrig: ${c.beTrig||0}  beOff: ${c.beOff||0}`);
   lines.push(`useTrail: ${!!c.useTrail}  trTrig: ${c.trTrig||0}  trDist: ${c.trDist||0}`);
+  lines.push(`useWickTrail: ${!!c.useWickTrail}  wickMult: ${c.wickMult||0}  wickOffType: ${c.wickOffType||'ATR'}`);
   lines.push(`usePartial: ${!!c.usePartial}  partRR: ${c.partRR||0}  partPct: ${c.partPct||0}`);
   lines.push(`useTime: ${!!c.useTime}  timeBars: ${c.timeBars||0}`);
   lines.push(`waitBars: ${c.waitBars||0}  waitRetrace: ${!!c.waitRetrace}  waitMaxBars: ${c.waitMaxBars||0}  waitCancelAtr: ${c.waitCancelAtr||0}`);
@@ -19921,7 +19923,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774648182003;
+window._BUILD_TS = 1774651319107;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
