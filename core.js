@@ -66,7 +66,17 @@ function calcWMA(data, period) {
   }
   return r;
 }
-// Pivot-based расчёт структуры рынка (как в Pine USE)
+// HMA(n) = WMA(2*WMA(n/2) - WMA(n), floor(sqrt(n)))
+function calcHMA(data, period) {
+  const half  = Math.max(1, Math.floor(period / 2));
+  const sqrtP = Math.max(1, Math.floor(Math.sqrt(period)));
+  const wma1  = calcWMA(data, half);
+  const wma2  = calcWMA(data, period);
+  const N = data.length;
+  const diff = new Float64Array(N);
+  for (let i = 0; i < N; i++) diff[i] = 2 * wma1[i] - wma2[i];
+  return calcWMA(diff, sqrtP);
+}
 function calcStructPivots(data, pvL, pvR) {
   const N=data.length;
   const bull=new Uint8Array(N), bear=new Uint8Array(N);
@@ -148,6 +158,7 @@ function calcTEMA(data, period) {
 function calcMA(data, period, type) {
   if (type === 'SMA') return calcSMA(data, period);
   if (type === 'WMA') return calcWMA(data, period);
+  if (type === 'HMA') return calcHMA(data, period);
   if (type === 'DEMA') return calcDEMA(data, period);
   if (type === 'TEMA') return calcTEMA(data, period);
   if (type === 'Kalman') return _buildKalmanMA(data, period); // ##KALMAN_TYPE##
