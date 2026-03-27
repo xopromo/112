@@ -269,7 +269,7 @@ function generatePineScript(r) {
   lines.push(`atr_step   = input.int(2, "Шаг вариаций ATR", group=grp_strat)`);
   // Align max_bars with optimizer's dataset: subtract MA/confirm warmup so TV starts from same bar
   const _maTypeW    = c.useMA      ? (c.maType   || 'EMA') : '';
-  const _confTypeW  = c.useConfirm ? (c.confType || 'EMA') : '';
+  const _confTypeW  = c.useConfirm ? (c.confMatType || c.confType || 'WMA') : '';
   const _temaMult   = (_maTypeW   === 'TEMA' || _maTypeW   === 'DEMA' || _maTypeW   === 'EMA') ? 3 : 1;
   const _confTMult  = (_confTypeW === 'TEMA' || _confTypeW === 'DEMA' || _confTypeW === 'EMA') ? 3 : 1;
   const _maWarmup   = (c.useMA      && c.maP   > 0) ? c.maP   * (c.htfRatio     || 1) * _temaMult  : 0;

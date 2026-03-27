@@ -3767,6 +3767,7 @@ function copyTVdiag() {
   lines.push(`useSTrend: ${!!c.useSTrend}  sTrendWin: ${c.sTrendWin||10}`);
   lines.push(`useBE: ${!!c.useBE}  beTrig: ${c.beTrig||0}  beOff: ${c.beOff||0}`);
   lines.push(`useTrail: ${!!c.useTrail}  trTrig: ${c.trTrig||0}  trDist: ${c.trDist||0}`);
+  lines.push(`useWickTrail: ${!!c.useWickTrail}  wickMult: ${c.wickMult||0}  wickOffType: ${c.wickOffType||'ATR'}`);
   lines.push(`usePartial: ${!!c.usePartial}  partRR: ${c.partRR||0}  partPct: ${c.partPct||0}`);
   lines.push(`useTime: ${!!c.useTime}  timeBars: ${c.timeBars||0}`);
   lines.push(`waitBars: ${c.waitBars||0}  waitRetrace: ${!!c.waitRetrace}  waitMaxBars: ${c.waitMaxBars||0}  waitCancelAtr: ${c.waitCancelAtr||0}`);
