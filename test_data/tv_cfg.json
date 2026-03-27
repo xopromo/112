@@ -1,16 +1,11 @@
 {
-  "usePivot": true,
-  "pvL": 7,
-  "pvR": 2,
-  "waitBars": 3,
-  "hasSLB": true,
-  "slPctMult": 10.0,
-  "hasTPA": true,
-  "tpMode": "pct",
-  "tpMult": 2.0,
-  "slLogic": "or",
-  "tpLogic": "or",
-  "start": 1785,
-  "comm": 0.04,
-  "commission": 0.04
+  "slPair": {"a":null,"p":null,"combo":false},
+  "tpPair": {"a":null,"b":null,"combo":false},
+  "atrPeriod": 16,
+  "comm": 0.1,
+  "commission": 0.1,
+  "usePivot": true, "pvL": 3, "pvR": 4,
+  "useMA": true, "maType": "DEMA", "maP": 10, "htfRatio": 1,
+  "useConfirm": true, "confN": 200, "confType": "WMA", "confHtfRatio": 5,
+  "longOnly": false, "shortOnly": false
 }
