@@ -255,7 +255,7 @@ function calcHTFADX(data, htfRatio, period) {
     for (let i = period; i < htfN; i++) {
       if (atrR[i] > 0) { const pi=pdmR[i]/atrR[i]*100, mi=mdmR[i]/atrR[i]*100, s=pi+mi; dx[i]=s>0?Math.abs(pi-mi)/s*100:0; }
     }
-    const htfADX = calcRMA(Array.from(dx), period);
+    const htfADX = _rmaFromFirstNonZero(Array.from(dx), period);
     const aligned = new Float64Array(N);
     for (let i = 0; i < N; i++) {
       const last = Math.floor((i+1)/htfRatio)-1;
@@ -301,7 +301,7 @@ function calcHTFADX(data, htfRatio, period) {
   for (let i = period; i < htfN; i++) {
     if (atrR[i] > 0) { const pi=pdmR[i]/atrR[i]*100, mi=mdmR[i]/atrR[i]*100, s=pi+mi; dx[i]=s>0?Math.abs(pi-mi)/s*100:0; }
   }
-  const htfADX = calcRMA(Array.from(dx), period);
+  const htfADX = _rmaFromFirstNonZero(Array.from(dx), period);
 
   // Align to base timeframe with lookahead-free [1] shift
   const aligned = new Float64Array(N);
@@ -323,6 +323,22 @@ function calcRMA(data, period) {
   for (let i = 0; i < period && i < N; i++) s += data[i];
   if (N >= period) { r[period - 1] = s / period; }
   for (let i = period; i < N; i++) r[i] = alpha * data[i] + (1 - alpha) * r[i-1];
+  return r;
+}
+// RMA seeded from first `period` non-zero values.
+// Matches Pine ta.rma behaviour on a series with leading na/0:
+// Pine seeds from SMA of the first `period` non-na values, not from the series start.
+// Used for the dx→ADX step where dx[0..period-1] = 0 (not real values).
+function _rmaFromFirstNonZero(data, period) {
+  const N = data.length, r = new Float64Array(N);
+  const alpha = 1 / period;
+  let first = -1;
+  for (let i = 0; i < N; i++) { if (data[i] > 0) { first = i; break; } }
+  if (first < 0 || first + period > N) return r;
+  let s = 0;
+  for (let j = first; j < first + period; j++) s += data[j];
+  r[first + period - 1] = s / period;
+  for (let i = first + period; i < N; i++) r[i] = alpha * data[i] + (1 - alpha) * r[i-1];
   return r;
 }
 function calcRMA_ATR(period) {
@@ -387,8 +403,8 @@ function calcADX(period) {
       dx[i] = s > 0 ? Math.abs(pi-mi)/s*100 : 0;
     }
   }
-  // ADX = RMA(dx, period) как в Pine
-  return calcRMA(Array.from(dx), period);
+  // ADX = RMA(dx, period), seeded from first non-zero dx (matching Pine ta.rma na-seed behaviour)
+  return _rmaFromFirstNonZero(Array.from(dx), period);
 }
 function calcRSI(period) {
   const N = DATA.length, r = new Float64Array(N).fill(50);
