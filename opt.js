@@ -1276,7 +1276,7 @@ async function runOpt() {
   } else {
     tpCfgs.forEach(t=>tpPairs.push({a:t,b:null,combo:false}));
   }
-  if(tpPairs.length===0) tpPairs=[{a:{type:'rr',m:2},b:null,combo:false}];
+  if(tpPairs.length===0) tpPairs=[{a:null,b:null,combo:false}];
 
   // Fixed params — read as ranges; single value = no extra loop overhead
   const pinRatioArr=usePin?parseRange('e_pinr'):[2];
