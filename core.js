@@ -902,7 +902,7 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
           }
           hasSL2 = slCandidates.length >= 2;
         } else if (slCandidates.length===1) { sl1=slCandidates[0]; hasSL2=false; }
-        else { sl1 = cfg.useWickTrail ? NaN : entry-dir*ac*1.5; hasSL2=false; }
+        else { sl1 = NaN; hasSL2=false; } // noSL: no exit, matches Pine na
 
         // Compute TP levels — через _calcTP из sl_tp_registry.js
         const slDist = !isNaN(sl1) ? Math.abs(entry-sl1) : ac; // fallback to 1×ATR for R:R TP when no fixed SL
@@ -920,7 +920,7 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
           hasTP2=true;
         } else if (!isNaN(tpA)) { tp1=tpA; hasTP2=false; }
         else if (!isNaN(tpB)) { tp1=tpB; hasTP2=false; }
-        else { tp1=entry+dir*slDist*2; hasTP2=false; }
+        else { tp1=NaN; hasTP2=false; } // noTP: no exit, matches Pine na
       }
     }
     // DD tracked only at trade close (matches Pine solve_core: _mpnl/_dd updated on exit).
