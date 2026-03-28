@@ -684,6 +684,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
 .tpl-list { overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:4px; }
 .tpl-item { display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:5px; border:1px solid var(--border); }
 .tpl-item.def { border-color:var(--accent2); background:rgba(0,212,255,.04); }
+.tpl-item.active-tpl { border-color:var(--accent); background:rgba(100,200,100,.06); }
 .tpl-item-name { flex:1; font-size:.71em; color:var(--text); }
 .tpl-item-date { font-size:.58em; color:var(--text3); }
 .tpl-ibtn { padding:5px 12px; border:1px solid var(--border2); border-radius:3px; background:var(--bg3); color:var(--text2); font-size:.85em; cursor:pointer; transition:all .1s; }
@@ -838,7 +839,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
   <!-- Settings -->
   <button class="tpl-ibtn" onclick="openSettingsModal()" title="Настройки интерфейса">⚙</button>
   <!-- Templates (moved from bottom) -->
-  <button class="tpl-ibtn" id="btn-open-tpl" onclick="openTplModal()" title="Шаблоны настроек">📂 Шаблоны</button>
+  <button class="tpl-ibtn" id="btn-open-tpl" onclick="openTplModal()" title="Шаблоны настроек">📂 Шаблоны</button><span id="tpl-active-name" onclick="quickSaveTpl()" title="Текущий шаблон · кликни для быстрого сохранения" style="display:none;font-size:.62em;color:var(--accent);background:var(--bg3);border:1px solid var(--accent);border-radius:4px;padding:2px 7px;cursor:pointer;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle;margin-left:3px" onmouseenter="this.style.background='var(--accent)';this.style.color='var(--bg)'" onmouseleave="this.style.background='var(--bg3)';this.style.color='var(--accent)'"></span>
   <!-- Divider -->
   <span style="color:var(--border2);margin:0 1px;font-size:1.3em;line-height:1">│</span>
   <!-- Collapse/Expand -->
