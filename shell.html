@@ -1627,6 +1627,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
       <button class="tbl-mode-btn" id="btn-tbl-tpl" onclick="openTableTplPopover()" title="Шаблоны фильтров — сохранить текущие фильтры / быстро применить сохранённый набор" style="border-color:var(--accent2);color:var(--accent)">💾 Наборы фильтров ▾</button>
     </div>
     <button class="tbl-mode-btn" onclick="_downloadSources()" title="Скачать исходные файлы: core.js, opt.js, ui.js, shell.html, build.py, README.md">⬇ Исходники</button>
+    <button class="tbl-mode-btn" id="btn-ml-scan" onclick="openMLModal()" title="ML-модели: обучить / управлять / скан сигналов" style="border-color:rgba(139,92,246,.5);color:var(--purple)">🤖 ML</button>
   </div>
   <div class="tbl-scroll">
     <div style="padding:3px 8px 3px;font-size:.62em;color:var(--text2);background:var(--bg2);border-bottom:1px solid var(--border);user-select:none">
@@ -1975,7 +1976,6 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
         <span style="font-size:.65em;color:var(--text3)">⚡ Быстрый OOS-скан всех видимых → заполняет robScore ≥ N для выбора выше</span>
         <button class="tpl-btn2" id="btn-oos-scan" onclick="runOOSScan()" style="font-size:.65em;padding:2px 8px;background:rgba(0,200,255,.1);border-color:rgba(0,200,255,.4);color:var(--accent)">🔎 OOS-скан</button>
-        <button class="tpl-btn2" id="btn-ml-scan" onclick="openMLModal()" style="font-size:.65em;padding:2px 8px;background:rgba(139,92,246,.1);border-color:rgba(139,92,246,.4);color:var(--purple)" title="ML-модели: управление и скан сигналов">🤖 ML</button>
         <span id="oos-scan-status" style="font-size:.62em;color:var(--text3)"></span>
       </div>
     </div>
