@@ -27,13 +27,16 @@ function _mltBuildDataset(opts) {
     const feat = mlComputeFeatures(i);
     if (!feat) continue;
 
-    // Label: did price close above entry + commission at any point in next labelBars?
-    // Better than checking only the final bar — captures real exit opportunities
+    // Label: did price gain >= targetPct within labelBars bars WITHOUT first hitting stopPct?
+    // targetPct and stopPct are passed in opts (configurable in UI)
     const entry = DATA[i].c;
-    const target = entry * (1 + commission);
+    const targetPrice = entry * (1 + opts.targetPct);
+    const stopPrice   = entry * (1 - opts.stopPct);
     let hit = false;
     for (let k = 1; k <= labelBars && i + k < n; k++) {
-      if (DATA[i + k].c > target) { hit = true; break; }
+      const c = DATA[i + k].c;
+      if (c <= stopPrice) { break; }        // stopped out → label=0
+      if (c >= targetPrice) { hit = true; break; }
     }
 
     X.push(Array.from(feat));
@@ -117,10 +120,11 @@ async function mlTrainInBrowser(params, onProgress) {
     lr          = 0.08,
     subsample   = 0.8,
     labelBars   = 20,
-    commission  = 0.001,
+    targetPct   = 0.01,   // цена должна вырасти на 1% → TP
+    stopPct     = 0.005,  // цена упала на 0.5% → SL (label=0)
     nBars       = DATA.length,
     minLeaf     = 3,
-    nFeatSub    = 6,  // sqrt(33) ≈ 6
+    nFeatSub    = 6,
     pvL         = ML_PVL,
     pvR         = ML_PVR,
   } = params;
@@ -128,7 +132,7 @@ async function mlTrainInBrowser(params, onProgress) {
   if (onProgress) onProgress(0, 0, nTrees, 'dataset');
   await new Promise(r => setTimeout(r, 0));
 
-  const ds = _mltBuildDataset({ nBars, labelBars, commission, pvL, pvR });
+  const ds = _mltBuildDataset({ nBars, labelBars, targetPct, stopPct, pvL, pvR });
   if (ds.n < 50)
     throw new Error(`Слишком мало сигналов: ${ds.n}. Нужно ≥50. Загрузите больше данных.`);
 
