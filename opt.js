@@ -988,8 +988,8 @@ async function runOpt() {
     if (!_useOOS) return;
     // Запускаем бэктест на ПОЛНЫХ данных для непрерывной equity-кривой.
     // Делим её по _isN: нет проблемы прогрева индикаторов в OOS-части.
-    // TV-строка показывает "что видит TradingView" — без ML-фильтра (TV его не знает) ##ML_FILTER
-    const rFull = _runOOS(_fullDATA, {...cfg, useMLFilter: false});
+    // Full бэктест использует те же параметры что и IS (включая ML если включён) ##ML_FILTER
+    const rFull = _runOOS(_fullDATA, cfg);
     cfg._oos = { forward: null, isPct: Math.round(_isN / N * 100) };
     // Диагностика: IS сделок не может быть больше TV сделок (оба прогона с bar 0).
     if (rFull && typeof isTradeN === 'number' && isTradeN > rFull.n) {

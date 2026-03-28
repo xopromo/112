@@ -696,25 +696,6 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
 .tpl-btn2 { flex:1; padding:7px; border:none; border-radius:5px; font-family:var(--font-mono); font-size:.72em; font-weight:600; cursor:pointer; }
 .tpl-btn2.ok { background:linear-gradient(135deg,#005533,var(--green2)); color:#fff; }
 .tpl-btn2.cancel { background:var(--bg4); color:var(--text2); border:1px solid var(--border2); }
-.fav-section { border-top:1px solid var(--border); margin-top:4px; display:none; }
-.fav-header { display:flex; align-items:center; gap:8px; padding:4px 0; cursor:pointer; user-select:none; }
-.fav-header:hover { opacity:.85; }
-.fav-title { font-size:.62em; color:var(--orange); font-weight:600; }
-.fav-count { font-size:.58em; color:var(--text3); background:var(--bg3); border-radius:8px; padding:1px 6px; }
-.fav-toggle { font-size:.6em; color:var(--text3); margin-left:auto; }
-.fav-search { background:var(--bg); border:1px solid var(--border2); border-radius:4px; color:var(--text); font-size:.62em; padding:2px 7px; width:130px; font-family:var(--font-mono); }
-.fav-body { display:none; max-height:200px; overflow-y:auto; }
-.fav-body.open { display:block; }
-.fav-list { display:flex; flex-direction:column; gap:2px; padding:3px 0; }
-.fav-row { display:flex; align-items:center; gap:6px; padding:3px 6px; border-radius:4px; font-size:.62em; cursor:pointer; }
-.fav-row:hover { background:var(--bg3); }
-.fav-row-num { color:var(--text3); min-width:16px; text-align:right; font-size:.9em; }
-.fav-row-name { color:var(--orange); flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.fav-row-name:hover { text-decoration:underline; }
-.fav-row-stats { color:var(--text3); white-space:nowrap; font-family:var(--font-mono); }
-.fav-row-pdd { color:var(--green); font-weight:600; min-width:36px; text-align:right; }
-.fav-row-del { color:var(--text3); cursor:pointer; padding:0 2px; opacity:.5; }
-.fav-row-del:hover { color:#ff4466; opacity:1; }
 /* confirm filter */
 .confirm-hint { font-size:.6em; color:var(--text3); margin:2px 0 5px; line-height:1.4; }
 
@@ -1508,22 +1489,6 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
   </div>
 </div>
 
-<!-- Favourites bar (shows below btn-row when non-empty) -->
-<div class="fav-section" id="fav-section">
-  <div class="fav-header" onclick="toggleFavBody()">
-    <span class="fav-title">⭐ Избранное</span>
-    <span class="fav-count" id="fav-count">0</span>
-    <span id="fav-ns-label" onclick="event.stopPropagation();openNsModal()" title="Неймспейс (тикер/ТФ) — кликни чтобы сменить"
-      style="font-size:.6em;color:var(--accent);cursor:pointer;background:rgba(0,212,255,.1);border:1px solid rgba(0,212,255,.25);border-radius:4px;padding:1px 6px;margin-left:2px"></span>
-    <button onclick="event.stopPropagation();openNsModal()" title="Разные тикеры/ТФ хранятся в отдельных неймспейсах"
-      style="font-size:.58em;padding:1px 7px;background:rgba(0,212,255,.08);border:1px solid var(--border2);border-radius:4px;color:var(--text3);cursor:pointer;margin-left:2px">📌 ns</button>
-    <input class="fav-search" id="fav-search" placeholder="🔍 поиск..." oninput="renderFavBar()" onclick="event.stopPropagation()" title="Фильтр по названию">
-    <span class="fav-toggle" id="fav-toggle">▼ показать</span>
-  </div>
-  <div class="fav-body" id="fav-body">
-    <div class="fav-list" id="fav-bar"></div>
-  </div>
-</div>
 
 <div id="eq-wrap">
   <canvas id="eqc"></canvas>
