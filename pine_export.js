@@ -232,7 +232,7 @@ function generatePineScript(r) {
   // Wick Trailing SL
   lines.push(`grp_wick = "🪝 WICK TRAILING SL"`);
   lines.push(`use_wick_trail = input.bool(${b(c.useWickTrail)}, "Wick Trailing SL", group=grp_wick)`);
-  lines.push(`wick_off_type  = input.string("${c.wickOffType||'atr'}", "Тип отступа", options=["atr","pct","pts"], group=grp_wick)`);
+  lines.push(`wick_off_type  = input.string("${(c.wickOffType||'atr').toLowerCase()}", "Тип отступа", options=["atr","pct","pts"], group=grp_wick)`);
   lines.push(`wick_mult      = input.float(${f(c.wickMult??1.0, 1)}, "Множитель отступа", step=0.1, group=grp_wick)`);
   lines.push(``);
 
