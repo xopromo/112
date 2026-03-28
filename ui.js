@@ -7847,19 +7847,55 @@ function _mlModelsTab(models, activeId, hasBuiltin) {
         ${modelRows || '<tr><td colspan="5" style="padding:10px 8px;color:#555;font-size:.82em">Нет сохранённых моделей</td></tr>'}
       </tbody>
     </table>
-    <div style="border-top:1px solid #333;padding-top:14px">
-      <div style="font-size:.8em;color:#888;margin-bottom:10px">
-        Добавить модель: выберите файл <code style="color:#a78bfa">model_generated.js</code>
-        (генерируется: <code style="color:#a78bfa">python3 ml/train.py ваш_файл.csv</code>)
+    <div style="border-top:1px solid #333;padding-top:14px;display:flex;flex-direction:column;gap:12px">
+
+      <div>
+        <div style="font-size:.8em;font-weight:600;color:#a78bfa;margin-bottom:8px">▶ Обучить на текущих данных</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+          <label style="font-size:.78em;color:#888;display:flex;flex-direction:column;gap:3px">Название
+            <input id="ml-train-name" type="text" placeholder="BTCUSDT 1H"
+              style="padding:4px 7px;background:var(--bg3,#313244);border:1px solid #555;border-radius:4px;color:var(--fg,#cdd6f4);font-size:1em">
+          </label>
+          <label style="font-size:.78em;color:#888;display:flex;flex-direction:column;gap:3px">Деревьев
+            <input id="ml-train-ntrees" type="number" value="80" min="20" max="300"
+              style="padding:4px 7px;background:var(--bg3,#313244);border:1px solid #555;border-radius:4px;color:var(--fg,#cdd6f4);font-size:1em">
+          </label>
+          <label style="font-size:.78em;color:#888;display:flex;flex-direction:column;gap:3px">Глубина дерева
+            <input id="ml-train-depth" type="number" value="4" min="2" max="6"
+              style="padding:4px 7px;background:var(--bg3,#313244);border:1px solid #555;border-radius:4px;color:var(--fg,#cdd6f4);font-size:1em">
+          </label>
+          <label style="font-size:.78em;color:#888;display:flex;flex-direction:column;gap:3px">Баров обучения
+            <input id="ml-train-bars" type="number" value="" placeholder="все"
+              style="padding:4px 7px;background:var(--bg3,#313244);border:1px solid #555;border-radius:4px;color:var(--fg,#cdd6f4);font-size:1em">
+          </label>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <button onclick="_mlStartTraining()"
+            style="padding:5px 18px;background:rgba(139,92,246,.25);border:1px solid rgba(139,92,246,.6);border-radius:4px;color:#a78bfa;cursor:pointer;font-size:.82em;font-weight:600">
+            ⚡ Обучить
+          </button>
+          <div id="ml-train-status" style="font-size:.78em;color:#888"></div>
+        </div>
+        <div id="ml-train-bar-wrap" style="margin-top:8px;display:none">
+          <div style="background:#333;border-radius:4px;height:6px;overflow:hidden">
+            <div id="ml-train-bar" style="background:#7c3aed;height:100%;width:0%;transition:width .1s"></div>
+          </div>
+        </div>
       </div>
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        <input id="ml-name-input" type="text" placeholder="Название, напр. BTCUSDT 1H 2024"
-          style="flex:1;min-width:150px;padding:5px 8px;background:var(--bg3,#313244);border:1px solid #555;border-radius:4px;color:var(--fg,#cdd6f4);font-size:.82em">
-        <label style="cursor:pointer;padding:5px 12px;background:rgba(139,92,246,.15);border:1px solid rgba(139,92,246,.4);border-radius:4px;font-size:.82em;color:#a78bfa;white-space:nowrap">
-          📂 Выбрать .js
-          <input type="file" accept=".js" style="display:none" onchange="_mlHandleFile(this)">
-        </label>
+
+      <div style="border-top:1px solid #222;padding-top:12px">
+        <div style="font-size:.78em;color:#666;margin-bottom:8px">Или загрузить готовую модель из файла
+          <code style="color:#666">model_generated.js</code> (python3 ml/train.py)</div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <input id="ml-name-input" type="text" placeholder="Название"
+            style="flex:1;min-width:120px;padding:5px 8px;background:var(--bg3,#313244);border:1px solid #555;border-radius:4px;color:var(--fg,#cdd6f4);font-size:.82em">
+          <label style="cursor:pointer;padding:5px 12px;background:rgba(100,100,120,.15);border:1px solid #555;border-radius:4px;font-size:.82em;color:#888;white-space:nowrap">
+            📂 Выбрать .js
+            <input type="file" accept=".js" style="display:none" onchange="_mlHandleFile(this)">
+          </label>
+        </div>
       </div>
+
     </div>`;
 }
 
@@ -7929,6 +7965,67 @@ function _mlRunScan() {
       </table>
       <div style="color:#555;margin-top:8px">≥65% высокая · 50–65% средняя · &lt;50% низкая вероятность прибыльного входа</div>`;
   }, 20);
+}
+
+async function _mlStartTraining() {
+  if (typeof mlTrainInBrowser !== 'function') {
+    toast('⚠️ Модуль обучения не загружен', 2500); return;
+  }
+  if (!DATA || DATA.length < 100) {
+    toast('⚠️ Нет данных. Загрузите CSV.', 2500); return;
+  }
+  const nameEl   = document.getElementById('ml-train-name');
+  const name     = nameEl?.value.trim();
+  if (!name) { toast('Введите название модели', 2000); nameEl?.focus(); return; }
+
+  const nTrees = parseInt(document.getElementById('ml-train-ntrees')?.value) || 80;
+  const depth  = parseInt(document.getElementById('ml-train-depth')?.value)  || 4;
+  const barsEl = document.getElementById('ml-train-bars');
+  const nBars  = parseInt(barsEl?.value) || DATA.length;
+
+  const statusEl  = document.getElementById('ml-train-status');
+  const barWrap   = document.getElementById('ml-train-bar-wrap');
+  const barEl     = document.getElementById('ml-train-bar');
+  const trainBtn  = document.querySelector('[onclick="_mlStartTraining()"]');
+
+  if (trainBtn) trainBtn.disabled = true;
+  if (barWrap)  barWrap.style.display = 'block';
+  if (statusEl) statusEl.textContent = 'Строим датасет...';
+
+  try {
+    const result = await mlTrainInBrowser(
+      { nTrees, maxDepth: depth, nBars },
+      (frac, done, total, phase) => {
+        if (barEl)    barEl.style.width = (frac * 100).toFixed(1) + '%';
+        if (statusEl) statusEl.textContent =
+          phase === 'dataset'  ? 'Строим датасет...' :
+          phase === 'training' ? `Обучение: дерево ${done}/${total}` :
+                                 'Сохраняем...';
+      }
+    );
+
+    const id = 'ml_' + Date.now();
+    await _MLModelDB.save({
+      id, name, code: result.code,
+      auc: result.auc, bars: result.bars, signals: result.n,
+      date: new Date().toLocaleDateString('ru-RU', { day:'2-digit', month:'2-digit', year:'2-digit' }),
+    });
+
+    // Activate immediately
+    _mlActivateCode(result.code);
+    _mlActiveId   = id;
+    _mlActiveName = name;
+    localStorage.setItem('_mlActiveId',   id);
+    localStorage.setItem('_mlActiveName', name);
+
+    toast(`✅ Модель «${name}» обучена, AUC=${result.auc.toFixed(3)}`, 3000);
+    await openMLModal('models');
+
+  } catch(e) {
+    if (statusEl) statusEl.textContent = '⚠️ ' + e.message;
+    if (trainBtn) trainBtn.disabled = false;
+    console.error('[mlTrain]', e);
+  }
 }
 
 async function _mlHandleFile(input) {
