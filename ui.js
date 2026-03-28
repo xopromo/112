@@ -214,6 +214,7 @@ function parseCSV(text) {
   const vi = hdr.findIndex(h => h.toLowerCase() === 'volume' || h.toLowerCase().includes('vol'));
   HAS_VOLUME = vi >= 0;
   DATA = [];
+  if (typeof _mlScoresArrCache !== 'undefined') _mlScoresArrCache = { arr: null, len: -1 }; // ##ML_FILTER
   for (let i = 1; i < lines.length; i++) {
     const c = lines[i].split(',');
     if (c.length > Math.max(oi,hi,li,ci)) {
@@ -231,6 +232,7 @@ function applyMaxBars() {
   const n = parseInt($('c_maxbars')?.value) || 0;
   const total = _rawDATA.length;
   DATA = (n > 0 && n < total) ? _rawDATA.slice(total - n) : _rawDATA;
+  if (typeof _mlScoresArrCache !== 'undefined') _mlScoresArrCache = { arr: null, len: -1 }; // ##ML_FILTER
   // Сохраняем мастер-копию для ресэмплинга в multi-TF режиме
   window.DATA_1M = DATA.slice();
   const used = DATA.length;
@@ -7769,6 +7771,8 @@ function _mlActivateCode(code) {
     if (!scoreFn) throw new Error('mlScore not found');
     window.mlScore = scoreFn;
     if (typeof mlResetCache === 'function') mlResetCache();
+    // Инвалидируем кеш ML-скоров при смене модели (opt.js)
+    if (typeof _mlScoresArrCache !== 'undefined') _mlScoresArrCache = { arr: null, len: -1 };
     return true;
   } catch(e) {
     console.error('[ML activate]', e);

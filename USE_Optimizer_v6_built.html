@@ -1661,6 +1661,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
           <th class="col-burke" data-sort="32" title="Burke Ratio = PnL / √(Σ просадок²). Учитывает ВСЕ события просадок, не только максимальную. ≥3 = отлично, ≥2 = хорошо." style="min-width:52px;resize:horizontal;overflow:auto;cursor:pointer;color:var(--accent)">Burke ↕</th>
           <th class="col-srnty" data-sort="33" title="Serenity Index = PnL / (UlcerIdx × TailFactor). TailFactor = CVaR(5%) / mean(убытков). Штраф за хвостовые риски. ≥5 = отлично, ≥3 = хорошо." style="min-width:56px;resize:horizontal;overflow:auto;cursor:pointer;color:var(--accent)">Serenity ↕</th>
           <th class="col-ir" data-sort="34" title="Information Ratio = mean(active_returns) / std(active_returns) × √252. active_return = стратегия − buy&hold. IR > 1 = хорошо, > 0.5 = добавляет ценность, < 0 = хуже buy&hold." style="min-width:44px;resize:horizontal;overflow:auto;cursor:pointer;color:var(--accent)">IR ↕</th>
+          <th class="col-ml" title="ML-фильтр активен: порог отсечки сигналов (🤖%). Без ML-фильтра — «—»." style="min-width:44px;resize:horizontal;overflow:auto;color:var(--purple)">ML ↕</th>
           <th class="col-cpcv" data-sort="29" title="CPCV% — блочная валидация. Заполняется после открытия детали (lazy). ≥80% = устойчива." style="min-width:52px;resize:horizontal;overflow:auto;cursor:pointer;color:var(--accent)">CPCV% ↕</th>
           <th class="col-avg" data-sort="6" title="Средний % прибыли/убытка на одну сделку. Показывает насколько «жирные» средние сделки." style="min-width:44px;resize:horizontal;overflow:auto;cursor:pointer">Avg% ↕</th>
           <th class="col-p1" data-sort="7" title="PnL за первую половину данных (IS). Показывает, как стратегия работала на обучающей части." style="min-width:52px;resize:horizontal;overflow:auto;cursor:pointer">1п PnL ↕</th>
@@ -12776,6 +12777,7 @@ function parseCSV(text) {
   const vi = hdr.findIndex(h => h.toLowerCase() === 'volume' || h.toLowerCase().includes('vol'));
   HAS_VOLUME = vi >= 0;
   DATA = [];
+  if (typeof _mlScoresArrCache !== 'undefined') _mlScoresArrCache = { arr: null, len: -1 }; // ##ML_FILTER
   for (let i = 1; i < lines.length; i++) {
     const c = lines[i].split(',');
     if (c.length > Math.max(oi,hi,li,ci)) {
@@ -12793,6 +12795,7 @@ function applyMaxBars() {
   const n = parseInt($('c_maxbars')?.value) || 0;
   const total = _rawDATA.length;
   DATA = (n > 0 && n < total) ? _rawDATA.slice(total - n) : _rawDATA;
+  if (typeof _mlScoresArrCache !== 'undefined') _mlScoresArrCache = { arr: null, len: -1 }; // ##ML_FILTER
   // Сохраняем мастер-копию для ресэмплинга в multi-TF режиме
   window.DATA_1M = DATA.slice();
   const used = DATA.length;
@@ -18621,11 +18624,16 @@ function _calcIndicators(cfg) {
     kalmanCrossArr, // ##KALMAN_CROSS##
     mlScoresArr: cfg.useMLFilter && typeof mlComputeFeatures === 'function' && typeof mlScore === 'function'
       ? (() => {
+          // Если в кеше есть массив для бо́льшего или равного набора данных —
+          // переиспользуем: IS/OOS срезы используют те же индексы что и полный DATA.
+          if (_mlScoresArrCache.arr && N <= _mlScoresArrCache.len) return _mlScoresArrCache.arr;
+          // Первый вызов на полных данных — считаем и кешируем
           const arr = new Float32Array(N).fill(-1);
           for (let i = 52; i < N; i++) {
             const f = mlComputeFeatures(i);
             if (f) try { arr[i] = mlScore(f); } catch(e) { arr[i] = 0.5; }
           }
+          _mlScoresArrCache = { arr, len: N };
           return arr;
         })()
       : null,
@@ -22821,6 +22829,10 @@ function _getFavAsResults() {
 // МАССОВЫЙ ТЕСТ УСТОЙЧИВОСТИ
 // ============================================================
 let _massRobRunning = false;
+// ##ML_FILTER## — кеш mlScoresArr: вычисляется один раз для полных данных,
+// переиспользуется для IS/OOS срезов (индексы баров совпадают).
+// Инвалидируется при смене модели (ui.js) и при загрузке новых данных.
+let _mlScoresArrCache = { arr: null, len: -1 };
 
 async function runMassRobust() {
   if (!DATA) { alert('Нет данных'); return; }
@@ -26605,6 +26617,8 @@ function _mlActivateCode(code) {
     if (!scoreFn) throw new Error('mlScore not found');
     window.mlScore = scoreFn;
     if (typeof mlResetCache === 'function') mlResetCache();
+    // Инвалидируем кеш ML-скоров при смене модели (opt.js)
+    if (typeof _mlScoresArrCache !== 'undefined') _mlScoresArrCache = { arr: null, len: -1 };
     return true;
   } catch(e) {
     console.error('[ML activate]', e);
@@ -27760,7 +27774,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774706601991;
+window._BUILD_TS = 1774707529121;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;

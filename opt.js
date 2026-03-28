@@ -3609,11 +3609,16 @@ function _calcIndicators(cfg) {
     kalmanCrossArr, // ##KALMAN_CROSS##
     mlScoresArr: cfg.useMLFilter && typeof mlComputeFeatures === 'function' && typeof mlScore === 'function'
       ? (() => {
+          // Если в кеше есть массив для бо́льшего или равного набора данных —
+          // переиспользуем: IS/OOS срезы используют те же индексы что и полный DATA.
+          if (_mlScoresArrCache.arr && N <= _mlScoresArrCache.len) return _mlScoresArrCache.arr;
+          // Первый вызов на полных данных — считаем и кешируем
           const arr = new Float32Array(N).fill(-1);
           for (let i = 52; i < N; i++) {
             const f = mlComputeFeatures(i);
             if (f) try { arr[i] = mlScore(f); } catch(e) { arr[i] = 0.5; }
           }
+          _mlScoresArrCache = { arr, len: N };
           return arr;
         })()
       : null,
@@ -3861,6 +3866,10 @@ function buildBtCfg(cfg, ind) {
 // МАССОВЫЙ ТЕСТ УСТОЙЧИВОСТИ
 // ============================================================
 let _massRobRunning = false;
+// ##ML_FILTER## — кеш mlScoresArr: вычисляется один раз для полных данных,
+// переиспользуется для IS/OOS срезов (индексы баров совпадают).
+// Инвалидируется при смене модели (ui.js) и при загрузке новых данных.
+let _mlScoresArrCache = { arr: null, len: -1 };
 
 async function runMassRobust() {
   if (!DATA) { alert('Нет данных'); return; }
