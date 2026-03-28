@@ -1292,8 +1292,8 @@ async function runOpt() {
   const consecMax=$n('f_concm')||5;
   const sTrendWin=$n('f_stw')||10;
   const structLen=$n('f_strl')||20;
-  const strPvL=$n('f_strpvl')||5;
-  const strPvR=$n('f_strpvr')||2;
+  const strPvLArr = useStruct ? parseRange('f_strpvl') : [$n('f_strpvl')||5];
+  const strPvRArr = useStruct ? parseRange('f_strpvr') : [$n('f_strpvr')||2];
   // SL Pivot — диапазоны параметров + кэш pivot-массивов
   const useSLPiv  = $c('s_piv');
   const slPivTrail= $c('s_pivtr');
@@ -1310,7 +1310,7 @@ async function runOpt() {
   const vsaMult=$n('f_vsam')||1.5;
   const vsaP=$n('f_vsap')||20;
   const liqMin=$n('f_liqm')||0.5;
-  const volDirP=$n('f_vdirp')||10;
+  const volDirPArr = useVolDir ? parseRange('f_vdirp') : [$n('f_vdirp')||10];
   const clxVolMult=$n('f_clxm')||3.0;
   const clxBodyMult=$n('f_clxb')||1.5;
   const wtN=$n('f_wtn')||11;
@@ -1339,15 +1339,14 @@ async function runOpt() {
   // adxArr default (used when adxL not ranging); per-adxL computed in loop via adxCache
   const adxCache={};
   const adxArr=useAdx?(()=>{const l=_adxLArr[0];if(!adxCache[l])adxCache[l]=calcADX(l);return adxCache[l];})():null;
-  const structData=(useStruct||useSTrend||useFresh||useMaDist||useMa)?null:null;
-  let structBull=null,structBear=null;
-  if(useStruct) {
-    // Pivot-based структура как в Pine USE:
-    // pivothigh/pivotlow → hi1>hi2 && lo1>lo2 = бычья структура
-    const N2=DATA.length; structBull=new Uint8Array(N2); structBear=new Uint8Array(N2);
-    const pvL=strPvL, pvR=strPvR;
+  // Кэш структуры рынка — вычисляется один раз per (pvL,pvR) combo
+  const structCache = {};
+  const _computeStruct = (pvL, pvR) => {
+    const k = `${pvL}_${pvR}`;
+    if (structCache[k]) return structCache[k];
+    const N2 = DATA.length;
+    const bull = new Uint8Array(N2), bear = new Uint8Array(N2);
     let pvHiArr=[], pvLoArr=[];
-    // Вычисляем pivot high и low
     for(let i=pvL;i<N2-pvR;i++) {
       let isH=true, isL=true;
       for(let j=1;j<=pvL;j++) { if(DATA[i-j].h>DATA[i].h){isH=false;break;} }
@@ -1357,23 +1356,18 @@ async function runOpt() {
       if(isH) pvHiArr.push({idx:i,v:DATA[i].h});
       if(isL) pvLoArr.push({idx:i,v:DATA[i].l});
     }
-    // Для каждого бара (с учётом задержки pvR) определяем структуру
-    let hi1=NaN,hi2=NaN,lo1=NaN,lo2=NaN;
-    let pHi=0,pLo=0;
+    let hi1=NaN,hi2=NaN,lo1=NaN,lo2=NaN,pHi=0,pLo=0;
     for(let i=pvL+pvR;i<N2;i++) {
-      // Добавляем новые пивоты доступные на баре i
-      while(pHi<pvHiArr.length && pvHiArr[pHi].idx+pvR<=i) {
-        hi2=hi1; hi1=pvHiArr[pHi].v; pHi++;
-      }
-      while(pLo<pvLoArr.length && pvLoArr[pLo].idx+pvR<=i) {
-        lo2=lo1; lo1=pvLoArr[pLo].v; pLo++;
-      }
+      while(pHi<pvHiArr.length && pvHiArr[pHi].idx+pvR<=i) { hi2=hi1; hi1=pvHiArr[pHi].v; pHi++; }
+      while(pLo<pvLoArr.length && pvLoArr[pLo].idx+pvR<=i) { lo2=lo1; lo1=pvLoArr[pLo].v; pLo++; }
       if(!isNaN(hi1)&&!isNaN(hi2)&&!isNaN(lo1)&&!isNaN(lo2)) {
-        if(hi1>hi2&&lo1>lo2) structBull[i]=1; // HH+HL = бычья
-        if(hi1<hi2&&lo1<lo2) structBear[i]=1; // LH+LL = медвежья
+        if(hi1>hi2&&lo1>lo2) bull[i]=1;
+        if(hi1<hi2&&lo1<lo2) bear[i]=1;
       }
     }
-  }
+    structCache[k] = {bull, bear};
+    return structCache[k];
+  };
 
 
 
@@ -1689,6 +1683,9 @@ async function runOpt() {
       ['pChgPctB',    (Array.isArray(pChgPctBArr) && pChgPctBArr.length > 0) ? pChgPctBArr : [1.0]],
       ['pChgPeriodB', (Array.isArray(pChgPerBArr) && pChgPerBArr.length > 0) ? pChgPerBArr : [20]],
       ['pChgHtfB',    (Array.isArray(pChgHtfBArr) && pChgHtfBArr.length > 0) ? pChgHtfBArr : [1]],
+      ['strPvL',      (Array.isArray(strPvLArr) && strPvLArr.length > 0) ? strPvLArr : [5]],
+      ['strPvR',      (Array.isArray(strPvRArr) && strPvRArr.length > 0) ? strPvRArr : [2]],
+      ['volDirPeriod',(Array.isArray(volDirPArr) && volDirPArr.length > 0) ? volDirPArr : [10]],
       ['stAtrP',      (Array.isArray(stAtrPArr) && stAtrPArr.length > 0) ? stAtrPArr : [10]],
       ['stMult',      (Array.isArray(stMultArr) && stMultArr.length > 0) ? stMultArr : [3.0]],
       ['waitBars',    (Array.isArray(waitBarsArr) && waitBarsArr.length > 0) ? waitBarsArr : [0]],
@@ -1721,6 +1718,7 @@ async function runOpt() {
       rsiExitOB: 70, maCrossP: 50, macdFast: 12, macdSlow: 26, macdSigP: 9,
       stochKP: 14, stochDP: 3, stochOS: 20, stochOB: 80, volMoveMult: 1.5, nReversalN: 3,
       pChgPctA: 1.0, pChgPeriodA: 10, pChgHtfA: 1, pChgPctB: 1.0, pChgPeriodB: 20, pChgHtfB: 1,
+      strPvL: 5, strPvR: 2, volDirPeriod: 10,
       stAtrP: 10, stMult: 3.0, waitBars: 0, waitRetrace: 0.618, eisPeriod: 20, erPeriod: 10,
       kalmanCrossLen: 20, // ##KALMAN_CROSS##
       pinRatio: 2, matPeriod: 20, matZone: 0.2, tlZonePct: 0.3
@@ -1889,6 +1887,9 @@ async function runOpt() {
       const pChgPctB   = _ip.pChgPctB   ?? window._ipDef.pChgPctB;
       const pChgPeriodB = _ip.pChgPeriodB ?? window._ipDef.pChgPeriodB;
       const pChgHtfB   = _ip.pChgHtfB   ?? window._ipDef.pChgHtfB;
+      const strPvL     = _ip.strPvL     ?? window._ipDef.strPvL;
+      const strPvR     = _ip.strPvR     ?? window._ipDef.strPvR;
+      const volDirPeriod = _ip.volDirPeriod ?? window._ipDef.volDirPeriod;
       const stAtrP      = _ip.stAtrP      ?? window._ipDef.stAtrP;
       const stMult      = _ip.stMult      ?? window._ipDef.stMult;
       const waitBars    = _ip.waitBars    ?? window._ipDef.waitBars;
@@ -1983,7 +1984,7 @@ async function runOpt() {
         useRSI:_effUseRsi,rsiArr:_effUseRsi?calcRSI(14):null,rsiOS:rsiPair.os,rsiOB:rsiPair.ob,
         useVolF:_effUseVolF&&vfM>0,atrAvg,volFMult:vfM,
         useAtrExp:_effUseAtrExp&&atrExpM>0,atrExpMult:atrExpM,
-        useStruct:_effUseStruct,structBull,structBear,strPvL,strPvR,
+        useStruct:_effUseStruct,structBull:_effUseStruct?_computeStruct(strPvL,strPvR).bull:null,structBear:_effUseStruct?_computeStruct(strPvL,strPvR).bear:null,strPvL,strPvR,
         useSLPiv,slPivOff,slPivMax,slPivL,slPivR,slPivTrail,pivSLLo,pivSLHi,pivSLLoAge,pivSLHiAge,
         useConfirm:_effUseConfirm&&confN>0,confN,confMatType:_confType,confHtfRatio:_confHtf,maArrConfirm:confMAArr,
         useMaDist:_effUseMaDist&&mdMax>0,maDistMax:mdMax,
@@ -1993,7 +1994,7 @@ async function runOpt() {
         useFresh:_effUseFresh&&freshMax>0,freshMax,
         useVSA:_effUseVSA&&vsaM>0,vsaMult:vsaM,volAvg:volAvgArr,
         useLiq:_effUseLiq,liqMin,
-        useVolDir:_effUseVolDir,volDirPeriod:volDirP,
+        useVolDir:_effUseVolDir,volDirPeriod,
         useWT:_effUseWT&&wtT>0,wtScores,wtThresh:wtT,
         useFat:_effUseFat,fatConsec,fatVolDrop,
         bodyAvg:bodyAvgArr,
@@ -2063,7 +2064,7 @@ async function runOpt() {
               useCandleF:_effUseCandleF,candleMin,candleMax,useConsec:_effUseConsec,consecMax,
               useSTrend:_effUseSTrend,sTrendWin,useFresh:_effUseFresh&&freshMax>0,freshMax,
               useVSA:_effUseVSA&&vsaM>0,vsaMult:vsaM,vsaPeriod:vsaP,
-              useLiq:_effUseLiq,liqMin,useVolDir:_effUseVolDir,volDirPeriod:volDirP,
+              useLiq:_effUseLiq,liqMin,useVolDir:_effUseVolDir,volDirPeriod,
               useWT:_effUseWT&&wtT>0,wtThresh:wtT,wtN,wtVolW,wtBodyW,wtUseDist,
               useFat:_effUseFat,fatConsec,fatVolDrop,
               useKalmanMA:_fCombo.useKalmanMA??useKalmanMA,kalmanLen, // ##KALMAN_MA##
@@ -2241,6 +2242,9 @@ async function runOpt() {
       const pChgPctB   = _ip.pChgPctB   ?? window._ipDef.pChgPctB;
       const pChgPeriodB = _ip.pChgPeriodB ?? window._ipDef.pChgPeriodB;
       const pChgHtfB   = _ip.pChgHtfB   ?? window._ipDef.pChgHtfB;
+      const strPvL     = _ip.strPvL     ?? window._ipDef.strPvL;
+      const strPvR     = _ip.strPvR     ?? window._ipDef.strPvR;
+      const volDirPeriod = _ip.volDirPeriod ?? window._ipDef.volDirPeriod;
       const stAtrP      = _ip.stAtrP      ?? window._ipDef.stAtrP;
       const stMult      = _ip.stMult      ?? window._ipDef.stMult;
       const waitBars    = _ip.waitBars    ?? window._ipDef.waitBars;
@@ -2335,14 +2339,14 @@ async function runOpt() {
         useRSI:_effUseRsi,rsiArr:_effUseRsi?_tpeRsiArr:null,rsiOS:rsiPair.os,rsiOB:rsiPair.ob,
         useVolF:_effUseVolF&&vfM>0,atrAvg,volFMult:vfM,
         useAtrExp:_effUseAtrExp&&atrExpM>0,atrExpMult:atrExpM,
-        useStruct:_effUseStruct,structBull,structBear,strPvL,strPvR,
+        useStruct:_effUseStruct,structBull:_effUseStruct?_computeStruct(strPvL,strPvR).bull:null,structBear:_effUseStruct?_computeStruct(strPvL,strPvR).bear:null,strPvL,strPvR,
         useSLPiv,slPivOff,slPivMax,slPivL,slPivR,slPivTrail,pivSLLo,pivSLHi,pivSLLoAge,pivSLHiAge,
         useConfirm:_effUseConfirm&&confN>0,confN,confMatType:_confType,confHtfRatio:_confHtf,maArrConfirm:confMAArr,
         useMaDist:_effUseMaDist&&mdMax>0,maDistMax:mdMax,
         useCandleF:_effUseCandleF,candleMin,candleMax,useConsec:_effUseConsec,consecMax,
         useSTrend:_effUseSTrend,sTrendWin,useFresh:_effUseFresh&&freshMax>0,freshMax,
         useVSA:_effUseVSA&&vsaM>0,vsaMult:vsaM,volAvg:volAvgArr,
-        useLiq:_effUseLiq,liqMin,useVolDir:_effUseVolDir,volDirPeriod:volDirP,
+        useLiq:_effUseLiq,liqMin,useVolDir:_effUseVolDir,volDirPeriod,
         useWT:_effUseWT&&wtT>0,wtScores,wtThresh:wtT,
         useFat:_effUseFat,fatConsec,fatVolDrop,bodyAvg:bodyAvgArr,
         useMacdFilter:_fCombo.useMacdFilter??useMacdFilter,
@@ -2446,7 +2450,7 @@ async function runOpt() {
               useCandleF:_effUseCandleF,candleMin,candleMax,useConsec:_effUseConsec,consecMax,
               useSTrend:_effUseSTrend,sTrendWin,useFresh:_effUseFresh&&freshMax>0,freshMax,
               useVSA:_effUseVSA&&vsaM>0,vsaMult:vsaM,vsaPeriod:vsaP,
-              useLiq:_effUseLiq,liqMin,useVolDir:_effUseVolDir,volDirPeriod:volDirP,
+              useLiq:_effUseLiq,liqMin,useVolDir:_effUseVolDir,volDirPeriod,
               useWT:_effUseWT&&wtT>0,wtThresh:wtT,wtN,wtVolW,wtBodyW,wtUseDist,
               useFat:_effUseFat,fatConsec,fatVolDrop,
               useKalmanMA:_fCombo.useKalmanMA??useKalmanMA,kalmanLen, // ##KALMAN_MA##
@@ -2875,6 +2879,9 @@ async function runOpt() {
                                     const pChgPctB   = _ip.pChgPctB   ?? window._ipDef.pChgPctB;
                                     const pChgPeriodB = _ip.pChgPeriodB ?? window._ipDef.pChgPeriodB;
                                     const pChgHtfB   = _ip.pChgHtfB   ?? window._ipDef.pChgHtfB;
+                                    const strPvL     = _ip.strPvL     ?? window._ipDef.strPvL;
+                                    const strPvR     = _ip.strPvR     ?? window._ipDef.strPvR;
+                                    const volDirPeriod = _ip.volDirPeriod ?? window._ipDef.volDirPeriod;
                                     const stAtrP      = _ip.stAtrP      ?? window._ipDef.stAtrP;
                                     const stMult      = _ip.stMult      ?? window._ipDef.stMult;
                                     const waitBars    = _ip.waitBars    ?? window._ipDef.waitBars;
@@ -2968,7 +2975,7 @@ async function runOpt() {
                                       rsiOS:rsiPair.os,rsiOB:rsiPair.ob,
                                       useVolF:useVolF&&vfM>0,atrAvg,volFMult:vfM,
                                       useAtrExp:useAtrExp&&atrExpM>0,atrExpMult:atrExpM,
-                                      useStruct,structBull,structBear,strPvL,strPvR,
+                                      useStruct,structBull:useStruct?_computeStruct(strPvL,strPvR).bull:null,structBear:useStruct?_computeStruct(strPvL,strPvR).bear:null,strPvL,strPvR,
                                       useConfirm:useConfirm&&confN>0,confN,confMatType:_confType,confHtfRatio:_confHtf,maArrConfirm:confMAArr,
                                       useMaDist:useMaDist&&mdMax>0,maDistMax:mdMax,
                                       useCandleF,candleMin,candleMax,
@@ -2977,7 +2984,7 @@ async function runOpt() {
                                       useFresh:useFresh&&freshMax>0,freshMax,
                                       useVSA:useVSA&&vsaM>0,vsaMult:vsaM,volAvg:volAvgArr,
                                       useLiq,liqMin,
-                                      useVolDir,volDirPeriod:volDirP,
+                                      useVolDir,volDirPeriod,
                                       useWT:useWT&&wtT>0,wtScores,wtThresh:wtT,
                                       useFat,fatConsec,fatVolDrop,
                                       useKalmanMA,kalmanArr,kalmanLen, // ##KALMAN_MA##
@@ -3074,7 +3081,7 @@ async function runOpt() {
                                           useFresh:useFresh&&freshMax>0, freshMax,
                                           useVSA:useVSA&&vsaM>0, vsaMult:vsaM, vsaPeriod:vsaP,
                                           useLiq, liqMin,
-                                          useVolDir, volDirPeriod:volDirP,
+                                          useVolDir, volDirPeriod,
                                           useWT:useWT&&wtT>0, wtThresh:wtT, wtN, wtVolW, wtBodyW, wtUseDist,
                                           useFat, fatConsec, fatVolDrop,
                                           useKalmanMA, kalmanLen, // ##KALMAN_MA##
