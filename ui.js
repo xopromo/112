@@ -8284,7 +8284,7 @@ async function _mlscrCompareBt(cfg, ind, topRules, mlThresh) {
   return{rML,rRules};
 }
 
-function _mlscrRender({trades,sorted,greedy,synergy,rNoML,rML,rRules,topRules,ML_THRESH}) {
+function _mlscrRender({trades,sorted,greedy,synergy,rNoML,rML,rRules,topRules,ML_THRESH,srcCfg,srcR_name}) {
   const n=trades.length;
   const nGood=trades.filter(t=>t.score>=ML_THRESH).length;
   const cc=v=>{const a=Math.abs(v);return a>=0.3?(v>0?'pos':'neg'):a>=0.15?'warn':'muted';};
@@ -8306,10 +8306,14 @@ function _mlscrRender({trades,sorted,greedy,synergy,rNoML,rML,rRules,topRules,ML
   let h=`<div style="display:grid;gap:18px">`;
 
   // Header
-  h+=`<div style="background:var(--bg2);border-radius:6px;padding:10px 14px;display:flex;gap:20px;flex-wrap:wrap;font-size:.82em">
-    <span>📊 Сделок: <b>${n}</b></span>
-    <span>✅ Хороших (≥${Math.round(ML_THRESH*100)}%): <b>${nGood}</b> (${Math.round(nGood/n*100)}%)</span>
-    <span>📈 Данных: <b>${DATA.length}</b> баров</span>
+  h+=`<div style="background:var(--bg2);border-radius:6px;padding:10px 14px;display:grid;gap:6px;font-size:.82em">
+    <div style="color:var(--fg3);font-size:.78em">Анализируется результат:</div>
+    <div style="color:var(--fg);font-size:.8em;word-break:break-all">${srcR_name||'—'}</div>
+    <div style="display:flex;gap:20px;flex-wrap:wrap;margin-top:2px">
+      <span>📊 Сделок: <b>${n}</b></span>
+      <span>✅ Хороших (≥${Math.round(ML_THRESH*100)}%): <b>${nGood}</b> (${Math.round(nGood/n*100)}%)</span>
+      <span>📈 Данных: <b>${DATA.length}</b> баров</span>
+    </div>
   </div>`;
 
   // 1. Feature rankings
@@ -8452,9 +8456,15 @@ async function runMLFeatureScreening() {
     // Get cfg from selected result or first visible
     const srcR=_tvCmpCurrentResult??_visibleResults?.[0]??null;
     if(!srcR?.cfg){
-      body.innerHTML='<p style="color:var(--warn);padding:20px">⚠️ Нет выбранного результата. Откройте любой результат (нажмите на строку), затем запустите скрининг снова.</p>';
+      body.innerHTML='<p style="color:var(--warn);padding:20px">⚠️ Нет выбранного результата. Нажмите на строку результата чтобы открыть детали, затем запустите скрининг кнопкой внизу панели.</p>';
       return;
     }
+    // Показываем имя результата сразу чтобы пользователь видел что анализируется
+    body.innerHTML=`<div style="text-align:center;padding:40px;color:var(--fg2)">
+      ⏳ Анализирую: <b style="color:var(--fg)">${(srcR.name||'результат').substring(0,80)}</b><br>
+      <small style="color:var(--fg3)">Собираю точки входа и вычисляю ML признаки…</small>
+    </div>`;
+    await new Promise(r=>setTimeout(r,20));
     const cfg={...srcR.cfg,useMLFilter:false};
     // Run backtest on full DATA without ML filter, collect trade entries + pnl
     const ind=_calcIndicators(cfg);
@@ -8518,7 +8528,7 @@ async function runMLFeatureScreening() {
     body.innerHTML='<div style="text-align:center;padding:40px;color:var(--fg2)">⏳ Запускаю сравнительные бэктесты…</div>';
     await new Promise(r=>setTimeout(r,0));
     const{rML,rRules}=await _mlscrCompareBt(cfg,ind,topRules,ML_THRESH);
-    body.innerHTML=_mlscrRender({trades,sorted,greedy,synergy,rNoML,rML,rRules,topRules,ML_THRESH,srcCfg:srcR.cfg});
+    body.innerHTML=_mlscrRender({trades,sorted,greedy,synergy,rNoML,rML,rRules,topRules,ML_THRESH,srcCfg:srcR.cfg,srcR_name:srcR.name||''});
   }catch(e){
     console.error('[MLScreening]',e);
     body.innerHTML=`<div style="color:var(--neg);padding:20px">❌ Ошибка: ${e.message}</div>`;
