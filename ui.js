@@ -7910,10 +7910,22 @@ function _mlModelsTab(models, activeId, hasBuiltin) {
             <input id="ml-train-bars" type="number" value="" placeholder="все"
               style="padding:4px 7px;background:var(--bg3,#313244);border:1px solid #555;border-radius:4px;color:var(--fg,#cdd6f4);font-size:1em">
           </label>
-          <label style="font-size:.78em;color:#888;display:flex;flex-direction:column;gap:3px" title="Сколько баров вперёд смотрит метка: был ли прибыльный выход">Горизонт (баров)
-            <input id="ml-train-label" type="number" value="20" min="5" max="100"
+          <label style="font-size:.78em;color:#888;display:flex;flex-direction:column;gap:3px" title="Максимум баров ожидания результата">Горизонт (баров)
+            <input id="ml-train-label" type="number" value="30" min="5" max="200"
               style="padding:4px 7px;background:var(--bg3,#313244);border:1px solid #555;border-radius:4px;color:var(--fg,#cdd6f4);font-size:1em">
           </label>
+          <label style="font-size:.78em;color:#888;display:flex;flex-direction:column;gap:3px" title="TP: цена выросла на X% — метка=1 (прибыльный вход)">TP порог %
+            <input id="ml-train-target" type="number" value="1.0" min="0.1" max="20" step="0.1"
+              style="padding:4px 7px;background:var(--bg3,#313244);border:1px solid #555;border-radius:4px;color:var(--fg,#cdd6f4);font-size:1em">
+          </label>
+          <label style="font-size:.78em;color:#888;display:flex;flex-direction:column;gap:3px" title="SL: цена упала на X% — метка=0 (убыточный вход)">SL порог %
+            <input id="ml-train-stop" type="number" value="0.5" min="0.1" max="20" step="0.1"
+              style="padding:4px 7px;background:var(--bg3,#313244);border:1px solid #555;border-radius:4px;color:var(--fg,#cdd6f4);font-size:1em">
+          </label>
+        </div>
+        <div style="font-size:.72em;color:#555;margin-bottom:8px">
+          Метка=1 если цена достигла +TP% раньше чем -SL% в течение «горизонт» баров.
+          Для 5min TF: TP=1%, SL=0.5%, горизонт=30. Для 1h TF: TP=3%, SL=1.5%, горизонт=20.
         </div>
         <div style="display:flex;align-items:center;gap:10px">
           <button onclick="_mlStartTraining()"
@@ -8041,10 +8053,12 @@ async function _mlStartTraining() {
   const name     = nameEl?.value.trim();
   if (!name) { toast('Введите название модели', 2000); nameEl?.focus(); return; }
 
-  const nTrees    = parseInt(document.getElementById('ml-train-ntrees')?.value) || 100;
-  const depth     = parseInt(document.getElementById('ml-train-depth')?.value)  || 5;
-  const labelBars = parseInt(document.getElementById('ml-train-label')?.value)  || 20;
-  const nBars     = parseInt(document.getElementById('ml-train-bars')?.value)   || DATA.length;
+  const nTrees    = parseInt(document.getElementById('ml-train-ntrees')?.value)  || 100;
+  const depth     = parseInt(document.getElementById('ml-train-depth')?.value)   || 5;
+  const labelBars = parseInt(document.getElementById('ml-train-label')?.value)   || 30;
+  const nBars     = parseInt(document.getElementById('ml-train-bars')?.value)    || DATA.length;
+  const targetPct = (parseFloat(document.getElementById('ml-train-target')?.value) || 1.0) / 100;
+  const stopPct   = (parseFloat(document.getElementById('ml-train-stop')?.value)   || 0.5) / 100;
 
   const statusEl  = document.getElementById('ml-train-status');
   const barWrap   = document.getElementById('ml-train-bar-wrap');
@@ -8057,7 +8071,7 @@ async function _mlStartTraining() {
 
   try {
     const result = await mlTrainInBrowser(
-      { nTrees, maxDepth: depth, nBars, labelBars },
+      { nTrees, maxDepth: depth, nBars, labelBars, targetPct, stopPct },
       (frac, done, total, phase) => {
         if (barEl)    barEl.style.width = (frac * 100).toFixed(1) + '%';
         if (statusEl) statusEl.textContent =
@@ -8081,7 +8095,9 @@ async function _mlStartTraining() {
     localStorage.setItem('_mlActiveId',   id);
     localStorage.setItem('_mlActiveName', name);
 
-    toast(`✅ Модель «${name}» обучена, AUC=${result.auc.toFixed(3)}`, 3000);
+    const posPct = (100 * result.nPos / result.n).toFixed(0);
+    const aucColor = result.auc >= 0.62 ? '✅' : result.auc >= 0.55 ? '⚠️' : '❌';
+    toast(`${aucColor} «${name}» AUC=${result.auc.toFixed(3)} · сигналов=${result.n} · TP-доля=${posPct}%`, 4000);
     await openMLModal('models');
 
   } catch(e) {
