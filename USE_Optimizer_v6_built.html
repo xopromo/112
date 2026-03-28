@@ -931,6 +931,13 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
     <label data-tip="Mark-to-Market: equity учитывает нереализованный PnL открытой позиции на каждом баре — как TradingView. По умолчанию выкл: equity обновляется только при закрытии сделки (быстрее, подходит для IS/OOS). Включать для точного совпадения кривой equity с TV-индикатором.">Equity mark-to-market (как TV)</label>
   </div>
   <div class="cb" style="margin-top:4px">
+    <input type="checkbox" id="c_ml_filter" onchange="document.getElementById('c_ml_thresh_row').style.display=this.checked?'':'none'">
+    <label data-tip="Блокирует входы, если ML-оценка паттерна ниже порога. Требует обученной модели (🤖 ML). Показывает насколько ML-модель улучшает отбор стратегий.">ML-фильтр входов</label>
+  </div>
+  <div id="c_ml_thresh_row" class="g2" style="display:none;margin-top:2px">
+    <div class="field"><label>Порог ML (0–1)</label><input id="c_ml_thresh" value="0.55" data-tip="Входы с ML-оценкой ниже порога блокируются. 0.5 = всё проходит, 0.7 = только высокодостоверные сигналы"></div>
+  </div>
+  <div class="cb" style="margin-top:4px">
     <input type="checkbox" id="c_powerset">
     <label data-tip="Перебирает все комбинации включённых фильтров (2^N вариантов). Например, если активны MA+ADX+RSI — тестирует {MA}, {ADX}, {RSI}, {MA+ADX}, {MA+RSI}, {ADX+RSI}, {MA+ADX+RSI} и без фильтров. Позволяет понять какие фильтры реально помогают входу.">Перебор комбо фильтров (powerset)</label>
   </div>
@@ -14985,6 +14992,13 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
 
       // --- C. Исполнение входа ---
       if (doDir !== 0 && ac > 0) {
+        // ML-фильтр: блокировать вход если ML-оценка ниже порога
+        if (cfg.mlScoresArr && cfg.mlScoresArr[i] >= 0 &&
+            cfg.mlScoresArr[i] < (cfg.mlThreshold || 0.5)) {
+          doDir = 0;
+        }
+      }
+      if (doDir !== 0 && ac > 0) {
         inTrade=true; dir=doDir;
         entry=bar.c; entryBar=i;
         beActive=false; trailActive=false; partialDone=false; posSize=1.0; wickSL=NaN;
@@ -16138,6 +16152,8 @@ async function runOpt() {
   const erThresh      = $n('f_ert') || 0.3;
   const useKalmanMA   = $c('f_kalman');      // ##KALMAN_MA##
   const kalmanLen     = $n('f_kalmanl') || 20; // ##KALMAN_MA##
+  const useMLFilter   = $c('c_ml_filter') && typeof mlScore === 'function'; // ##ML_FILTER##
+  const mlThreshold   = $n('c_ml_thresh') || 0.55; // ##ML_FILTER##
 
   // ── Powerset фильтров ────────────────────────────────────────────────
   // Перебирает все 2^N комбинаций включённых фильтров.
@@ -17079,6 +17095,7 @@ async function runOpt() {
               useKalmanMA:_fCombo.useKalmanMA??useKalmanMA,kalmanLen, // ##KALMAN_MA##
               useMacdFilter:_fCombo.useMacdFilter??useMacdFilter,
               useER:_fCombo.useER??useER,erPeriod:erPeriod||10,erThresh,
+              useMLFilter,mlThreshold, // ##ML_FILTER##
               atrPeriod:atrP,commission:commTotal,baseComm:comm,spreadVal:spread*2,
               revSkip,revCooldown,revSrc,markToMarket:_mkm};
           results.push({name,pnl:r.pnl,wr:r.wr,n:r.n,dd:r.dd,pdd,avg:r.avg,sig,gt,
@@ -17466,6 +17483,7 @@ async function runOpt() {
               useKalmanMA:_fCombo.useKalmanMA??useKalmanMA,kalmanLen, // ##KALMAN_MA##
               useMacdFilter:_fCombo.useMacdFilter??useMacdFilter,
               useER:_fCombo.useER??useER,erPeriod:erPeriod||10,erThresh,
+              useMLFilter,mlThreshold, // ##ML_FILTER##
               atrPeriod:atrP,commission:commTotal,baseComm:comm,spreadVal:spread*2,markToMarket:_mkm};
           // OOS и тяжёлые метрики НЕ вызываем здесь — это горячий цикл
           // CVR/UPI/Sortino/kRatio вычислятся батчем после завершения TPE
@@ -18097,6 +18115,7 @@ async function runOpt() {
                                           useFat, fatConsec, fatVolDrop,
                                           useKalmanMA, kalmanLen, // ##KALMAN_MA##
                                           useMacdFilter, useER, erPeriod:erPArr[0]||10, erThresh,
+                                          useMLFilter, mlThreshold, // ##ML_FILTER##
                                           atrPeriod:atrP, commission:commTotal, baseComm:comm, spreadVal:spread*2,
                                           markToMarket:_mkm
                                         };
@@ -18600,6 +18619,16 @@ function _calcIndicators(cfg) {
     erArr,
     kalmanArr, // ##KALMAN_MA##
     kalmanCrossArr, // ##KALMAN_CROSS##
+    mlScoresArr: cfg.useMLFilter && typeof mlComputeFeatures === 'function' && typeof mlScore === 'function'
+      ? (() => {
+          const arr = new Float32Array(N).fill(-1);
+          for (let i = 52; i < N; i++) {
+            const f = mlComputeFeatures(i);
+            if (f) try { arr[i] = mlScore(f); } catch(e) { arr[i] = 0.5; }
+          }
+          return arr;
+        })()
+      : null,
   };
 }
 
@@ -18826,6 +18855,10 @@ function buildBtCfg(cfg, ind) {
     useKalmanCross: cfg.useKalmanCross || false, // ##KALMAN_CROSS##
     kalmanCrossArr: ind.kalmanCrossArr,
     kalmanCrossLen: cfg.kalmanCrossLen || 20,
+
+    useMLFilter:  cfg.useMLFilter  || false, // ##ML_FILTER##
+    mlThreshold:  cfg.mlThreshold  || 0.55,
+    mlScoresArr:  ind.mlScoresArr  || null,
 
     start: Math.max(
       (cfg.useMA      ? (maP || 0)       * (cfg.htfRatio     || 1) * (cfg.maType==='EMA'||cfg.maType==='DEMA'||cfg.maType==='TEMA'?3:1) : 0),
@@ -19404,6 +19437,7 @@ function renderVisibleResults() {
       (()=>{ const v=r.burke??null; if(v===null) return '<td class="col-burke muted">—</td>'; const vc=v>=3?'pos':v>=2?'warn':'neg'; return `<td class="col-burke ${vc}" title="Burke Ratio = PnL / √(Σ просадок²)\nУчитывает ВСЕ события просадок, не только максимальную.\n≥3 = отлично ✅ | ≥2 = хорошо | &lt;0.5 = плохо">${v.toFixed(1)}</td>`; })() + // ##BURKE
       (()=>{ const v=r.serenity??null; if(v===null) return '<td class="col-srnty muted">—</td>'; const vc=v>=5?'pos':v>=3?'warn':'neg'; return `<td class="col-srnty ${vc}" title="Serenity Index = PnL / (UlcerIndex × TailFactor)\nTailFactor = CVaR(5%) / mean(убытков) — штраф за хвостовые риски.\n≥5 = отлично ✅ | ≥3 = хорошо | &lt;1 = плохо">${v.toFixed(1)}</td>`; })() + // ##SRNTY
       (()=>{ const v=r.ir??null; if(v===null) return '<td class="col-ir muted">—</td>'; const vc=v>=1?'pos':v>=0?'warn':'neg'; return `<td class="col-ir ${vc}" title="Information Ratio = mean(active) / std(active) × √252\nactive_return = стратегия − buy&amp;hold.\n≥1 = хорошо ✅ | ≥0.5 = добавляет ценность | &lt;0 = хуже buy&amp;hold">${v.toFixed(1)}</td>`; })() + // ##IR
+      (()=>{ const ml=r.cfg&&r.cfg.useMLFilter; if(!ml) return '<td class="col-ml muted">—</td>'; const t=r.cfg.mlThreshold||0.55; const vc=t>=0.65?'pos':t>=0.55?'warn':'neg'; return `<td class="col-ml ${vc}" title="ML-фильтр активен\nПорог: ${(t*100).toFixed(0)}%\n≥65% = строгий отбор | 55–65% = умеренный | &lt;55% = мягкий">🤖${(t*100).toFixed(0)}%</td>`; })() + // ##ML_FILTER
       (()=>{ const v=r.cpcvScore??null; if(v===null) return '<td class="col-cpcv muted">—</td>'; const vc=v>=80?'pos':v>=60?'warn':'neg'; return `<td class="col-cpcv ${vc}" title="CPCV% — блочная валидация: % прибыльных блоков.\nЗаполняется после открытия детали. ≥80% = устойчива ✅">${v}%</td>`; })() + // ##CPCV lazy
       `<td class="col-avg">${r.avg.toFixed(2)}</td>` +
       `<td class="col-p1 ${r.p1 >= 0 ? 'pos' : 'neg'}">${r.p1.toFixed(1)}</td>` +
@@ -23878,6 +23912,7 @@ const _COL_DEFS = [
   { id: 'col-burke',      label: 'Burke',               default: true },  // ##BURKE
   { id: 'col-srnty',      label: 'Serenity',            default: true },  // ##SRNTY
   { id: 'col-ir',         label: 'IR',                  default: true },  // ##IR
+  { id: 'col-ml',         label: 'ML-фильтр',           default: true },  // ##ML_FILTER
   { id: 'col-cpcv',       label: 'CPCV%',               default: false }, // ##CPCV lazy
   { id: 'col-avg',        label: 'Avg%',                default: true },
   { id: 'col-p1',         label: '1п PnL',              default: true },
@@ -27725,7 +27760,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774704932680;
+window._BUILD_TS = 1774705740056;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;

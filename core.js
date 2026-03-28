@@ -876,6 +876,13 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
 
       // --- C. Исполнение входа ---
       if (doDir !== 0 && ac > 0) {
+        // ML-фильтр: блокировать вход если ML-оценка ниже порога
+        if (cfg.mlScoresArr && cfg.mlScoresArr[i] >= 0 &&
+            cfg.mlScoresArr[i] < (cfg.mlThreshold || 0.5)) {
+          doDir = 0;
+        }
+      }
+      if (doDir !== 0 && ac > 0) {
         inTrade=true; dir=doDir;
         entry=bar.c; entryBar=i;
         beActive=false; trailActive=false; partialDone=false; posSize=1.0; wickSL=NaN;
