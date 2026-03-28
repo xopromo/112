@@ -1207,7 +1207,7 @@ function showDetail(r) {
   if (_fwd && _fwd.pnlFull != null) {
     const oosPct = 100 - r.cfg._oos.isPct;
     dp.innerHTML +=
-      `<div class="dp-stats-lbl tv" title="Полный бэктест на всех данных (IS+OOS). Соответствует equity-графику.">TradingView · полный бэктест (IS+${oosPct}%) <span style="font-size:.75em;opacity:.6">· см. график</span></div>` +
+      `<div class="dp-stats-lbl tv" title="Полный бэктест на всех данных (IS+OOS). Соответствует equity-графику.">${r.cfg.useMLFilter ? '' : 'TradingView · '}полный бэктест (IS+${oosPct}%) <span style="font-size:.75em;opacity:.6">· см. график</span></div>` +
       _statsRow({
         pnl: _fwd.pnlFull, wr: _fwd.wr, n: _fwd.n, dd: _fwd.dd, pdd: _fwd.pdd??0,
         dwr: _fwd.dwr??0, p1: _fwd.p1??0, p2: _fwd.p2??0, c1: _fwd.c1??0, c2: _fwd.c2??0,
@@ -2321,53 +2321,8 @@ function _refreshFavStars() {
   // Если мы в режиме fav — обновляем список полностью
   if (_tableMode === 'fav') applyFilters(true);
 }
-function renderFavBar() {
-  const bar = $('fav-bar'), sec = $('fav-section');
-  // Показываем секцию если есть хоть какие-то избранные (любого ns)
-  if (!favourites.length) { sec.style.display='none'; return; }
-  sec.style.display = 'block';
-
-  // Считаем только текущий ns
-  const nsItems = favourites.filter(f => (f.ns||'') === _favNs);
-  $('fav-count').textContent = nsItems.length;
-
-  // Обновляем метку ns
-  const nsLabel = $('fav-ns-label');
-  if (nsLabel) nsLabel.textContent = _favNs ? _favNs : '';
-
-  const q = ($('fav-search') ? $('fav-search').value.trim().toLowerCase() : '');
-  // Фильтруем: только текущий ns + поисковый запрос
-  const filtered = favourites
-    .map((f, i) => ({ f, i }))
-    .filter(({ f }) => (f.ns||'') === _favNs && (!q || f.name.toLowerCase().includes(q)));
-
-  if (!filtered.length) {
-    const allNs = [...new Set(favourites.map(f => f.ns||'').filter(Boolean))];
-    const hint = !_favNs && allNs.length
-      ? `<br><span style="color:var(--accent);cursor:pointer" onclick="openNsModal()">Доступные ns: ${allNs.join(', ')}</span>`
-      : '';
-    bar.innerHTML = `<div style="font-size:.62em;color:var(--text3);padding:4px 6px">Нет избранных в ns "${_favNs||'общий'}"${hint}</div>`;
-    return;
-  }
-
-  bar.innerHTML = filtered.map(({ f, i }, idx) => {
-    const pdd = f.stats.dd > 0 ? (f.stats.pnl / f.stats.dd) : 0;
-    const pddCls = pdd >= 5 ? 'pos' : pdd >= 2 ? 'warn' : 'neg';
-    return `<div class="fav-row">
-      <span class="fav-row-num">${idx + 1}</span>
-      <span class="fav-row-name" onclick="loadFavAsTpl(${i})" title="${f.name}">${f.name}</span>
-      <span class="fav-row-stats">PnL&nbsp;${f.stats.pnl.toFixed(1)}%&nbsp;WR&nbsp;${f.stats.wr ? f.stats.wr.toFixed(0) : '—'}%&nbsp;#${f.stats.n}</span>
-      <span class="fav-row-pdd ${pddCls}">P/DD&nbsp;${pdd.toFixed(1)}</span>
-      <span class="fav-row-del" onclick="removeFav(${i})" title="Удалить">✕</span>
-    </div>`;
-  }).join('');
-}
-
-function toggleFavBody() {
-  const body = $('fav-body'), tog = $('fav-toggle');
-  const open = body.classList.toggle('open');
-  tog.textContent = open ? '▲ скрыть' : '▼ показать';
-}
+function renderFavBar() { /* панель убрана — избранные доступны в таблице (вкладка Избранные) */ }
+function toggleFavBody() {}
 function removeFav(i) {
   favourites.splice(i,1);
   storeSave(_favKey(), favourites);
