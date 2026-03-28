@@ -7899,15 +7899,19 @@ function _mlModelsTab(models, activeId, hasBuiltin) {
               style="padding:4px 7px;background:var(--bg3,#313244);border:1px solid #555;border-radius:4px;color:var(--fg,#cdd6f4);font-size:1em">
           </label>
           <label style="font-size:.78em;color:#888;display:flex;flex-direction:column;gap:3px">Деревьев
-            <input id="ml-train-ntrees" type="number" value="80" min="20" max="300"
+            <input id="ml-train-ntrees" type="number" value="100" min="20" max="400"
               style="padding:4px 7px;background:var(--bg3,#313244);border:1px solid #555;border-radius:4px;color:var(--fg,#cdd6f4);font-size:1em">
           </label>
           <label style="font-size:.78em;color:#888;display:flex;flex-direction:column;gap:3px">Глубина дерева
-            <input id="ml-train-depth" type="number" value="4" min="2" max="6"
+            <input id="ml-train-depth" type="number" value="5" min="2" max="8"
               style="padding:4px 7px;background:var(--bg3,#313244);border:1px solid #555;border-radius:4px;color:var(--fg,#cdd6f4);font-size:1em">
           </label>
           <label style="font-size:.78em;color:#888;display:flex;flex-direction:column;gap:3px">Баров обучения
             <input id="ml-train-bars" type="number" value="" placeholder="все"
+              style="padding:4px 7px;background:var(--bg3,#313244);border:1px solid #555;border-radius:4px;color:var(--fg,#cdd6f4);font-size:1em">
+          </label>
+          <label style="font-size:.78em;color:#888;display:flex;flex-direction:column;gap:3px" title="Сколько баров вперёд смотрит метка: был ли прибыльный выход">Горизонт (баров)
+            <input id="ml-train-label" type="number" value="20" min="5" max="100"
               style="padding:4px 7px;background:var(--bg3,#313244);border:1px solid #555;border-radius:4px;color:var(--fg,#cdd6f4);font-size:1em">
           </label>
         </div>
@@ -7943,15 +7947,32 @@ function _mlModelsTab(models, activeId, hasBuiltin) {
 
 function _mlScanTab() {
   const active = typeof mlScore === 'function';
+  // Check feature mismatch: test model with a dummy 33-feature vector
+  let featWarn = '';
+  if (active && typeof ML_FEAT_N !== 'undefined') {
+    try {
+      const dummy = new Float64Array(ML_FEAT_N);
+      const r = mlScore(dummy);
+      if (r === 0.5 && ML_FEAT_N !== 21) featWarn = `
+        <div style="margin-top:6px;padding:5px 8px;background:rgba(249,226,175,.08);border:1px solid rgba(249,226,175,.3);border-radius:4px;font-size:.78em;color:#f9e2af">
+          ⚠️ Активная модель обучена на старых признаках. Перейдите в «Модели» и нажмите <b>⚡ Обучить</b> заново.
+        </div>`;
+    } catch(e) {}
+  }
   return `
-    <div style="font-size:.82em;color:#888;margin-bottom:14px">
+    <div style="font-size:.82em;color:#888;margin-bottom:10px">
       Активная модель: <span style="color:#a78bfa">${_mlActiveName||'Встроенная'}</span>
-      ${active ? '' : ' <span style="color:#f38ba8">— не загружена</span>'}
+      ${active ? '' : ' <span style="color:#f38ba8">— не загружена. Перейдите в «Модели» → ⚡ Обучить</span>'}
+      ${featWarn}
+    </div>
+    <div style="font-size:.75em;color:#555;margin-bottom:12px;line-height:1.5">
+      Сканирует pivot-low сигналы и оценивает каждый по 33 признакам:<br>
+      цена · объём · RSI · расст. от EMA20/50 · структура свечи · режим волатильности · тренд
     </div>
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap">
       <label style="font-size:.82em;color:#aaa">Последних баров:</label>
-      <input id="ml-scan-bars" type="number" value="500" min="50" max="5000"
-        style="width:70px;padding:4px 6px;background:var(--bg3,#313244);border:1px solid #555;border-radius:4px;color:var(--fg,#cdd6f4);font-size:.82em">
+      <input id="ml-scan-bars" type="number" value="500" min="50" max="50000"
+        style="width:80px;padding:4px 6px;background:var(--bg3,#313244);border:1px solid #555;border-radius:4px;color:var(--fg,#cdd6f4);font-size:.82em">
       <button onclick="_mlRunScan()"
         style="padding:5px 16px;background:rgba(139,92,246,.2);border:1px solid rgba(139,92,246,.5);border-radius:4px;color:#a78bfa;cursor:pointer;font-size:.82em">
         ▶ Сканировать
@@ -8020,10 +8041,10 @@ async function _mlStartTraining() {
   const name     = nameEl?.value.trim();
   if (!name) { toast('Введите название модели', 2000); nameEl?.focus(); return; }
 
-  const nTrees = parseInt(document.getElementById('ml-train-ntrees')?.value) || 80;
-  const depth  = parseInt(document.getElementById('ml-train-depth')?.value)  || 4;
-  const barsEl = document.getElementById('ml-train-bars');
-  const nBars  = parseInt(barsEl?.value) || DATA.length;
+  const nTrees    = parseInt(document.getElementById('ml-train-ntrees')?.value) || 100;
+  const depth     = parseInt(document.getElementById('ml-train-depth')?.value)  || 5;
+  const labelBars = parseInt(document.getElementById('ml-train-label')?.value)  || 20;
+  const nBars     = parseInt(document.getElementById('ml-train-bars')?.value)   || DATA.length;
 
   const statusEl  = document.getElementById('ml-train-status');
   const barWrap   = document.getElementById('ml-train-bar-wrap');
@@ -8036,7 +8057,7 @@ async function _mlStartTraining() {
 
   try {
     const result = await mlTrainInBrowser(
-      { nTrees, maxDepth: depth, nBars },
+      { nTrees, maxDepth: depth, nBars, labelBars },
       (frac, done, total, phase) => {
         if (barEl)    barEl.style.width = (frac * 100).toFixed(1) + '%';
         if (statusEl) statusEl.textContent =
