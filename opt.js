@@ -1140,6 +1140,8 @@ async function runOpt() {
   const erThresh      = $n('f_ert') || 0.3;
   const useKalmanMA   = $c('f_kalman');      // ##KALMAN_MA##
   const kalmanLen     = $n('f_kalmanl') || 20; // ##KALMAN_MA##
+  const useMLFilter   = $c('c_ml_filter') && typeof mlScore === 'function'; // ##ML_FILTER##
+  const mlThreshold   = $n('c_ml_thresh') || 0.55; // ##ML_FILTER##
 
   // ── Powerset фильтров ────────────────────────────────────────────────
   // Перебирает все 2^N комбинаций включённых фильтров.
@@ -2081,6 +2083,7 @@ async function runOpt() {
               useKalmanMA:_fCombo.useKalmanMA??useKalmanMA,kalmanLen, // ##KALMAN_MA##
               useMacdFilter:_fCombo.useMacdFilter??useMacdFilter,
               useER:_fCombo.useER??useER,erPeriod:erPeriod||10,erThresh,
+              useMLFilter,mlThreshold, // ##ML_FILTER##
               atrPeriod:atrP,commission:commTotal,baseComm:comm,spreadVal:spread*2,
               revSkip,revCooldown,revSrc,markToMarket:_mkm};
           results.push({name,pnl:r.pnl,wr:r.wr,n:r.n,dd:r.dd,pdd,avg:r.avg,sig,gt,
@@ -2468,6 +2471,7 @@ async function runOpt() {
               useKalmanMA:_fCombo.useKalmanMA??useKalmanMA,kalmanLen, // ##KALMAN_MA##
               useMacdFilter:_fCombo.useMacdFilter??useMacdFilter,
               useER:_fCombo.useER??useER,erPeriod:erPeriod||10,erThresh,
+              useMLFilter,mlThreshold, // ##ML_FILTER##
               atrPeriod:atrP,commission:commTotal,baseComm:comm,spreadVal:spread*2,markToMarket:_mkm};
           // OOS и тяжёлые метрики НЕ вызываем здесь — это горячий цикл
           // CVR/UPI/Sortino/kRatio вычислятся батчем после завершения TPE
@@ -3099,6 +3103,7 @@ async function runOpt() {
                                           useFat, fatConsec, fatVolDrop,
                                           useKalmanMA, kalmanLen, // ##KALMAN_MA##
                                           useMacdFilter, useER, erPeriod:erPArr[0]||10, erThresh,
+                                          useMLFilter, mlThreshold, // ##ML_FILTER##
                                           atrPeriod:atrP, commission:commTotal, baseComm:comm, spreadVal:spread*2,
                                           markToMarket:_mkm
                                         };
@@ -3602,6 +3607,16 @@ function _calcIndicators(cfg) {
     erArr,
     kalmanArr, // ##KALMAN_MA##
     kalmanCrossArr, // ##KALMAN_CROSS##
+    mlScoresArr: cfg.useMLFilter && typeof mlComputeFeatures === 'function' && typeof mlScore === 'function'
+      ? (() => {
+          const arr = new Float32Array(N).fill(-1);
+          for (let i = 52; i < N; i++) {
+            const f = mlComputeFeatures(i);
+            if (f) try { arr[i] = mlScore(f); } catch(e) { arr[i] = 0.5; }
+          }
+          return arr;
+        })()
+      : null,
   };
 }
 
@@ -3828,6 +3843,10 @@ function buildBtCfg(cfg, ind) {
     useKalmanCross: cfg.useKalmanCross || false, // ##KALMAN_CROSS##
     kalmanCrossArr: ind.kalmanCrossArr,
     kalmanCrossLen: cfg.kalmanCrossLen || 20,
+
+    useMLFilter:  cfg.useMLFilter  || false, // ##ML_FILTER##
+    mlThreshold:  cfg.mlThreshold  || 0.55,
+    mlScoresArr:  ind.mlScoresArr  || null,
 
     start: Math.max(
       (cfg.useMA      ? (maP || 0)       * (cfg.htfRatio     || 1) * (cfg.maType==='EMA'||cfg.maType==='DEMA'||cfg.maType==='TEMA'?3:1) : 0),

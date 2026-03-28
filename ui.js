@@ -993,6 +993,7 @@ function renderVisibleResults() {
       (()=>{ const v=r.burke??null; if(v===null) return '<td class="col-burke muted">—</td>'; const vc=v>=3?'pos':v>=2?'warn':'neg'; return `<td class="col-burke ${vc}" title="Burke Ratio = PnL / √(Σ просадок²)\nУчитывает ВСЕ события просадок, не только максимальную.\n≥3 = отлично ✅ | ≥2 = хорошо | &lt;0.5 = плохо">${v.toFixed(1)}</td>`; })() + // ##BURKE
       (()=>{ const v=r.serenity??null; if(v===null) return '<td class="col-srnty muted">—</td>'; const vc=v>=5?'pos':v>=3?'warn':'neg'; return `<td class="col-srnty ${vc}" title="Serenity Index = PnL / (UlcerIndex × TailFactor)\nTailFactor = CVaR(5%) / mean(убытков) — штраф за хвостовые риски.\n≥5 = отлично ✅ | ≥3 = хорошо | &lt;1 = плохо">${v.toFixed(1)}</td>`; })() + // ##SRNTY
       (()=>{ const v=r.ir??null; if(v===null) return '<td class="col-ir muted">—</td>'; const vc=v>=1?'pos':v>=0?'warn':'neg'; return `<td class="col-ir ${vc}" title="Information Ratio = mean(active) / std(active) × √252\nactive_return = стратегия − buy&amp;hold.\n≥1 = хорошо ✅ | ≥0.5 = добавляет ценность | &lt;0 = хуже buy&amp;hold">${v.toFixed(1)}</td>`; })() + // ##IR
+      (()=>{ const ml=r.cfg&&r.cfg.useMLFilter; if(!ml) return '<td class="col-ml muted">—</td>'; const t=r.cfg.mlThreshold||0.55; const vc=t>=0.65?'pos':t>=0.55?'warn':'neg'; return `<td class="col-ml ${vc}" title="ML-фильтр активен\nПорог: ${(t*100).toFixed(0)}%\n≥65% = строгий отбор | 55–65% = умеренный | &lt;55% = мягкий">🤖${(t*100).toFixed(0)}%</td>`; })() + // ##ML_FILTER
       (()=>{ const v=r.cpcvScore??null; if(v===null) return '<td class="col-cpcv muted">—</td>'; const vc=v>=80?'pos':v>=60?'warn':'neg'; return `<td class="col-cpcv ${vc}" title="CPCV% — блочная валидация: % прибыльных блоков.\nЗаполняется после открытия детали. ≥80% = устойчива ✅">${v}%</td>`; })() + // ##CPCV lazy
       `<td class="col-avg">${r.avg.toFixed(2)}</td>` +
       `<td class="col-p1 ${r.p1 >= 0 ? 'pos' : 'neg'}">${r.p1.toFixed(1)}</td>` +
@@ -5075,6 +5076,7 @@ const _COL_DEFS = [
   { id: 'col-burke',      label: 'Burke',               default: true },  // ##BURKE
   { id: 'col-srnty',      label: 'Serenity',            default: true },  // ##SRNTY
   { id: 'col-ir',         label: 'IR',                  default: true },  // ##IR
+  { id: 'col-ml',         label: 'ML-фильтр',           default: true },  // ##ML_FILTER
   { id: 'col-cpcv',       label: 'CPCV%',               default: false }, // ##CPCV lazy
   { id: 'col-avg',        label: 'Avg%',                default: true },
   { id: 'col-p1',         label: '1п PnL',              default: true },

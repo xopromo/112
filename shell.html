@@ -931,6 +931,13 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
     <label data-tip="Mark-to-Market: equity учитывает нереализованный PnL открытой позиции на каждом баре — как TradingView. По умолчанию выкл: equity обновляется только при закрытии сделки (быстрее, подходит для IS/OOS). Включать для точного совпадения кривой equity с TV-индикатором.">Equity mark-to-market (как TV)</label>
   </div>
   <div class="cb" style="margin-top:4px">
+    <input type="checkbox" id="c_ml_filter" onchange="document.getElementById('c_ml_thresh_row').style.display=this.checked?'':'none'">
+    <label data-tip="Блокирует входы, если ML-оценка паттерна ниже порога. Требует обученной модели (🤖 ML). Показывает насколько ML-модель улучшает отбор стратегий.">ML-фильтр входов</label>
+  </div>
+  <div id="c_ml_thresh_row" class="g2" style="display:none;margin-top:2px">
+    <div class="field"><label>Порог ML (0–1)</label><input id="c_ml_thresh" value="0.55" data-tip="Входы с ML-оценкой ниже порога блокируются. 0.5 = всё проходит, 0.7 = только высокодостоверные сигналы"></div>
+  </div>
+  <div class="cb" style="margin-top:4px">
     <input type="checkbox" id="c_powerset">
     <label data-tip="Перебирает все комбинации включённых фильтров (2^N вариантов). Например, если активны MA+ADX+RSI — тестирует {MA}, {ADX}, {RSI}, {MA+ADX}, {MA+RSI}, {ADX+RSI}, {MA+ADX+RSI} и без фильтров. Позволяет понять какие фильтры реально помогают входу.">Перебор комбо фильтров (powerset)</label>
   </div>
