@@ -91,7 +91,7 @@ const FILTER_REGISTRY = [
     flag:     'useStruct',
     blocksL:  (cfg, i) => cfg.structBull && !cfg.structBull[i],
     blocksS:  (cfg, i) => cfg.structBear && !cfg.structBear[i],
-    nameLabel: (cfg) => `Struct(L${cfg.strPvL||5}R${cfg.strPvR||2})`,
+    nameLabel: (cfg) => `Struct${cfg.structLen||20}(L${cfg.strPvL||5}R${cfg.strPvR||2})`,
   },
 
   // ── MA Distance ───────────────────────────────────────────
