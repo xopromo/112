@@ -17009,7 +17009,7 @@ async function runOpt() {
         useRSI:_effUseRsi,rsiArr:_effUseRsi?calcRSI(14):null,rsiOS:rsiPair.os,rsiOB:rsiPair.ob,
         useVolF:_effUseVolF&&vfM>0,atrAvg,volFMult:vfM,
         useAtrExp:_effUseAtrExp&&atrExpM>0,atrExpMult:atrExpM,
-        useStruct:_effUseStruct,structBull:_effUseStruct?_computeStruct(strPvL,strPvR,structLen).bull:null,structBear:_effUseStruct?_computeStruct(strPvL,strPvR,structLen).bear:null,strPvL,strPvR,
+        useStruct:_effUseStruct,structLen,structBull:_effUseStruct?_computeStruct(strPvL,strPvR,structLen).bull:null,structBear:_effUseStruct?_computeStruct(strPvL,strPvR,structLen).bear:null,strPvL,strPvR,
         useSLPiv,slPivOff,slPivMax,slPivL,slPivR,slPivTrail,pivSLLo,pivSLHi,pivSLLoAge,pivSLHiAge,
         useConfirm:_effUseConfirm&&confN>0,confN,confMatType:_confType,confHtfRatio:_confHtf,maArrConfirm:confMAArr,
         useMaDist:_effUseMaDist&&mdMax>0,maDistMax:mdMax,
@@ -17366,7 +17366,7 @@ async function runOpt() {
         useRSI:_effUseRsi,rsiArr:_effUseRsi?_tpeRsiArr:null,rsiOS:rsiPair.os,rsiOB:rsiPair.ob,
         useVolF:_effUseVolF&&vfM>0,atrAvg,volFMult:vfM,
         useAtrExp:_effUseAtrExp&&atrExpM>0,atrExpMult:atrExpM,
-        useStruct:_effUseStruct,structBull:_effUseStruct?_computeStruct(strPvL,strPvR,structLen).bull:null,structBear:_effUseStruct?_computeStruct(strPvL,strPvR,structLen).bear:null,strPvL,strPvR,
+        useStruct:_effUseStruct,structLen,structBull:_effUseStruct?_computeStruct(strPvL,strPvR,structLen).bull:null,structBear:_effUseStruct?_computeStruct(strPvL,strPvR,structLen).bear:null,strPvL,strPvR,
         useSLPiv,slPivOff,slPivMax,slPivL,slPivR,slPivTrail,pivSLLo,pivSLHi,pivSLLoAge,pivSLHiAge,
         useConfirm:_effUseConfirm&&confN>0,confN,confMatType:_confType,confHtfRatio:_confHtf,maArrConfirm:confMAArr,
         useMaDist:_effUseMaDist&&mdMax>0,maDistMax:mdMax,
@@ -18004,7 +18004,7 @@ async function runOpt() {
                                       rsiOS:rsiPair.os,rsiOB:rsiPair.ob,
                                       useVolF:useVolF&&vfM>0,atrAvg,volFMult:vfM,
                                       useAtrExp:useAtrExp&&atrExpM>0,atrExpMult:atrExpM,
-                                      useStruct,structBull:useStruct?_computeStruct(strPvL,strPvR,structLen).bull:null,structBear:useStruct?_computeStruct(strPvL,strPvR,structLen).bear:null,strPvL,strPvR,
+                                      useStruct,structLen,structBull:useStruct?_computeStruct(strPvL,strPvR,structLen).bull:null,structBear:useStruct?_computeStruct(strPvL,strPvR,structLen).bear:null,strPvL,strPvR,
                                       useConfirm:useConfirm&&confN>0,confN,confMatType:_confType,confHtfRatio:_confHtf,maArrConfirm:confMAArr,
                                       useMaDist:useMaDist&&mdMax>0,maDistMax:mdMax,
                                       useCandleF,candleMin,candleMax,
@@ -27760,7 +27760,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774705944818;
+window._BUILD_TS = 1774706387472;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
