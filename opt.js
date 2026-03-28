@@ -2026,6 +2026,7 @@ async function runOpt() {
         useMacdFilter:_fCombo.useMacdFilter??useMacdFilter,
         useER:_fCombo.useER??useER,erArr,erPeriod:erPeriod||10,erThresh,
         useKalmanMA:_fCombo.useKalmanMA??useKalmanMA,kalmanArr,kalmanLen, // ##KALMAN_MA##
+        useMLFilter,mlThreshold,mlScoresArr:_precompMlScores, // ##ML_FILTER## горячий цикл IS
         start:Math.max(
           (_effUseMa&&maP>0?(maP||0)*(htfRatio||1)*(_mType==='EMA'||_mType==='DEMA'||_mType==='TEMA'?3:1):0),
           (_effUseConfirm&&confN>0?(confN||0)*(_confHtf||1)*(_confType==='EMA'||_confType==='DEMA'||_confType==='TEMA'?3:1):0),
@@ -2379,6 +2380,7 @@ async function runOpt() {
         useMacdFilter:_fCombo.useMacdFilter??useMacdFilter,
         useER:_fCombo.useER??useER,erArr,erPeriod:erPeriod||10,erThresh,
         useKalmanMA:_fCombo.useKalmanMA??useKalmanMA,kalmanArr,kalmanLen, // ##KALMAN_MA##
+        useMLFilter,mlThreshold,mlScoresArr:_precompMlScores, // ##ML_FILTER## горячий цикл IS
         start:Math.max(
           (_effUseMa&&maP>0?(maP||0)*(htfRatio||1)*(_mType==='EMA'||_mType==='DEMA'||_mType==='TEMA'?3:1):0),
           (_effUseConfirm&&confN>0?(confN||0)*(_confHtf||1)*(_confType==='EMA'||_confType==='DEMA'||_confType==='TEMA'?3:1):0),
@@ -3018,6 +3020,7 @@ async function runOpt() {
                                       useFat,fatConsec,fatVolDrop,
                                       useKalmanMA,kalmanArr,kalmanLen, // ##KALMAN_MA##
                                       useMacdFilter,useER,erArr:erArrEx,erPeriod:erPArr[0]||10,erThresh,
+                                      useMLFilter,mlThreshold,mlScoresArr:_precompMlScores, // ##ML_FILTER## горячий цикл IS
                                       bodyAvg:bodyAvgArr,
                                       start:Math.max(
                                         (useMa&&maP>0?(maP||0)*(htfRatio||1)*(mType==='EMA'||mType==='DEMA'||mType==='TEMA'?3:1):0),
