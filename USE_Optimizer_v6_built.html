@@ -9610,6 +9610,7 @@ function generatePineScript(r) {
   lines.push(`use_struct   = input.bool(${b(c.useStruct)}, "Структура рынка HH/HL", group=grp_struct)`);
   lines.push(`struct_pv_l  = input.int(${Math.max(2, c.strPvL||5)}, "Pivot left",  minval=2, maxval=100, group=grp_struct)`);
   lines.push(`struct_pv_r  = input.int(${Math.max(1, c.strPvR||2)}, "Pivot right", minval=1, maxval=10,   group=grp_struct)`);
+  lines.push(`struct_len_v = input.int(${Math.max(10, c.structLen||200)}, "Окно (баров)", minval=10, maxval=2000, group=grp_struct)`);
   lines.push(``);
 
   lines.push(`grp_rsi_f = "📊 RSI ФИЛЬТР"`);
@@ -9820,14 +9821,24 @@ function generatePineScript(r) {
     lines.push(`var float struct_hi2 = na`);
     lines.push(`var float struct_lo1 = na`);
     lines.push(`var float struct_lo2 = na`);
+    lines.push(`var int struct_hi1_bar = na`);
+    lines.push(`var int struct_hi2_bar = na`);
+    lines.push(`var int struct_lo1_bar = na`);
+    lines.push(`var int struct_lo2_bar = na`);
   lines.push(`if not na(struct_pv_hi_v)`);
     lines.push(`    struct_hi2 := struct_hi1`);
+    lines.push(`    struct_hi2_bar := struct_hi1_bar`);
     lines.push(`    struct_hi1 := high[struct_pv_r]`);
+    lines.push(`    struct_hi1_bar := bar_index - struct_pv_r`);
   lines.push(`if not na(struct_pv_lo_v)`);
     lines.push(`    struct_lo2 := struct_lo1`);
+    lines.push(`    struct_lo2_bar := struct_lo1_bar`);
     lines.push(`    struct_lo1 := low[struct_pv_r]`);
-  lines.push(`bool struct_bull = not na(struct_hi1) and not na(struct_hi2) and not na(struct_lo1) and not na(struct_lo2) and struct_hi1 > struct_hi2 and struct_lo1 > struct_lo2`);
-  lines.push(`bool struct_bear = not na(struct_hi1) and not na(struct_hi2) and not na(struct_lo1) and not na(struct_lo2) and struct_hi1 < struct_hi2 and struct_lo1 < struct_lo2`);
+    lines.push(`    struct_lo1_bar := bar_index - struct_pv_r`);
+  lines.push(`bool struct_has_2hi = not na(struct_hi2) and not na(struct_hi2_bar) and (bar_index - struct_hi2_bar) <= struct_len_v`);
+  lines.push(`bool struct_has_2lo = not na(struct_lo2) and not na(struct_lo2_bar) and (bar_index - struct_lo2_bar) <= struct_len_v`);
+  lines.push(`bool struct_bull = struct_has_2hi and struct_has_2lo and struct_hi1 > struct_hi2 and struct_lo1 > struct_lo2`);
+  lines.push(`bool struct_bear = struct_has_2hi and struct_has_2lo and struct_hi1 < struct_hi2 and struct_lo1 < struct_lo2`);
   lines.push(`bool struct_ok_l = not use_struct or struct_bull`);
   lines.push(`bool struct_ok_s = not use_struct or struct_bear`);
   lines.push(``);
@@ -11135,6 +11146,7 @@ function _addActivePinev6(code) {
   if (!code) return code;
   // [toggleVar, [...depVars]]
   const groups = [
+    ['use_struct',     ['struct_pv_l','struct_pv_r','struct_len_v']],
     ['use_pivot',      ['pivot_left','pivot_right']],
     ['use_pinbar',     ['pin_ratio']],
     ['use_donch',      ['donch_len']],
@@ -27795,7 +27807,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774712010875;
+window._BUILD_TS = 1774712508905;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
