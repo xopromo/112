@@ -1832,6 +1832,7 @@ let timeMode  = 'any';  // any | plus
 let clxMode   = 'any';  // any | plus
 let favourites = [];
 let templates = [];
+let _activeTplIdx = -1; // индекс последнего загруженного/сохранённого шаблона
 let _favNs = '';   // неймспейс избранных: 'BTC_1h', 'ETH_4h' и т.д. Пустая строка = без метки.
 let resultCache = new Map();
 let _t0 = 0;
@@ -1889,8 +1890,8 @@ async function storeLoad(key) {
 window.addEventListener('load', async () => {
   _idbInit(); // IndexedDB для задач/серий — запускаем async, не блокируем
   templates = (await storeLoad('use6_tpl')) || [];
-  const def = templates.find(t => t.isDefault);
-  if (def) applySettings(def.settings);
+  const defIdx = templates.findIndex(t => t.isDefault);
+  if (defIdx >= 0) { applySettings(templates[defIdx].settings); _activeTplIdx = defIdx; }
 
   // Наборы фильтров: рендерим кнопки быстрого доступа и применяем дефолтный
   const filterTpls = (await storeLoad(_TBL_TPL_KEY)) || [];
@@ -1898,6 +1899,7 @@ window.addEventListener('load', async () => {
   const defFilterTpl = filterTpls.find(t => t.isDefault);
   if (defFilterTpl) _applyTableFilters(defFilterTpl.filters, false);
   renderTplList();
+  _updateActiveTplBadge();
   updateClxExitVisibility();
 
   // ── Projects ──────────────────────────────────────────────
@@ -2084,6 +2086,14 @@ function downloadPineCode() {
   a.click();
 }
 
+function _updateActiveTplBadge() {
+  const el = document.getElementById('tpl-active-name');
+  if (!el) return;
+  const t = (_activeTplIdx >= 0 && _activeTplIdx < templates.length) ? templates[_activeTplIdx] : null;
+  if (t) { el.textContent = t.name; el.style.display = 'inline'; }
+  else    { el.textContent = ''; el.style.display = 'none'; }
+}
+
 function renderTplList() {
   const el = $('tpl-list-el');
   if (!templates.length) {
@@ -2091,13 +2101,14 @@ function renderTplList() {
     return;
   }
   el.innerHTML = templates.map((t,i) => `
-    <div class="tpl-item ${t.isDefault?'def':''}">
+    <div class="tpl-item ${t.isDefault?'def':''} ${i===_activeTplIdx?'active-tpl':''}">
       <div style="flex:1;min-width:0">
-        <div class="tpl-item-name">${t.isDefault?'⭐ ':''}${t.name}</div>
+        <div class="tpl-item-name">${t.isDefault?'⭐ ':''}${i===_activeTplIdx?'▶ ':''}${t.name}</div>
         <div class="tpl-item-date">${new Date(t.ts).toLocaleString('ru-RU')}</div>
       </div>
       <div style="display:flex;gap:4px;flex-shrink:0">
         <div class="tpl-ibtn" onclick="loadTpl(${i})" title="Загрузить настройки">Загрузить</div>
+        <div class="tpl-ibtn ok" onclick="overwriteTpl(${i})" title="Перезаписать текущими настройками">💾</div>
         <div class="tpl-ibtn" onclick="exportTpl(${i})" title="Скопировать шаблон в буфер (для переноса)">📤</div>
         <div class="tpl-ibtn" onclick="setDefaultTpl(${i})" title="Загружать по умолчанию при открытии">${t.isDefault?'★':'☆'}</div>
         <div class="tpl-ibtn del" onclick="deleteTpl(${i})" title="Удалить шаблон">✕</div>
@@ -2159,14 +2170,30 @@ function applySettings(s) {
 function saveTpl() {
   const name = ($('tpl-name-inp').value.trim()) || ('Шаблон ' + new Date().toLocaleTimeString('ru-RU'));
   const isDef = $c('tpl-def-cb');
-  if (isDef) templates.forEach(t => t.isDefault=false);
-  templates.push({ name, settings: gatherSettings(), isDefault: isDef, ts: Date.now() });
+  const existIdx = templates.findIndex(t => t.name === name);
+  if (existIdx >= 0) {
+    // Перезаписываем существующий
+    if (isDef) templates.forEach(t => t.isDefault=false);
+    templates[existIdx].settings = gatherSettings();
+    templates[existIdx].ts = Date.now();
+    if (isDef) templates[existIdx].isDefault = true;
+    _activeTplIdx = existIdx;
+    showTplToast(`💾 Шаблон "${name}" перезаписан`);
+  } else {
+    // Новый шаблон
+    if (isDef) templates.forEach(t => t.isDefault=false);
+    templates.push({ name, settings: gatherSettings(), isDefault: isDef, ts: Date.now() });
+    _activeTplIdx = templates.length - 1;
+  }
   storeSave('use6_tpl', templates);
   renderTplList();
+  _updateActiveTplBadge();
   $('tpl-name-inp').value = '';
 }
 function loadTpl(i) {
   applySettings(templates[i].settings);
+  _activeTplIdx = i;
+  _updateActiveTplBadge();
   closeTplModal();
 }
 function setDefaultTpl(i) {
@@ -2175,9 +2202,24 @@ function setDefaultTpl(i) {
   renderTplList();
 }
 function deleteTpl(i) {
+  if (_activeTplIdx === i) { _activeTplIdx = -1; _updateActiveTplBadge(); }
+  else if (_activeTplIdx > i) { _activeTplIdx--; }
   templates.splice(i,1);
   storeSave('use6_tpl', templates);
   renderTplList();
+}
+function overwriteTpl(i) {
+  templates[i].settings = gatherSettings();
+  templates[i].ts = Date.now();
+  _activeTplIdx = i;
+  storeSave('use6_tpl', templates);
+  renderTplList();
+  _updateActiveTplBadge();
+  showTplToast(`💾 "${templates[i].name}" перезаписан`);
+}
+function quickSaveTpl() {
+  if (_activeTplIdx < 0 || _activeTplIdx >= templates.length) return;
+  overwriteTpl(_activeTplIdx);
 }
 
 function exportTpl(i) {
