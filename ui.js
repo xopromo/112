@@ -7682,3 +7682,76 @@ async function refreshProjectFiles() {
   }
 }
 
+// ── ML Scan Modal ──────────────────────────────────────────────
+
+function openMLScanModal() {
+  if (typeof mlModelLoaded !== 'function' || !mlModelLoaded()) {
+    toast('⚠️ ML-модель не загружена. Сначала загрузите model_generated.js', 3000);
+    return;
+  }
+  if (!DATA || DATA.length < 50) {
+    toast('⚠️ Нет данных для ML-скана', 2500);
+    return;
+  }
+
+  const results = mlScanSignals(500);
+
+  let el = document.getElementById('ml-scan-modal');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'ml-scan-modal';
+    el.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;display:flex;align-items:center;justify-content:center';
+    el.innerHTML = `
+      <div style="background:var(--bg2,#1e1e2e);border:1px solid rgba(139,92,246,.4);border-radius:8px;padding:20px;max-width:600px;width:95%;max-height:80vh;overflow-y:auto;color:var(--fg,#cdd6f4)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+          <span style="font-weight:600;font-size:.95em">🤖 ML-скан: лучшие pivot-сигналы</span>
+          <button onclick="document.getElementById('ml-scan-modal').remove()" style="background:none;border:none;color:var(--fg,#cdd6f4);cursor:pointer;font-size:1.2em">✕</button>
+        </div>
+        <div id="ml-scan-body"></div>
+      </div>`;
+    document.body.appendChild(el);
+  }
+
+  const body = el.querySelector('#ml-scan-body');
+  if (!results.length) {
+    body.innerHTML = '<div style="color:#888;text-align:center;padding:20px">Сигналов не найдено</div>';
+    return;
+  }
+
+  const fmt = ts => {
+    if (!ts) return '—';
+    const d = new Date(ts * 1000);
+    return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit' });
+  };
+
+  const rows = results.slice(0, 50).map((r, i) => {
+    const pct = (r.score * 100).toFixed(1);
+    const color = r.score >= 0.65 ? '#a6e3a1' : r.score >= 0.5 ? '#f9e2af' : '#f38ba8';
+    return `<tr>
+      <td style="padding:4px 8px;color:#888">${i+1}</td>
+      <td style="padding:4px 8px">${fmt(r.time)}</td>
+      <td style="padding:4px 8px;text-align:right">${r.close.toFixed(2)}</td>
+      <td style="padding:4px 8px;text-align:right;color:${color};font-weight:600">${pct}%</td>
+    </tr>`;
+  }).join('');
+
+  body.innerHTML = `
+    <div style="font-size:.78em;color:#888;margin-bottom:10px">
+      Найдено: ${results.length} pivot-low сигналов за последние 500 баров. Топ-50 по ML-оценке:
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:.8em">
+      <thead>
+        <tr style="color:#888;border-bottom:1px solid #333">
+          <th style="padding:4px 8px;text-align:left">#</th>
+          <th style="padding:4px 8px;text-align:left">Дата</th>
+          <th style="padding:4px 8px;text-align:right">Цена</th>
+          <th style="padding:4px 8px;text-align:right">ML-оценка</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div style="font-size:.72em;color:#666;margin-top:10px">
+      ≥65% — высокая вероятность прибыльного входа &nbsp;|&nbsp; <50% — низкая
+    </div>`;
+}
+

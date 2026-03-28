@@ -24,6 +24,15 @@ core     = open(os.path.join(base, 'core.js'),       encoding='utf-8').read()
 opt      = open(os.path.join(base, 'opt.js'),        encoding='utf-8').read()
 ui       = open(os.path.join(base, 'ui.js'),         encoding='utf-8').read()
 pine     = open(os.path.join(base, 'pine_export.js'), encoding='utf-8').read()
+
+# ── ML: model + inference (опционально — не падать если нет модели) ────────
+_ml_model_path = os.path.join(base, 'ml', 'model_generated.js')
+_ml_signal_path = os.path.join(base, 'ml_signal.js')
+if os.path.exists(_ml_model_path) and os.path.exists(_ml_signal_path):
+    ml_code = (open(_ml_model_path, encoding='utf-8').read() + '\n' +
+               open(_ml_signal_path, encoding='utf-8').read())
+else:
+    ml_code = '// ML model not generated yet. Run: python3 ml/train.py'
 projects = open(os.path.join(base, 'projects.js'),   encoding='utf-8').read()
 synthesis = open(os.path.join(base, 'synthesis.js'),   encoding='utf-8').read()
 synthesis_worker = open(os.path.join(base, 'synthesis_worker.js'), encoding='utf-8').read()
@@ -78,6 +87,9 @@ for ph, content in [
 
 # ── Шаг 2: подставляем готовый ui в shell ─────────────────────────────────
 # ── Шаг 3: вставляем pine_export.js как отдельный <script> перед ##UI##
+assert '/* ##ML## */' in shell, "Placeholder ##ML## not found in shell.html"
+shell = shell.replace('/* ##ML## */', ml_code, 1)
+
 assert '/* ##PINE## */' in shell, "Placeholder ##PINE## not found in shell.html"
 shell = shell.replace('/* ##PINE## */', pine, 1)
 
