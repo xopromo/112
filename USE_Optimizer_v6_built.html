@@ -696,25 +696,6 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
 .tpl-btn2 { flex:1; padding:7px; border:none; border-radius:5px; font-family:var(--font-mono); font-size:.72em; font-weight:600; cursor:pointer; }
 .tpl-btn2.ok { background:linear-gradient(135deg,#005533,var(--green2)); color:#fff; }
 .tpl-btn2.cancel { background:var(--bg4); color:var(--text2); border:1px solid var(--border2); }
-.fav-section { border-top:1px solid var(--border); margin-top:4px; display:none; }
-.fav-header { display:flex; align-items:center; gap:8px; padding:4px 0; cursor:pointer; user-select:none; }
-.fav-header:hover { opacity:.85; }
-.fav-title { font-size:.62em; color:var(--orange); font-weight:600; }
-.fav-count { font-size:.58em; color:var(--text3); background:var(--bg3); border-radius:8px; padding:1px 6px; }
-.fav-toggle { font-size:.6em; color:var(--text3); margin-left:auto; }
-.fav-search { background:var(--bg); border:1px solid var(--border2); border-radius:4px; color:var(--text); font-size:.62em; padding:2px 7px; width:130px; font-family:var(--font-mono); }
-.fav-body { display:none; max-height:200px; overflow-y:auto; }
-.fav-body.open { display:block; }
-.fav-list { display:flex; flex-direction:column; gap:2px; padding:3px 0; }
-.fav-row { display:flex; align-items:center; gap:6px; padding:3px 6px; border-radius:4px; font-size:.62em; cursor:pointer; }
-.fav-row:hover { background:var(--bg3); }
-.fav-row-num { color:var(--text3); min-width:16px; text-align:right; font-size:.9em; }
-.fav-row-name { color:var(--orange); flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.fav-row-name:hover { text-decoration:underline; }
-.fav-row-stats { color:var(--text3); white-space:nowrap; font-family:var(--font-mono); }
-.fav-row-pdd { color:var(--green); font-weight:600; min-width:36px; text-align:right; }
-.fav-row-del { color:var(--text3); cursor:pointer; padding:0 2px; opacity:.5; }
-.fav-row-del:hover { color:#ff4466; opacity:1; }
 /* confirm filter */
 .confirm-hint { font-size:.6em; color:var(--text3); margin:2px 0 5px; line-height:1.4; }
 
@@ -1508,22 +1489,6 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
   </div>
 </div>
 
-<!-- Favourites bar (shows below btn-row when non-empty) -->
-<div class="fav-section" id="fav-section">
-  <div class="fav-header" onclick="toggleFavBody()">
-    <span class="fav-title">⭐ Избранное</span>
-    <span class="fav-count" id="fav-count">0</span>
-    <span id="fav-ns-label" onclick="event.stopPropagation();openNsModal()" title="Неймспейс (тикер/ТФ) — кликни чтобы сменить"
-      style="font-size:.6em;color:var(--accent);cursor:pointer;background:rgba(0,212,255,.1);border:1px solid rgba(0,212,255,.25);border-radius:4px;padding:1px 6px;margin-left:2px"></span>
-    <button onclick="event.stopPropagation();openNsModal()" title="Разные тикеры/ТФ хранятся в отдельных неймспейсах"
-      style="font-size:.58em;padding:1px 7px;background:rgba(0,212,255,.08);border:1px solid var(--border2);border-radius:4px;color:var(--text3);cursor:pointer;margin-left:2px">📌 ns</button>
-    <input class="fav-search" id="fav-search" placeholder="🔍 поиск..." oninput="renderFavBar()" onclick="event.stopPropagation()" title="Фильтр по названию">
-    <span class="fav-toggle" id="fav-toggle">▼ показать</span>
-  </div>
-  <div class="fav-body" id="fav-body">
-    <div class="fav-list" id="fav-bar"></div>
-  </div>
-</div>
 
 <div id="eq-wrap">
   <canvas id="eqc"></canvas>
@@ -1868,6 +1833,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
     <button class="dp-copy-btn" style="flex:1 1 calc(33% - 6px);background:var(--bg4);border-color:var(--green);color:var(--green)" id="btn-open-hc-from-detail" onclick="openHCModal('selected')">🧗 Поиск соседей</button>
     <button class="dp-copy-btn" style="flex:1 1 calc(50% - 6px);background:var(--bg4);border-color:#c792ea;color:#c792ea" id="btn-pine-export" onclick="openPineModal()">🌲 Pine Script</button>
     <button class="dp-copy-btn" style="flex:1 1 calc(50% - 6px);background:var(--bg4);border-color:#ffcb6b;color:#ffcb6b" id="btn-open-heatmap" onclick="openHeatmapModal()">🗺️ Карта параметров</button>
+    <button class="dp-copy-btn" style="flex:1 1 100%;background:var(--bg4);border-color:var(--purple);color:var(--purple)" onclick="runMLFeatureScreening()" title="Анализ ML-признаков для этого результата">🔬 Скрининг ML-признаков</button>
   </div>
 </div>
 
@@ -20805,53 +20771,8 @@ function _refreshFavStars() {
   // Если мы в режиме fav — обновляем список полностью
   if (_tableMode === 'fav') applyFilters(true);
 }
-function renderFavBar() {
-  const bar = $('fav-bar'), sec = $('fav-section');
-  // Показываем секцию если есть хоть какие-то избранные (любого ns)
-  if (!favourites.length) { sec.style.display='none'; return; }
-  sec.style.display = 'block';
-
-  // Считаем только текущий ns
-  const nsItems = favourites.filter(f => (f.ns||'') === _favNs);
-  $('fav-count').textContent = nsItems.length;
-
-  // Обновляем метку ns
-  const nsLabel = $('fav-ns-label');
-  if (nsLabel) nsLabel.textContent = _favNs ? _favNs : '';
-
-  const q = ($('fav-search') ? $('fav-search').value.trim().toLowerCase() : '');
-  // Фильтруем: только текущий ns + поисковый запрос
-  const filtered = favourites
-    .map((f, i) => ({ f, i }))
-    .filter(({ f }) => (f.ns||'') === _favNs && (!q || f.name.toLowerCase().includes(q)));
-
-  if (!filtered.length) {
-    const allNs = [...new Set(favourites.map(f => f.ns||'').filter(Boolean))];
-    const hint = !_favNs && allNs.length
-      ? `<br><span style="color:var(--accent);cursor:pointer" onclick="openNsModal()">Доступные ns: ${allNs.join(', ')}</span>`
-      : '';
-    bar.innerHTML = `<div style="font-size:.62em;color:var(--text3);padding:4px 6px">Нет избранных в ns "${_favNs||'общий'}"${hint}</div>`;
-    return;
-  }
-
-  bar.innerHTML = filtered.map(({ f, i }, idx) => {
-    const pdd = f.stats.dd > 0 ? (f.stats.pnl / f.stats.dd) : 0;
-    const pddCls = pdd >= 5 ? 'pos' : pdd >= 2 ? 'warn' : 'neg';
-    return `<div class="fav-row">
-      <span class="fav-row-num">${idx + 1}</span>
-      <span class="fav-row-name" onclick="loadFavAsTpl(${i})" title="${f.name}">${f.name}</span>
-      <span class="fav-row-stats">PnL&nbsp;${f.stats.pnl.toFixed(1)}%&nbsp;WR&nbsp;${f.stats.wr ? f.stats.wr.toFixed(0) : '—'}%&nbsp;#${f.stats.n}</span>
-      <span class="fav-row-pdd ${pddCls}">P/DD&nbsp;${pdd.toFixed(1)}</span>
-      <span class="fav-row-del" onclick="removeFav(${i})" title="Удалить">✕</span>
-    </div>`;
-  }).join('');
-}
-
-function toggleFavBody() {
-  const body = $('fav-body'), tog = $('fav-toggle');
-  const open = body.classList.toggle('open');
-  tog.textContent = open ? '▲ скрыть' : '▼ показать';
-}
+function renderFavBar() { /* панель убрана — избранные доступны в таблице (вкладка Избранные) */ }
+function toggleFavBody() {}
 function removeFav(i) {
   favourites.splice(i,1);
   storeSave(_favKey(), favourites);
@@ -27164,7 +27085,7 @@ async function _mlscrCompareBt(cfg, ind, topRules, mlThresh) {
   return{rML,rRules};
 }
 
-function _mlscrRender({trades,sorted,greedy,synergy,rNoML,rML,rRules,topRules,ML_THRESH}) {
+function _mlscrRender({trades,sorted,greedy,synergy,rNoML,rML,rRules,topRules,ML_THRESH,srcCfg,srcR_name}) {
   const n=trades.length;
   const nGood=trades.filter(t=>t.score>=ML_THRESH).length;
   const cc=v=>{const a=Math.abs(v);return a>=0.3?(v>0?'pos':'neg'):a>=0.15?'warn':'muted';};
@@ -27186,10 +27107,14 @@ function _mlscrRender({trades,sorted,greedy,synergy,rNoML,rML,rRules,topRules,ML
   let h=`<div style="display:grid;gap:18px">`;
 
   // Header
-  h+=`<div style="background:var(--bg2);border-radius:6px;padding:10px 14px;display:flex;gap:20px;flex-wrap:wrap;font-size:.82em">
-    <span>📊 Сделок: <b>${n}</b></span>
-    <span>✅ Хороших (≥${Math.round(ML_THRESH*100)}%): <b>${nGood}</b> (${Math.round(nGood/n*100)}%)</span>
-    <span>📈 Данных: <b>${DATA.length}</b> баров</span>
+  h+=`<div style="background:var(--bg2);border-radius:6px;padding:10px 14px;display:grid;gap:6px;font-size:.82em">
+    <div style="color:var(--fg3);font-size:.78em">Анализируется результат:</div>
+    <div style="color:var(--fg);font-size:.8em;word-break:break-all">${srcR_name||'—'}</div>
+    <div style="display:flex;gap:20px;flex-wrap:wrap;margin-top:2px">
+      <span>📊 Сделок: <b>${n}</b></span>
+      <span>✅ Хороших (≥${Math.round(ML_THRESH*100)}%): <b>${nGood}</b> (${Math.round(nGood/n*100)}%)</span>
+      <span>📈 Данных: <b>${DATA.length}</b> баров</span>
+    </div>
   </div>`;
 
   // 1. Feature rankings
@@ -27332,9 +27257,15 @@ async function runMLFeatureScreening() {
     // Get cfg from selected result or first visible
     const srcR=_tvCmpCurrentResult??_visibleResults?.[0]??null;
     if(!srcR?.cfg){
-      body.innerHTML='<p style="color:var(--warn);padding:20px">⚠️ Нет выбранного результата. Откройте любой результат (нажмите на строку), затем запустите скрининг снова.</p>';
+      body.innerHTML='<p style="color:var(--warn);padding:20px">⚠️ Нет выбранного результата. Нажмите на строку результата чтобы открыть детали, затем запустите скрининг кнопкой внизу панели.</p>';
       return;
     }
+    // Показываем имя результата сразу чтобы пользователь видел что анализируется
+    body.innerHTML=`<div style="text-align:center;padding:40px;color:var(--fg2)">
+      ⏳ Анализирую: <b style="color:var(--fg)">${(srcR.name||'результат').substring(0,80)}</b><br>
+      <small style="color:var(--fg3)">Собираю точки входа и вычисляю ML признаки…</small>
+    </div>`;
+    await new Promise(r=>setTimeout(r,20));
     const cfg={...srcR.cfg,useMLFilter:false};
     // Run backtest on full DATA without ML filter, collect trade entries + pnl
     const ind=_calcIndicators(cfg);
@@ -27398,7 +27329,7 @@ async function runMLFeatureScreening() {
     body.innerHTML='<div style="text-align:center;padding:40px;color:var(--fg2)">⏳ Запускаю сравнительные бэктесты…</div>';
     await new Promise(r=>setTimeout(r,0));
     const{rML,rRules}=await _mlscrCompareBt(cfg,ind,topRules,ML_THRESH);
-    body.innerHTML=_mlscrRender({trades,sorted,greedy,synergy,rNoML,rML,rRules,topRules,ML_THRESH,srcCfg:srcR.cfg});
+    body.innerHTML=_mlscrRender({trades,sorted,greedy,synergy,rNoML,rML,rRules,topRules,ML_THRESH,srcCfg:srcR.cfg,srcR_name:srcR.name||''});
   }catch(e){
     console.error('[MLScreening]',e);
     body.innerHTML=`<div style="color:var(--neg);padding:20px">❌ Ошибка: ${e.message}</div>`;
@@ -28173,7 +28104,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774717541134;
+window._BUILD_TS = 1774724404166;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
