@@ -8160,3 +8160,368 @@ async function _mlDeleteModel(id) {
 
 // Алиас для обратной совместимости
 function openMLScanModal() { openMLModal('scan'); }
+
+// ─── ML Feature Screening ─────────────────────────────────────────────────
+
+function _mlscrPearson(xs, ys) {
+  const n = xs.length;
+  if (n < 3) return 0;
+  let sx=0,sy=0,sx2=0,sy2=0,sxy=0;
+  for(let i=0;i<n;i++){sx+=xs[i];sy+=ys[i];sx2+=xs[i]*xs[i];sy2+=ys[i]*ys[i];sxy+=xs[i]*ys[i];}
+  const num=n*sxy-sx*sy, den=Math.sqrt((n*sx2-sx*sx)*(n*sy2-sy*sy));
+  return den>0?num/den:0;
+}
+
+function _mlscrVariance(xs) {
+  const n=xs.length; if(n<2)return 0;
+  let s=0,s2=0; for(let i=0;i<n;i++){s+=xs[i];s2+=xs[i]*xs[i];}
+  return s2/n-(s/n)*(s/n);
+}
+
+function _mlscrLinFit(ys, xs) {
+  const n=xs.length; let sx=0,sy=0,sxy=0,sx2=0;
+  for(let i=0;i<n;i++){sx+=xs[i];sy+=ys[i];sxy+=xs[i]*ys[i];sx2+=xs[i]*xs[i];}
+  const d=n*sx2-sx*sx;
+  if(Math.abs(d)<1e-12)return{slope:0,intercept:sy/n};
+  const slope=(n*sxy-sx*sy)/d;
+  return{slope,intercept:(sy-slope*sx)/n};
+}
+
+function _mlscrGreedyR2(trades, featDefs, scores) {
+  const totalVar=_mlscrVariance(scores);
+  if(totalVar<=0)return[];
+  const res=scores.slice();
+  const selected=[], remaining=featDefs.map(fd=>({...fd}));
+  for(let step=0;step<Math.min(8,remaining.length);step++){
+    let bestC=0,bestRi=-1;
+    for(let ri=0;ri<remaining.length;ri++){
+      const fv=trades.map(t=>t.feat[remaining[ri].idx]);
+      const c=_mlscrPearson(fv,res);
+      if(Math.abs(c)>Math.abs(bestC)){bestC=c;bestRi=ri;}
+    }
+    if(bestRi<0||Math.abs(bestC)<0.04)break;
+    const fd=remaining.splice(bestRi,1)[0];
+    const fv=trades.map(t=>t.feat[fd.idx]);
+    const {slope,intercept}=_mlscrLinFit(res,fv);
+    for(let i=0;i<res.length;i++)res[i]-=slope*fv[i]+intercept;
+    const cumR2=Math.min(1,Math.max(0,1-_mlscrVariance(res)/totalVar));
+    selected.push({...fd,stepC:bestC,cumR2});
+    if(cumR2>=0.95)break;
+  }
+  return selected;
+}
+
+function _mlscrOptThresh(trades, featIdx, dir, scoreThresh) {
+  if(dir===0)return{thresh:NaN,f1:0,prec:0,rec:0,blocked:0};
+  const vals=trades.map(t=>t.feat[featIdx]);
+  const scores=trades.map(t=>t.score);
+  const sorted=[...vals].sort((a,b)=>a-b);
+  let bestF1=-1,bestThresh=sorted[0],bestPrec=0,bestRec=0,bestBlocked=0;
+  for(let qi=2;qi<=22;qi++){
+    const thresh=sorted[Math.floor(sorted.length*qi/24)];
+    let tp=0,fp=0,fn=0,tn=0;
+    for(let i=0;i<trades.length;i++){
+      const pass=dir>0?vals[i]>=thresh:vals[i]<=thresh;
+      const good=scores[i]>=scoreThresh;
+      if(pass&&good)tp++;else if(pass&&!good)fp++;else if(!pass&&good)fn++;else tn++;
+    }
+    const prec=tp+fp>0?tp/(tp+fp):0,rec=tp+fn>0?tp/(tp+fn):1;
+    const f1=prec+rec>0?2*prec*rec/(prec+rec):0;
+    if(rec>=0.65&&f1>bestF1){bestF1=f1;bestThresh=thresh;bestPrec=prec;bestRec=rec;bestBlocked=fp+tn;}
+  }
+  return{thresh:bestThresh,f1:bestF1,prec:bestPrec,rec:bestRec,blocked:bestBlocked};
+}
+
+function _mlscrPairSynergy(trades, topFeats, scores) {
+  const n=topFeats.length, totalVar=_mlscrVariance(scores);
+  const indR2=topFeats.map(fd=>{
+    const fv=trades.map(t=>t.feat[fd.idx]);
+    const c=_mlscrPearson(fv,scores);
+    return c*c;
+  });
+  const matrix=[];
+  for(let i=0;i<n;i++){
+    matrix[i]=[];
+    for(let j=0;j<n;j++){
+      if(i===j){matrix[i][j]=null;continue;}
+      const fi=trades.map(t=>t.feat[topFeats[i].idx]);
+      const fj=trades.map(t=>t.feat[topFeats[j].idx]);
+      const {slope:si,intercept:ii}=_mlscrLinFit(scores,fi);
+      const res_i=scores.map((s,k)=>s-si*fi[k]-ii);
+      const cj=_mlscrPearson(fj,res_i);
+      matrix[i][j]=Math.max(0,cj*cj*(1-indR2[i]));
+    }
+  }
+  return{matrix,indR2,topFeats};
+}
+
+async function _mlscrCompareBt(cfg, ind, topRules, mlThresh) {
+  const N=DATA.length;
+  // Run with full ML model
+  const mlArr=new Float32Array(N).fill(-1);
+  for(let i=52;i<N;i++){const f=mlComputeFeatures(i);if(f)try{mlArr[i]=mlScore(f);}catch(e){mlArr[i]=0.5;}}
+  const btML=buildBtCfg({...cfg,useMLFilter:false},ind);
+  btML.mlScoresArr=mlArr;btML.mlThreshold=mlThresh;
+  const rML=backtest(ind.pvLo,ind.pvHi,ind.atrArr,btML);
+  await new Promise(r=>setTimeout(r,0));
+  // Run with simple rules
+  const rulesArr=new Float32Array(N).fill(-1);
+  const activeRules=topRules.filter(fd=>fd.dir!==0&&fd.optThresh&&!isNaN(fd.optThresh.thresh));
+  for(let i=52;i<N;i++){
+    const f=mlComputeFeatures(i);
+    if(!f){rulesArr[i]=-1;continue;}
+    let pass=true;
+    for(const fd of activeRules){
+      const v=f[fd.idx];
+      if(fd.dir>0&&v<fd.optThresh.thresh){pass=false;break;}
+      if(fd.dir<0&&v>fd.optThresh.thresh){pass=false;break;}
+    }
+    rulesArr[i]=pass?1.0:0.0;
+  }
+  const btRules=buildBtCfg({...cfg,useMLFilter:false},ind);
+  btRules.mlScoresArr=rulesArr;btRules.mlThreshold=0.5;
+  const rRules=backtest(ind.pvLo,ind.pvHi,ind.atrArr,btRules);
+  return{rML,rRules};
+}
+
+function _mlscrRender({trades,sorted,greedy,synergy,rNoML,rML,rRules,topRules,ML_THRESH}) {
+  const n=trades.length;
+  const nGood=trades.filter(t=>t.score>=ML_THRESH).length;
+  const cc=v=>{const a=Math.abs(v);return a>=0.3?(v>0?'pos':'neg'):a>=0.15?'warn':'muted';};
+  const r2c=v=>v>=0.8?'pos':v>=0.55?'warn':'neg';
+  const fmtN=(v,d=1)=>isNaN(v)?'—':v.toFixed(d);
+  const pRow=(label,r,cls='')=>{
+    if(!r)return'';
+    const pdd=r.dd>0?r.pnl/r.dd:0;
+    return`<tr style="border-top:1px solid var(--border)">
+      <td style="padding:4px 8px" class="${cls}">${label}</td>
+      <td style="padding:4px 8px;text-align:center">${r.n}</td>
+      <td style="padding:4px 8px;text-align:center">${Math.round(r.wr)}%</td>
+      <td style="padding:4px 8px;text-align:center;color:${r.pnl>=0?'var(--pos)':'var(--neg)'}">${r.pnl>=0?'+':''}${fmtN(r.pnl,0)}%</td>
+      <td style="padding:4px 8px;text-align:center">${fmtN(r.dd,1)}%</td>
+      <td style="padding:4px 8px;text-align:center" class="${pdd>=5?'pos':pdd>=2?'warn':'neg'}">${fmtN(pdd,1)}</td>
+    </tr>`;
+  };
+
+  let h=`<div style="display:grid;gap:18px">`;
+
+  // Header
+  h+=`<div style="background:var(--bg2);border-radius:6px;padding:10px 14px;display:flex;gap:20px;flex-wrap:wrap;font-size:.82em">
+    <span>📊 Сделок: <b>${n}</b></span>
+    <span>✅ Хороших (≥${Math.round(ML_THRESH*100)}%): <b>${nGood}</b> (${Math.round(nGood/n*100)}%)</span>
+    <span>📈 Данных: <b>${DATA.length}</b> баров</span>
+  </div>`;
+
+  // 1. Feature rankings
+  h+=`<div><h3 style="font-size:.8em;color:var(--fg2);text-transform:uppercase;letter-spacing:.06em;margin:0 0 8px">① Ранжирование признаков</h3>
+  <table style="width:100%;border-collapse:collapse;font-size:.8em">
+  <thead><tr style="color:var(--fg3);font-size:.75em">
+    <th style="text-align:left;padding:3px 8px">Признак</th>
+    <th style="padding:3px 6px" title="Корреляция с ML-оценкой">Corr(ML)</th>
+    <th style="padding:3px 6px" title="Корреляция с реальным PnL сделки">Corr(PnL)</th>
+    <th style="padding:3px 6px">Знак</th>
+    <th style="padding:3px 6px">Порог</th>
+    <th style="padding:3px 6px" title="% сделок заблокированных этим правилом">Блок%</th>
+    <th style="padding:3px 6px" title="F1-мера правила">F1</th>
+  </tr></thead><tbody>`;
+  for(const fd of sorted){
+    const t=fd.optThresh;
+    const sign=fd.dir===0?'±':fd.dir>0?'≥':'≤';
+    const blPct=n>0?Math.round(t.blocked/n*100):0;
+    h+=`<tr style="border-top:1px solid var(--border)">
+      <td style="padding:3px 8px" title="${fd.hint}">${fd.label}</td>
+      <td style="padding:3px 6px;text-align:center" class="${cc(fd.corrScore)}">${(fd.corrScore>=0?'+':'')+fmtN(fd.corrScore,2)}</td>
+      <td style="padding:3px 6px;text-align:center" class="${cc(fd.corrPnl)}">${(fd.corrPnl>=0?'+':'')+fmtN(fd.corrPnl,2)}</td>
+      <td style="padding:3px 6px;text-align:center;color:var(--fg2)">${fd.dir===0?'±':sign}</td>
+      <td style="padding:3px 6px;text-align:center;font-family:monospace">${fd.dir===0?'—':fmtN(t.thresh,3)}</td>
+      <td style="padding:3px 6px;text-align:center;color:var(--fg2)">${fd.dir===0?'—':blPct+'%'}</td>
+      <td style="padding:3px 6px;text-align:center" class="${t.f1>=0.7?'pos':t.f1>=0.5?'warn':'neg'}">${fd.dir===0?'—':fmtN(t.f1,2)}</td>
+    </tr>`;
+  }
+  h+=`</tbody></table></div>`;
+
+  // 2. Greedy R²
+  h+=`<div><h3 style="font-size:.8em;color:var(--fg2);text-transform:uppercase;letter-spacing:.06em;margin:0 0 8px">② Жадный отбор — сколько признаков нужно</h3>
+  <table style="width:100%;border-collapse:collapse;font-size:.8em">
+  <thead><tr style="color:var(--fg3);font-size:.75em">
+    <th style="padding:3px 6px">#</th>
+    <th style="text-align:left;padding:3px 8px">Признак</th>
+    <th style="padding:3px 6px">+R²</th>
+    <th style="padding:3px 6px">Кум. R²</th>
+    <th style="padding:3px 6px">Покрытие</th>
+    <th style="text-align:left;padding:3px 8px">Правило</th>
+  </tr></thead><tbody>`;
+  let prevR2=0;
+  for(let i=0;i<greedy.length;i++){
+    const g=greedy[i];
+    const stepR2=g.cumR2-prevR2;
+    const hit90=g.cumR2>=0.90&&prevR2<0.90;
+    const hit80=g.cumR2>=0.80&&prevR2<0.80;
+    const hl=hit90?'background:rgba(100,220,130,.07)':hit80?'background:rgba(220,180,50,.05)':'';
+    const sign=g.dir===0?'':g.dir>0?'≥':'≤';
+    const thresh=g.dir===0?'—':(g.optThresh&&!isNaN(g.optThresh.thresh)?`${sign} ${fmtN(g.optThresh.thresh,3)}`:'—');
+    h+=`<tr style="border-top:1px solid var(--border);${hl}">
+      <td style="padding:3px 6px;text-align:center;color:var(--fg3)">${i+1}</td>
+      <td style="padding:3px 8px">${g.label}${hit90?' <span style="color:var(--pos);font-size:.75em">← 90%</span>':hit80?' <span style="color:var(--warn);font-size:.75em">← 80%</span>':''}</td>
+      <td style="padding:3px 6px;text-align:center;color:var(--pos)">+${(stepR2*100).toFixed(1)}%</td>
+      <td style="padding:3px 6px;text-align:center" class="${r2c(g.cumR2)}"><b>${(g.cumR2*100).toFixed(1)}%</b></td>
+      <td style="padding:3px 6px;min-width:80px">
+        <div style="background:var(--border);border-radius:3px;height:5px">
+          <div style="background:var(--pos);border-radius:3px;height:5px;width:${(g.cumR2*100).toFixed(0)}%"></div>
+        </div>
+      </td>
+      <td style="padding:3px 8px;font-family:monospace;font-size:.82em;color:var(--fg2)">${thresh}</td>
+    </tr>`;
+    prevR2=g.cumR2;
+  }
+  h+=`</tbody></table></div>`;
+
+  // 3. Pairwise synergy
+  const{matrix,indR2,topFeats}=synergy;
+  h+=`<div><h3 style="font-size:.8em;color:var(--fg2);text-transform:uppercase;letter-spacing:.06em;margin:0 0 4px">③ Синергия пар (топ-5)</h3>
+  <p style="font-size:.75em;color:var(--fg3);margin:0 0 8px">Прирост R² при добавлении столбца к строке. Зелёный = взаимодополняющие.</p>
+  <table style="border-collapse:collapse;font-size:.78em">
+  <thead><tr><th style="padding:3px 6px"></th>`;
+  for(const fd of topFeats)h+=`<th style="padding:3px 8px;color:var(--fg2);font-size:.82em;max-width:90px;overflow:hidden;white-space:nowrap" title="${fd.label}">${fd.label.substring(0,11)}</th>`;
+  h+=`</tr></thead><tbody>`;
+  for(let i=0;i<topFeats.length;i++){
+    h+=`<tr><td style="padding:3px 8px;color:var(--fg2);font-size:.82em;white-space:nowrap" title="${topFeats[i].label}">${topFeats[i].label.substring(0,11)}</td>`;
+    for(let j=0;j<topFeats.length;j++){
+      if(i===j){h+=`<td style="padding:3px 8px;text-align:center;color:var(--fg3)">—</td>`;}
+      else{
+        const v=matrix[i][j];
+        const cls=v>=0.08?'pos':v>=0.03?'warn':'muted';
+        h+=`<td style="padding:3px 8px;text-align:center" class="${cls}">+${(v*100).toFixed(0)}%</td>`;
+      }
+    }
+    h+=`</tr>`;
+  }
+  h+=`</tbody></table></div>`;
+
+  // 4. Comparison
+  const ruleNames=topRules.filter(r=>r.dir!==0).map(r=>r.label.substring(0,10)).join(', ');
+  const nRules=topRules.filter(r=>r.dir!==0).length;
+  let covTxt='';
+  if(rML&&rNoML&&rRules){
+    const mlGain=rML.pnl-rNoML.pnl;
+    const rulesGain=rRules.pnl-rNoML.pnl;
+    if(mlGain>0.5){
+      const cov=Math.round(rulesGain/mlGain*100);
+      const verdict=cov>=85?' ✅ гипотеза подтверждена':cov>=65?' ⚠️ частично':' ❌ недостаточно';
+      covTxt=`<tr><td colspan="6" style="padding:6px 8px;font-size:.8em;color:var(--fg2);border-top:2px solid var(--border)">
+        💡 <b>${nRules} простых правил</b> дают <b style="color:${cov>=85?'var(--pos)':cov>=65?'var(--warn)':'var(--neg)'}">${cov}%</b> эффекта ML по приросту PnL${verdict}
+      </td></tr>`;
+    }
+  }
+  h+=`<div><h3 style="font-size:.8em;color:var(--fg2);text-transform:uppercase;letter-spacing:.06em;margin:0 0 8px">④ Сравнение подходов (полные данные)</h3>
+  <table style="width:100%;border-collapse:collapse;font-size:.8em">
+  <thead><tr style="color:var(--fg3);font-size:.75em">
+    <th style="text-align:left;padding:3px 8px">Подход</th>
+    <th style="padding:3px 6px">Сделок</th>
+    <th style="padding:3px 6px">WR%</th>
+    <th style="padding:3px 6px">PnL%</th>
+    <th style="padding:3px 6px">DD%</th>
+    <th style="padding:3px 6px">P/DD</th>
+  </tr></thead><tbody>
+  ${pRow('Без фильтра',rNoML)}
+  ${pRow('ML модель',rML,'pos')}
+  ${pRow(`${nRules} правил (${ruleNames})`,rRules,'warn')}
+  ${covTxt}
+  </tbody></table></div>`;
+
+  h+=`</div>`;
+  return h;
+}
+
+async function runMLFeatureScreening() {
+  const modal=$('ml-screening-modal');
+  const body=$('ml-screening-body');
+  if(!modal)return;
+  if(typeof mlModelLoaded!=='function'||!mlModelLoaded()){
+    body.innerHTML='<p style="color:var(--neg);padding:20px">❌ ML модель не загружена. Сначала загрузите модель в разделе ML.</p>';
+    modal.style.display='flex';return;
+  }
+  if(!DATA||DATA.length<100){
+    body.innerHTML='<p style="color:var(--neg);padding:20px">❌ Нет данных.</p>';
+    modal.style.display='flex';return;
+  }
+  body.innerHTML='<div style="text-align:center;padding:60px;color:var(--fg2)">⏳ Собираю точки входа и вычисляю ML признаки…</div>';
+  modal.style.display='flex';
+  await new Promise(r=>setTimeout(r,20));
+  try{
+    // Get cfg from selected result or first visible
+    const srcR=_tvCmpCurrentResult??_visibleResults?.[0]??null;
+    if(!srcR?.cfg){
+      body.innerHTML='<p style="color:var(--warn);padding:20px">⚠️ Нет выбранного результата. Откройте любой результат (нажмите на строку), затем запустите скрининг снова.</p>';
+      return;
+    }
+    const cfg={...srcR.cfg,useMLFilter:false};
+    // Run backtest on full DATA without ML filter, collect trade entries + pnl
+    const ind=_calcIndicators(cfg);
+    const btCfg=buildBtCfg(cfg,ind);
+    btCfg.useMLFilter=false;btCfg.collectTrades=true;btCfg.tradeLog=[];
+    const rNoML=backtest(ind.pvLo,ind.pvHi,ind.atrArr,btCfg);
+    const trLog=btCfg.tradeLog||[];
+    const trPnl=rNoML?.tradePnl||[];
+    const nMin=Math.min(trLog.length,trPnl.length);
+    if(nMin<15){
+      body.innerHTML=`<p style="color:var(--neg);padding:20px">❌ Мало сделок (${nMin}). Нужно ≥ 15. Выберите результат с большим количеством сделок.</p>`;
+      return;
+    }
+    // Compute features + scores per trade entry
+    const trades=[];
+    for(let ti=0;ti<nMin;ti++){
+      const t=trLog[ti];
+      const feat=mlComputeFeatures(t.entryBar);
+      if(!feat)continue;
+      let score;try{score=mlScore(feat);}catch(e){continue;}
+      if(isNaN(score))continue;
+      trades.push({bar:t.entryBar,dir:t.dir,feat,score,pnl:trPnl[ti]??0});
+    }
+    if(trades.length<10){
+      body.innerHTML=`<p style="color:var(--neg);padding:20px">❌ Недостаточно точек (${trades.length}) после вычисления признаков (нужно bar≥52).</p>`;
+      return;
+    }
+    await new Promise(r=>setTimeout(r,0));
+    const ML_THRESH=parseFloat($('c_ml_thresh')?.value)||0.55;
+    const FDEFS=[
+      {id:'wick',  label:'Нижний хвост/ATR', idx:26,dir:+1,hint:'Сила отбоя на пивоте (выше → лучше для лонга)'},
+      {id:'rsi',   label:'RSI(14)',           idx:23,dir:-1,hint:'Перепроданность (ниже → лучше)'},
+      {id:'chan',  label:'Позиция в канале',   idx:30,dir:-1,hint:'0=дно 20-бар канала, 1=вершина'},
+      {id:'ema50', label:'Откат EMA50/ATR',    idx:25,dir:+1,hint:'Насколько цена ниже EMA50 (>0 = ниже EMA)'},
+      {id:'ema20', label:'Откат EMA20/ATR',    idx:24,dir:+1,hint:'Насколько цена ниже EMA20'},
+      {id:'body',  label:'Тело пивота/ATR',    idx:27,dir:-1,hint:'Меньше тело → молоткообразная свеча'},
+      {id:'streak',label:'Серия падений/10',   idx:29,dir:+1,hint:'Подряд медвежьих закрытий (капитуляция)'},
+      {id:'er',    label:'Eff.Ratio (10б)',    idx:20,dir:-1,hint:'Ниже ER → более разворотный рынок'},
+      {id:'atr_r', label:'ATR режим',          idx:28,dir: 0,hint:'Текущий ATR vs 50-бар среднего (нелинейный)'},
+      {id:'slope', label:'Наклон LR(20)/ATR',  idx:31,dir:-1,hint:'Отрицательный наклон → нисходящий тренд'},
+      {id:'bb_w',  label:'Ширина BB',          idx:32,dir:+1,hint:'Шире → расширение, уже → сжатие'},
+      {id:'vol',   label:'Объём/средний(20)',  idx:21,dir:+1,hint:'> 1 = объём выше среднего'},
+    ];
+    // Correlations
+    const scoreArr=trades.map(t=>t.score);
+    const pnlArr=trades.map(t=>t.pnl);
+    for(const fd of FDEFS){
+      const fv=trades.map(t=>t.feat[fd.idx]);
+      fd.corrScore=_mlscrPearson(fv,scoreArr);
+      fd.corrPnl=_mlscrPearson(fv,pnlArr);
+      fd.optThresh=_mlscrOptThresh(trades,fd.idx,fd.dir,ML_THRESH);
+    }
+    const sorted=[...FDEFS].sort((a,b)=>Math.abs(b.corrScore)-Math.abs(a.corrScore));
+    const greedy=_mlscrGreedyR2(trades,FDEFS,scoreArr);
+    // Top features for synergy + comparison (up to first ≥90% R², min 3, max 6)
+    let topN=greedy.findIndex(g=>g.cumR2>=0.90);
+    if(topN<0)topN=greedy.length;else topN++;
+    topN=Math.max(3,Math.min(6,topN));
+    const topRules=greedy.slice(0,topN);
+    const synergy=_mlscrPairSynergy(trades,sorted.slice(0,5),scoreArr);
+    body.innerHTML='<div style="text-align:center;padding:40px;color:var(--fg2)">⏳ Запускаю сравнительные бэктесты…</div>';
+    await new Promise(r=>setTimeout(r,0));
+    const{rML,rRules}=await _mlscrCompareBt(cfg,ind,topRules,ML_THRESH);
+    body.innerHTML=_mlscrRender({trades,sorted,greedy,synergy,rNoML,rML,rRules,topRules,ML_THRESH,srcCfg:srcR.cfg});
+  }catch(e){
+    console.error('[MLScreening]',e);
+    body.innerHTML=`<div style="color:var(--neg);padding:20px">❌ Ошибка: ${e.message}</div>`;
+  }
+}
+try{window.runMLFeatureScreening=runMLFeatureScreening;}catch(e){}
