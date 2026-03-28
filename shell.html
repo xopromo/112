@@ -937,6 +937,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
   <div id="c_ml_thresh_row" class="g2" style="display:none;margin-top:2px">
     <div class="field"><label>Порог ML (0–1)</label><input id="c_ml_thresh" value="0.55" data-tip="Входы с ML-оценкой ниже порога блокируются. 0.5 = всё проходит, 0.7 = только высокодостоверные сигналы"></div>
   </div>
+  <button onclick="runMLFeatureScreening()" style="margin-top:6px;width:100%;padding:5px 0;font-size:.78em;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--purple);cursor:pointer" data-tip="Анализирует какие из 12 ML-признаков наиболее важны. Показывает сколько простых правил нужно чтобы получить 90% эффекта ML-модели. Требует: модель загружена + выбран результат.">🔬 Скрининг признаков ML</button>
   <div class="cb" style="margin-top:4px">
     <input type="checkbox" id="c_powerset">
     <label data-tip="Перебирает все комбинации включённых фильтров (2^N вариантов). Например, если активны MA+ADX+RSI — тестирует {MA}, {ADX}, {RSI}, {MA+ADX}, {MA+RSI}, {ADX+RSI}, {MA+ADX+RSI} и без фильтров. Позволяет понять какие фильтры реально помогают входу.">Перебор комбо фильтров (powerset)</label>
@@ -2670,6 +2671,17 @@ window._BUILD_TS = /* ##BUILD_TS## */ 0;
   setInterval(update, 60000);
 })();
 </script>
+
+<!-- ML Feature Screening Modal -->
+<div id="ml-screening-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:10000;align-items:flex-start;justify-content:center;padding:24px;overflow-y:auto" onclick="if(event.target===this)this.style.display='none'">
+  <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;width:100%;max-width:860px;padding:20px;position:relative">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <h2 style="margin:0;font-size:.95em;color:var(--fg)">🔬 Скрининг признаков ML-модели</h2>
+      <button onclick="document.getElementById('ml-screening-modal').style.display='none'" style="background:none;border:none;color:var(--fg2);font-size:1.2em;cursor:pointer;padding:0 4px">✕</button>
+    </div>
+    <div id="ml-screening-body" style="color:var(--fg)"></div>
+  </div>
+</div>
 
 </body>
 </html>
