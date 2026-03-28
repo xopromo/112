@@ -7682,76 +7682,299 @@ async function refreshProjectFiles() {
   }
 }
 
-// ── ML Scan Modal ──────────────────────────────────────────────
+// ── ML Model Manager ──────────────────────────────────────────
 
-function openMLScanModal() {
-  if (typeof mlModelLoaded !== 'function' || !mlModelLoaded()) {
-    toast('⚠️ ML-модель не загружена. Сначала загрузите model_generated.js', 3000);
-    return;
+// IndexedDB хранилище моделей
+const _MLModelDB = (() => {
+  const DB = 'use-ml-models', STORE = 'models';
+  function open() {
+    return new Promise((res, rej) => {
+      const r = indexedDB.open(DB, 1);
+      r.onupgradeneeded = e => e.target.result.createObjectStore(STORE, { keyPath: 'id' });
+      r.onsuccess = e => res(e.target.result);
+      r.onerror   = e => rej(e.target.error);
+    });
   }
-  if (!DATA || DATA.length < 50) {
-    toast('⚠️ Нет данных для ML-скана', 2500);
-    return;
+  async function tx(mode, fn) {
+    const db = await open();
+    return new Promise((res, rej) => {
+      const t = db.transaction(STORE, mode);
+      t.onerror = e => rej(e.target.error);
+      fn(t.objectStore(STORE), res, rej);
+    });
   }
-
-  const results = mlScanSignals(500);
-
-  let el = document.getElementById('ml-scan-modal');
-  if (!el) {
-    el = document.createElement('div');
-    el.id = 'ml-scan-modal';
-    el.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;display:flex;align-items:center;justify-content:center';
-    el.innerHTML = `
-      <div style="background:var(--bg2,#1e1e2e);border:1px solid rgba(139,92,246,.4);border-radius:8px;padding:20px;max-width:600px;width:95%;max-height:80vh;overflow-y:auto;color:var(--fg,#cdd6f4)">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-          <span style="font-weight:600;font-size:.95em">🤖 ML-скан: лучшие pivot-сигналы</span>
-          <button onclick="document.getElementById('ml-scan-modal').remove()" style="background:none;border:none;color:var(--fg,#cdd6f4);cursor:pointer;font-size:1.2em">✕</button>
-        </div>
-        <div id="ml-scan-body"></div>
-      </div>`;
-    document.body.appendChild(el);
-  }
-
-  const body = el.querySelector('#ml-scan-body');
-  if (!results.length) {
-    body.innerHTML = '<div style="color:#888;text-align:center;padding:20px">Сигналов не найдено</div>';
-    return;
-  }
-
-  const fmt = ts => {
-    if (!ts) return '—';
-    const d = new Date(ts * 1000);
-    return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit' });
+  return {
+    save:   m  => tx('readwrite', (s, res) => { s.put(m).onsuccess = () => res(); }),
+    load:   id => tx('readonly',  (s, res) => { s.get(id).onsuccess = e => res(e.target.result); }),
+    list:   () => tx('readonly',  (s, res) => { s.getAll().onsuccess = e => res(
+                  e.target.result.map(m => ({ id: m.id, name: m.name, auc: m.auc,
+                    bars: m.bars, signals: m.signals, date: m.date }))); }),
+    remove: id => tx('readwrite', (s, res) => { s.delete(id).onsuccess = () => res(); }),
   };
+})();
 
-  const rows = results.slice(0, 50).map((r, i) => {
-    const pct = (r.score * 100).toFixed(1);
-    const color = r.score >= 0.65 ? '#a6e3a1' : r.score >= 0.5 ? '#f9e2af' : '#f38ba8';
-    return `<tr>
-      <td style="padding:4px 8px;color:#888">${i+1}</td>
-      <td style="padding:4px 8px">${fmt(r.time)}</td>
-      <td style="padding:4px 8px;text-align:right">${r.close.toFixed(2)}</td>
-      <td style="padding:4px 8px;text-align:right;color:${color};font-weight:600">${pct}%</td>
-    </tr>`;
-  }).join('');
+// Состояние: ID активной модели ('__builtin__' = встроенная скомпилированная)
+let _mlActiveId   = localStorage.getItem('_mlActiveId')   || '__builtin__';
+let _mlActiveName = localStorage.getItem('_mlActiveName') || 'Встроенная';
 
-  body.innerHTML = `
-    <div style="font-size:.78em;color:#888;margin-bottom:10px">
-      Найдено: ${results.length} pivot-low сигналов за последние 500 баров. Топ-50 по ML-оценке:
+// Активировать модель по коду JS (изолированное выполнение)
+function _mlActivateCode(code) {
+  try {
+    const fn = new Function(code + '\nreturn typeof mlScore!=="undefined"?mlScore:null;');
+    const scoreFn = fn();
+    if (!scoreFn) throw new Error('mlScore not found');
+    window.mlScore = scoreFn;
+    if (typeof mlResetCache === 'function') mlResetCache();
+    return true;
+  } catch(e) {
+    console.error('[ML activate]', e);
+    return false;
+  }
+}
+
+// Активировать модель из IndexedDB по id
+async function _mlActivateById(id) {
+  if (id === '__builtin__') {
+    _mlActiveId = '__builtin__';
+    _mlActiveName = 'Встроенная';
+    localStorage.setItem('_mlActiveId', '__builtin__');
+    localStorage.setItem('_mlActiveName', 'Встроенная');
+    toast('Перезагрузите страницу чтобы восстановить встроенную модель', 3500);
+    return true;
+  }
+  const model = await _MLModelDB.load(id);
+  if (!model) { toast('Модель не найдена в БД', 2000); return false; }
+  if (!_mlActivateCode(model.code)) { toast('⚠️ Ошибка загрузки модели', 2500); return false; }
+  _mlActiveId   = id;
+  _mlActiveName = model.name;
+  localStorage.setItem('_mlActiveId',   id);
+  localStorage.setItem('_mlActiveName', model.name);
+  toast('✅ Модель активирована: ' + model.name, 2000);
+  return true;
+}
+
+// Извлечь метаданные из заголовка model_generated.js
+function _mlParseMeta(code) {
+  const g = (re, def) => { const m = code.match(re); return m ? m[1] : def; };
+  return {
+    auc:     parseFloat(g(/AUC:\s*([\d.]+)/, '0')) || null,
+    bars:    parseInt(g(/Баров:\s*(\d+)/, '0'))    || null,
+    signals: parseInt(g(/Сигналов:\s*(\d+)/, '0')) || null,
+  };
+}
+
+// Главный ML-модал (tab: 'models' | 'scan')
+async function openMLModal(tab) {
+  tab = tab || 'models';
+  document.getElementById('ml-modal')?.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'ml-modal';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:9999;display:flex;align-items:center;justify-content:center';
+  overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
+  document.body.appendChild(overlay);
+
+  const box = document.createElement('div');
+  box.style.cssText = 'background:var(--bg2,#1e1e2e);border:1px solid rgba(139,92,246,.45);border-radius:8px;padding:20px;width:min(640px,95vw);max-height:86vh;overflow-y:auto;color:var(--fg,#cdd6f4)';
+  overlay.appendChild(box);
+
+  const models   = await _MLModelDB.list();
+  const activeId = _mlActiveId;
+  const hasBuiltin = typeof mlScore === 'function';
+
+  const tabBtn = (id, label) =>
+    `<button onclick="openMLModal('${id}')" style="background:${tab===id?'rgba(139,92,246,.2)':'none'};border:1px solid ${tab===id?'rgba(139,92,246,.6)':'#444'};color:var(--fg,#cdd6f4);border-radius:4px;padding:4px 14px;cursor:pointer;font-size:.82em">${label}</button>`;
+
+  box.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <span style="font-weight:600">🤖 ML-модели</span>
+      <button onclick="document.getElementById('ml-modal').remove()" style="background:none;border:none;color:var(--fg,#cdd6f4);cursor:pointer;font-size:1.2em">✕</button>
     </div>
-    <table style="width:100%;border-collapse:collapse;font-size:.8em">
-      <thead>
-        <tr style="color:#888;border-bottom:1px solid #333">
-          <th style="padding:4px 8px;text-align:left">#</th>
-          <th style="padding:4px 8px;text-align:left">Дата</th>
-          <th style="padding:4px 8px;text-align:right">Цена</th>
-          <th style="padding:4px 8px;text-align:right">ML-оценка</th>
-        </tr>
-      </thead>
-      <tbody>${rows}</tbody>
-    </table>
-    <div style="font-size:.72em;color:#666;margin-top:10px">
-      ≥65% — высокая вероятность прибыльного входа &nbsp;|&nbsp; <50% — низкая
+    <div style="display:flex;gap:6px;margin-bottom:14px">
+      ${tabBtn('models','Модели')} ${tabBtn('scan','Скан')}
+    </div>
+    <div id="ml-modal-content">
+      ${tab === 'models' ? _mlModelsTab(models, activeId, hasBuiltin) : _mlScanTab()}
     </div>`;
 }
 
+function _mlModelsTab(models, activeId, hasBuiltin) {
+  const hl = 'rgba(139,92,246,.15)';
+
+  const builtinRow = `
+    <tr style="background:${activeId==='__builtin__'?hl:''}">
+      <td style="padding:6px 8px">${activeId==='__builtin__'?'●':'○'} Встроенная</td>
+      <td style="padding:6px 8px;color:#888;font-size:.8em">${hasBuiltin?'загружена':'—'}</td>
+      <td style="padding:6px 8px;text-align:center">—</td>
+      <td style="padding:6px 8px;text-align:center">—</td>
+      <td style="padding:6px 8px;text-align:right">
+        ${activeId!=='__builtin__'
+          ? `<button onclick="_mlActivateById('__builtin__').then(()=>openMLModal('models'))"
+               style="font-size:.72em;padding:2px 8px;background:rgba(139,92,246,.15);border:1px solid rgba(139,92,246,.4);color:var(--fg,#cdd6f4);border-radius:4px;cursor:pointer">Активировать</button>`
+          : `<span style="font-size:.7em;padding:2px 8px;background:rgba(139,92,246,.2);border:1px solid rgba(139,92,246,.5);border-radius:4px;color:#a78bfa">Активна</span>`}
+      </td>
+    </tr>`;
+
+  const modelRows = models.map(m => `
+    <tr style="background:${activeId===m.id?hl:''}">
+      <td style="padding:6px 8px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${m.name}">${activeId===m.id?'●':'○'} ${m.name}</td>
+      <td style="padding:6px 8px;color:#888;font-size:.8em">${m.date||'—'}</td>
+      <td style="padding:6px 8px;text-align:center;color:${(m.auc||0)>=0.6?'#a6e3a1':(m.auc||0)>=0.55?'#f9e2af':'#888'}">${m.auc?m.auc.toFixed(3):'—'}</td>
+      <td style="padding:6px 8px;text-align:center;color:#888;font-size:.8em">${m.bars?m.bars.toLocaleString():'—'}</td>
+      <td style="padding:6px 8px;text-align:right;white-space:nowrap">
+        ${activeId!==m.id
+          ? `<button onclick="_mlActivateById('${m.id}').then(()=>openMLModal('models'))"
+               style="font-size:.72em;padding:2px 8px;background:rgba(139,92,246,.15);border:1px solid rgba(139,92,246,.4);color:var(--fg,#cdd6f4);border-radius:4px;cursor:pointer;margin-right:4px">Активировать</button>`
+          : `<span style="font-size:.7em;padding:2px 8px;background:rgba(139,92,246,.2);border:1px solid rgba(139,92,246,.5);border-radius:4px;color:#a78bfa;margin-right:4px">Активна</span>`}
+        <button onclick="_mlDeleteModel('${m.id}')"
+          style="font-size:.72em;padding:2px 6px;background:rgba(255,60,60,.1);border:1px solid rgba(255,60,60,.3);color:#f38ba8;border-radius:4px;cursor:pointer">🗑</button>
+      </td>
+    </tr>`).join('');
+
+  return `
+    <table style="width:100%;border-collapse:collapse;font-size:.82em;margin-bottom:16px">
+      <thead>
+        <tr style="color:#666;border-bottom:1px solid #333;font-size:.78em">
+          <th style="padding:4px 8px;text-align:left">Название</th>
+          <th style="padding:4px 8px;text-align:left">Загружена</th>
+          <th style="padding:4px 8px;text-align:center">AUC</th>
+          <th style="padding:4px 8px;text-align:center">Баров</th>
+          <th style="padding:4px 8px"></th>
+        </tr>
+      </thead>
+      <tbody>
+        ${builtinRow}
+        ${modelRows || '<tr><td colspan="5" style="padding:10px 8px;color:#555;font-size:.82em">Нет сохранённых моделей</td></tr>'}
+      </tbody>
+    </table>
+    <div style="border-top:1px solid #333;padding-top:14px">
+      <div style="font-size:.8em;color:#888;margin-bottom:10px">
+        Добавить модель: выберите файл <code style="color:#a78bfa">model_generated.js</code>
+        (генерируется: <code style="color:#a78bfa">python3 ml/train.py ваш_файл.csv</code>)
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input id="ml-name-input" type="text" placeholder="Название, напр. BTCUSDT 1H 2024"
+          style="flex:1;min-width:150px;padding:5px 8px;background:var(--bg3,#313244);border:1px solid #555;border-radius:4px;color:var(--fg,#cdd6f4);font-size:.82em">
+        <label style="cursor:pointer;padding:5px 12px;background:rgba(139,92,246,.15);border:1px solid rgba(139,92,246,.4);border-radius:4px;font-size:.82em;color:#a78bfa;white-space:nowrap">
+          📂 Выбрать .js
+          <input type="file" accept=".js" style="display:none" onchange="_mlHandleFile(this)">
+        </label>
+      </div>
+    </div>`;
+}
+
+function _mlScanTab() {
+  const active = typeof mlScore === 'function';
+  return `
+    <div style="font-size:.82em;color:#888;margin-bottom:14px">
+      Активная модель: <span style="color:#a78bfa">${_mlActiveName||'Встроенная'}</span>
+      ${active ? '' : ' <span style="color:#f38ba8">— не загружена</span>'}
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap">
+      <label style="font-size:.82em;color:#aaa">Последних баров:</label>
+      <input id="ml-scan-bars" type="number" value="500" min="50" max="5000"
+        style="width:70px;padding:4px 6px;background:var(--bg3,#313244);border:1px solid #555;border-radius:4px;color:var(--fg,#cdd6f4);font-size:.82em">
+      <button onclick="_mlRunScan()"
+        style="padding:5px 16px;background:rgba(139,92,246,.2);border:1px solid rgba(139,92,246,.5);border-radius:4px;color:#a78bfa;cursor:pointer;font-size:.82em">
+        ▶ Сканировать
+      </button>
+    </div>
+    <div id="ml-scan-results" style="font-size:.82em;color:#666">Нажмите «Сканировать»</div>`;
+}
+
+function _mlRunScan() {
+  if (typeof mlScore !== 'function') {
+    document.getElementById('ml-scan-results').innerHTML =
+      '<span style="color:#f38ba8">⚠️ Модель не загружена. Перейдите на вкладку «Модели» и активируйте</span>';
+    return;
+  }
+  if (!DATA || DATA.length < 50) {
+    document.getElementById('ml-scan-results').innerHTML = '<span style="color:#f38ba8">⚠️ Нет данных</span>';
+    return;
+  }
+  const nBars = parseInt(document.getElementById('ml-scan-bars')?.value) || 500;
+  const res = document.getElementById('ml-scan-results');
+  res.innerHTML = '<span style="color:#888">Сканирование...</span>';
+
+  setTimeout(() => {
+    const results = mlScanSignals(nBars);
+    if (!results.length) { res.innerHTML = '<span style="color:#888">Сигналов не найдено</span>'; return; }
+
+    const fmt = ts => {
+      if (!ts) return '—';
+      const d = new Date(ts * 1000);
+      return d.toLocaleDateString('ru-RU', { day:'2-digit', month:'2-digit', year:'2-digit' });
+    };
+    const rows = results.slice(0, 50).map((r, i) => {
+      const pct = (r.score * 100).toFixed(1);
+      const col = r.score >= 0.65 ? '#a6e3a1' : r.score >= 0.5 ? '#f9e2af' : '#f38ba8';
+      return `<tr>
+        <td style="padding:3px 8px;color:#555">${i+1}</td>
+        <td style="padding:3px 8px">${fmt(r.time)}</td>
+        <td style="padding:3px 8px;text-align:right;color:#aaa">${r.close.toFixed(2)}</td>
+        <td style="padding:3px 8px;text-align:right;color:${col};font-weight:600">${pct}%</td>
+      </tr>`;
+    }).join('');
+
+    res.innerHTML = `
+      <div style="color:#666;margin-bottom:8px">Найдено: ${results.length} сигналов · топ-50 по ML-оценке</div>
+      <table style="width:100%;border-collapse:collapse">
+        <thead><tr style="color:#555;border-bottom:1px solid #333">
+          <th style="padding:3px 8px;text-align:left">#</th>
+          <th style="padding:3px 8px;text-align:left">Дата</th>
+          <th style="padding:3px 8px;text-align:right">Цена</th>
+          <th style="padding:3px 8px;text-align:right">ML-оценка</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <div style="color:#555;margin-top:8px">≥65% высокая · 50–65% средняя · &lt;50% низкая вероятность прибыльного входа</div>`;
+  }, 20);
+}
+
+async function _mlHandleFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const code = await file.text();
+  const nameEl = document.getElementById('ml-name-input');
+  const name = nameEl?.value.trim() || file.name.replace('.js','');
+  if (!name) { toast('Введите название модели', 2000); return; }
+  try {
+    const fn = new Function(code + '\nreturn typeof mlScore!=="undefined"?mlScore:null;');
+    if (!fn()) throw new Error('no mlScore');
+  } catch(e) {
+    toast('⚠️ Файл не является валидной моделью (нет функции mlScore)', 3000);
+    return;
+  }
+  const meta = _mlParseMeta(code);
+  const id = 'ml_' + Date.now();
+  await _MLModelDB.save({
+    id, name, code,
+    auc: meta.auc, bars: meta.bars, signals: meta.signals,
+    date: new Date().toLocaleDateString('ru-RU', { day:'2-digit', month:'2-digit', year:'2-digit' }),
+  });
+  toast('✅ Модель «' + name + '» сохранена', 2000);
+  await openMLModal('models');
+}
+
+async function _mlDeleteModel(id) {
+  if (!confirm('Удалить модель?')) return;
+  await _MLModelDB.remove(id);
+  if (_mlActiveId === id) {
+    _mlActiveId = '__builtin__';
+    _mlActiveName = 'Встроенная';
+    localStorage.setItem('_mlActiveId', '__builtin__');
+    localStorage.setItem('_mlActiveName', 'Встроенная');
+  }
+  await openMLModal('models');
+}
+
+// При старте — восстановить последнюю сохранённую модель из IndexedDB
+(async () => {
+  if (_mlActiveId && _mlActiveId !== '__builtin__') {
+    const model = await _MLModelDB.load(_mlActiveId);
+    if (model) _mlActivateCode(model.code);
+  }
+})();
+
+// Алиас для обратной совместимости
+function openMLScanModal() { openMLModal('scan'); }
