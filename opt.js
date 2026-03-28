@@ -2808,6 +2808,7 @@ async function runOpt() {
     return;
   }
   // ─────────────────────────────────────────────────────────────────
+  updateETA(0, total, 0); await yieldToUI(); // показать начальное состояние (кнопку Стоп) до цикла
 
   for(const pvL of pvLs) { for(const pvR of pvRs) {
     if(_mcDone) break;
@@ -3130,8 +3131,8 @@ async function runOpt() {
                                       equities[name]=r.eq;
                                       } // end else (не дубль)
                                     } // end if(r passed filter)
-                                    // Yield: в prune режиме реже (1000 ит.), в обычном — чаще (300 ит.)
-                                    const _yieldEvery = optMode === 'prune' ? 1000 : 300;
+                                    // Yield каждые 300 итераций для отзывчивости UI (кнопка Стоп)
+                                    const _yieldEvery = 300;
                                     if(done%_yieldEvery===0||done===total) {
                                       if(optMode==='mc' && done===300) setMcPhase('⚡ Перебор…');
                                       updateETA(done, total, results.length);
