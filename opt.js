@@ -988,7 +988,8 @@ async function runOpt() {
     if (!_useOOS) return;
     // Запускаем бэктест на ПОЛНЫХ данных для непрерывной equity-кривой.
     // Делим её по _isN: нет проблемы прогрева индикаторов в OOS-части.
-    const rFull = _runOOS(_fullDATA, cfg);
+    // TV-строка показывает "что видит TradingView" — без ML-фильтра (TV его не знает) ##ML_FILTER
+    const rFull = _runOOS(_fullDATA, {...cfg, useMLFilter: false});
     cfg._oos = { forward: null, isPct: Math.round(_isN / N * 100) };
     // Диагностика: IS сделок не может быть больше TV сделок (оба прогона с bar 0).
     if (rFull && typeof isTradeN === 'number' && isTradeN > rFull.n) {
@@ -1142,6 +1143,17 @@ async function runOpt() {
   const kalmanLen     = $n('f_kalmanl') || 20; // ##KALMAN_MA##
   const useMLFilter   = $c('c_ml_filter') && typeof mlScore === 'function'; // ##ML_FILTER##
   const mlThreshold   = $n('c_ml_thresh') || 0.55; // ##ML_FILTER##
+  // Precompute ML scores once on full DATA — IS/OOS срезы используют те же индексы ##ML_FILTER
+  const _precompMlScores = useMLFilter
+    ? (() => {
+        const arr = new Float32Array(N).fill(-1);
+        for (let i = 52; i < N; i++) {
+          const f = mlComputeFeatures(i);
+          if (f) try { arr[i] = mlScore(f); } catch(e) { arr[i] = 0.5; }
+        }
+        return arr;
+      })()
+    : null;
 
   // ── Powerset фильтров ────────────────────────────────────────────────
   // Перебирает все 2^N комбинаций включённых фильтров.
@@ -2083,7 +2095,7 @@ async function runOpt() {
               useKalmanMA:_fCombo.useKalmanMA??useKalmanMA,kalmanLen, // ##KALMAN_MA##
               useMacdFilter:_fCombo.useMacdFilter??useMacdFilter,
               useER:_fCombo.useER??useER,erPeriod:erPeriod||10,erThresh,
-              useMLFilter,mlThreshold, // ##ML_FILTER##
+              useMLFilter,mlThreshold,mlScoresArr:_precompMlScores, // ##ML_FILTER##
               atrPeriod:atrP,commission:commTotal,baseComm:comm,spreadVal:spread*2,
               revSkip,revCooldown,revSrc,markToMarket:_mkm};
           results.push({name,pnl:r.pnl,wr:r.wr,n:r.n,dd:r.dd,pdd,avg:r.avg,sig,gt,
@@ -2471,7 +2483,7 @@ async function runOpt() {
               useKalmanMA:_fCombo.useKalmanMA??useKalmanMA,kalmanLen, // ##KALMAN_MA##
               useMacdFilter:_fCombo.useMacdFilter??useMacdFilter,
               useER:_fCombo.useER??useER,erPeriod:erPeriod||10,erThresh,
-              useMLFilter,mlThreshold, // ##ML_FILTER##
+              useMLFilter,mlThreshold,mlScoresArr:_precompMlScores, // ##ML_FILTER##
               atrPeriod:atrP,commission:commTotal,baseComm:comm,spreadVal:spread*2,markToMarket:_mkm};
           // OOS и тяжёлые метрики НЕ вызываем здесь — это горячий цикл
           // CVR/UPI/Sortino/kRatio вычислятся батчем после завершения TPE
@@ -3103,7 +3115,7 @@ async function runOpt() {
                                           useFat, fatConsec, fatVolDrop,
                                           useKalmanMA, kalmanLen, // ##KALMAN_MA##
                                           useMacdFilter, useER, erPeriod:erPArr[0]||10, erThresh,
-                                          useMLFilter, mlThreshold, // ##ML_FILTER##
+                                          useMLFilter, mlThreshold, mlScoresArr:_precompMlScores, // ##ML_FILTER##
                                           atrPeriod:atrP, commission:commTotal, baseComm:comm, spreadVal:spread*2,
                                           markToMarket:_mkm
                                         };
@@ -3851,7 +3863,7 @@ function buildBtCfg(cfg, ind) {
 
     useMLFilter:  cfg.useMLFilter  || false, // ##ML_FILTER##
     mlThreshold:  cfg.mlThreshold  || 0.55,
-    mlScoresArr:  ind.mlScoresArr  || null,
+    mlScoresArr:  ind.mlScoresArr  || null,  // HC/robustness используют кеш; _attachOOS передаёт useMLFilter:false
 
     start: Math.max(
       (cfg.useMA      ? (maP || 0)       * (cfg.htfRatio     || 1) * (cfg.maType==='EMA'||cfg.maType==='DEMA'||cfg.maType==='TEMA'?3:1) : 0),
