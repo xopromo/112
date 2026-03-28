@@ -542,6 +542,7 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
   let p1 = 0, c1 = 0, w1 = 0, p2 = 0, c2 = 0, w2 = 0;
   let nL = 0, wL = 0, pL = 0, nS = 0, wS = 0, pS = 0; // лонг/шорт стат
   const eq = new Float32Array(N);
+  let _mlScoreSum = 0, _mlScoreN = 0; // ##ML_FILTER — средний скор принятых сделок
   // ##SQN_LAZY## — collectTrades для per-trade анализа в showDetail (не в горячем цикле)
   // Откат: удалить эти 2 строки + tradePnl в return ниже
   const _trPnl = cfg.collectTrades ? [] : null;
@@ -883,6 +884,10 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
         }
       }
       if (doDir !== 0 && ac > 0) {
+        // Трекинг среднего ML-скора принятых сделок ##ML_FILTER
+        if (cfg.mlScoresArr && cfg.mlScoresArr[i] >= 0) {
+          _mlScoreSum += cfg.mlScoresArr[i]; _mlScoreN++;
+        }
         inTrade=true; dir=doDir;
         entry=bar.c; entryBar=i;
         beActive=false; trailActive=false; partialDone=false; posSize=1.0; wickSL=NaN;
@@ -953,6 +958,7 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
            nL, pL, wrL, nS, pS, wrS,
            dwrLS: (wrL!==null&&wrS!==null) ? Math.abs(wrL-wrS) : null,
            sqn, // ##SQN_HOT## всегда вычисляется
+           mlAvg: _mlScoreN > 0 ? Math.round(_mlScoreSum / _mlScoreN * 100) : null, // ##ML_FILTER
            tradePnl: _trPnl??[] }; // ##SQN_LAZY## пусто если collectTrades не задан
 }
 

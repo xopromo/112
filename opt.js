@@ -988,7 +988,8 @@ async function runOpt() {
     if (!_useOOS) return;
     // Запускаем бэктест на ПОЛНЫХ данных для непрерывной equity-кривой.
     // Делим её по _isN: нет проблемы прогрева индикаторов в OOS-части.
-    const rFull = _runOOS(_fullDATA, cfg);
+    // TV-строка показывает "что видит TradingView" — без ML-фильтра (TV его не знает) ##ML_FILTER
+    const rFull = _runOOS(_fullDATA, {...cfg, useMLFilter: false});
     cfg._oos = { forward: null, isPct: Math.round(_isN / N * 100) };
     // Диагностика: IS сделок не может быть больше TV сделок (оба прогона с bar 0).
     if (rFull && typeof isTradeN === 'number' && isTradeN > rFull.n) {
@@ -1142,6 +1143,17 @@ async function runOpt() {
   const kalmanLen     = $n('f_kalmanl') || 20; // ##KALMAN_MA##
   const useMLFilter   = $c('c_ml_filter') && typeof mlScore === 'function'; // ##ML_FILTER##
   const mlThreshold   = $n('c_ml_thresh') || 0.55; // ##ML_FILTER##
+  // Precompute ML scores once on full DATA — IS/OOS срезы используют те же индексы ##ML_FILTER
+  const _precompMlScores = useMLFilter
+    ? (() => {
+        const arr = new Float32Array(N).fill(-1);
+        for (let i = 52; i < N; i++) {
+          const f = mlComputeFeatures(i);
+          if (f) try { arr[i] = mlScore(f); } catch(e) { arr[i] = 0.5; }
+        }
+        return arr;
+      })()
+    : null;
 
   // ── Powerset фильтров ────────────────────────────────────────────────
   // Перебирает все 2^N комбинаций включённых фильтров.
@@ -2083,12 +2095,12 @@ async function runOpt() {
               useKalmanMA:_fCombo.useKalmanMA??useKalmanMA,kalmanLen, // ##KALMAN_MA##
               useMacdFilter:_fCombo.useMacdFilter??useMacdFilter,
               useER:_fCombo.useER??useER,erPeriod:erPeriod||10,erThresh,
-              useMLFilter,mlThreshold, // ##ML_FILTER##
+              useMLFilter,mlThreshold,mlScoresArr:_precompMlScores, // ##ML_FILTER##
               atrPeriod:atrP,commission:commTotal,baseComm:comm,spreadVal:spread*2,
               revSkip,revCooldown,revSrc,markToMarket:_mkm};
           results.push({name,pnl:r.pnl,wr:r.wr,n:r.n,dd:r.dd,pdd,avg:r.avg,sig,gt,
             p1:r.p1,p2:r.p2,dwr:r.dwr,c1:r.c1,c2:r.c2,nL:r.nL||0,pL:r.pL||0,wrL:r.wrL,nS:r.nS||0,pS:r.pS||0,wrS:r.wrS,dwrLS:r.dwrLS,
-            cvr:_calcCVR(r.eq),upi:_calcUlcerIdx(r.eq),sortino:_calcSortino(r.eq),kRatio:_calcKRatio(r.eq),sqn:r.sqn??null,
+            cvr:_calcCVR(r.eq),upi:_calcUlcerIdx(r.eq),sortino:_calcSortino(r.eq),kRatio:_calcKRatio(r.eq),sqn:r.sqn??null,mlAvg:r.mlAvg??null, // ##ML_FILTER
             omega:_calcOmega(r.eq),pain:_calcPainRatio(r.eq),
             burke:_calcBurke(r.eq),serenity:_calcSerenity(r.eq),ir:_calcInfoRatio(r.eq),eq:r.eq,cfg:_cfg}); // ##OMG ##PAIN ##BURKE ##SRNTY ##IR
           equities[name] = r.eq;
@@ -2471,13 +2483,13 @@ async function runOpt() {
               useKalmanMA:_fCombo.useKalmanMA??useKalmanMA,kalmanLen, // ##KALMAN_MA##
               useMacdFilter:_fCombo.useMacdFilter??useMacdFilter,
               useER:_fCombo.useER??useER,erPeriod:erPeriod||10,erThresh,
-              useMLFilter,mlThreshold, // ##ML_FILTER##
+              useMLFilter,mlThreshold,mlScoresArr:_precompMlScores, // ##ML_FILTER##
               atrPeriod:atrP,commission:commTotal,baseComm:comm,spreadVal:spread*2,markToMarket:_mkm};
           // OOS и тяжёлые метрики НЕ вызываем здесь — это горячий цикл
           // CVR/UPI/Sortino/kRatio вычислятся батчем после завершения TPE
           results.push({name,pnl:r.pnl,wr:r.wr,n:r.n,dd:r.dd,pdd,avg:r.avg,sig,gt,
             p1:r.p1,p2:r.p2,dwr:r.dwr,c1:r.c1,c2:r.c2,nL:r.nL||0,pL:r.pL||0,wrL:r.wrL,nS:r.nS||0,pS:r.pS||0,wrS:r.wrS,dwrLS:r.dwrLS,
-            cvr:null,upi:null,sortino:null,kRatio:null,sqn:r.sqn??null,
+            cvr:null,upi:null,sortino:null,kRatio:null,sqn:r.sqn??null,mlAvg:r.mlAvg??null, // ##ML_FILTER
             omega:null,pain:null,burke:null,serenity:null,ir:null,eq:r.eq,cfg:_cfg_tpe}); // ##OMG ##PAIN ##BURKE ##SRNTY ##IR (null — батч)
           equities[name] = r.eq;
         }
@@ -3103,13 +3115,13 @@ async function runOpt() {
                                           useFat, fatConsec, fatVolDrop,
                                           useKalmanMA, kalmanLen, // ##KALMAN_MA##
                                           useMacdFilter, useER, erPeriod:erPArr[0]||10, erThresh,
-                                          useMLFilter, mlThreshold, // ##ML_FILTER##
+                                          useMLFilter, mlThreshold, mlScoresArr:_precompMlScores, // ##ML_FILTER##
                                           atrPeriod:atrP, commission:commTotal, baseComm:comm, spreadVal:spread*2,
                                           markToMarket:_mkm
                                         };
                                       results.push({name,pnl:r.pnl,wr:r.wr,n:r.n,dd:r.dd,pdd,avg:r.avg,sig,gt,
                                         p1:r.p1,p2:r.p2,dwr:r.dwr,c1:r.c1,c2:r.c2,nL:r.nL||0,pL:r.pL||0,wrL:r.wrL,nS:r.nS||0,pS:r.pS||0,wrS:r.wrS,dwrLS:r.dwrLS,
-                                        cvr:_calcCVR(r.eq),upi:_calcUlcerIdx(r.eq),sortino:_calcSortino(r.eq),kRatio:_calcKRatio(r.eq),sqn:r.sqn??null,
+                                        cvr:_calcCVR(r.eq),upi:_calcUlcerIdx(r.eq),sortino:_calcSortino(r.eq),kRatio:_calcKRatio(r.eq),sqn:r.sqn??null,mlAvg:r.mlAvg??null, // ##ML_FILTER
                                         omega:_calcOmega(r.eq),pain:_calcPainRatio(r.eq),
                                         burke:_calcBurke(r.eq),serenity:_calcSerenity(r.eq),ir:_calcInfoRatio(r.eq),eq:r.eq,cfg:_cfg_ex}); // ##OMG ##PAIN ##BURKE ##SRNTY ##IR
                                       equities[name]=r.eq;
@@ -3851,7 +3863,7 @@ function buildBtCfg(cfg, ind) {
 
     useMLFilter:  cfg.useMLFilter  || false, // ##ML_FILTER##
     mlThreshold:  cfg.mlThreshold  || 0.55,
-    mlScoresArr:  ind.mlScoresArr  || null,
+    mlScoresArr:  ind.mlScoresArr  || null,  // HC/robustness используют кеш; _attachOOS передаёт useMLFilter:false
 
     start: Math.max(
       (cfg.useMA      ? (maP || 0)       * (cfg.htfRatio     || 1) * (cfg.maType==='EMA'||cfg.maType==='DEMA'||cfg.maType==='TEMA'?3:1) : 0),
