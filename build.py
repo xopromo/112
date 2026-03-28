@@ -25,14 +25,20 @@ opt      = open(os.path.join(base, 'opt.js'),        encoding='utf-8').read()
 ui       = open(os.path.join(base, 'ui.js'),         encoding='utf-8').read()
 pine     = open(os.path.join(base, 'pine_export.js'), encoding='utf-8').read()
 
-# ── ML: model + inference (опционально — не падать если нет модели) ────────
-_ml_model_path = os.path.join(base, 'ml', 'model_generated.js')
+# ── ML: model + inference + in-browser training ────────────────────────────
+_ml_model_path  = os.path.join(base, 'ml', 'model_generated.js')
 _ml_signal_path = os.path.join(base, 'ml_signal.js')
-if os.path.exists(_ml_model_path) and os.path.exists(_ml_signal_path):
-    ml_code = (open(_ml_model_path, encoding='utf-8').read() + '\n' +
-               open(_ml_signal_path, encoding='utf-8').read())
+_ml_train_path  = os.path.join(base, 'ml_train_browser.js')
+ml_parts = []
+if os.path.exists(_ml_model_path):
+    ml_parts.append(open(_ml_model_path, encoding='utf-8').read())
 else:
-    ml_code = '// ML model not generated yet. Run: python3 ml/train.py'
+    ml_parts.append('// ML model not generated yet. Run: python3 ml/train.py')
+if os.path.exists(_ml_signal_path):
+    ml_parts.append(open(_ml_signal_path, encoding='utf-8').read())
+if os.path.exists(_ml_train_path):
+    ml_parts.append(open(_ml_train_path, encoding='utf-8').read())
+ml_code = '\n'.join(ml_parts)
 projects = open(os.path.join(base, 'projects.js'),   encoding='utf-8').read()
 synthesis = open(os.path.join(base, 'synthesis.js'),   encoding='utf-8').read()
 synthesis_worker = open(os.path.join(base, 'synthesis_worker.js'), encoding='utf-8').read()
