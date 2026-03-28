@@ -143,7 +143,7 @@ function generatePineScript(r) {
   lines.push(`grp_struct = "🏗️ СТРУКТУРА"`);
   lines.push(`use_struct   = input.bool(${b(c.useStruct)}, "Структура рынка HH/HL", group=grp_struct)`);
   lines.push(`struct_pv_l  = input.int(${Math.max(2, c.strPvL||5)}, "Pivot left",  minval=2, maxval=100, group=grp_struct)`);
-  lines.push(`struct_pv_r  = input.int(${Math.max(1, c.strPvR||2)}, "Pivot right", minval=1, maxval=5,   group=grp_struct)`);
+  lines.push(`struct_pv_r  = input.int(${Math.max(1, c.strPvR||2)}, "Pivot right", minval=1, maxval=10,   group=grp_struct)`);
   lines.push(``);
 
   lines.push(`grp_rsi_f = "📊 RSI ФИЛЬТР"`);

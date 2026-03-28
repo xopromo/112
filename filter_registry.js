@@ -261,7 +261,7 @@ const FILTER_REGISTRY = [
       }
       return bearVol <= bullVol;
     },
-    nameLabel: () => 'VolDir',
+    nameLabel: (cfg) => `VolDir${cfg.volDirPeriod||10}`,
   },
 
   // ── Weighted Trend ────────────────────────────────────────
