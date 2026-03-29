@@ -754,12 +754,15 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
 #oos-chart-wrap { display:none; background:var(--bg2); border:1px solid var(--border); border-radius:6px; margin:6px 0; }
 #oos-eqc { width:100%; height:150px; display:block; border-radius:6px; cursor:crosshair; }
 
-/* Звёздочки — три уровня яркости */
-[data-fav] { cursor:pointer; user-select:none; transition:color .15s, text-shadow .15s; }
-[data-fav][data-level="0"] { color:rgba(150,150,150,0.35); }
-[data-fav][data-level="1"] { color:rgba(190,190,190,0.65); }
-[data-fav][data-level="2"] { color:rgba(255,200,50,0.92); }
-[data-fav][data-level="3"] { color:#ffd700; text-shadow:0 0 8px rgba(255,215,0,.75); }
+/* Звёздочки — три уровня яркости + размер */
+[data-fav] { cursor:pointer; user-select:none; transition:color .15s, font-size .15s, text-shadow .15s; display:inline-block; line-height:1; }
+[data-fav][data-level="0"] { color:rgba(150,150,150,0.35); font-size:.72em; }
+[data-fav][data-level="1"] { color:rgba(190,190,190,0.65); font-size:.88em; }
+[data-fav][data-level="2"] { color:rgba(255,200,50,0.92);  font-size:1.05em; }
+[data-fav][data-level="3"] { color:#ffd700; text-shadow:0 0 8px rgba(255,215,0,.75); font-size:1.25em; }
+/* Кнопка удаления из избранного */
+.fav-del-btn { float:right; cursor:pointer; color:rgba(255,61,87,.38); font-size:1.1em; line-height:1; padding:0 1px 0 6px; transition:color .15s; user-select:none; }
+.fav-del-btn:hover { color:rgba(255,61,87,.9); }
 /* OOS tbody строки */
 #oos-rtbl td { padding:4px 7px; border-bottom:1px solid var(--border); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 #oos-rtbl tr:hover td { background:var(--bg3); }
