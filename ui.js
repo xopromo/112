@@ -7003,7 +7003,7 @@ function applyOOSFilters() {
     const dStr = (v,d=1) => v == null ? '—' : (v>=0?'+':'')+v.toFixed(d)+'%';
     const _esc = s => String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     html +=
-      `<tr data-i="${globalIdx}" data-name="${_esc(r.name)}" class="${isFavRow?'fav-row':''}" onclick="drawOOSChart(${globalIdx},this)">` +
+      `<tr data-i="${globalIdx}" data-name="${_esc(r.name)}" class="${isFavRow?'fav-row':''}" onclick="drawOOSChart(${globalIdx},this)" ondblclick="showOOSDetail(${globalIdx})">` +
       `<td title="${_esc(r.name)}" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_esc(r.name)}</td>` +
       `<td style="text-align:center;cursor:pointer" onclick="toggleFav(${globalIdx},event)">${fav}</td>` +
       `<td class="${r.old_pnl!=null&&r.old_pnl>0?'pos':'neg'}">${f1(r.old_pnl)}%</td>` +
@@ -7035,6 +7035,16 @@ function _oosGetBadge(r) {
   return 'b';
 }
 
+
+// Детальный вид OOS результата (дабл-клик по строке)
+function showOOSDetail(idx) {
+  const r = _oosTableResults[idx];
+  if (!r || !r.cfg) return;
+  // showDetail ожидает r.eq для построения equity-графика;
+  // маппируем old_eq → eq (история = то, на чём стратегия была найдена)
+  if (!r.eq && r.old_eq) r.eq = r.old_eq;
+  showDetail(r);
+}
 
 // Графическое сравнение equity: история (синий) + новые данные (оранжевый)
 function drawOOSChart(idx, rowEl) {
