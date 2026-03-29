@@ -446,6 +446,23 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
   background: rgba(8,11,16,0.6);
   backdrop-filter: blur(3px);
 }
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(8,11,16,0.6);
+  backdrop-filter: blur(3px);
+  z-index: 9999;
+}
+.modal-content {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 20px;
+  max-width: 900px;
+  max-height: 90vh;
+  overflow: auto;
+  box-shadow: 0 20px 60px rgba(0,0,0,.6);
+}
 #detail-panel {
   position: fixed;
   top: 0; right: 0; bottom: 0;
@@ -27036,9 +27053,29 @@ function drawOOSChart(idx, rowEl) {
 
   const eq_old = r.old_eq;
   const eq_new = r.new_eq;
+
+  // Рассчитаем прогрев для новых данных (игнорируем первые N баров)
+  let newEqClean = eq_new;
+  if (eq_new && eq_new.length > 0) {
+    const cfg = r.cfg || {};
+    // Минимальный прогрев: макс из MA, pivot, ATR периодов
+    const maWarmup = cfg.useMA ? (cfg.maP || 20) : 0;
+    const pivotWarmup = cfg.usePivot ? ((cfg.pvL || 5) + (cfg.pvR || 2) + 5) : 0;
+    const atrWarmup = cfg.useATR ? (cfg.atrPeriod || 14) * 3 : 0;
+    const warmup = Math.max(maWarmup, pivotWarmup, atrWarmup, 1);
+
+    // Пропускаем первые warmup баров из equity кривой (убираем прогрев)
+    const warmupEndIdx = Math.min(warmup, eq_new.length - 1);
+    if (warmupEndIdx > 0 && warmupEndIdx < eq_new.length) {
+      // Берём значение при окончании прогрева и смещаем так чтобы начало было от нуля
+      const warmupValue = eq_new[warmupEndIdx];
+      newEqClean = eq_new.slice(warmupEndIdx).map(v => v - warmupValue);
+    }
+  }
+
   // Concatenate: новый сегмент продолжает с последнего значения истории
   const lastOld = eq_old[eq_old.length - 1];
-  const combined = [...eq_old, ...eq_new.map(v => v + lastOld)];
+  const combined = [...eq_old, ...newEqClean.map(v => v + lastOld)];
   const splitIdx  = eq_old.length;
   const splitFrac = (splitIdx - 1) / (combined.length - 1);
 
@@ -29680,7 +29717,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774813467427;
+window._BUILD_TS = 1774813966506;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
