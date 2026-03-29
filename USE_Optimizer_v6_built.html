@@ -751,7 +751,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
 .oos-th-new   { background:var(--bg3); color:var(--accent); padding:6px 8px; border-bottom:1px solid var(--border2); border-left:2px solid rgba(0,212,255,.3); cursor:pointer; white-space:nowrap; font-size:.72em; }
 .oos-th-delta { background:var(--bg3); color:var(--orange,#ffaa44); padding:6px 8px; border-bottom:1px solid var(--border2); border-left:1px solid var(--border2); cursor:pointer; white-space:nowrap; font-size:.72em; }
 /* OOS chart */
-#oos-chart-wrap { display:none; background:var(--bg2); border:1px solid var(--border); border-radius:6px; margin:6px 0; }
+#oos-chart-wrap { display:none; background:var(--bg2); border:1px solid var(--border); border-radius:6px; margin:6px 0; position:sticky; top:0; z-index:9; }
 #oos-eqc { width:100%; height:150px; display:block; border-radius:6px; cursor:crosshair; }
 
 /* Звёздочки — три уровня яркости */
@@ -26513,11 +26513,14 @@ function drawOOSChart(idx, rowEl) {
   }
   const wrap   = document.getElementById('oos-chart-wrap');
   const canvas = document.getElementById('oos-eqc');
+  const eqWrap = document.getElementById('eq-wrap');
   if (!canvas || !wrap) return;
   const r = _oosTableResults[idx];
   if (!r || !r.old_eq || !r.old_eq.length || !r.new_eq || !r.new_eq.length) {
     wrap.style.display = 'none'; return;
   }
+  // Скрываем основной график и показываем OOS
+  if (eqWrap) eqWrap.style.display = 'none';
   wrap.style.display = 'block';
 
   const eq_old = r.old_eq;
@@ -29038,7 +29041,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774798592630;
+window._BUILD_TS = 1774798660407;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;

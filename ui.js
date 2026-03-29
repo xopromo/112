@@ -7154,11 +7154,14 @@ function drawOOSChart(idx, rowEl) {
   }
   const wrap   = document.getElementById('oos-chart-wrap');
   const canvas = document.getElementById('oos-eqc');
+  const eqWrap = document.getElementById('eq-wrap');
   if (!canvas || !wrap) return;
   const r = _oosTableResults[idx];
   if (!r || !r.old_eq || !r.old_eq.length || !r.new_eq || !r.new_eq.length) {
     wrap.style.display = 'none'; return;
   }
+  // Скрываем основной график и показываем OOS
+  if (eqWrap) eqWrap.style.display = 'none';
   wrap.style.display = 'block';
 
   const eq_old = r.old_eq;
