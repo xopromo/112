@@ -13106,6 +13106,7 @@ window.onerror = function(msg, src, line, col, err) {
 let dropZone, fileInput;
 document.addEventListener('DOMContentLoaded', () => {
   _loadPrfCutoff(); // restore cutoff fields from localStorage
+  _checkMSCConfig(); // apply Market Structure Comparator config if present
 
   dropZone = document.getElementById('drop');
   fileInput = document.getElementById('fi');
@@ -28339,6 +28340,95 @@ async function runMLFeatureScreening() {
 }
 try{window.runMLFeatureScreening=runMLFeatureScreening;}catch(e){}
 
+// ─── Market Structure Comparator config reader ───────────────────────────────
+
+function _checkMSCConfig() {
+  const raw = localStorage.getItem('msc_config');
+  if (!raw) return;
+  let cfg;
+  try { cfg = JSON.parse(raw); } catch(e) { localStorage.removeItem('msc_config'); return; }
+  if (!cfg || !cfg.apply) return;
+
+  const meta = cfg.meta || {};
+  const periodLabel = (meta.periodBStart && meta.periodBEnd)
+    ? `период B: ${meta.periodBStart} → ${meta.periodBEnd}`
+    : 'период B';
+
+  // Build apply rows HTML
+  const applyEntries = Object.entries(cfg.apply);
+  const applyRows = applyEntries.map(([id, val]) => {
+    const displayVal = typeof val === 'boolean' ? (val ? '✅ вкл' : '❌ выкл') : val;
+    return `<span style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.06);border-radius:6px;padding:3px 8px;font-size:12px">
+      <code style="color:var(--accent)">${id}</code>
+      <span style="color:var(--fg2)">→</span>
+      <b style="color:var(--fg)">${displayVal}</b>
+    </span>`;
+  }).join(' ');
+
+  const hintsHtml = (cfg.hints || []).map(h =>
+    `<div style="font-size:12px;color:var(--fg2);line-height:1.4">${h.icon || '•'} ${h.text}</div>`
+  ).join('');
+
+  const banner = document.createElement('div');
+  banner.id = 'msc-banner';
+  banner.style.cssText = `
+    position:fixed;bottom:16px;left:50%;transform:translateX(-50%);
+    background:var(--bg2,#1e1e2e);border:1px solid rgba(137,220,235,.4);
+    border-radius:10px;padding:14px 18px;z-index:9999;
+    box-shadow:0 4px 20px rgba(0,0,0,.5);max-width:680px;width:calc(100vw - 32px);
+    display:flex;flex-direction:column;gap:10px;
+  `;
+  banner.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+      <div style="font-size:13px;font-weight:600;color:var(--accent)">
+        📊 Конфигурация от Comparator
+        <span style="font-weight:400;color:var(--fg2);margin-left:6px;font-size:12px">${periodLabel}</span>
+      </div>
+      <button onclick="document.getElementById('msc-banner').remove()" style="
+        background:none;border:none;color:var(--fg2);cursor:pointer;font-size:16px;line-height:1;padding:0;flex-shrink:0
+      ">✕</button>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px">${applyRows}</div>
+    ${hintsHtml ? `<div id="msc-hints" style="display:none;border-top:1px solid rgba(255,255,255,.08);padding-top:8px;display:flex;flex-direction:column;gap:4px">${hintsHtml}</div>` : ''}
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button id="msc-apply-btn" style="
+        background:var(--accent,#89dceb);color:#1e1e2e;border:none;border-radius:6px;
+        padding:6px 16px;font-size:13px;font-weight:600;cursor:pointer
+      ">✅ Применить</button>
+      ${hintsHtml ? `<button onclick="
+        const h=document.getElementById('msc-hints');
+        if(h){h.style.display=h.style.display==='none'?'flex':'none';this.textContent=h.style.display==='none'?'💡 Подробнее':'💡 Скрыть'}
+      " style="background:rgba(255,255,255,.08);color:var(--fg);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:6px 12px;font-size:13px;cursor:pointer">💡 Подробнее</button>` : ''}
+      <button onclick="localStorage.removeItem('msc_config');document.getElementById('msc-banner').remove()" style="
+        background:none;border:1px solid rgba(255,255,255,.15);color:var(--fg2);
+        border-radius:6px;padding:6px 12px;font-size:13px;cursor:pointer
+      ">Закрыть</button>
+    </div>
+  `;
+
+  document.body.appendChild(banner);
+
+  document.getElementById('msc-apply-btn').addEventListener('click', function() {
+    applyEntries.forEach(([id, val]) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (typeof val === 'boolean') {
+        if (el.checked !== val) {
+          el.checked = val;
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      } else {
+        el.value = String(val);
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    });
+    localStorage.removeItem('msc_config');
+    const btn = document.getElementById('msc-apply-btn');
+    if (btn) { btn.textContent = '✅ Применено'; btn.disabled = true; btn.style.opacity = '0.6'; }
+    setTimeout(() => { const b = document.getElementById('msc-banner'); if (b) b.remove(); }, 1500);
+  });
+}
+
 </script>
 </script>
 <!-- OOS COMPARE MODAL: сравнение избранных на старых и новых данных -->
@@ -29106,7 +29196,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774800004818;
+window._BUILD_TS = 1774801110646;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
