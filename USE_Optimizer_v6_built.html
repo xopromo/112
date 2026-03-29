@@ -28409,23 +28409,55 @@ function _checkMSCConfig() {
   document.body.appendChild(banner);
 
   document.getElementById('msc-apply-btn').addEventListener('click', function() {
+    const changed = [];
+    let firstEl = null;
+
     applyEntries.forEach(([id, val]) => {
       const el = document.getElementById(id);
       if (!el) return;
       if (typeof val === 'boolean') {
-        if (el.checked !== val) {
-          el.checked = val;
-          el.dispatchEvent(new Event('change', { bubbles: true }));
-        }
+        el.checked = val;
+        el.dispatchEvent(new Event('change', { bubbles: true }));
       } else {
         el.value = String(val);
+        el.dispatchEvent(new Event('input',  { bubbles: true }));
         el.dispatchEvent(new Event('change', { bubbles: true }));
       }
+      // Highlight element
+      const wrap = el.closest('.field, .cb') || el;
+      wrap.style.transition = 'box-shadow .15s, background .15s';
+      wrap.style.boxShadow  = '0 0 0 2px #89dceb';
+      wrap.style.background = 'rgba(137,220,235,.12)';
+      wrap.style.borderRadius = '4px';
+      setTimeout(() => { wrap.style.boxShadow=''; wrap.style.background=''; }, 2500);
+      if (!firstEl) firstEl = wrap;
+
+      const label = typeof val === 'boolean' ? (val ? '✅ вкл' : '❌ выкл') : `= ${val}`;
+      changed.push(`<b>${id}</b> ${label}`);
     });
+
     localStorage.removeItem('msc_config');
-    const btn = document.getElementById('msc-apply-btn');
-    if (btn) { btn.textContent = '✅ Применено'; btn.disabled = true; btn.style.opacity = '0.6'; }
-    setTimeout(() => { const b = document.getElementById('msc-banner'); if (b) b.remove(); }, 1500);
+
+    // Scroll to first changed element
+    if (firstEl) firstEl.scrollIntoView({ behavior:'smooth', block:'center' });
+
+    // Update banner to show applied changes
+    const b = document.getElementById('msc-banner');
+    if (b) {
+      b.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+          <div style="font-size:13px;font-weight:600;color:#a6e3a1">
+            ✅ Применено — ${changed.length} изменений
+            <span style="font-weight:400;color:var(--fg2);font-size:11px;margin-left:6px">${changed.join(' · ')}</span>
+          </div>
+          <button onclick="document.getElementById('msc-banner').remove()" style="
+            background:none;border:none;color:var(--fg2);cursor:pointer;font-size:16px;padding:0;flex-shrink:0
+          ">✕</button>
+        </div>
+        <div style="font-size:11px;color:var(--fg2)">Настройки подсвечены выше (синяя рамка). Прокрути страницу вверх чтобы увидеть их.</div>
+      `;
+      b.style.borderColor = 'rgba(166,227,161,.5)';
+    }
   });
 }
 
@@ -29196,7 +29228,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774803537447;
+window._BUILD_TS = 1774803993579;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
