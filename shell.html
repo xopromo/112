@@ -1586,12 +1586,6 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
     <button class="tpl-btn2 ok" id="btn-oos-new" style="padding:3px 10px;font-size:.85em;display:none" onclick="runOOSOnNewData()">📊 Сравнить с новыми</button>
     <button class="tpl-btn2" id="btn-oos-export" style="padding:3px 10px;font-size:.85em;display:none" onclick="exportOOSTableCSV()">💾 CSV</button>
     <span style="margin-left:auto;display:flex;gap:6px;align-items:center">
-      <input type="file" id="fi-session" accept=".json" style="display:none" onchange="loadSession(this.files[0]);this.value=''">
-      <button class="tpl-btn2" onclick="saveSession()" title="Сохранить результаты + избранные текущего неймспейса в JSON"
-        style="padding:3px 10px;font-size:.8em;border-color:var(--green2);color:var(--green)">💾 Сохранить сессию</button>
-      <button class="tpl-btn2" onclick="document.getElementById('fi-session').click()" title="Загрузить ранее сохранённую сессию (JSON)"
-        style="padding:3px 10px;font-size:.8em">📂 Загрузить сессию</button>
-    </span>
     <label style="display:flex;align-items:center;gap:4px;color:var(--text2);font-size:.85em" title="Стратегия считается стабильной если средняя прибыль за сделку (APT) на новых данных >= X% от исторической">
       Порог стабильности: <input type="number" id="oos-stable-thresh" value="50" min="10" max="100" step="5"
         style="width:44px;background:var(--bg4);color:var(--text1);border:1px solid var(--border);border-radius:3px;padding:1px 4px;font-size:.9em">%
