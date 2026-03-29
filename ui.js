@@ -935,12 +935,6 @@ function renderVisibleResults() {
   const end   = Math.min(start + _pageSize, total);
   const page  = _visibleResults.slice(start, end);
 
-  console.log(`[RENDER] renderVisibleResults: total=${total}, page_length=${page.length}, _tableMode=${_tableMode}, _curPage=${_curPage}, _totalPages=${_totalPages}`);
-  if (total > 0 && page.length > 0) {
-    const first = _visibleResults[0];
-    console.log('[RENDER] Первый результат:', `pnl=${first.pnl}, wr=${first.wr}, n=${first.n}, dd=${first.dd}, gt=${first.gt}`);
-  }
-
   // Строим HTML строкой — намного быстрее чем createElement в цикле
   // ── OOS-режим: рендер через applyOOSFilters (своя фильтрация) ──
   if (_tableMode === 'oos') {
@@ -1059,22 +1053,10 @@ function renderVisibleResults() {
       '<td></td></tr>';
   }
 
-  // ОТЛАДКА: первые 400 символов HTML
-  const htmlPreview = html.substring(0, 400);
-  console.log('[RENDER] HTML preview:', htmlPreview.substring(0, 200) + '...');
-
   const tbody = $('tb');
-  console.log(`[RENDER] tbody element: exists=${!!tbody}, html_length=${html.length}`);
-
-  if (!tbody) {
-    console.error('[RENDER] КРИТИЧЕСКАЯ ОШИБКА: element tb не найден!');
-    return;
-  }
+  if (!tbody) return;
 
   tbody.innerHTML = html;
-  const firstTr = tbody.querySelector('tr');
-  const trs = tbody.querySelectorAll('tr');
-  console.log(`[RENDER] HTML вставлен. Всего строк: ${trs.length}, firstTr существует: ${!!firstTr}`);
 
   // Применяем настройки видимости колонок к только что созданным td
   if (typeof _applyColSettings === 'function') _applyColSettings(getColSettings());
@@ -5042,11 +5024,12 @@ function _saveColSettings(settings) {
 }
 
 function _applyColSettings(settings) {
-  // Применяем показ/скрытие через CSS класс col-hidden
-  // Используем nth-child для td/th — через data-col атрибут
+  // ОПТИМИЗАЦИЯ: если все колонки видимы — пропускаем querySelectorAll (дефолт после рендера)
+  const hiddenCols = _COL_DEFS.filter(col => settings[col.id] === false);
+  if (hiddenCols.length === 0) return;
+  // Применяем показ/скрытие через CSS класс col-hidden только для изменённых колонок
   _COL_DEFS.forEach(col => {
     const visible = settings[col.id] !== false;
-    // Скрываем все элементы с этим классом
     document.querySelectorAll('.' + col.id).forEach(el => {
       el.classList.toggle('col-hidden', !visible);
     });
@@ -5970,13 +5953,10 @@ async function runHillClimbing() {
         await yieldToUI();
 
         _hcRobRunning = true; // разрешаем noise/MC работать в фазе 2
-        console.log('[HC Фаза2] robTests=', robTests, 'totalPhase2=', totalPhase2, '_hcRobRunning=', _hcRobRunning);
         for (let pi = 0; pi < totalPhase2 && _hcRunning; pi++) {
           const { nc, r } = phase1Passed[pi];
           const fakeR2 = { cfg: nc };
-          console.log('[HC Фаза2] кандидат', pi, '/', totalPhase2, 'nc=', JSON.stringify(nc).slice(0,80));
           const { score: robScore, details: robDetails2 } = await runRobustScoreForDetailed(fakeR2, robTests, true); // fastMode=true для скорости
-          console.log('[HC Фаза2] кандидат', pi, 'robScore=', robScore, 'details=', robDetails2);
           if (!_hcRunning) break;
           r._robScore = robScore; r.robDetails = robDetails2;
           const pdd = r.dd > 0 ? r.pnl / r.dd : (r.pnl > 0 ? 99 : 0);
