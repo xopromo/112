@@ -7654,6 +7654,7 @@ function _drawOOSCrosshair(e) {
 function _clearOOSCrosshair() {
   const ch = document.getElementById('oos-crosshair');
   if (ch) ch.getContext('2d').clearRect(0, 0, ch.width, ch.height);
+}
 
 function doOOSSort(key) {
   if (_oosSortKey === key) _oosSortDir *= -1;

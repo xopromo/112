@@ -27073,6 +27073,7 @@ function _drawOOSCrosshair(e) {
 function _clearOOSCrosshair() {
   const ch = document.getElementById('oos-crosshair');
   if (ch) ch.getContext('2d').clearRect(0, 0, ch.width, ch.height);
+}
 
 function doOOSSort(key) {
   if (_oosSortKey === key) _oosSortDir *= -1;
@@ -29619,7 +29620,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774816878194;
+window._BUILD_TS = 1774817081133;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
