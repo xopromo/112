@@ -980,15 +980,181 @@ function renderRecommendations(rows) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// MAIN ENTRY POINT
+// OPTIMIZER CONFIG GENERATOR
+// Maps analysis results → specific optimizer UI element IDs
+// ═══════════════════════════════════════════════════════════════
+
+// Returns { apply:{id:value,...}, hints:[{icon,type,text},...], meta }
+function generateOptimizerConfig(mA, mB, rows) {
+  const cfg = { version:1, timestamp:Date.now(), apply:{}, hints:[] };
+
+  const rowMap = {};
+  rows.forEach(r => { rowMap[r.key] = r; });
+
+  // ── 1. MA-filter: unstable cross-frequency → disable ──────────
+  const maCrossRow = rowMap['maCrossFreq'];
+  if (maCrossRow && !isNaN(maCrossRow.score) && maCrossRow.score < 0.5
+      && !isNaN(maCrossRow.vA) && maCrossRow.vA > 0) {
+    const chgPct = ((maCrossRow.vB - maCrossRow.vA) / maCrossRow.vA * 100).toFixed(0);
+    cfg.apply['f_ma']     = false;
+    cfg.apply['f_strend'] = false;
+    cfg.hints.push({ type:'warn', icon:'🔴',
+      text:`MA-фильтр <b>отключён</b> — кросс-частота изменилась <b>+${chgPct}%</b> (A=${maCrossRow.vA.toFixed(1)} → B=${maCrossRow.vB.toFixed(1)} /100б). Он будет блокировать входы.` });
+    cfg.hints.push({ type:'hint', icon:'💡',
+      text:`Вместо MA-фильтра попробуй <b>ADX</b> — измеряет силу тренда без зависимости от периода MA. Отлично работает при ER&lt;0.3.` });
+  }
+
+  // ── 2. ATR SL based on stable pivot depth (period B = recent) ─
+  const pdLow  = isNaN(mB.pivDepthLow)  ? null : mB.pivDepthLow;
+  const pdHigh = isNaN(mB.pivDepthHigh) ? null : mB.pivDepthHigh;
+  const pivDepth = (pdLow && pdHigh) ? (pdLow+pdHigh)/2 : (pdLow||pdHigh);
+  if (pivDepth && pivDepth > 0) {
+    const slMult = Math.max(0.5, Math.min(4.0, pivDepth * 1.25)).toFixed(1);
+    cfg.apply['s_atr']  = true;
+    cfg.apply['s_atrv'] = slMult;
+    cfg.hints.push({ type:'info', icon:'📍',
+      text:`ATR SL = <b>${slMult}×</b> (средняя глубина пивота B = ${pivDepth.toFixed(2)} ATR + 25% запас). Метрика стабильна — смело используй.` });
+  }
+
+  // ── 3. TP R:R based on Efficiency Ratio ───────────────────────
+  if (!isNaN(mB.erMean)) {
+    let rrVal, rrReason;
+    if (mB.erMean < 0.25) {
+      rrVal = '1.5'; rrReason = 'очень хаотичный рынок (ER&lt;0.25) → короткий TP';
+    } else if (mB.erMean < 0.40) {
+      rrVal = '2.0'; rrReason = 'хаотичный рынок (ER&lt;0.40) → умеренный TP';
+    } else {
+      rrVal = '2.5'; rrReason = 'умеренно трендовый рынок (ER≥0.40) → длинный TP';
+    }
+    cfg.apply['t_rr']  = true;
+    cfg.apply['t_rrv'] = rrVal;
+    cfg.hints.push({ type:'info', icon:'🎯',
+      text:`TP R:R = <b>${rrVal}</b> (ER=${mB.erMean.toFixed(3)} — ${rrReason})` });
+  }
+
+  // ── 4. Hurst-based strategy type hint ─────────────────────────
+  if (!isNaN(mB.hurst)) {
+    if (mB.hurst < 0.48) {
+      cfg.hints.push({ type:'hint', icon:'🔄',
+        text:`Hurst=${mB.hurst.toFixed(3)} — <b>mean-reversion режим</b>. Пивот-стратегия идеальна. RSI-перепроданность как дополнительный фильтр улучшит WR.` });
+    } else if (mB.hurst > 0.58) {
+      cfg.hints.push({ type:'hint', icon:'📈',
+        text:`Hurst=${mB.hurst.toFixed(3)} — <b>трендовый режим</b>. Добавь фильтр по направлению (структура рынка или ADX). Не торгуй против тренда.` });
+    } else {
+      cfg.hints.push({ type:'hint', icon:'〰️',
+        text:`Hurst=${mB.hurst.toFixed(3)} — <b>нейтральный режим</b> (между тренд/MR). Обе стороны симметрично, без трендового фильтра.` });
+    }
+  }
+
+  // ── 5. Bullish balance hint ───────────────────────────────────
+  if (!isNaN(mB.bullish)) {
+    if (Math.abs(mB.bullish - 50) < 4) {
+      cfg.hints.push({ type:'info', icon:'⚖️',
+        text:`% бычьих баров = ${mB.bullish.toFixed(1)}% — нет направленного уклона. Лонг и шорт равноправны.` });
+    } else if (mB.bullish > 54) {
+      cfg.hints.push({ type:'info', icon:'📈',
+        text:`% бычьих баров = ${mB.bullish.toFixed(1)}% — лёгкий бычий уклон. Лонг-сигналы будут надёжнее.` });
+    } else {
+      cfg.hints.push({ type:'info', icon:'📉',
+        text:`% бычьих баров = ${mB.bullish.toFixed(1)}% — лёгкий медвежий уклон. Шорт-сигналы будут надёжнее.` });
+    }
+  }
+
+  cfg.meta = {
+    periodB: { start:mB.dateStart, end:mB.dateEnd, n:mB.n },
+    hurst: mB.hurst, erMean: mB.erMean, bullish: mB.bullish,
+    pivDepth, atrPctMean: mB.atrPctMean,
+  };
+
+  return cfg;
+}
+
+// ─── Render the config panel ──────────────────────────────────
+function renderConfigPanel(cfg) {
+  const LABELS = {
+    f_ma:     'MA-фильтр тренда',
+    f_strend: 'Простой тренд (MA)',
+    s_atr:    'SL ×ATR',
+    s_atrv:   'Множитель ATR SL',
+    t_rr:     'TP R:R от SL',
+    t_rrv:    'Множитель R:R',
+  };
+
+  const applyRows = Object.entries(cfg.apply).map(([id, val]) => {
+    const label = LABELS[id] || id;
+    const display = typeof val === 'boolean'
+      ? (val ? '<span style="color:var(--green)">✓ включить</span>' : '<span style="color:var(--red)">✗ отключить</span>')
+      : `<span style="color:var(--accent)">= ${val}</span>`;
+    return `<div style="display:flex;gap:8px;align-items:center;font-size:.78em;padding:2px 0">
+      <span style="color:var(--fg2);min-width:160px">${label}</span>
+      ${display}
+    </div>`;
+  }).join('');
+
+  const hintsHtml = cfg.hints.map(h => {
+    const bg = h.type==='warn'?'rgba(243,139,168,.07)':h.type==='hint'?'rgba(249,226,175,.06)':'rgba(137,220,235,.06)';
+    const border = h.type==='warn'?'rgba(243,139,168,.25)':h.type==='hint'?'rgba(249,226,175,.2)':'rgba(137,220,235,.2)';
+    return `<div style="padding:6px 10px;border-radius:4px;background:${bg};border-left:2px solid ${border};font-size:.78em;line-height:1.5;margin-bottom:5px">
+      ${h.icon} ${h.text}
+    </div>`;
+  }).join('');
+
+  return `
+  <h2>🚀 Применить в оптимизаторе</h2>
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:14px 16px;margin-bottom:10px">
+    <div style="font-size:.8em;color:var(--fg2);margin-bottom:10px">
+      На основе данных <span style="color:var(--purple)">Периода B</span>
+      (${cfg.meta.periodB.start} — ${cfg.meta.periodB.end}, ${cfg.meta.periodB.n} баров)
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      <div>
+        <div style="font-size:.72em;color:var(--fg2);margin-bottom:6px;font-weight:700;text-transform:uppercase;letter-spacing:.04em">Что будет применено</div>
+        ${applyRows}
+        <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn" onclick="_saveAndOpenOptimizer()" style="font-size:.78em;padding:5px 14px">
+            🚀 Открыть оптимизатор и применить
+          </button>
+          <button onclick="_copyConfigJSON()" style="padding:5px 12px;background:none;border:1px solid var(--border);border-radius:4px;color:var(--fg2);cursor:pointer;font-size:.75em">
+            📋 Копировать JSON
+          </button>
+        </div>
+        <div id="cfg-copy-status" style="font-size:.72em;color:var(--green);margin-top:4px"></div>
+      </div>
+      <div>
+        <div style="font-size:.72em;color:var(--fg2);margin-bottom:6px;font-weight:700;text-transform:uppercase;letter-spacing:.04em">Рекомендации</div>
+        ${hintsHtml}
+      </div>
+    </div>
+  </div>`;
+}
+
+let _lastCfg = null;
+
+function _saveAndOpenOptimizer() {
+  if (!_lastCfg) return;
+  localStorage.setItem('msc_config', JSON.stringify(_lastCfg));
+  // Try to open optimizer relative to current location
+  const base = location.href.replace(/comparator\.html.*$/, '');
+  const url = base + 'USE_Optimizer_v6_built.html';
+  window.open(url, '_blank');
+}
+
+function _copyConfigJSON() {
+  if (!_lastCfg) return;
+  navigator.clipboard?.writeText(JSON.stringify(_lastCfg, null, 2)).then(() => {
+    document.getElementById('cfg-copy-status').textContent = '✓ Скопировано';
+    setTimeout(() => { const el = document.getElementById('cfg-copy-status'); if(el) el.textContent=''; }, 2000);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PATCH runAnalysis to also render config panel
 // ═══════════════════════════════════════════════════════════════
 async function runAnalysis() {
   const btn = document.getElementById('btn-analyze');
   const status = document.getElementById('analyze-status');
   btn.disabled = true;
   status.textContent = 'Анализирую...';
-
-  // yield to browser
   await new Promise(r=>setTimeout(r,10));
 
   try {
@@ -996,17 +1162,20 @@ async function runAnalysis() {
     const mB = analyzeData(_csvData.b);
 
     if (!mA || !mB) {
-      status.textContent = '⚠️ Недостаточно данных в одном из файлов (нужно ≥30 баров)';
+      status.textContent = '⚠️ Недостаточно данных (нужно ≥30 баров)';
       btn.disabled = false;
       return;
     }
 
     const comparedRows = compareMetrics(mA, mB);
+    _lastCfg = generateOptimizerConfig(mA, mB, comparedRows);
 
-    document.getElementById('regime-section').innerHTML      = renderRegime(mA, mB);
-    document.getElementById('metrics-section').innerHTML     = renderMetricsTable(comparedRows);
-    document.getElementById('signals-section').innerHTML     = renderSignals(mA, mB);
-    document.getElementById('recommendations-section').innerHTML = renderRecommendations(comparedRows);
+    document.getElementById('regime-section').innerHTML          = renderRegime(mA, mB);
+    document.getElementById('metrics-section').innerHTML         = renderMetricsTable(comparedRows);
+    document.getElementById('signals-section').innerHTML         = renderSignals(mA, mB);
+    document.getElementById('recommendations-section').innerHTML =
+      renderRecommendations(comparedRows) + renderConfigPanel(_lastCfg);
+
     document.getElementById('results').style.display = 'block';
     document.getElementById('results').scrollIntoView({behavior:'smooth'});
     status.textContent = `✓ Готово · ${mA.n} + ${mB.n} баров`;
@@ -1019,5 +1188,6 @@ async function runAnalysis() {
 </script>
 </body>
 </html>
+
 
 
