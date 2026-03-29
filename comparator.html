@@ -456,6 +456,278 @@ function isSignal(v) {
   const n = parseFloat(v);
   return !isNaN(n) && n !== 0;
 }
+
+// ═══════════════════════════════════════════════════════════════
+// ATR
+// ═══════════════════════════════════════════════════════════════
+function computeATR(data, period=14) {
+  const n = data.length;
+  const atr = new Array(n).fill(0);
+  for (let i=1; i<n; i++) {
+    const tr = Math.max(
+      data[i].h - data[i].l,
+      Math.abs(data[i].h - data[i-1].c),
+      Math.abs(data[i].l - data[i-1].c)
+    );
+    atr[i] = i < period ? tr : (atr[i-1]*(period-1) + tr)/period;
+  }
+  return atr;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PIVOT STATISTICS
+// ═══════════════════════════════════════════════════════════════
+function computePivotStats(data, atr, pvL=3, pvR=3) {
+  const n = data.length;
+  const lowDepths=[], highDepths=[];
+
+  for (let i=pvL; i<n-pvR; i++) {
+    const lo=data[i].l, hi=data[i].h;
+    let isLow=true, isHigh=true;
+    for (let j=i-pvL; j<i; j++) {
+      if (data[j].l <= lo) isLow=false;
+      if (data[j].h >= hi) isHigh=false;
+    }
+    if (isLow||isHigh) for (let j=i+1; j<=i+pvR; j++) {
+      if (data[j].l <= lo) isLow=false;
+      if (data[j].h >= hi) isHigh=false;
+    }
+    const a = atr[i]||1;
+    if (isLow) {
+      let maxSurr=-Infinity;
+      for (let j=i-pvL; j<=i+pvR; j++) if(j!==i) maxSurr=Math.max(maxSurr,data[j].l);
+      lowDepths.push((maxSurr-lo)/a);
+    }
+    if (isHigh) {
+      let minSurr=Infinity;
+      for (let j=i-pvL; j<=i+pvR; j++) if(j!==i) minSurr=Math.min(minSurr,data[j].h);
+      highDepths.push((hi-minSurr)/a);
+    }
+  }
+
+  const total = lowDepths.length + highDepths.length;
+  return {
+    freq: total/n*100,
+    avgDepthLow:  lowDepths.length  ? mean(lowDepths)  : NaN,
+    avgDepthHigh: highDepths.length ? mean(highDepths) : NaN,
+    nLows: lowDepths.length,
+    nHighs: highDepths.length,
+    lowDepths, highDepths,
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TRADE RECONSTRUCTION from EL/ES/XL/XS columns
+// ═══════════════════════════════════════════════════════════════
+function reconstructTrades(data) {
+  const longTrades=[], shortTrades=[];
+  let longEntry=null, shortEntry=null;
+
+  for (let i=0; i<data.length; i++) {
+    const d = data[i];
+
+    // Open long
+    if (!longEntry && isSignal(d.el)) {
+      longEntry = { bar:i, eq:d.eq };
+    }
+    // Close long
+    if (longEntry && isSignal(d.xl)) {
+      longTrades.push({
+        bars: i - longEntry.bar,
+        pnl: (!isNaN(d.eq)&&!isNaN(longEntry.eq)) ? d.eq-longEntry.eq : NaN,
+      });
+      longEntry = null;
+    }
+    // Open short
+    if (!shortEntry && isSignal(d.es)) {
+      shortEntry = { bar:i, eq:d.eq };
+    }
+    // Close short
+    if (shortEntry && isSignal(d.xs)) {
+      shortTrades.push({
+        bars: i - shortEntry.bar,
+        pnl: (!isNaN(d.eq)&&!isNaN(shortEntry.eq)) ? d.eq-shortEntry.eq : NaN,
+      });
+      shortEntry = null;
+    }
+  }
+  return { longTrades, shortTrades };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MAIN ANALYSIS FUNCTION
+// Returns metrics object for one period
+// ═══════════════════════════════════════════════════════════════
+function analyzeData(parsed) {
+  const cols = mapColumns(parsed.headers);
+  if (!cols.close) return null;
+
+  // Build typed data array
+  const raw = parsed.rows.map(r => ({
+    t:  r[cols.time]   || '',
+    o:  parseFloat(r[cols.open])   || 0,
+    h:  parseFloat(r[cols.high])   || 0,
+    l:  parseFloat(r[cols.low])    || 0,
+    c:  parseFloat(r[cols.close])  || 0,
+    v:  cols.volume ? (parseFloat(r[cols.volume])  || 0) : 0,
+    ma: cols.ma     ? parseFloat(r[cols.ma])        : NaN,
+    eq: cols.equity ? parseFloat(r[cols.equity])    : NaN,
+    el: cols.el     ? r[cols.el]  || '' : '',
+    es: cols.es     ? r[cols.es]  || '' : '',
+    xl: cols.xl     ? r[cols.xl]  || '' : '',
+    xs: cols.xs     ? r[cols.xs]  || '' : '',
+  })).filter(d => d.c > 0);
+
+  const n = raw.length;
+  if (n < 30) return null;
+
+  // ── Dates ──────────────────────────────────────────────────
+  const times = raw.map(d=>d.t).filter(Boolean);
+  const dateStart = times[0]    || '—';
+  const dateEnd   = times[times.length-1] || '—';
+
+  // ── Returns ───────────────────────────────────────────────
+  const returns=[];
+  for (let i=1; i<n; i++) {
+    if (raw[i].c>0 && raw[i-1].c>0)
+      returns.push(Math.log(raw[i].c/raw[i-1].c));
+  }
+
+  // ── ATR ───────────────────────────────────────────────────
+  const atrArr = computeATR(raw);
+  const atrPct  = atrArr.map((a,i)=>raw[i].c>0?a/raw[i].c*100:0).filter(v=>v>0);
+  const atrMom  = moments(atrPct);
+
+  // ── Return moments ────────────────────────────────────────
+  const retMom = moments(returns);
+
+  // ── Hurst ─────────────────────────────────────────────────
+  const hurst = computeHurst(raw.map(d=>d.c));
+
+  // ── Autocorrelation ───────────────────────────────────────
+  const ac1 = acfAt(returns, 1);
+  const ac2 = acfAt(returns, 2);
+  const ac5 = acfAt(returns, 5);
+
+  // ── Pivot stats ───────────────────────────────────────────
+  const pvSt = computePivotStats(raw, atrArr);
+
+  // ── Bullish bars ──────────────────────────────────────────
+  const bullish = raw.filter(d=>d.c>=d.o).length/n*100;
+
+  // ── Volume ────────────────────────────────────────────────
+  const vols = raw.map(d=>d.v).filter(v=>v>0);
+  const hasVol = vols.length > n*0.4;
+  const volMom = hasVol ? moments(vols) : null;
+
+  // ── MA stats ──────────────────────────────────────────────
+  const maRows = raw.filter(d=>!isNaN(d.ma)&&d.ma>0&&d.c>0);
+  const hasMa  = maRows.length > n*0.3;
+  const maDist = hasMa ? maRows.map(d=>(d.c-d.ma)/d.ma*100) : [];
+  const maDistMom = hasMa ? moments(maDist) : null;
+  const pctAboveMA = hasMa ? maRows.filter(d=>d.c>d.ma).length/maRows.length*100 : NaN;
+
+  // MA cross frequency (count sign changes of d.c-d.ma)
+  let maCrosses=0;
+  if (hasMa) {
+    let prev = maRows[0].c - maRows[0].ma;
+    for (let i=1; i<maRows.length; i++) {
+      const cur = maRows[i].c - maRows[i].ma;
+      if ((prev>0&&cur<0)||(prev<0&&cur>0)) maCrosses++;
+      prev=cur;
+    }
+  }
+  const maCrossFreq = hasMa ? maCrosses/n*100 : NaN;
+
+  // ── Signal stats ──────────────────────────────────────────
+  const elBars = raw.filter(d=>isSignal(d.el));
+  const esBars = raw.filter(d=>isSignal(d.es));
+  const elFreq = elBars.length/n*100;
+  const esFreq = esBars.length/n*100;
+  const hasSignals = elBars.length>0 || esBars.length>0;
+
+  // ── Trade reconstruction ──────────────────────────────────
+  const trades = hasSignals ? reconstructTrades(raw) : { longTrades:[], shortTrades:[] };
+  const avgLongHold  = trades.longTrades.length  ? mean(trades.longTrades.map(t=>t.bars))  : NaN;
+  const avgShortHold = trades.shortTrades.length ? mean(trades.shortTrades.map(t=>t.bars)) : NaN;
+
+  // Win rates from equity P&L
+  const lPnls = trades.longTrades.map(t=>t.pnl).filter(v=>!isNaN(v));
+  const sPnls = trades.shortTrades.map(t=>t.pnl).filter(v=>!isNaN(v));
+  const longWR  = lPnls.length ? lPnls.filter(v=>v>0).length/lPnls.length*100 : NaN;
+  const shortWR = sPnls.length ? sPnls.filter(v=>v>0).length/sPnls.length*100 : NaN;
+
+  // ── Equity curve stats ────────────────────────────────────
+  const eqVals = raw.map(d=>d.eq).filter(v=>!isNaN(v));
+  let totalReturn=NaN, maxDD=NaN, equityHurst=NaN;
+  if (eqVals.length>5) {
+    totalReturn = eqVals[eqVals.length-1] - eqVals[0];
+    let peak=eqVals[0], dd=0;
+    for (const v of eqVals) { if(v>peak)peak=v; dd=Math.min(dd,v-peak); }
+    maxDD = dd;
+    // Equity as price series for Hurst
+    if (eqVals.length>40) equityHurst = computeHurst(eqVals.map((v,i)=>100+v));
+  }
+
+  // ── Volatility clustering (autocorr of |returns|) ─────────
+  const absRets = returns.map(Math.abs);
+  const volClustering = acfAt(absRets, 1);
+
+  // ── Efficiency Ratio (trending efficiency over 20-bar windows) ──
+  const erVals=[];
+  const erWin=20;
+  for (let i=erWin; i<n; i++) {
+    const net = Math.abs(raw[i].c - raw[i-erWin].c);
+    let path=0; for(let j=i-erWin+1;j<=i;j++) path+=Math.abs(raw[j].c-raw[j-1].c);
+    if (path>0) erVals.push(net/path);
+  }
+  const erMean = erVals.length ? mean(erVals) : NaN;
+
+  return {
+    n, dateStart, dateEnd,
+    // Structure
+    hurst,
+    ac1, ac2, ac5,
+    retMean: retMom.mean*100,
+    retStd:  retMom.std*100,
+    retSkew: retMom.skew,
+    retKurt: retMom.kurt,
+    bullish,
+    volClustering,
+    erMean,
+    // Volatility
+    atrPctMean: atrMom.mean,
+    atrPctStd:  atrMom.std,
+    atrPctCoV:  atrMom.std/(atrMom.mean||1),
+    // Pivots
+    pivFreq:      pvSt.freq,
+    pivDepthLow:  pvSt.avgDepthLow,
+    pivDepthHigh: pvSt.avgDepthHigh,
+    // Indicator
+    pctAboveMA,
+    maDistMean: maDistMom?.mean,
+    maDistStd:  maDistMom?.std,
+    maCrossFreq,
+    hasMa,
+    // Signals
+    elFreq, esFreq, hasSignals,
+    avgLongHold, avgShortHold,
+    longWR, shortWR,
+    longCount:  trades.longTrades.length,
+    shortCount: trades.shortTrades.length,
+    // Equity
+    totalReturn, maxDD, equityHurst,
+    hasVol,
+    volCoV: volMom ? volMom.std/(volMom.mean||1) : NaN,
+    // Raw distributions for KS tests
+    _returns: returns,
+    _atrPct:  atrPct,
+    _maDist:  maDist,
+    _pvLowDepths:  pvSt.lowDepths,
+    _pvHighDepths: pvSt.highDepths,
+  };
+}
 </script>
 </body>
 </html>
+
