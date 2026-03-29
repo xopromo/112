@@ -2310,7 +2310,7 @@ function toggleFav(idx, event, startLevel) {
       favourites[fi].level = cur + 1; // повысить уровень
     }
   } else {
-    favourites.push({ name:r.name, ns:_favNs, level: startLevel || 1, stats:{
+    const favEntry = { name:r.name, ns:_favNs, level: startLevel || 1, stats:{
       pnl:r.pnl, wr:r.wr, n:r.n, dd:r.dd, pdd:r.pdd,
       dwr:r.dwr||0, avg:r.avg||0, p1:r.p1||0, p2:r.p2||0, c1:r.c1||0, c2:r.c2||0,
       nL:r.nL||0, pL:r.pL||0, wrL:r.wrL, nS:r.nS||0, pS:r.pS||0, wrS:r.wrS, dwrLS:r.dwrLS,
@@ -2319,12 +2319,40 @@ function toggleFav(idx, event, startLevel) {
       omega:r.omega, pain:r.pain, burke:r.burke, serenity:r.serenity, ir:r.ir,
       cpcvScore:r.cpcvScore,
       eq:r.eq,
+      old_eq:r.old_eq, new_eq:r.new_eq, // для полного OOS графика в режиме Избранное
       robScore:r.robScore, robMax:r.robMax, robDetails:r.robDetails
-    }, cfg:r.cfg, ts:Date.now() });
+    }, cfg:r.cfg, ts:Date.now() };
+    favourites.push(favEntry);
+    // Асинхронно запустить быстрый тест устойчивости для нового избранного
+    _autoRunRobustForFav(favEntry);
   }
   storeSave(_favKey(), favourites);
   renderFavBar();
   _refreshFavStars();
+}
+
+// Запускает быстрый тест устойчивости для добавленного в Избранное результата
+async function _autoRunRobustForFav(favEntry) {
+  if (!favEntry || !favEntry.cfg) return;
+  // Не запускаем если уже есть тест
+  if (favEntry.stats.robScore !== undefined) return;
+
+  try {
+    const { score: robScore, details: robDetails } = await runRobustScoreForDetailed(
+      { cfg: favEntry.cfg },
+      ['oos', 'walk', 'param'],
+      true // fastMode
+    );
+    // Сохраняем результаты теста
+    favEntry.stats.robScore = robScore;
+    favEntry.stats.robMax = 3; // 3 теста: oos(1) + walk(1) + param(1)
+    favEntry.stats.robDetails = robDetails;
+    storeSave(_favKey(), favourites);
+    // Обновляем отображение если открыт режим Избранные
+    if (_tableMode === 'fav') renderVisibleResults();
+  } catch(e) {
+    console.error('[_autoRunRobustForFav]', e);
+  }
 }
 // Удалить из избранного по имени (для кнопки ✕ в режиме Избранные)
 function removeFavByName(name, event) {
@@ -3380,6 +3408,13 @@ function drawEquity(name) {
 // Обёртка для режимов hc/fav — рисует equity из объекта результата
 function drawEquityForResult(r) {
   if (!r) return;
+
+  // Если результат из OOS (имеет old_eq и new_eq), рисуем полный OOS график
+  if (r.old_eq && r.old_eq.length && r.new_eq && r.new_eq.length) {
+    _drawOOSGraphicForResult(r);
+    return;
+  }
+
   const splitPct = r.cfg?._oos?.isPct ?? null;
   // Проверяем доступные источники equity
   if (r.eq && r.eq.length) {
@@ -3394,6 +3429,94 @@ function drawEquityForResult(r) {
       drawEquityData(raw.eq, r.name, splitPct);
     }
   }
+}
+
+// Рисует полный OOS график (история + новые данные) для избранных результатов
+function _drawOOSGraphicForResult(r) {
+  const canvas = document.getElementById('eqc');
+  if (!canvas) return;
+
+  const eq_old = r.old_eq;
+  const eq_new = r.new_eq;
+  // Concatenate: новый сегмент продолжает с последнего значения истории
+  const lastOld = eq_old[eq_old.length - 1];
+  const combined = [...eq_old, ...eq_new.map(v => v + lastOld)];
+  const splitIdx  = eq_old.length;
+  const splitFrac = (splitIdx - 1) / (combined.length - 1);
+
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width  = canvas.offsetWidth  * dpr;
+  canvas.height = canvas.offsetHeight * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  const W = canvas.offsetWidth, H = canvas.offsetHeight;
+  const pad = 16;
+
+  ctx.fillStyle = '#080b10';
+  ctx.fillRect(0, 0, W, H);
+
+  // Диапазон значений
+  let mn = 0, mx = 0;
+  for (const v of combined) { if (v < mn) mn = v; if (v > mx) mx = v; }
+  const range = mx - mn || 1;
+  const toY = v => H - pad - ((v - mn) / range * (H - 2 * pad));
+
+  // Сетка
+  ctx.strokeStyle = 'rgba(30,42,56,0.8)'; ctx.lineWidth = 0.5;
+  for (let i = 1; i < 4; i++) {
+    const y = pad + (H - 2 * pad) * i / 4;
+    ctx.beginPath(); ctx.moveTo(pad, y); ctx.lineTo(W - pad, y); ctx.stroke();
+  }
+  // Нулевая линия
+  const zy = toY(0);
+  ctx.strokeStyle = 'rgba(255,255,255,0.15)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(pad, zy); ctx.lineTo(W - pad, zy); ctx.stroke();
+
+  // Вертикальная линия разделения
+  const sx = pad + (W - 2 * pad) * splitFrac;
+  ctx.strokeStyle = 'rgba(255,160,40,0.6)'; ctx.lineWidth = 1.5;
+  ctx.setLineDash([4, 3]);
+  ctx.beginPath(); ctx.moveTo(sx, pad - 4); ctx.lineTo(sx, H - pad + 4); ctx.stroke();
+  ctx.setLineDash([]);
+  // Подсветка зоны новых данных
+  ctx.fillStyle = 'rgba(255,160,40,0.04)';
+  ctx.fillRect(sx, pad, W - pad - sx, H - 2 * pad);
+
+  const nPx  = W - 2 * pad;
+  const nLst = Math.max(combined.length - 1, 1);
+  const pxSp = Math.round(splitFrac * (nPx - 1)); // пиксель разделения
+
+  // Функция пути по сегменту [pxA..pxB]
+  function pathSeg(pxA, pxB) {
+    ctx.beginPath();
+    for (let px = pxA; px <= pxB; px++) {
+      const i = Math.round(px * nLst / (nPx - 1));
+      const x = pad + px, y = toY(combined[Math.min(i, combined.length - 1)]);
+      px === pxA ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+  }
+
+  // Заливка — история
+  pathSeg(0, pxSp);
+  ctx.lineTo(pad + pxSp, zy); ctx.lineTo(pad, zy); ctx.closePath();
+  ctx.fillStyle = 'rgba(0,212,255,0.06)'; ctx.fill();
+
+  // Заливка — новые данные
+  pathSeg(pxSp, nPx - 1);
+  ctx.lineTo(W - pad, zy); ctx.lineTo(pad + pxSp, zy); ctx.closePath();
+  ctx.fillStyle = 'rgba(255,160,40,0.06)'; ctx.fill();
+
+  // Линия — история
+  pathSeg(0, pxSp);
+  const gOld = ctx.createLinearGradient(pad, 0, pad + pxSp, 0);
+  gOld.addColorStop(0, 'rgba(0,212,255,0.7)'); gOld.addColorStop(1, 'rgba(0,212,255,0.9)');
+  ctx.strokeStyle = gOld; ctx.lineWidth = 1.5; ctx.stroke();
+
+  // Линия — новые данные
+  pathSeg(pxSp, nPx - 1);
+  const gNew = ctx.createLinearGradient(pad + pxSp, 0, W - pad, 0);
+  gNew.addColorStop(0, 'rgba(255,160,40,0.9)'); gNew.addColorStop(1, 'rgba(255,100,20,0.8)');
+  ctx.strokeStyle = gNew; ctx.lineWidth = 1.5; ctx.stroke();
 }
 
 
@@ -4130,11 +4253,13 @@ function selectRow(idx) {
     return; // renderVisibleResults восстановит выделение сам
   }
 
-  // В OOS режиме не пытаемся выделить строку в основной таблице (она скрыта)
+  // В OOS режиме показываем OOS график, а не основной
   if (_tableMode === 'oos') {
     const r = _visibleResults[idx];
     if (!r) return;
-    drawEquityForResult(r);
+    // Найдём индекс в _oosTableResults (глобальный индекс для drawOOSChart)
+    const globalIdx = _oosTableResults.indexOf(r);
+    if (globalIdx >= 0) drawOOSChart(globalIdx);
     return;
   }
 
@@ -4312,7 +4437,8 @@ function _getFavAsResults() {
     dwr: f.stats.dwr||0, avg: f.stats.avg||0,
     p1: f.stats.p1||0, p2: f.stats.p2||0,
     robScore: f.stats.robScore, robMax: f.stats.robMax,
-    robDetails: f.stats.robDetails
+    robDetails: f.stats.robDetails,
+    old_eq: f.stats.old_eq, new_eq: f.stats.new_eq // полный график из OOS
   }));
 }
 
@@ -7055,11 +7181,14 @@ function drawOOSChart(idx, rowEl) {
   }
   const wrap   = document.getElementById('oos-chart-wrap');
   const canvas = document.getElementById('oos-eqc');
+  const eqWrap = document.getElementById('eq-wrap');
   if (!canvas || !wrap) return;
   const r = _oosTableResults[idx];
   if (!r || !r.old_eq || !r.old_eq.length || !r.new_eq || !r.new_eq.length) {
     wrap.style.display = 'none'; return;
   }
+  // Скрываем основной график и показываем OOS
+  if (eqWrap) eqWrap.style.display = 'none';
   wrap.style.display = 'block';
 
   const eq_old = r.old_eq;
