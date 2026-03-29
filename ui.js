@@ -4429,9 +4429,10 @@ function _queueSnapshot() {
     if (!el.id) return;
     if (el.type === 'checkbox' || el.type === 'radio') {
       if (!_QUEUE_SNAP_EXCLUDE.has(el.id)) checks[el.id] = el.checked;
-    } else {
+    } else if (el.type !== 'file') {
       // Не сохранять пустые поля — экономим место в localStorage
       // Не сохранять фильтры таблицы — они слетают при восстановлении снапшота
+      // Не сохранять file-инпуты — браузер запрещает читать/писать их value
       if (el.value !== '' && !_QUEUE_SNAP_EXCLUDE.has(el.id)) inputs[el.id] = el.value;
     }
   });
@@ -4448,7 +4449,7 @@ function _queueRestore(snap) {
   if (snap.optMode && typeof setOptMode === 'function') setOptMode(snap.optMode);
   Object.entries(snap.inputs || {}).forEach(([id, val]) => {
     const el = document.getElementById(id);
-    if (el && el.tagName !== 'BUTTON') el.value = val;
+    if (el && el.tagName !== 'BUTTON' && el.type !== 'file') el.value = val;
   });
   Object.entries(snap.checks || {}).forEach(([id, checked]) => {
     const el = document.getElementById(id);
