@@ -4130,11 +4130,13 @@ function selectRow(idx) {
     return; // renderVisibleResults восстановит выделение сам
   }
 
-  // В OOS режиме не пытаемся выделить строку в основной таблице (она скрыта)
+  // В OOS режиме показываем OOS график, а не основной
   if (_tableMode === 'oos') {
     const r = _visibleResults[idx];
     if (!r) return;
-    drawEquityForResult(r);
+    // Найдём индекс в _oosTableResults (глобальный индекс для drawOOSChart)
+    const globalIdx = _oosTableResults.indexOf(r);
+    if (globalIdx >= 0) drawOOSChart(globalIdx);
     return;
   }
 

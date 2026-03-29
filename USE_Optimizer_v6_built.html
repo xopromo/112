@@ -1777,7 +1777,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
   </div>
 
   <!-- ── OOS таблица: полностью отдельная, не зависит от стандартной ── -->
-  <div id="oos-tbl-wrap" style="display:none;overflow-x:auto;margin-top:0">
+  <div id="oos-tbl-wrap" style="display:none;overflow-x:auto;overflow-y:auto;max-height:600px;margin-top:0">
     <table id="oos-rtbl" style="width:max-content;min-width:100%;border-collapse:collapse;table-layout:fixed">
       <colgroup>
         <col style="width:220px"><!-- Стратегия -->
@@ -23082,11 +23082,13 @@ function selectRow(idx) {
     return; // renderVisibleResults восстановит выделение сам
   }
 
-  // В OOS режиме не пытаемся выделить строку в основной таблице (она скрыта)
+  // В OOS режиме показываем OOS график, а не основной
   if (_tableMode === 'oos') {
     const r = _visibleResults[idx];
     if (!r) return;
-    drawEquityForResult(r);
+    // Найдём индекс в _oosTableResults (глобальный индекс для drawOOSChart)
+    const globalIdx = _oosTableResults.indexOf(r);
+    if (globalIdx >= 0) drawOOSChart(globalIdx);
     return;
   }
 
@@ -28939,7 +28941,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774798148606;
+window._BUILD_TS = 1774798589304;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
