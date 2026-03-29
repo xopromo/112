@@ -21262,7 +21262,7 @@ function toggleFav(idx, event, startLevel) {
       favourites[fi].level = cur + 1; // повысить уровень
     }
   } else {
-    favourites.push({ name:r.name, ns:_favNs, level: startLevel || 1, stats:{
+    const favEntry = { name:r.name, ns:_favNs, level: startLevel || 1, stats:{
       pnl:r.pnl, wr:r.wr, n:r.n, dd:r.dd, pdd:r.pdd,
       dwr:r.dwr||0, avg:r.avg||0, p1:r.p1||0, p2:r.p2||0, c1:r.c1||0, c2:r.c2||0,
       nL:r.nL||0, pL:r.pL||0, wrL:r.wrL, nS:r.nS||0, pS:r.pS||0, wrS:r.wrS, dwrLS:r.dwrLS,
@@ -21273,11 +21273,38 @@ function toggleFav(idx, event, startLevel) {
       eq:r.eq,
       old_eq:r.old_eq, new_eq:r.new_eq, // для полного OOS графика в режиме Избранное
       robScore:r.robScore, robMax:r.robMax, robDetails:r.robDetails
-    }, cfg:r.cfg, ts:Date.now() });
+    }, cfg:r.cfg, ts:Date.now() };
+    favourites.push(favEntry);
+    // Асинхронно запустить быстрый тест устойчивости для нового избранного
+    _autoRunRobustForFav(favEntry);
   }
   storeSave(_favKey(), favourites);
   renderFavBar();
   _refreshFavStars();
+}
+
+// Запускает быстрый тест устойчивости для добавленного в Избранное результата
+async function _autoRunRobustForFav(favEntry) {
+  if (!favEntry || !favEntry.cfg) return;
+  // Не запускаем если уже есть тест
+  if (favEntry.stats.robScore !== undefined) return;
+
+  try {
+    const { score: robScore, details: robDetails } = await runRobustScoreForDetailed(
+      { cfg: favEntry.cfg },
+      ['oos', 'walk', 'param'],
+      true // fastMode
+    );
+    // Сохраняем результаты теста
+    favEntry.stats.robScore = robScore;
+    favEntry.stats.robMax = 3; // 3 теста: oos(1) + walk(1) + param(1)
+    favEntry.stats.robDetails = robDetails;
+    storeSave(_favKey(), favourites);
+    // Обновляем отображение если открыт режим Избранные
+    if (_tableMode === 'fav') renderVisibleResults();
+  } catch(e) {
+    console.error('[_autoRunRobustForFav]', e);
+  }
 }
 // Удалить из избранного по имени (для кнопки ✕ в режиме Избранные)
 function removeFavByName(name, event) {
@@ -29041,7 +29068,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774798660407;
+window._BUILD_TS = 1774798888669;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
