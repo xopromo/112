@@ -7003,7 +7003,7 @@ function applyOOSFilters() {
     const dStr = (v,d=1) => v == null ? '—' : (v>=0?'+':'')+v.toFixed(d)+'%';
     const _esc = s => String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     html +=
-      `<tr data-i="${globalIdx}" data-name="${_esc(r.name)}" class="${isFavRow?'fav-row':''}">` +
+      `<tr data-i="${globalIdx}" data-name="${_esc(r.name)}" class="${isFavRow?'fav-row':''}" onclick="drawOOSChart(${globalIdx},this)">` +
       `<td title="${_esc(r.name)}" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_esc(r.name)}</td>` +
       `<td style="text-align:center;cursor:pointer" onclick="toggleFav(${globalIdx},event)">${fav}</td>` +
       `<td class="${r.old_pnl!=null&&r.old_pnl>0?'pos':'neg'}">${f1(r.old_pnl)}%</td>` +
@@ -7035,6 +7035,126 @@ function _oosGetBadge(r) {
   return 'b';
 }
 
+
+// Графическое сравнение equity: история (синий) + новые данные (оранжевый)
+function drawOOSChart(idx, rowEl) {
+  // Подсветить выбранную строку
+  if (rowEl) {
+    document.querySelectorAll('#oos-rtbl tr.sel').forEach(tr => tr.classList.remove('sel'));
+    rowEl.classList.add('sel');
+  }
+  const wrap   = document.getElementById('oos-chart-wrap');
+  const canvas = document.getElementById('oos-eqc');
+  if (!canvas || !wrap) return;
+  const r = _oosTableResults[idx];
+  if (!r || !r.old_eq || !r.old_eq.length || !r.new_eq || !r.new_eq.length) {
+    wrap.style.display = 'none'; return;
+  }
+  wrap.style.display = 'block';
+
+  const eq_old = r.old_eq;
+  const eq_new = r.new_eq;
+  // Concatenate: новый сегмент продолжает с последнего значения истории
+  const lastOld = eq_old[eq_old.length - 1];
+  const combined = [...eq_old, ...eq_new.map(v => v + lastOld)];
+  const splitIdx  = eq_old.length;
+  const splitFrac = (splitIdx - 1) / (combined.length - 1);
+
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width  = canvas.offsetWidth  * dpr;
+  canvas.height = canvas.offsetHeight * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  const W = canvas.offsetWidth, H = canvas.offsetHeight;
+  const pad = 16;
+
+  ctx.fillStyle = '#080b10';
+  ctx.fillRect(0, 0, W, H);
+
+  // Диапазон значений
+  let mn = 0, mx = 0;
+  for (const v of combined) { if (v < mn) mn = v; if (v > mx) mx = v; }
+  const range = mx - mn || 1;
+  const toY = v => H - pad - ((v - mn) / range * (H - 2 * pad));
+
+  // Сетка
+  ctx.strokeStyle = 'rgba(30,42,56,0.8)'; ctx.lineWidth = 0.5;
+  for (let i = 1; i < 4; i++) {
+    const y = pad + (H - 2 * pad) * i / 4;
+    ctx.beginPath(); ctx.moveTo(pad, y); ctx.lineTo(W - pad, y); ctx.stroke();
+  }
+  // Нулевая линия
+  const zy = toY(0);
+  ctx.strokeStyle = 'rgba(255,255,255,0.15)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(pad, zy); ctx.lineTo(W - pad, zy); ctx.stroke();
+
+  // Вертикальная линия разделения
+  const sx = pad + (W - 2 * pad) * splitFrac;
+  ctx.strokeStyle = 'rgba(255,160,40,0.6)'; ctx.lineWidth = 1.5;
+  ctx.setLineDash([4, 3]);
+  ctx.beginPath(); ctx.moveTo(sx, pad - 4); ctx.lineTo(sx, H - pad + 4); ctx.stroke();
+  ctx.setLineDash([]);
+  // Подсветка зоны новых данных
+  ctx.fillStyle = 'rgba(255,160,40,0.04)';
+  ctx.fillRect(sx, pad, W - pad - sx, H - 2 * pad);
+
+  const nPx  = W - 2 * pad;
+  const nLst = Math.max(combined.length - 1, 1);
+  const pxSp = Math.round(splitFrac * (nPx - 1)); // пиксель разделения
+
+  // Функция пути по сегменту [pxA..pxB]
+  function pathSeg(pxA, pxB) {
+    ctx.beginPath();
+    for (let px = pxA; px <= pxB; px++) {
+      const i = Math.round(px * nLst / (nPx - 1));
+      const x = pad + px, y = toY(combined[Math.min(i, combined.length - 1)]);
+      px === pxA ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+  }
+
+  // Заливка — история
+  pathSeg(0, pxSp);
+  ctx.lineTo(pad + pxSp, zy); ctx.lineTo(pad, zy); ctx.closePath();
+  ctx.fillStyle = 'rgba(0,212,255,0.06)'; ctx.fill();
+
+  // Заливка — новые данные
+  pathSeg(pxSp, nPx - 1);
+  ctx.lineTo(W - pad, zy); ctx.lineTo(pad + pxSp, zy); ctx.closePath();
+  ctx.fillStyle = 'rgba(255,160,40,0.06)'; ctx.fill();
+
+  // Линия — история
+  pathSeg(0, pxSp);
+  const gOld = ctx.createLinearGradient(pad, 0, pad + pxSp, 0);
+  gOld.addColorStop(0, 'rgba(0,212,255,0.7)'); gOld.addColorStop(1, 'rgba(0,212,255,0.9)');
+  ctx.strokeStyle = gOld; ctx.lineWidth = 1.5; ctx.stroke();
+
+  // Линия — новые данные
+  pathSeg(pxSp, nPx - 1);
+  const gNew = ctx.createLinearGradient(pad + pxSp, 0, W - pad, 0);
+  gNew.addColorStop(0, 'rgba(255,160,40,0.9)'); gNew.addColorStop(1, 'rgba(255,100,20,0.8)');
+  ctx.strokeStyle = gNew; ctx.lineWidth = 1.5; ctx.stroke();
+
+  // Подписи значений
+  ctx.font = '9px JetBrains Mono,monospace';
+  ctx.fillStyle = 'rgba(180,200,220,0.55)';
+  ctx.fillText(mx.toFixed(1) + '%', 2, pad + 9);
+  ctx.fillText(mn.toFixed(1) + '%', 2, H - pad - 2);
+
+  // Легенда: история и новые
+  const oldLbl = (r.old_pnl != null ? r.old_pnl.toFixed(1) : '?') + '%  n=' + (r.old_n ?? '?');
+  const newLbl = (r.new_pnl != null ? r.new_pnl.toFixed(1) : '?') + '%  n=' + (r.new_n ?? '?');
+  ctx.font = '9px JetBrains Mono,monospace';
+  ctx.fillStyle = 'rgba(0,212,255,0.85)';
+  ctx.fillText('▌ История: ' + oldLbl, pad + 2, pad - 2);
+  ctx.fillStyle = 'rgba(255,160,40,0.9)';
+  ctx.fillText('▌ Новые: ' + newLbl, sx + 6, pad - 2);
+
+  // Имя стратегии внизу
+  const nameShort = (r.name || '').slice(0, 60);
+  ctx.fillStyle = 'rgba(0,212,255,0.45)';
+  ctx.font = '8px JetBrains Mono,monospace';
+  ctx.fillText(nameShort, pad, H - 4);
+}
 
 function doOOSSort(key) {
   if (_oosSortKey === key) _oosSortDir *= -1;
@@ -7160,6 +7280,8 @@ async function runOOSOnNewData() {
       delta_wr:  (rOld && rNew) ? rNew.wr  - rOld.wr  : null,
       old_bars:  DATA ? DATA.length : null,
       new_bars:  NEW_DATA ? NEW_DATA.length : null,
+      old_eq:    rOld ? rOld.eq  : null,   // equity curve на истории
+      new_eq:    rNew ? rNew.eq  : null,   // equity curve на новых данных
     });
   }
 
