@@ -1785,6 +1785,12 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
         <col style="width:76px"> <!-- PnL% ист -->
         <col style="width:76px"> <!-- PnL% нов -->
         <col style="width:70px"> <!-- ΔPnL -->
+        <col style="width:66px"> <!-- DD% ист -->
+        <col style="width:66px"> <!-- DD% нов -->
+        <col style="width:60px"> <!-- ΔDD -->
+        <col style="width:66px"> <!-- P/DD ист -->
+        <col style="width:66px"> <!-- P/DD нов -->
+        <col style="width:60px"> <!-- ΔP/DD -->
         <col style="width:78px"> <!-- Avg/tr ист -->
         <col style="width:78px"> <!-- Avg/tr нов -->
         <col style="width:72px"> <!-- ΔAvg/tr -->
@@ -1805,6 +1811,12 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
           <th onclick="doOOSSort('old_pnl')"   class="oos-th-hist" style="resize:horizontal">PnL ист ↕</th>
           <th onclick="doOOSSort('new_pnl')"   class="oos-th-new"  style="resize:horizontal">PnL нов ↕</th>
           <th onclick="doOOSSort('delta_pnl')" class="oos-th-delta" style="resize:horizontal">ΔPnL ↕</th>
+          <th onclick="doOOSSort('old_dd')"    class="oos-th-hist"  style="resize:horizontal" title="DrawDown % — максимальная просадка">DD ист ↕</th>
+          <th onclick="doOOSSort('new_dd')"    class="oos-th-new"   style="resize:horizontal" title="DrawDown % — максимальная просадка">DD нов ↕</th>
+          <th onclick="doOOSSort('delta_dd')"  class="oos-th-delta" style="resize:horizontal">ΔDD ↕</th>
+          <th onclick="doOOSSort('old_pdd')"   class="oos-th-hist"  style="resize:horizontal" title="P/DD = PnL / MaxDD. Выше = лучше. ≥3 = хорошо">P/DD ист ↕</th>
+          <th onclick="doOOSSort('new_pdd')"   class="oos-th-new"   style="resize:horizontal" title="P/DD = PnL / MaxDD. Выше = лучше. ≥3 = хорошо">P/DD нов ↕</th>
+          <th onclick="doOOSSort('delta_pdd')" class="oos-th-delta" style="resize:horizontal">ΔP/DD ↕</th>
           <th onclick="doOOSSort('apt_old')"   class="oos-th-hist"  style="resize:horizontal" title="Avg/сделку — история">Avg/tr ист ↕</th>
           <th onclick="doOOSSort('apt_new')"   class="oos-th-new"   style="resize:horizontal" title="Avg/сделку — новые">Avg/tr нов ↕</th>
           <th onclick="doOOSSort('delta_apt')" class="oos-th-delta" style="resize:horizontal">ΔAvg/tr ↕</th>
@@ -1825,6 +1837,12 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
           <td style="padding:1px 2px"><input id="oof_npnl" type="number" placeholder="≥" oninput="applyOOSFilters()" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border2);border-radius:3px;color:var(--text);font-size:.65em;padding:1px 3px"></td>
           <td style="padding:1px 2px"><input id="oof_dpnl" type="number" placeholder="≥" oninput="applyOOSFilters()" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border2);border-radius:3px;color:var(--text);font-size:.65em;padding:1px 3px"></td>
           <td></td><td></td>
+          <td style="padding:1px 2px"><input id="oof_oddd" type="number" placeholder="≤" oninput="applyOOSFilters()" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border2);border-radius:3px;color:var(--text);font-size:.65em;padding:1px 3px"></td>
+          <td style="padding:1px 2px"><input id="oof_nddd" type="number" placeholder="≤" oninput="applyOOSFilters()" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border2);border-radius:3px;color:var(--text);font-size:.65em;padding:1px 3px"></td>
+          <td></td>
+          <td style="padding:1px 2px"><input id="oof_opdd" type="number" placeholder="≥" oninput="applyOOSFilters()" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border2);border-radius:3px;color:var(--text);font-size:.65em;padding:1px 3px"></td>
+          <td style="padding:1px 2px"><input id="oof_npdd" type="number" placeholder="≥" oninput="applyOOSFilters()" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border2);border-radius:3px;color:var(--text);font-size:.65em;padding:1px 3px"></td>
+          <td></td>
           <td style="padding:1px 2px"><input id="oof_dapt" type="number" placeholder="≥" oninput="applyOOSFilters()" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border2);border-radius:3px;color:var(--text);font-size:.65em;padding:1px 3px"></td>
           <td></td><td></td>
           <td style="padding:1px 2px"><input id="oof_dwr" type="number" placeholder="≥" oninput="applyOOSFilters()" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border2);border-radius:3px;color:var(--text);font-size:.65em;padding:1px 3px"></td>

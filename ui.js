@@ -7095,6 +7095,10 @@ function applyOOSFilters() {
   const fopnl  = parseFloat(document.getElementById('oof_opnl')?.value);
   const fnpnl  = parseFloat(document.getElementById('oof_npnl')?.value);
   const fdpnl  = parseFloat(document.getElementById('oof_dpnl')?.value);
+  const foddd  = parseFloat(document.getElementById('oof_oddd')?.value);
+  const fnddd  = parseFloat(document.getElementById('oof_nddd')?.value);
+  const fopdd  = parseFloat(document.getElementById('oof_opdd')?.value);
+  const fnpdd  = parseFloat(document.getElementById('oof_npdd')?.value);
   const fdapt  = parseFloat(document.getElementById('oof_dapt')?.value);
   const fdwr   = parseFloat(document.getElementById('oof_dwr')?.value);
   const fon    = parseFloat(document.getElementById('oof_on')?.value);
@@ -7111,6 +7115,10 @@ function applyOOSFilters() {
     if (!isNaN(fopnl) && (r.old_pnl ?? -Infinity) < fopnl) return false;
     if (!isNaN(fnpnl) && (r.new_pnl ?? -Infinity) < fnpnl) return false;
     if (!isNaN(fdpnl) && (r.delta_pnl ?? -Infinity) < fdpnl) return false;
+    if (!isNaN(foddd) && (r.old_dd ?? Infinity) > foddd) return false;
+    if (!isNaN(fnddd) && (r.new_dd ?? Infinity) > fnddd) return false;
+    if (!isNaN(fopdd) && (r.old_pdd ?? -Infinity) < fopdd) return false;
+    if (!isNaN(fnpdd) && (r.new_pdd ?? -Infinity) < fnpdd) return false;
     if (!isNaN(fon)   && (r.old_n ?? -Infinity) < fon) return false;
     if (!isNaN(fnn)   && (r.new_n ?? -Infinity) < fnn) return false;
     if (!isNaN(fdapt) || !isNaN(fdwr)) {
@@ -7169,6 +7177,12 @@ function applyOOSFilters() {
       `<td class="${r.old_pnl!=null&&r.old_pnl>0?'pos':'neg'}">${f1(r.old_pnl)}%</td>` +
       `<td class="${r.new_pnl!=null&&r.new_pnl>0?'pos':'neg'}">${f1(r.new_pnl)}%</td>` +
       `<td class="${pCls(r.delta_pnl)}">${dStr(r.delta_pnl)}</td>` +
+      `<td class="${r.old_dd!=null&&r.old_dd<50?'pos':'neg'}">${f1(r.old_dd)}%</td>` +
+      `<td class="${r.new_dd!=null&&r.new_dd<50?'pos':'neg'}">${f1(r.new_dd)}%</td>` +
+      `<td class="${pCls(r.delta_dd)}">${r.delta_dd != null ? (r.delta_dd >= 0 ? '+' : '') + r.delta_dd.toFixed(1) + '%' : '—'}</td>` +
+      `<td class="${pCls(r.old_pdd)}">${f2(r.old_pdd)}</td>` +
+      `<td class="${pCls(r.new_pdd)}">${f2(r.new_pdd)}</td>` +
+      `<td class="${pCls(r.delta_pdd)}">${r.delta_pdd != null ? (r.delta_pdd >= 0 ? '+' : '') + r.delta_pdd.toFixed(2) : '—'}</td>` +
       `<td class="${pCls(apt_old)}">${f2(apt_old)}%</td>` +
       `<td class="${pCls(apt_new)}">${f2(apt_new)}%</td>` +
       `<td class="${pCls(delta_apt)}">${dStr(delta_apt,2)}</td>` +
@@ -7707,13 +7721,19 @@ async function runOOSOnNewData() {
       old_pnl:   rOld ? rOld.pnl : null,
       old_wr:    rOld ? rOld.wr  : null,
       old_n:     rOld ? rOld.n   : null,
+      old_dd:    rOld ? rOld.dd  : null,
+      old_pdd:   rOld && rOld.dd > 0 ? rOld.pnl / rOld.dd : null,
       old_kRatio: rOld && rOld.eq ? _calcKRatio(rOld.eq) : null,
       new_pnl:   rNew ? rNew.pnl : null,
       new_wr:    rNew ? rNew.wr  : null,
       new_n:     rNew ? rNew.n   : null,
+      new_dd:    rNew ? rNew.dd  : null,
+      new_pdd:   rNew && rNew.dd > 0 ? rNew.pnl / rNew.dd : null,
       new_kRatio: rNew && rNew.eq ? _calcKRatio(rNew.eq) : null,
       delta_pnl: (rOld && rNew) ? rNew.pnl - rOld.pnl : null,
       delta_wr:  (rOld && rNew) ? rNew.wr  - rOld.wr  : null,
+      delta_dd:  (rOld && rNew) ? rNew.dd - rOld.dd : null,
+      delta_pdd: (rOld && rOld.dd > 0 && rNew && rNew.dd > 0) ? (rNew.pnl / rNew.dd) - (rOld.pnl / rOld.dd) : null,
       delta_kRatio: (rOld && rOld.eq && rNew && rNew.eq) ? (_calcKRatio(rNew.eq) ?? 0) - (_calcKRatio(rOld.eq) ?? 0) : null,
       old_bars:  DATA ? DATA.length : null,
       new_bars:  NEW_DATA ? NEW_DATA.length : null,
