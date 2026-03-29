@@ -1,0 +1,1023 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Market Structure Comparator</title>
+<style>
+:root {
+  --bg:#1e1e2e;--bg2:#181825;--bg3:#313244;--bg4:#45475a;
+  --fg:#cdd6f4;--fg2:#a6adc8;--border:#45475a;
+  --green:#a6e3a1;--red:#f38ba8;--yellow:#f9e2af;
+  --blue:#89b4fa;--purple:#cba6f7;--accent:#89dceb;
+  --teal:#94e2d5;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--fg);font-family:'Segoe UI',system-ui,sans-serif;font-size:13px;padding:18px;max-width:1100px;margin:0 auto}
+a{color:var(--blue);text-decoration:none}a:hover{text-decoration:underline}
+h1{font-size:1em;color:var(--purple);margin-bottom:2px}
+.subtitle{font-size:.75em;color:var(--fg2);margin-bottom:16px}
+h2{font-size:.85em;color:var(--blue);margin:18px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--border)}
+h3{font-size:.78em;color:var(--fg2);margin:8px 0 5px}
+
+/* Upload */
+.upload-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:12px 0}
+.upload-zone{border:2px dashed var(--border);border-radius:8px;padding:18px 14px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s;position:relative}
+.upload-zone:hover{border-color:var(--purple);background:rgba(203,166,247,.04)}
+.upload-zone.drag{border-color:var(--purple);background:rgba(203,166,247,.08)}
+.upload-zone.loaded{border-color:var(--green);border-style:solid;background:rgba(166,227,161,.04)}
+.upload-zone input[type=file]{display:none}
+.upload-icon{font-size:1.5em;margin-bottom:6px}
+.upload-title{font-size:.82em;color:var(--fg);font-weight:600;margin-bottom:2px}
+.upload-hint{font-size:.7em;color:var(--fg2)}
+.upload-status{font-size:.72em;margin-top:6px;color:var(--green)}
+.period-label{display:inline-block;padding:1px 8px;border-radius:10px;font-size:.7em;font-weight:700;margin-bottom:6px}
+.period-a{background:rgba(137,180,250,.15);color:var(--blue);border:1px solid rgba(137,180,250,.3)}
+.period-b{background:rgba(203,166,247,.15);color:var(--purple);border:1px solid rgba(203,166,247,.3)}
+
+/* Buttons */
+.btn{padding:6px 18px;background:rgba(139,92,246,.2);border:1px solid rgba(139,92,246,.5);border-radius:4px;color:var(--purple);cursor:pointer;font-size:.82em;font-weight:600;transition:background .15s}
+.btn:hover{background:rgba(139,92,246,.35)}
+.btn:disabled{opacity:.4;cursor:default}
+.btn-row{display:flex;gap:10px;align-items:center;margin:10px 0}
+
+/* Results */
+#results{display:none;margin-top:20px}
+
+/* Regime cards */
+.regime-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:8px 0 16px}
+.regime-card{background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:12px 14px}
+.regime-card.a{border-top:2px solid var(--blue)}
+.regime-card.b{border-top:2px solid var(--purple)}
+.regime-name{font-size:.78em;font-weight:700;margin-bottom:6px}
+.regime-desc{font-size:.75em;color:var(--fg2);line-height:1.6}
+.tag{display:inline-block;padding:1px 6px;border-radius:3px;font-size:.68em;font-weight:700;margin:1px 2px}
+.tag-trend{background:rgba(137,180,250,.18);color:var(--blue)}
+.tag-mr{background:rgba(203,166,247,.18);color:var(--purple)}
+.tag-random{background:rgba(166,173,200,.12);color:var(--fg2)}
+.tag-vol-hi{background:rgba(243,139,168,.18);color:var(--red)}
+.tag-vol-lo{background:rgba(166,227,161,.18);color:var(--green)}
+.tag-bull{background:rgba(166,227,161,.12);color:var(--green)}
+.tag-bear{background:rgba(243,139,168,.12);color:var(--red)}
+.tag-neutral{background:rgba(166,173,200,.1);color:var(--fg2)}
+
+/* Metrics table */
+.metrics-section{margin:0 0 20px}
+.cat-header td{background:var(--bg3)!important;color:var(--fg2);font-size:.7em;font-weight:700;padding:4px 8px;letter-spacing:.04em;text-transform:uppercase}
+table.mt{width:100%;border-collapse:collapse;font-size:.78em}
+table.mt th{padding:5px 8px;text-align:left;color:var(--fg2);font-size:.72em;border-bottom:1px solid var(--border);background:var(--bg2);white-space:nowrap}
+table.mt th.r{text-align:right}
+table.mt td{padding:4px 8px;border-bottom:1px solid rgba(69,71,90,.35);vertical-align:middle}
+table.mt td.r{text-align:right}
+table.mt td.label{color:var(--fg);max-width:180px}
+table.mt td.desc{color:var(--fg2);font-size:.7em;max-width:220px}
+table.mt tr:hover td{background:rgba(49,50,68,.6)}
+
+.val-a{color:var(--blue)}
+.val-b{color:var(--purple)}
+.chg{font-size:.72em;padding:1px 5px;border-radius:3px}
+.chg-up{color:var(--green);background:rgba(166,227,161,.1)}
+.chg-dn{color:var(--red);background:rgba(243,139,168,.1)}
+.chg-no{color:var(--fg2)}
+
+/* Stability badge */
+.stab{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:10px;font-size:.71em;font-weight:700;white-space:nowrap}
+.stab-hi{background:rgba(166,227,161,.14);color:var(--green);border:1px solid rgba(166,227,161,.28)}
+.stab-md{background:rgba(249,226,175,.12);color:var(--yellow);border:1px solid rgba(249,226,175,.28)}
+.stab-lo{background:rgba(243,139,168,.12);color:var(--red);border:1px solid rgba(243,139,168,.28)}
+
+/* Mini bar */
+.mini-bar-row{display:flex;align-items:center;gap:4px;min-width:90px}
+.mini-bar{height:6px;border-radius:2px;min-width:2px;transition:width .3s}
+
+/* Recommendation boxes */
+.rec-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:8px 0}
+.rec-box{background:var(--bg2);border-radius:6px;padding:12px 14px}
+.rec-box.good{border-left:3px solid var(--green)}
+.rec-box.warn{border-left:3px solid var(--red)}
+.rec-box h3{margin-bottom:8px}
+.rec-item{font-size:.75em;padding:3px 0;color:var(--fg2);display:flex;gap:6px;align-items:flex-start}
+.rec-item strong{color:var(--fg)}
+.rec-icon{flex-shrink:0;margin-top:1px}
+
+/* Signal grid */
+.sig-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:8px 0}
+.sig-card{background:var(--bg2);border:1px solid var(--border);border-radius:5px;padding:8px 10px}
+.sig-card .sc-label{font-size:.68em;color:var(--fg2);margin-bottom:4px}
+.sig-card .sc-vals{display:flex;gap:10px;flex-wrap:wrap}
+.sc-val{font-size:.8em}
+.sc-val .p{font-size:.65em;color:var(--fg2)}
+
+/* Verdict */
+.verdict{background:var(--bg3);border-radius:8px;padding:14px 16px;margin:12px 0;font-size:.8em;line-height:1.7}
+.verdict strong{color:var(--accent)}
+
+/* Misc */
+.dimmed{color:var(--fg2)}
+.err{color:var(--red);font-size:.78em;padding:6px 0}
+@media(max-width:680px){
+  .upload-grid,.regime-grid,.rec-grid,.sig-grid{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<h1>📊 Market Structure Comparator</h1>
+<p class="subtitle">Загрузи два CSV-периода из TradingView и узнай что стабильно, а что изменилось</p>
+<p style="font-size:.72em;color:var(--fg2);margin-bottom:12px">
+  Формат CSV: <code style="color:var(--accent)">time, open, high, low, close, Volume, MA, Equity %, Zero, XL, XS, EL, ES</code>
+  — экспорт из Pine Script индикатора
+</p>
+
+<div class="upload-grid">
+  <label class="upload-zone" id="zone-a" ondragover="dragOver(event,'a')" ondragleave="dragLeave('a')" ondrop="dropFile(event,'a')">
+    <div class="period-label period-a">Период A</div>
+    <div class="upload-icon">📂</div>
+    <div class="upload-title">Старый период</div>
+    <div class="upload-hint">CSV или перетащи файл</div>
+    <div class="upload-status" id="status-a"></div>
+    <input type="file" id="file-a" accept=".csv,.txt" onchange="loadFile('a',this)">
+  </label>
+  <label class="upload-zone" id="zone-b" ondragover="dragOver(event,'b')" ondragleave="dragLeave('b')" ondrop="dropFile(event,'b')">
+    <div class="period-label period-b">Период B</div>
+    <div class="upload-icon">📂</div>
+    <div class="upload-title">Новый период</div>
+    <div class="upload-hint">CSV или перетащи файл</div>
+    <div class="upload-status" id="status-b"></div>
+    <input type="file" id="file-b" accept=".csv,.txt" onchange="loadFile('b',this)">
+  </label>
+</div>
+
+<div class="btn-row">
+  <button class="btn" id="btn-analyze" onclick="runAnalysis()" disabled>▶ Анализировать</button>
+  <span id="analyze-status" style="font-size:.75em;color:var(--fg2)"></span>
+</div>
+
+<div id="results">
+  <div id="regime-section"></div>
+  <div id="metrics-section"></div>
+  <div id="signals-section"></div>
+  <div id="recommendations-section"></div>
+</div>
+
+<script>
+'use strict';
+// ═══════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════
+const _csvData = { a: null, b: null };
+
+// ═══════════════════════════════════════════════════════════════
+// FILE LOADING
+// ═══════════════════════════════════════════════════════════════
+function dragOver(e, period) {
+  e.preventDefault();
+  document.getElementById('zone-' + period).classList.add('drag');
+}
+function dragLeave(period) {
+  document.getElementById('zone-' + period).classList.remove('drag');
+}
+function dropFile(e, period) {
+  e.preventDefault();
+  dragLeave(period);
+  const file = e.dataTransfer?.files?.[0];
+  if (file) readFile(period, file);
+}
+function loadFile(period, input) {
+  const file = input.files[0];
+  if (file) readFile(period, file);
+}
+function readFile(period, file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    const text = e.target.result;
+    const parsed = parseCSV(text);
+    if (!parsed || parsed.rows.length < 20) {
+      document.getElementById('status-' + period).textContent = '⚠️ Не удалось разобрать CSV';
+      return;
+    }
+    _csvData[period] = parsed;
+    const zone = document.getElementById('zone-' + period);
+    zone.classList.add('loaded');
+    zone.classList.remove('drag');
+    document.getElementById('status-' + period).textContent =
+      `✓ ${file.name} · ${parsed.rows.length} строк`;
+    if (_csvData.a && _csvData.b) {
+      document.getElementById('btn-analyze').disabled = false;
+    }
+  };
+  reader.readAsText(file);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CSV PARSER
+// ═══════════════════════════════════════════════════════════════
+function parseCSV(text) {
+  const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim().split('\n');
+  if (lines.length < 3) return null;
+
+  // Detect separator: tab or comma
+  const sep = lines[0].includes('\t') ? '\t' : ',';
+
+  // Clean header
+  const headers = lines[0].split(sep).map(h => h.trim().replace(/^"|"$/g, ''));
+
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+    const parts = splitCSVLine(line, sep);
+    if (parts.length < 4) continue;
+    const row = {};
+    headers.forEach((h, j) => {
+      row[h] = (parts[j] || '').trim().replace(/^"|"$/g, '');
+    });
+    rows.push(row);
+  }
+  return { headers, rows };
+}
+
+function splitCSVLine(line, sep) {
+  // Simple split — handles quoted fields
+  const result = [];
+  let cur = '', inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') { inQ = !inQ; continue; }
+    if (c === sep && !inQ) { result.push(cur); cur = ''; continue; }
+    cur += c;
+  }
+  result.push(cur);
+  return result;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// COLUMN MAP
+// ═══════════════════════════════════════════════════════════════
+function mapColumns(headers) {
+  const find = (...names) => {
+    for (const n of names) {
+      const h = headers.find(h => h.toLowerCase() === n.toLowerCase());
+      if (h) return h;
+    }
+    // partial match fallback
+    for (const n of names) {
+      const h = headers.find(h => h.toLowerCase().includes(n.toLowerCase()));
+      if (h) return h;
+    }
+    return null;
+  };
+  return {
+    time:   find('time','date','datetime'),
+    open:   find('open'),
+    high:   find('high'),
+    low:    find('low'),
+    close:  find('close'),
+    volume: find('Volume','volume','vol'),
+    ma:     find('MA','ma','ema','sma'),
+    equity: find('Equity %','equity','pnl','equity%'),
+    el:     find('EL','el','entry long','entrylong'),
+    es:     find('ES','es','entry short','entryshort'),
+    xl:     find('XL','xl','exit long','exitlong'),
+    xs:     find('XS','xs','exit short','exitshort'),
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MATH UTILITIES
+// ═══════════════════════════════════════════════════════════════
+
+/** Linear regression slope of ys on xs */
+function linRegSlope(xs, ys) {
+  const n = xs.length;
+  if (n < 2) return NaN;
+  let sx=0, sy=0, sxy=0, sx2=0;
+  for (let i=0; i<n; i++) { sx+=xs[i]; sy+=ys[i]; sxy+=xs[i]*ys[i]; sx2+=xs[i]*xs[i]; }
+  const d = n*sx2 - sx*sx;
+  return d !== 0 ? (n*sxy - sx*sy) / d : NaN;
+}
+
+/** Mean of array */
+function mean(arr) {
+  if (!arr.length) return NaN;
+  return arr.reduce((a,b)=>a+b,0)/arr.length;
+}
+
+/** Std dev of array */
+function std(arr) {
+  if (arr.length < 2) return NaN;
+  const m = mean(arr);
+  return Math.sqrt(arr.reduce((s,v)=>s+(v-m)**2,0)/arr.length);
+}
+
+/** Median */
+function median(arr) {
+  if (!arr.length) return NaN;
+  const s = [...arr].sort((a,b)=>a-b);
+  const m = Math.floor(s.length/2);
+  return s.length%2 ? s[m] : (s[m-1]+s[m])/2;
+}
+
+/** Mean, std, skewness, excess kurtosis */
+function moments(arr) {
+  const n = arr.length;
+  if (n < 4) return { mean:NaN, std:NaN, skew:NaN, kurt:NaN };
+  const m = mean(arr);
+  let m2=0, m3=0, m4=0;
+  for (const x of arr) { const d=x-m; m2+=d*d; m3+=d*d*d; m4+=d*d*d*d; }
+  m2/=n; m3/=n; m4/=n;
+  const s = Math.sqrt(m2);
+  return {
+    mean: m,
+    std: s,
+    skew: s>0 ? m3/s**3 : 0,
+    kurt: s>0 ? m4/s**4 - 3 : 0,
+  };
+}
+
+/** Autocorrelation at given lag */
+function acfAt(arr, lag) {
+  const n = arr.length;
+  if (n <= lag) return NaN;
+  const m = mean(arr);
+  let num=0, den=0;
+  for (let i=0; i<n-lag; i++) num += (arr[i]-m)*(arr[i+lag]-m);
+  for (const v of arr) den += (v-m)**2;
+  return den > 0 ? num/den : 0;
+}
+
+/** Kolmogorov-Smirnov distance between two samples (0=identical, 1=max) */
+function ksDist(a, b) {
+  if (!a.length || !b.length) return NaN;
+  // Sample for performance
+  const MAX = 600;
+  const sa = uniformSample([...a].sort((x,y)=>x-y), MAX);
+  const sb = uniformSample([...b].sort((x,y)=>x-y), MAX);
+  const na=sa.length, nb=sb.length;
+  let i=0, j=0, maxD=0;
+  while (i<na && j<nb) {
+    const cdfA=(i+1)/na, cdfB=(j+1)/nb;
+    maxD = Math.max(maxD, Math.abs(cdfA-cdfB));
+    if (sa[i]<=sb[j]) i++; else j++;
+  }
+  return maxD;
+}
+
+function uniformSample(sorted, n) {
+  if (sorted.length <= n) return sorted;
+  const result=[];
+  for (let i=0; i<n; i++) result.push(sorted[Math.floor(i*(sorted.length-1)/(n-1))]);
+  return result;
+}
+
+/** Hurst exponent via R/S analysis */
+function computeHurst(closes) {
+  const n = closes.length;
+  if (n < 50) return NaN;
+  const cap = Math.min(n, 2000);
+  const c = closes.slice(closes.length - cap);
+
+  const rets = [];
+  for (let i=1; i<c.length; i++) {
+    if (c[i]>0 && c[i-1]>0) rets.push(Math.log(c[i]/c[i-1]));
+  }
+  if (rets.length < 30) return NaN;
+
+  const logRS=[], logN=[];
+  for (let sz=8; sz<=rets.length/3; sz=Math.ceil(sz*1.6)) {
+    const nChunks = Math.floor(rets.length/sz);
+    if (nChunks < 2) break;
+    let rsSum=0, cnt=0;
+    for (let chunk=0; chunk<nChunks; chunk++) {
+      const seg = rets.slice(chunk*sz, (chunk+1)*sz);
+      const m = mean(seg);
+      let cum=0, mn=0, mx=0, ss=0;
+      for (const r of seg) {
+        cum += r-m; if(cum>mx) mx=cum; if(cum<mn) mn=cum;
+        ss += (r-m)**2;
+      }
+      const R = mx-mn, S = Math.sqrt(ss/sz);
+      if (S>0 && R>0) { rsSum += R/S; cnt++; }
+    }
+    if (cnt>0) { logRS.push(Math.log(rsSum/cnt)); logN.push(Math.log(sz)); }
+  }
+  if (logN.length < 3) return NaN;
+  const h = linRegSlope(logN, logRS);
+  return isFinite(h) ? Math.max(0.1, Math.min(0.9, h)) : NaN;
+}
+
+/** Stability score 0-1 from two scalar values + optional distribution arrays */
+function stabilityScore(vA, vB, minScale, distA, distB) {
+  if (isNaN(vA) || isNaN(vB)) return NaN;
+  // Relative change component
+  const scale = Math.max(Math.abs(vA), Math.abs(vB), minScale);
+  const relChg = Math.abs(vB-vA)/scale;
+  const stabChg = Math.max(0, 1 - relChg*2.5); // 40% change → 0
+  // Distribution component
+  let stabDist = 1;
+  if (distA && distB && distA.length>15 && distB.length>15) {
+    stabDist = 1 - ksDist(distA, distB);
+  }
+  const w = (distA && distB) ? 0.45 : 0;
+  return Math.max(0, Math.min(1, (1-w)*stabChg + w*stabDist));
+}
+
+/** Format number: sign + fixed decimals */
+function fmt(v, dec=3, suffix='') {
+  if (v===null||v===undefined||isNaN(v)) return '—';
+  return v.toFixed(dec) + suffix;
+}
+function fmtPct(v, dec=1) { return fmt(v, dec, '%'); }
+function fmtChg(a, b) {
+  if (isNaN(a)||isNaN(b)||a===0) return '';
+  const pct = (b-a)/Math.abs(a)*100;
+  const s = (pct>=0?'+':'')+pct.toFixed(1)+'%';
+  const cls = Math.abs(pct)<3?'chg-no':pct>0?'chg-up':'chg-dn';
+  return `<span class="chg ${cls}">${s}</span>`;
+}
+
+function stabBadge(score, labelOverride) {
+  if (isNaN(score)) return '<span class="stab stab-md">—</span>';
+  const pct = Math.round(score*100);
+  const [cls,icon] = pct>=75?['stab-hi','●']:pct>=50?['stab-md','◐']:['stab-lo','○'];
+  const label = labelOverride || (pct>=75?'Стабильно':pct>=50?'Умеренно':'Нестабильно');
+  return `<span class="stab ${cls}" title="${pct}%">${icon} ${label} ${pct}%</span>`;
+}
+
+function miniBar(score) {
+  if (isNaN(score)) return '';
+  const pct = Math.round(score*100);
+  const color = pct>=75?'var(--green)':pct>=50?'var(--yellow)':'var(--red)';
+  return `<div class="mini-bar-row"><div class="mini-bar" style="width:${pct}%;background:${color}"></div><span style="font-size:.65em;color:var(--fg2)">${pct}%</span></div>`;
+}
+
+function isSignal(v) {
+  if (v===undefined||v===null||v===''||v.toLowerCase()==='nan'||v.toLowerCase()==='na') return false;
+  const n = parseFloat(v);
+  return !isNaN(n) && n !== 0;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ATR
+// ═══════════════════════════════════════════════════════════════
+function computeATR(data, period=14) {
+  const n = data.length;
+  const atr = new Array(n).fill(0);
+  for (let i=1; i<n; i++) {
+    const tr = Math.max(
+      data[i].h - data[i].l,
+      Math.abs(data[i].h - data[i-1].c),
+      Math.abs(data[i].l - data[i-1].c)
+    );
+    atr[i] = i < period ? tr : (atr[i-1]*(period-1) + tr)/period;
+  }
+  return atr;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PIVOT STATISTICS
+// ═══════════════════════════════════════════════════════════════
+function computePivotStats(data, atr, pvL=3, pvR=3) {
+  const n = data.length;
+  const lowDepths=[], highDepths=[];
+
+  for (let i=pvL; i<n-pvR; i++) {
+    const lo=data[i].l, hi=data[i].h;
+    let isLow=true, isHigh=true;
+    for (let j=i-pvL; j<i; j++) {
+      if (data[j].l <= lo) isLow=false;
+      if (data[j].h >= hi) isHigh=false;
+    }
+    if (isLow||isHigh) for (let j=i+1; j<=i+pvR; j++) {
+      if (data[j].l <= lo) isLow=false;
+      if (data[j].h >= hi) isHigh=false;
+    }
+    const a = atr[i]||1;
+    if (isLow) {
+      let maxSurr=-Infinity;
+      for (let j=i-pvL; j<=i+pvR; j++) if(j!==i) maxSurr=Math.max(maxSurr,data[j].l);
+      lowDepths.push((maxSurr-lo)/a);
+    }
+    if (isHigh) {
+      let minSurr=Infinity;
+      for (let j=i-pvL; j<=i+pvR; j++) if(j!==i) minSurr=Math.min(minSurr,data[j].h);
+      highDepths.push((hi-minSurr)/a);
+    }
+  }
+
+  const total = lowDepths.length + highDepths.length;
+  return {
+    freq: total/n*100,
+    avgDepthLow:  lowDepths.length  ? mean(lowDepths)  : NaN,
+    avgDepthHigh: highDepths.length ? mean(highDepths) : NaN,
+    nLows: lowDepths.length,
+    nHighs: highDepths.length,
+    lowDepths, highDepths,
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TRADE RECONSTRUCTION from EL/ES/XL/XS columns
+// ═══════════════════════════════════════════════════════════════
+function reconstructTrades(data) {
+  const longTrades=[], shortTrades=[];
+  let longEntry=null, shortEntry=null;
+
+  for (let i=0; i<data.length; i++) {
+    const d = data[i];
+
+    // Open long
+    if (!longEntry && isSignal(d.el)) {
+      longEntry = { bar:i, eq:d.eq };
+    }
+    // Close long
+    if (longEntry && isSignal(d.xl)) {
+      longTrades.push({
+        bars: i - longEntry.bar,
+        pnl: (!isNaN(d.eq)&&!isNaN(longEntry.eq)) ? d.eq-longEntry.eq : NaN,
+      });
+      longEntry = null;
+    }
+    // Open short
+    if (!shortEntry && isSignal(d.es)) {
+      shortEntry = { bar:i, eq:d.eq };
+    }
+    // Close short
+    if (shortEntry && isSignal(d.xs)) {
+      shortTrades.push({
+        bars: i - shortEntry.bar,
+        pnl: (!isNaN(d.eq)&&!isNaN(shortEntry.eq)) ? d.eq-shortEntry.eq : NaN,
+      });
+      shortEntry = null;
+    }
+  }
+  return { longTrades, shortTrades };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MAIN ANALYSIS FUNCTION
+// Returns metrics object for one period
+// ═══════════════════════════════════════════════════════════════
+function analyzeData(parsed) {
+  const cols = mapColumns(parsed.headers);
+  if (!cols.close) return null;
+
+  // Build typed data array
+  const raw = parsed.rows.map(r => ({
+    t:  r[cols.time]   || '',
+    o:  parseFloat(r[cols.open])   || 0,
+    h:  parseFloat(r[cols.high])   || 0,
+    l:  parseFloat(r[cols.low])    || 0,
+    c:  parseFloat(r[cols.close])  || 0,
+    v:  cols.volume ? (parseFloat(r[cols.volume])  || 0) : 0,
+    ma: cols.ma     ? parseFloat(r[cols.ma])        : NaN,
+    eq: cols.equity ? parseFloat(r[cols.equity])    : NaN,
+    el: cols.el     ? r[cols.el]  || '' : '',
+    es: cols.es     ? r[cols.es]  || '' : '',
+    xl: cols.xl     ? r[cols.xl]  || '' : '',
+    xs: cols.xs     ? r[cols.xs]  || '' : '',
+  })).filter(d => d.c > 0);
+
+  const n = raw.length;
+  if (n < 30) return null;
+
+  // ── Dates ──────────────────────────────────────────────────
+  const times = raw.map(d=>d.t).filter(Boolean);
+  const dateStart = times[0]    || '—';
+  const dateEnd   = times[times.length-1] || '—';
+
+  // ── Returns ───────────────────────────────────────────────
+  const returns=[];
+  for (let i=1; i<n; i++) {
+    if (raw[i].c>0 && raw[i-1].c>0)
+      returns.push(Math.log(raw[i].c/raw[i-1].c));
+  }
+
+  // ── ATR ───────────────────────────────────────────────────
+  const atrArr = computeATR(raw);
+  const atrPct  = atrArr.map((a,i)=>raw[i].c>0?a/raw[i].c*100:0).filter(v=>v>0);
+  const atrMom  = moments(atrPct);
+
+  // ── Return moments ────────────────────────────────────────
+  const retMom = moments(returns);
+
+  // ── Hurst ─────────────────────────────────────────────────
+  const hurst = computeHurst(raw.map(d=>d.c));
+
+  // ── Autocorrelation ───────────────────────────────────────
+  const ac1 = acfAt(returns, 1);
+  const ac2 = acfAt(returns, 2);
+  const ac5 = acfAt(returns, 5);
+
+  // ── Pivot stats ───────────────────────────────────────────
+  const pvSt = computePivotStats(raw, atrArr);
+
+  // ── Bullish bars ──────────────────────────────────────────
+  const bullish = raw.filter(d=>d.c>=d.o).length/n*100;
+
+  // ── Volume ────────────────────────────────────────────────
+  const vols = raw.map(d=>d.v).filter(v=>v>0);
+  const hasVol = vols.length > n*0.4;
+  const volMom = hasVol ? moments(vols) : null;
+
+  // ── MA stats ──────────────────────────────────────────────
+  const maRows = raw.filter(d=>!isNaN(d.ma)&&d.ma>0&&d.c>0);
+  const hasMa  = maRows.length > n*0.3;
+  const maDist = hasMa ? maRows.map(d=>(d.c-d.ma)/d.ma*100) : [];
+  const maDistMom = hasMa ? moments(maDist) : null;
+  const pctAboveMA = hasMa ? maRows.filter(d=>d.c>d.ma).length/maRows.length*100 : NaN;
+
+  // MA cross frequency (count sign changes of d.c-d.ma)
+  let maCrosses=0;
+  if (hasMa) {
+    let prev = maRows[0].c - maRows[0].ma;
+    for (let i=1; i<maRows.length; i++) {
+      const cur = maRows[i].c - maRows[i].ma;
+      if ((prev>0&&cur<0)||(prev<0&&cur>0)) maCrosses++;
+      prev=cur;
+    }
+  }
+  const maCrossFreq = hasMa ? maCrosses/n*100 : NaN;
+
+  // ── Signal stats ──────────────────────────────────────────
+  const elBars = raw.filter(d=>isSignal(d.el));
+  const esBars = raw.filter(d=>isSignal(d.es));
+  const elFreq = elBars.length/n*100;
+  const esFreq = esBars.length/n*100;
+  const hasSignals = elBars.length>0 || esBars.length>0;
+
+  // ── Trade reconstruction ──────────────────────────────────
+  const trades = hasSignals ? reconstructTrades(raw) : { longTrades:[], shortTrades:[] };
+  const avgLongHold  = trades.longTrades.length  ? mean(trades.longTrades.map(t=>t.bars))  : NaN;
+  const avgShortHold = trades.shortTrades.length ? mean(trades.shortTrades.map(t=>t.bars)) : NaN;
+
+  // Win rates from equity P&L
+  const lPnls = trades.longTrades.map(t=>t.pnl).filter(v=>!isNaN(v));
+  const sPnls = trades.shortTrades.map(t=>t.pnl).filter(v=>!isNaN(v));
+  const longWR  = lPnls.length ? lPnls.filter(v=>v>0).length/lPnls.length*100 : NaN;
+  const shortWR = sPnls.length ? sPnls.filter(v=>v>0).length/sPnls.length*100 : NaN;
+
+  // ── Equity curve stats ────────────────────────────────────
+  const eqVals = raw.map(d=>d.eq).filter(v=>!isNaN(v));
+  let totalReturn=NaN, maxDD=NaN, equityHurst=NaN;
+  if (eqVals.length>5) {
+    totalReturn = eqVals[eqVals.length-1] - eqVals[0];
+    let peak=eqVals[0], dd=0;
+    for (const v of eqVals) { if(v>peak)peak=v; dd=Math.min(dd,v-peak); }
+    maxDD = dd;
+    // Equity as price series for Hurst
+    if (eqVals.length>40) equityHurst = computeHurst(eqVals.map((v,i)=>100+v));
+  }
+
+  // ── Volatility clustering (autocorr of |returns|) ─────────
+  const absRets = returns.map(Math.abs);
+  const volClustering = acfAt(absRets, 1);
+
+  // ── Efficiency Ratio (trending efficiency over 20-bar windows) ──
+  const erVals=[];
+  const erWin=20;
+  for (let i=erWin; i<n; i++) {
+    const net = Math.abs(raw[i].c - raw[i-erWin].c);
+    let path=0; for(let j=i-erWin+1;j<=i;j++) path+=Math.abs(raw[j].c-raw[j-1].c);
+    if (path>0) erVals.push(net/path);
+  }
+  const erMean = erVals.length ? mean(erVals) : NaN;
+
+  return {
+    n, dateStart, dateEnd,
+    // Structure
+    hurst,
+    ac1, ac2, ac5,
+    retMean: retMom.mean*100,
+    retStd:  retMom.std*100,
+    retSkew: retMom.skew,
+    retKurt: retMom.kurt,
+    bullish,
+    volClustering,
+    erMean,
+    // Volatility
+    atrPctMean: atrMom.mean,
+    atrPctStd:  atrMom.std,
+    atrPctCoV:  atrMom.std/(atrMom.mean||1),
+    // Pivots
+    pivFreq:      pvSt.freq,
+    pivDepthLow:  pvSt.avgDepthLow,
+    pivDepthHigh: pvSt.avgDepthHigh,
+    // Indicator
+    pctAboveMA,
+    maDistMean: maDistMom?.mean,
+    maDistStd:  maDistMom?.std,
+    maCrossFreq,
+    hasMa,
+    // Signals
+    elFreq, esFreq, hasSignals,
+    avgLongHold, avgShortHold,
+    longWR, shortWR,
+    longCount:  trades.longTrades.length,
+    shortCount: trades.shortTrades.length,
+    // Equity
+    totalReturn, maxDD, equityHurst,
+    hasVol,
+    volCoV: volMom ? volMom.std/(volMom.mean||1) : NaN,
+    // Raw distributions for KS tests
+    _returns: returns,
+    _atrPct:  atrPct,
+    _maDist:  maDist,
+    _pvLowDepths:  pvSt.lowDepths,
+    _pvHighDepths: pvSt.highDepths,
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// METRIC DEFINITIONS
+// key, label, description, format fn, minScale, category, distKey
+// ═══════════════════════════════════════════════════════════════
+const METRIC_DEFS = [
+  // ── Market structure ──
+  { key:'hurst',       cat:'structure', label:'Hurst Exponent',
+    desc:'Трендовость: >0.5 тренд, <0.5 mean-reversion, 0.5 случайность',
+    fmt:v=>fmt(v,3), ms:0.05 },
+  { key:'ac1',         cat:'structure', label:'Автокорр. (lag 1)',
+    desc:'Серийная корреляция доходностей на 1 бар — краткосрочный импульс',
+    fmt:v=>fmt(v,3), ms:0.02 },
+  { key:'ac5',         cat:'structure', label:'Автокорр. (lag 5)',
+    desc:'Серийная корреляция на 5 баров — среднесрочный импульс',
+    fmt:v=>fmt(v,3), ms:0.02 },
+  { key:'volClustering', cat:'structure', label:'Кластеризация волатильности',
+    desc:'Автокорр. |доходностей| — насколько волатильность группируется',
+    fmt:v=>fmt(v,3), ms:0.05, distKey:'_returns' },
+  { key:'erMean',      cat:'structure', label:'Efficiency Ratio (20-бар)',
+    desc:'Насколько эффективно цена движется — 0 хаос, 1 чистый тренд',
+    fmt:v=>fmt(v,3), ms:0.05 },
+  { key:'retSkew',     cat:'structure', label:'Skewness доходностей',
+    desc:'Асимметрия: >0 правый хвост (редкий рост), <0 левый (редкий обвал)',
+    fmt:v=>fmt(v,3), ms:0.2, distKey:'_returns' },
+  { key:'retKurt',     cat:'structure', label:'Kurtosis доходностей',
+    desc:'Толщина хвостов (excess): >0 fat tails — больше экстремальных движений',
+    fmt:v=>fmt(v,2), ms:0.5, distKey:'_returns' },
+  { key:'bullish',     cat:'structure', label:'% бычьих баров',
+    desc:'Доля баров где close >= open — направленный bias',
+    fmt:v=>fmtPct(v), ms:5 },
+  // ── Volatility ──
+  { key:'atrPctMean',  cat:'volatility', label:'ATR% средний',
+    desc:'Средняя волатильность (ATR/цена) — абсолютный уровень',
+    fmt:v=>fmt(v,3,'%'), ms:0.1, distKey:'_atrPct' },
+  { key:'atrPctCoV',   cat:'volatility', label:'ATR CoV',
+    desc:'Изменчивость волатильности (std/mean) — режим: стабильный или рваный',
+    fmt:v=>fmt(v,3), ms:0.1, distKey:'_atrPct' },
+  { key:'retStd',      cat:'volatility', label:'StdDev доходностей',
+    desc:'Стандартное отклонение баровых доходностей',
+    fmt:v=>fmt(v,4,'%'), ms:0.01, distKey:'_returns' },
+  // ── Pivots ──
+  { key:'pivFreq',     cat:'pivots', label:'Частота пивотов',
+    desc:'Количество пивотов (hi+lo) на 100 баров',
+    fmt:v=>fmt(v,2), ms:0.5 },
+  { key:'pivDepthLow', cat:'pivots', label:'Глубина пивот-лоу (ATR)',
+    desc:'Средняя глубина минимума пивота в единицах ATR',
+    fmt:v=>fmt(v,3), ms:0.1, distKey:'_pvLowDepths' },
+  { key:'pivDepthHigh',cat:'pivots', label:'Высота пивот-хай (ATR)',
+    desc:'Средняя высота максимума пивота в единицах ATR',
+    fmt:v=>fmt(v,3), ms:0.1, distKey:'_pvHighDepths' },
+  // ── Indicator ──
+  { key:'pctAboveMA',  cat:'indicator', label:'% баров выше MA',
+    desc:'Доля времени когда цена выше скользящей средней',
+    fmt:v=>fmtPct(v), ms:5 },
+  { key:'maDistMean',  cat:'indicator', label:'Расстояние от MA (%)',
+    desc:'Среднее отклонение цены от MA — характеризует "упругость"',
+    fmt:v=>fmt(v,2,'%'), ms:0.5, distKey:'_maDist' },
+  { key:'maCrossFreq', cat:'indicator', label:'Кросс-частота MA',
+    desc:'Пересечений цены и MA на 100 баров — выше = рваный рынок',
+    fmt:v=>fmt(v,2), ms:0.2 },
+  // ── Signals ──
+  { key:'elFreq',      cat:'signals', label:'Лонг-входов / 100 баров',
+    desc:'Частота EL сигналов',
+    fmt:v=>fmt(v,2), ms:0.1 },
+  { key:'esFreq',      cat:'signals', label:'Шорт-входов / 100 баров',
+    desc:'Частота ES сигналов',
+    fmt:v=>fmt(v,2), ms:0.1 },
+  { key:'avgLongHold', cat:'signals', label:'Удержание лонга (баров)',
+    desc:'Среднее количество баров в лонг-позиции',
+    fmt:v=>fmt(v,1), ms:1 },
+  { key:'avgShortHold',cat:'signals', label:'Удержание шорта (баров)',
+    desc:'Среднее количество баров в шорт-позиции',
+    fmt:v=>fmt(v,1), ms:1 },
+];
+
+const CAT_LABELS = {
+  structure: '⚙️ Структура рынка',
+  volatility:'📈 Волатильность',
+  pivots:    '📍 Пивоты',
+  indicator: '〰️ Индикатор (MA)',
+  signals:   '🎯 Сигналы стратегии',
+};
+
+// ═══════════════════════════════════════════════════════════════
+// COMPARISON — returns enriched metric rows
+// ═══════════════════════════════════════════════════════════════
+function compareMetrics(mA, mB) {
+  return METRIC_DEFS.map(def => {
+    const vA = mA[def.key], vB = mB[def.key];
+    const dA = def.distKey ? mA[def.distKey] : null;
+    const dB = def.distKey ? mB[def.distKey] : null;
+    const score = stabilityScore(vA, vB, def.ms||0.01, dA, dB);
+    return { ...def, vA, vB, score };
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// REGIME PROFILE — one-line description of a period
+// ═══════════════════════════════════════════════════════════════
+function regimeProfile(m) {
+  const tags=[];
+  // Hurst
+  if (!isNaN(m.hurst)) {
+    if (m.hurst>0.58)      tags.push('<span class="tag tag-trend">Трендовый</span>');
+    else if (m.hurst<0.42) tags.push('<span class="tag tag-mr">Mean-reversion</span>');
+    else                   tags.push('<span class="tag tag-random">Нейтральный</span>');
+  }
+  // Volatility
+  if (!isNaN(m.atrPctMean)) {
+    if (m.atrPctMean>1.5)       tags.push('<span class="tag tag-vol-hi">Высокая волат.</span>');
+    else if (m.atrPctMean<0.5)  tags.push('<span class="tag tag-vol-lo">Низкая волат.</span>');
+    else                        tags.push('<span class="tag tag-neutral">Умер. волат.</span>');
+  }
+  // Bullish bias
+  if (!isNaN(m.bullish)) {
+    if (m.bullish>55)      tags.push('<span class="tag tag-bull">Бычий уклон</span>');
+    else if (m.bullish<45) tags.push('<span class="tag tag-bear">Медвежий уклон</span>');
+    else                   tags.push('<span class="tag tag-neutral">Без уклона</span>');
+  }
+  // Efficiency
+  if (!isNaN(m.erMean)) {
+    if (m.erMean>0.35) tags.push('<span class="tag tag-trend">Эффективн. движение</span>');
+    else               tags.push('<span class="tag tag-mr">Хаотичн. движение</span>');
+  }
+
+  const lines=[];
+  if(!isNaN(m.hurst))      lines.push(`Hurst=${m.hurst.toFixed(3)}`);
+  if(!isNaN(m.atrPctMean)) lines.push(`ATR=${m.atrPctMean.toFixed(2)}%`);
+  if(!isNaN(m.pivFreq))    lines.push(`пивотов=${m.pivFreq.toFixed(1)}/100б`);
+  if(!isNaN(m.bullish))    lines.push(`бычьих=${m.bullish.toFixed(0)}%`);
+
+  return { tags: tags.join(' '), stats: lines.join(' · '), n: m.n, start: m.dateStart, end: m.dateEnd };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// RENDER
+// ═══════════════════════════════════════════════════════════════
+function renderRegime(mA, mB) {
+  const pA = regimeProfile(mA), pB = regimeProfile(mB);
+  return `
+  <h2>🌍 Режим рынка</h2>
+  <div class="regime-grid">
+    <div class="regime-card a">
+      <div class="regime-name"><span class="period-label period-a">Период A</span> ${pA.start} — ${pA.end} <span class="dimmed">(${pA.n} баров)</span></div>
+      <div style="margin-bottom:6px">${pA.tags}</div>
+      <div class="regime-desc">${pA.stats}</div>
+    </div>
+    <div class="regime-card b">
+      <div class="regime-name"><span class="period-label period-b">Период B</span> ${pB.start} — ${pB.end} <span class="dimmed">(${pB.n} баров)</span></div>
+      <div style="margin-bottom:6px">${pB.tags}</div>
+      <div class="regime-desc">${pB.stats}</div>
+    </div>
+  </div>`;
+}
+
+function renderMetricsTable(rows) {
+  let html = '<h2>📐 Метрики: сравнение и стабильность</h2>';
+  html += '<div class="metrics-section"><table class="mt"><thead><tr>';
+  html += '<th style="width:180px">Метрика</th>';
+  html += '<th class="r" style="width:90px"><span style="color:var(--blue)">Период A</span></th>';
+  html += '<th class="r" style="width:90px"><span style="color:var(--purple)">Период B</span></th>';
+  html += '<th class="r" style="width:70px">Изменение</th>';
+  html += '<th style="width:160px">Стабильность</th>';
+  html += '<th class="desc" style="min-width:180px">Что означает</th>';
+  html += '</tr></thead><tbody>';
+
+  let prevCat = null;
+  for (const r of rows) {
+    if (r.cat !== prevCat) {
+      prevCat = r.cat;
+      html += `<tr class="cat-header"><td colspan="6">${CAT_LABELS[r.cat]||r.cat}</td></tr>`;
+    }
+    const skip = (isNaN(r.vA) && isNaN(r.vB));
+    if (skip) continue;
+    const fA = r.fmt(r.vA), fB = r.fmt(r.vB);
+    html += `<tr>
+      <td class="label" title="${r.desc}">${r.label}</td>
+      <td class="r val-a">${fA}</td>
+      <td class="r val-b">${fB}</td>
+      <td class="r">${fmtChg(r.vA, r.vB)}</td>
+      <td>${miniBar(r.score)} ${stabBadge(r.score)}</td>
+      <td class="desc dimmed">${r.desc}</td>
+    </tr>`;
+  }
+  html += '</tbody></table></div>';
+  return html;
+}
+
+function renderSignals(mA, mB) {
+  if (!mA.hasSignals && !mB.hasSignals) return '';
+  const row = (label, vA, vB) =>
+    `<div class="sig-card"><div class="sc-label">${label}</div><div class="sc-vals">
+      <div class="sc-val"><span class="val-a">${vA}</span> <span class="p">A</span></div>
+      <div class="sc-val"><span class="val-b">${vB}</span> <span class="p">B</span></div>
+    </div></div>`;
+
+  return `<h2>🎯 Сигналы стратегии</h2>
+  <div class="sig-grid">
+    ${row('Лонг-входов / 100б', fmt(mA.elFreq,2), fmt(mB.elFreq,2))}
+    ${row('Шорт-входов / 100б', fmt(mA.esFreq,2), fmt(mB.esFreq,2))}
+    ${row('Всего сделок', mA.longCount+mA.shortCount, mB.longCount+mB.shortCount)}
+    ${row('Удержание лонга (б)', fmt(mA.avgLongHold,1), fmt(mB.avgLongHold,1))}
+    ${row('Удержание шорта (б)', fmt(mA.avgShortHold,1), fmt(mB.avgShortHold,1))}
+    ${row('WR лонг', fmtPct(mA.longWR), fmtPct(mB.longWR))}
+    ${row('WR шорт', fmtPct(mA.shortWR), fmtPct(mB.shortWR))}
+    ${row('Equity итог A→B', fmtPct(mA.totalReturn,1), fmtPct(mB.totalReturn,1))}
+    ${row('MaxDD A→B', fmtPct(mA.maxDD,1), fmtPct(mB.maxDD,1))}
+  </div>`;
+}
+
+function renderRecommendations(rows) {
+  const sorted = rows.filter(r=>!isNaN(r.score)).sort((a,b)=>b.score-a.score);
+  const stable   = sorted.filter(r=>r.score>=0.75).slice(0,7);
+  const unstable = sorted.filter(r=>r.score< 0.50).sort((a,b)=>a.score-b.score).slice(0,7);
+
+  // Verdict text
+  const avgScore = sorted.length ? mean(sorted.map(r=>r.score)) : 0.5;
+  let verdict='';
+  if (avgScore>=0.75)
+    verdict=`<strong>Структура рынка стабильна</strong> — большинство метрик сохранили характер. Стратегии, построенные на этих данных, имеют высокий шанс перенести свойства в будущее.`;
+  else if (avgScore>=0.55)
+    verdict=`<strong>Умеренные изменения</strong> — часть метрик устойчива, часть сдвинулась. Стабильные метрики можно брать как основу; параметры нестабильных нужно адаптировать.`;
+  else
+    verdict=`<strong>Рынок значительно изменился</strong> — параметры стратегий из периода A могут плохо работать в B. Переобучи пороги на свежих данных.`;
+
+  const stableItems = stable.map(r=>`
+    <div class="rec-item">
+      <span class="rec-icon">🟢</span>
+      <span><strong>${r.label}</strong> — A=${r.fmt(r.vA)}, B=${r.fmt(r.vB)}</span>
+    </div>`).join('');
+
+  const unstableItems = unstable.map(r=>`
+    <div class="rec-item">
+      <span class="rec-icon">🔴</span>
+      <span><strong>${r.label}</strong> — A=${r.fmt(r.vA)}, B=${r.fmt(r.vB)} (${fmtChg(r.vA,r.vB)||'—'})</span>
+    </div>`).join('');
+
+  return `<h2>💡 Выводы и рекомендации</h2>
+  <div class="verdict">${verdict}</div>
+  <div class="rec-grid">
+    <div class="rec-box good">
+      <h3>✅ Строй стратегию на этом</h3>
+      ${stableItems||'<div class="rec-item dimmed">нет метрик с высокой стабильностью</div>'}
+    </div>
+    <div class="rec-box warn">
+      <h3>⚠️ Это изменилось — не зашивай в параметры</h3>
+      ${unstableItems||'<div class="rec-item dimmed">нет нестабильных метрик</div>'}
+    </div>
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MAIN ENTRY POINT
+// ═══════════════════════════════════════════════════════════════
+async function runAnalysis() {
+  const btn = document.getElementById('btn-analyze');
+  const status = document.getElementById('analyze-status');
+  btn.disabled = true;
+  status.textContent = 'Анализирую...';
+
+  // yield to browser
+  await new Promise(r=>setTimeout(r,10));
+
+  try {
+    const mA = analyzeData(_csvData.a);
+    const mB = analyzeData(_csvData.b);
+
+    if (!mA || !mB) {
+      status.textContent = '⚠️ Недостаточно данных в одном из файлов (нужно ≥30 баров)';
+      btn.disabled = false;
+      return;
+    }
+
+    const comparedRows = compareMetrics(mA, mB);
+
+    document.getElementById('regime-section').innerHTML      = renderRegime(mA, mB);
+    document.getElementById('metrics-section').innerHTML     = renderMetricsTable(comparedRows);
+    document.getElementById('signals-section').innerHTML     = renderSignals(mA, mB);
+    document.getElementById('recommendations-section').innerHTML = renderRecommendations(comparedRows);
+    document.getElementById('results').style.display = 'block';
+    document.getElementById('results').scrollIntoView({behavior:'smooth'});
+    status.textContent = `✓ Готово · ${mA.n} + ${mB.n} баров`;
+  } catch(e) {
+    status.textContent = '⚠️ Ошибка: ' + e.message;
+    console.error('[comparator]', e);
+  }
+  btn.disabled = false;
+}
+</script>
+</body>
+</html>
+
+

@@ -1639,6 +1639,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
     </div>
     <button class="tbl-mode-btn" onclick="_downloadSources()" title="Скачать исходные файлы: core.js, opt.js, ui.js, shell.html, build.py, README.md">⬇ Исходники</button>
     <button class="tbl-mode-btn" id="btn-ml-scan" onclick="openMLModal()" title="ML-модели: обучить / управлять / скан сигналов" style="border-color:rgba(139,92,246,.5);color:var(--purple)">🤖 ML</button>
+    <a class="tbl-mode-btn" href="comparator.html" target="_blank" title="Сравни два периода CSV: что стабильно, что изменилось — Hurst, пивоты, волатильность, сигналы" style="border-color:rgba(137,220,235,.4);color:var(--accent);text-decoration:none">📊 Comparator</a>
   </div>
   <div class="tbl-scroll">
     <div style="padding:3px 8px 3px;font-size:.62em;color:var(--text2);background:var(--bg2);border-bottom:1px solid var(--border);user-select:none">
@@ -28907,7 +28908,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774796518664;
+window._BUILD_TS = 1774796662997;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
