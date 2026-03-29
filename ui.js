@@ -938,6 +938,9 @@ function renderVisibleResults() {
   // Строим HTML строкой — намного быстрее чем createElement в цикле
   // ── OOS-режим: рендер через applyOOSFilters (своя фильтрация) ──
   if (_tableMode === 'oos') {
+    // Скрываем основную таблицу в OOS режиме (никогда не показывать обе таблицы одновременно)
+    const stdScroll = document.querySelector('.tbl-scroll');
+    if (stdScroll) stdScroll.style.display = 'none';
     applyOOSFilters();
     return; // дальнейший рендер не нужен
   }
@@ -6900,6 +6903,12 @@ let _oosSortDir = -1; // -1 = desc
 
 // ── OOS фильтрация (собственная, независимая от applyFilters) ─
 function applyOOSFilters() {
+  // УЛУЧШЕНИЕ: убедиться что основная таблица скрыта в OOS режиме
+  const stdScroll = document.querySelector('.tbl-scroll');
+  if (stdScroll) stdScroll.style.display = 'none';
+  const oosTbl = document.getElementById('oos-tbl-wrap');
+  if (oosTbl) oosTbl.style.display = '';
+
   const fname  = document.getElementById('oof_name')?.value.trim().toLowerCase() || '';
   const fopnl  = parseFloat(document.getElementById('oof_opnl')?.value);
   const fnpnl  = parseFloat(document.getElementById('oof_npnl')?.value);
