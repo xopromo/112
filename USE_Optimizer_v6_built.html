@@ -26825,6 +26825,9 @@ function _showOOSDiagnostic(r, idx) {
   modal.style.zIndex = 9999;
   modal.onclick = e => { if (e.target === modal) modal.remove(); };
 
+  // Функция экранирования HTML
+  const _esc = s => String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
   const cfg = r.cfg || {};
   const hasOld = r.old_pnl != null;
   const hasNew = r.new_pnl != null;
@@ -29755,7 +29758,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774814868176;
+window._BUILD_TS = 1774815331980;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;

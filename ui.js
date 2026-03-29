@@ -7408,6 +7408,9 @@ function _showOOSDiagnostic(r, idx) {
   modal.style.zIndex = 9999;
   modal.onclick = e => { if (e.target === modal) modal.remove(); };
 
+  // Функция экранирования HTML
+  const _esc = s => String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
   const cfg = r.cfg || {};
   const hasOld = r.old_pnl != null;
   const hasNew = r.new_pnl != null;
