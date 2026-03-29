@@ -5439,7 +5439,7 @@ function _hcRunBacktest(cfg) {
     const ind    = _calcIndicators(cfg);
     const btCfg  = buildBtCfg(cfg, ind);
     const _hcRes = backtest(ind.pvLo, ind.pvHi, ind.atrArr, btCfg);
-    _robSliceCache.set(_hcsk, _hcRes);
+    _robSliceCacheSet(_hcsk, _hcRes);
     return _hcRes;
   } catch(e) { return null; }
 }

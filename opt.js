@@ -4072,7 +4072,7 @@ async function runRobustScoreFor(r, tests, _fastMode) {
       const ind   = _calcIndicators(cfg);
       const btCfg = buildBtCfg(cfg, ind);
       const _res  = backtest(ind.pvLo, ind.pvHi, ind.atrArr, btCfg);
-      _robSliceCache.set(_sk, _res);
+      _robSliceCacheSet(_sk, _res);
       return _res;
     } catch(e) { return null; }
     finally { DATA = origDATA; }
@@ -4277,8 +4277,18 @@ let _hcSourceResult = null;
 const _robCache = new Map(); // key → {score, tests, dataHash}
 // Per-slice indicator+backtest result cache (shared across multiple rob test calls for same cfg)
 // Key: cfgKey + '|' + sliceKey  Value: backtest result
+// ОПТИМИЗАЦИЯ: ограничен 500 записями (FIFO). Без лимита при HC-1000 итерациях
+// с 100k баров: 1000 × 800 КБ (eq[]) = ~800 МБ. С лимитом: max ~400 МБ.
+const _ROB_SLICE_CACHE_MAX = 500;
 const _robSliceCache = new Map();
 let _robSliceCacheDataHash = '';
+function _robSliceCacheSet(key, value) {
+  if (_robSliceCache.size >= _ROB_SLICE_CACHE_MAX) {
+    // Map.keys() итерирует в порядке вставки — удаляем самый старый
+    _robSliceCache.delete(_robSliceCache.keys().next().value);
+  }
+  _robSliceCache.set(key, value);
+}
 // ── HC_NUMERIC_PARAMS ────────────────────────────────────────────────
 // ЕДИНЫЙ ИСТОЧНИК ИСТИНЫ для всех числовых параметров HC.
 // Добавить новый параметр = добавить одну строку сюда.
