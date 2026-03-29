@@ -718,11 +718,11 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
   font-family: var(--font-mono);
 }
 /* OOS Compare на новых данных */
-.oos-cmp-table { width:100%; border-collapse:collapse; font-size:.7em; }
-.oos-cmp-table th { background:var(--bg4); color:var(--text2); padding:5px 8px; text-align:right; border-bottom:1px solid var(--border2); white-space:nowrap; }
+.oos-cmp-table { width:100%; border-collapse:collapse; }
+.oos-cmp-table th { background:var(--bg4); color:var(--text2); padding:5px 9px; text-align:right; border-bottom:1px solid var(--border2); white-space:nowrap; font-size:.72em; }
 .oos-cmp-table th:first-child { text-align:left; }
-.oos-cmp-table td { padding:4px 8px; border-bottom:1px solid var(--border); text-align:right; white-space:nowrap; }
-.oos-cmp-table td:first-child { text-align:left; color:var(--text); font-size:.65em; max-width:180px; overflow:hidden; text-overflow:ellipsis; }
+.oos-cmp-table td { padding:4px 9px; border-bottom:1px solid var(--border); text-align:right; white-space:nowrap; }
+.oos-cmp-table td:first-child { text-align:left; color:var(--text); max-width:220px; overflow:hidden; text-overflow:ellipsis; }
 .oos-cmp-table tr:hover td { background:var(--bg3); }
 .oos-cmp-up { color:var(--green); }
 .oos-cmp-dn { color:var(--red); }
@@ -747,13 +747,17 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
 .oos-badge.b { background:rgba(255,61,87,.18);color:var(--red) }
 
 /* OOS таблица: заголовки групп */
-.oos-th-hist  { background:var(--bg3); color:var(--text2); padding:6px 7px; border-bottom:1px solid var(--border2); border-left:2px solid var(--bg4); cursor:pointer; white-space:nowrap; }
-.oos-th-new   { background:var(--bg3); color:var(--accent); padding:6px 7px; border-bottom:1px solid var(--border2); border-left:2px solid rgba(0,212,255,.3); cursor:pointer; white-space:nowrap; }
-.oos-th-delta { background:var(--bg3); color:var(--orange,#ffaa44); padding:6px 7px; border-bottom:1px solid var(--border2); border-left:1px solid var(--border2); cursor:pointer; white-space:nowrap; }
+.oos-th-hist  { background:var(--bg3); color:var(--text2); padding:6px 8px; border-bottom:1px solid var(--border2); border-left:2px solid var(--bg4); cursor:pointer; white-space:nowrap; font-size:.72em; }
+.oos-th-new   { background:var(--bg3); color:var(--accent); padding:6px 8px; border-bottom:1px solid var(--border2); border-left:2px solid rgba(0,212,255,.3); cursor:pointer; white-space:nowrap; font-size:.72em; }
+.oos-th-delta { background:var(--bg3); color:var(--orange,#ffaa44); padding:6px 8px; border-bottom:1px solid var(--border2); border-left:1px solid var(--border2); cursor:pointer; white-space:nowrap; font-size:.72em; }
+/* OOS chart */
+#oos-chart-wrap { display:none; background:var(--bg2); border-top:1px solid var(--border); padding:0; }
+#oos-eqc { width:100%; height:160px; display:block; border-radius:0; }
 /* OOS tbody строки */
-#oos-rtbl td { padding:3px 7px; border-bottom:1px solid var(--border); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+#oos-rtbl td { padding:4px 7px; border-bottom:1px solid var(--border); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 #oos-rtbl tr:hover td { background:var(--bg3); }
-#oos-rtbl td:first-child { font-size:.66em; color:var(--accent); max-width:200px; overflow:hidden; text-overflow:ellipsis; }
+#oos-rtbl td:first-child { color:var(--accent); max-width:220px; overflow:hidden; text-overflow:ellipsis; }
+#oos-rtbl tr { cursor:pointer; }
 
 /* NOTEPAD */
 #notepad-panel {
@@ -1746,22 +1750,22 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
 
   <!-- ── OOS таблица: полностью отдельная, не зависит от стандартной ── -->
   <div id="oos-tbl-wrap" style="display:none;overflow-x:auto;margin-top:0">
-    <table id="oos-rtbl" style="width:max-content;min-width:100%;border-collapse:collapse;font-size:.7em;table-layout:fixed">
+    <table id="oos-rtbl" style="width:max-content;min-width:100%;border-collapse:collapse;table-layout:fixed">
       <colgroup>
-        <col style="width:180px"><!-- Стратегия -->
-        <col style="width:26px"> <!-- ★ -->
-        <col style="width:64px"> <!-- PnL% ист -->
-        <col style="width:64px"> <!-- PnL% нов -->
-        <col style="width:60px"> <!-- ΔPnL -->
-        <col style="width:68px"> <!-- Avg/tr ист -->
-        <col style="width:68px"> <!-- Avg/tr нов -->
-        <col style="width:62px"> <!-- ΔAvg/tr -->
-        <col style="width:56px"> <!-- WR% ист -->
-        <col style="width:56px"> <!-- WR% нов -->
-        <col style="width:50px"> <!-- ΔWR -->
-        <col style="width:38px"> <!-- # ист -->
-        <col style="width:38px"> <!-- # нов -->
-        <col style="width:94px"> <!-- Оценка -->
+        <col style="width:220px"><!-- Стратегия -->
+        <col style="width:30px"> <!-- ★ -->
+        <col style="width:76px"> <!-- PnL% ист -->
+        <col style="width:76px"> <!-- PnL% нов -->
+        <col style="width:70px"> <!-- ΔPnL -->
+        <col style="width:78px"> <!-- Avg/tr ист -->
+        <col style="width:78px"> <!-- Avg/tr нов -->
+        <col style="width:72px"> <!-- ΔAvg/tr -->
+        <col style="width:66px"> <!-- WR% ист -->
+        <col style="width:66px"> <!-- WR% нов -->
+        <col style="width:60px"> <!-- ΔWR -->
+        <col style="width:46px"> <!-- # ист -->
+        <col style="width:46px"> <!-- # нов -->
+        <col style="width:104px"><!-- Оценка -->
       </colgroup>
       <thead>
         <tr id="oos-header-row">
@@ -1804,6 +1808,9 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
       </thead>
       <tbody id="oos-tb"></tbody>
     </table>
+  </div>
+  <div id="oos-chart-wrap">
+    <canvas id="oos-eqc"></canvas>
   </div>
 
 </div>
