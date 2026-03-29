@@ -916,7 +916,14 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
     <label data-tip="Блокирует входы, если ML-оценка паттерна ниже порога. Требует обученной модели (🤖 ML). Показывает насколько ML-модель улучшает отбор стратегий.">ML-фильтр входов</label>
   </div>
   <div id="c_ml_thresh_row" class="g2" style="display:none;margin-top:2px">
-    <div class="field"><label>Порог ML (0–1)</label><input id="c_ml_thresh" value="0.55" data-tip="Входы с ML-оценкой ниже порога блокируются. 0.5 = всё проходит, 0.7 = только высокодостоверные сигналы"></div>
+    <div class="field"><label>Порог ML лонг (0–1)</label><input id="c_ml_thresh" value="0.55" data-tip="Лонг-входы с ML-оценкой (модель доньев) ниже порога блокируются. 0.5 = всё проходит, 0.7 = только высокодостоверные сигналы"></div>
+  </div>
+  <div class="cb" style="margin-top:4px">
+    <input type="checkbox" id="c_ml_high_filter" onchange="document.getElementById('c_ml_high_thresh_row').style.display=this.checked?'':'none'">
+    <label data-tip="Блокирует шорт-входы, если ML-оценка вершины ниже порога. Требует обученной модели вершин (🤖 ML → Вершины → ⚡ Обучить). Модель хранится как mlScoreHigh().">ML-фильтр шортов (вершины)</label>
+  </div>
+  <div id="c_ml_high_thresh_row" class="g2" style="display:none;margin-top:2px">
+    <div class="field"><label>Порог ML шорт (0–1)</label><input id="c_ml_high_thresh" value="0.55" data-tip="Шорт-входы с ML-оценкой (модель вершин) ниже порога блокируются."></div>
   </div>
   <button onclick="runMLFeatureScreening()" style="margin-top:6px;width:100%;padding:5px 0;font-size:.78em;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--purple);cursor:pointer" data-tip="Анализирует какие из 12 ML-признаков наиболее важны. Показывает сколько простых правил нужно чтобы получить 90% эффекта ML-модели. Требует: модель загружена + выбран результат.">🔬 Скрининг признаков ML</button>
   <div class="cb" style="margin-top:4px">

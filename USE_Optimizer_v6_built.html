@@ -916,7 +916,14 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
     <label data-tip="Блокирует входы, если ML-оценка паттерна ниже порога. Требует обученной модели (🤖 ML). Показывает насколько ML-модель улучшает отбор стратегий.">ML-фильтр входов</label>
   </div>
   <div id="c_ml_thresh_row" class="g2" style="display:none;margin-top:2px">
-    <div class="field"><label>Порог ML (0–1)</label><input id="c_ml_thresh" value="0.55" data-tip="Входы с ML-оценкой ниже порога блокируются. 0.5 = всё проходит, 0.7 = только высокодостоверные сигналы"></div>
+    <div class="field"><label>Порог ML лонг (0–1)</label><input id="c_ml_thresh" value="0.55" data-tip="Лонг-входы с ML-оценкой (модель доньев) ниже порога блокируются. 0.5 = всё проходит, 0.7 = только высокодостоверные сигналы"></div>
+  </div>
+  <div class="cb" style="margin-top:4px">
+    <input type="checkbox" id="c_ml_high_filter" onchange="document.getElementById('c_ml_high_thresh_row').style.display=this.checked?'':'none'">
+    <label data-tip="Блокирует шорт-входы, если ML-оценка вершины ниже порога. Требует обученной модели вершин (🤖 ML → Вершины → ⚡ Обучить). Модель хранится как mlScoreHigh().">ML-фильтр шортов (вершины)</label>
+  </div>
+  <div id="c_ml_high_thresh_row" class="g2" style="display:none;margin-top:2px">
+    <div class="field"><label>Порог ML шорт (0–1)</label><input id="c_ml_high_thresh" value="0.55" data-tip="Шорт-входы с ML-оценкой (модель вершин) ниже порога блокируются."></div>
   </div>
   <button onclick="runMLFeatureScreening()" style="margin-top:6px;width:100%;padding:5px 0;font-size:.78em;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--purple);cursor:pointer" data-tip="Анализирует какие из 12 ML-признаков наиболее важны. Показывает сколько простых правил нужно чтобы получить 90% эффекта ML-модели. Требует: модель загружена + выбран результат.">🔬 Скрининг признаков ML</button>
   <div class="cb" style="margin-top:4px">
@@ -9173,9 +9180,127 @@ function mlComputeFeatures(barIdx) {
   return feat;
 }
 
+// ── Feature vector for pivot-HIGHS (33 features, mirrors mlComputeFeatures) ──
+// barIdx = confirmation bar index (pivot high was at barIdx - ML_PVR)
+// Returns Float64Array(33) or null if insufficient data
+
+function mlComputeFeaturesHigh(barIdx) {
+  if (!DATA || barIdx < 52 || barIdx >= DATA.length) return null;
+  _mlEnsureCache();
+  const { atr, ema20, ema50, rsi, hasVol } = _mlCache;
+
+  const i  = barIdx;
+  const c0 = DATA[i - 1].c;
+  const a0 = atr[i - 1];
+  if (a0 <= 0 || c0 <= 0) return null;
+
+  const feat = new Float64Array(ML_FEAT_N);
+
+  // [0-18] Normalized log-returns (same as lows model)
+  const WINDOW = 20;
+  let rSum = 0, rSum2 = 0;
+  const lr = new Float64Array(WINDOW - 1);
+  for (let k = 0; k < WINDOW - 1; k++) {
+    const bi = i - WINDOW + k;
+    const ca = DATA[bi].c, cb = DATA[bi + 1].c;
+    lr[k] = (ca > 0 && cb > 0) ? Math.log(cb / ca) : 0;
+    rSum += lr[k]; rSum2 += lr[k] * lr[k];
+  }
+  const lrMean = rSum / 19;
+  const lrStd  = Math.sqrt(rSum2 / 19 - lrMean * lrMean) + 1e-8;
+  for (let k = 0; k < 19; k++) feat[k] = (lr[k] - lrMean) / lrStd;
+
+  // [19] ATR normalised
+  feat[19] = a0 / c0;
+
+  // [20] Efficiency Ratio over 10 bars
+  const ER_P = 10;
+  if (i > ER_P) {
+    const net = Math.abs(DATA[i - 1].c - DATA[i - 1 - ER_P].c);
+    let path = 0;
+    for (let j = i - ER_P; j < i; j++) path += Math.abs(DATA[j].c - DATA[j - 1].c);
+    feat[20] = path > 0 ? net / path : 0;
+  }
+
+  // [21] Volume ratio / [22] Volume z-score
+  if (hasVol) {
+    let vSum = 0, vSum2 = 0, vN = 0;
+    for (let j = Math.max(0, i - 21); j < i - 1; j++) {
+      const v = DATA[j].v || 0;
+      vSum += v; vSum2 += v * v; vN++;
+    }
+    const vMean = vN > 0 ? vSum / vN : 1;
+    const vStd  = vN > 1 ? Math.sqrt(Math.max(0, vSum2 / vN - vMean * vMean)) + 1e-8 : 1;
+    const vNow  = DATA[i - 1].v || 0;
+    feat[21] = vMean > 0 ? vNow / vMean : 1;
+    feat[22] = (vNow - vMean) / vStd;
+  } else {
+    feat[21] = 1; feat[22] = 0;
+  }
+
+  // [23] RSI(14) / 100
+  feat[23] = rsi[i - 1] / 100;
+
+  // [24] Distance ABOVE EMA20 in ATR units (positive = price > EMA, overbought)
+  // [25] Distance above EMA50
+  feat[24] = (c0 - ema20[i - 1]) / a0;
+  feat[25] = (c0 - ema50[i - 1]) / a0;
+
+  // [26] Upper wick at pivot bar (rejection candle strength for highs)
+  // [27] Body size at pivot bar
+  const pvBar = Math.max(0, i - ML_PVR);
+  feat[26] = (DATA[pvBar].h - DATA[pvBar].c) / a0;
+  feat[27] = Math.abs((DATA[pvBar].o || DATA[pvBar].c) - DATA[pvBar].c) / a0;
+
+  // [28] ATR regime
+  let atrSum = 0, atrN = 0;
+  for (let j = Math.max(1, i - 51); j < i - 1; j++) {
+    if (atr[j] > 0) { atrSum += atr[j]; atrN++; }
+  }
+  feat[28] = atrN > 0 ? a0 / (atrSum / atrN) : 1;
+
+  // [29] Consecutive bullish closes before confirmation (/ 10, capped) — overbought streak
+  let streak = 0;
+  for (let j = i - 1; j > Math.max(1, i - 11) && DATA[j].c > DATA[j - 1].c; j--) streak++;
+  feat[29] = streak / 10;
+
+  // [30] Price position in 20-bar high-low channel (0=bottom, 1=top) — high = near top
+  let lo = Infinity, hi = -Infinity;
+  for (let j = Math.max(0, i - 20); j < i; j++) {
+    if (DATA[j].l < lo) lo = DATA[j].l;
+    if (DATA[j].h > hi) hi = DATA[j].h;
+  }
+  feat[30] = hi > lo ? (c0 - lo) / (hi - lo) : 0.5;
+
+  // [31] 20-bar linear regression slope / ATR (positive = uptrend, overbought)
+  {
+    const N = Math.min(20, i);
+    let sx = 0, sy = 0, sxy = 0, sx2 = 0;
+    for (let j = 0; j < N; j++) {
+      const c = DATA[i - N + j].c;
+      sx += j; sy += c; sxy += j * c; sx2 += j * j;
+    }
+    const denom = N * sx2 - sx * sx;
+    feat[31] = denom > 0 ? (N * sxy - sx * sy) / denom / a0 : 0;
+  }
+
+  // [32] Bollinger Band width (4σ / close)
+  {
+    const N = Math.min(20, i);
+    let s = 0, s2 = 0;
+    for (let j = i - N; j < i; j++) { s += DATA[j].c; s2 += DATA[j].c * DATA[j].c; }
+    const bMean = s / N;
+    const bStd  = Math.sqrt(Math.max(0, s2 / N - bMean * bMean));
+    feat[32] = c0 > 0 ? 4 * bStd / c0 : 0;
+  }
+
+  return feat;
+}
+
 // ── Signal scoring and scanning ────────────────────────────────
 
 function mlModelLoaded() { return typeof mlScore === 'function'; }
+function mlModelHighLoaded() { return typeof mlScoreHigh === 'function'; }
 
 // Scan last nBars for pivot-low signals, return array sorted by score desc
 function mlScanSignals(nBars) {
@@ -9208,6 +9333,59 @@ function mlScanSignals(nBars) {
   }
 
   return results.sort((a, b) => b.score - a.score);
+}
+
+// Scan last nBars for pivot-high signals, return array sorted by score desc
+function mlScanHighSignals(nBars) {
+  if (!mlModelHighLoaded() || !DATA || DATA.length < 50) return [];
+  _mlEnsureCache();
+
+  const n = DATA.length;
+  const start = Math.max(ML_PVL + ML_PVR, n - nBars);
+  const results = [];
+
+  for (let i = start + ML_PVR; i < n - 1; i++) {
+    const idx = i - ML_PVR;
+    if (idx < ML_PVL) continue;
+
+    // Check if idx is a pivot high
+    const v = DATA[idx].h;
+    let ok = true;
+    for (let j = idx - ML_PVL; j < idx; j++)        { if (DATA[j].h > v) { ok = false; break; } }
+    if (ok) for (let j = idx + 1; j <= idx + ML_PVR; j++) { if (j < n && DATA[j].h >= v) { ok = false; break; } }
+    if (!ok) continue;
+
+    const feat = mlComputeFeaturesHigh(i);
+    if (!feat) continue;
+
+    let score;
+    try { score = mlScoreHigh(feat); } catch(e) { continue; }
+    if (typeof score !== 'number' || isNaN(score)) continue;
+
+    results.push({ bar: i, time: DATA[i].t, close: DATA[i].c, score });
+  }
+
+  return results.sort((a, b) => b.score - a.score);
+}
+
+// ── Precompute scores array for full DATA (used in backtest filter) ──────────
+// Returns Float64Array(DATA.length) for lows or highs model
+function mlPrecomputeScores(useHigh) {
+  if (!DATA) return null;
+  const fn = useHigh ? mlComputeFeaturesHigh : mlComputeFeatures;
+  const scoreFn = useHigh ? (typeof mlScoreHigh === 'function' ? mlScoreHigh : null)
+                          : (typeof mlScore === 'function' ? mlScore : null);
+  if (!scoreFn) return null;
+  _mlEnsureCache();
+  const n = DATA.length;
+  const scores = new Float64Array(n);
+  for (let i = 0; i < n; i++) {
+    const feat = fn(i);
+    if (!feat) { scores[i] = 0; continue; }
+    try { const s = scoreFn(feat); scores[i] = (typeof s === 'number' && !isNaN(s)) ? s : 0; }
+    catch(e) { scores[i] = 0; }
+  }
+  return scores;
 }
 
 // ml_train_browser.js — In-browser Gradient Boosted Trees training
@@ -9427,6 +9605,204 @@ function mlScore(features){
   for(const t of _mGBT.trees)s+=_mGBT.lr*_mPN(t,x);
   return 1/(1+Math.exp(-Math.max(-50,Math.min(50,s))));
 }`;
+}
+
+// ── Dataset builder for pivot-HIGH (tops / short signals) ─────────────────
+// Labeling: 3 methods, combinable via AND/OR
+// Method 1 (pct):    price fell >= fallPct within labelBars
+// Method 2 (atr):    price fell >= fallAtr × ATR within labelBars
+// Method 3 (struct): next pivot-low < previous pivot-low (structural break)
+
+function _mltBuildDatasetHigh(opts) {
+  const {
+    nBars, labelBars, pvL, pvR,
+    useMethodPct    = true,  fallPct    = 0.02,  // 2% fall
+    useMethodAtr    = false, fallAtr    = 2.0,   // 2 ATR fall
+    useMethodStruct = false,
+    combineMode     = 'or',                      // 'and' | 'or'
+  } = opts;
+
+  if (!useMethodPct && !useMethodAtr && !useMethodStruct)
+    throw new Error('Выберите хотя бы один метод разметки');
+
+  const n = DATA.length;
+  const startBar = Math.max(pvL + pvR + 52, n - nBars);
+  _mlEnsureCache();
+  const { atr } = _mlCache;
+
+  const X = [], y = [];
+
+  for (let i = startBar + pvR; i < n - labelBars; i++) {
+    const idx = i - pvR;
+    if (idx < pvL) continue;
+
+    // Pivot HIGH at idx
+    const v = DATA[idx].h;
+    let ok = true;
+    for (let j = idx - pvL; j < idx; j++)        { if (DATA[j].h > v)  { ok = false; break; } }
+    if (ok) for (let j = idx + 1; j <= idx + pvR; j++) { if (j < n && DATA[j].h >= v) { ok = false; break; } }
+    if (!ok) continue;
+
+    const feat = mlComputeFeaturesHigh(i);
+    if (!feat) continue;
+
+    const entry = DATA[i].c;
+    const a0    = atr[i - 1] || 0;
+    const methodLabels = [];
+
+    // Method 1: % fall
+    if (useMethodPct) {
+      const target = entry * (1 - fallPct);
+      let hit = false;
+      for (let k = 1; k <= labelBars && i + k < n; k++) {
+        if (DATA[i + k].c <= target) { hit = true; break; }
+      }
+      methodLabels.push(hit ? 1 : 0);
+    }
+
+    // Method 2: ATR fall
+    if (useMethodAtr) {
+      const target = a0 > 0 ? entry - fallAtr * a0 : entry * (1 - 0.02);
+      let hit = false;
+      for (let k = 1; k <= labelBars && i + k < n; k++) {
+        if (DATA[i + k].c <= target) { hit = true; break; }
+      }
+      methodLabels.push(hit ? 1 : 0);
+    }
+
+    // Method 3: structural break (next pivot-low < previous pivot-low)
+    if (useMethodStruct) {
+      let prevPivLo = null;
+      for (let pi = idx - pvL - pvR - 1; pi >= Math.max(0, idx - 60); pi--) {
+        const vl = DATA[pi].l;
+        let isLow = true;
+        for (let j = pi - pvL; j < pi;      j++) { if (j < 0 || DATA[j].l < vl) { isLow = false; break; } }
+        if (isLow) for (let j = pi + 1; j <= pi + pvR && j < n; j++) { if (DATA[j].l <= vl) { isLow = false; break; } }
+        if (isLow) { prevPivLo = vl; break; }
+      }
+      let nextPivLo = null;
+      const end = Math.min(n - pvR - 1, i + labelBars);
+      for (let ni = i + pvR; ni < end; ni++) {
+        const vl = DATA[ni].l;
+        let isLow = true;
+        for (let j = ni - pvL; j < ni;      j++) { if (j < 0 || DATA[j].l < vl) { isLow = false; break; } }
+        if (isLow) for (let j = ni + 1; j <= ni + pvR && j < n; j++) { if (DATA[j].l <= vl) { isLow = false; break; } }
+        if (isLow) { nextPivLo = vl; break; }
+      }
+      methodLabels.push((prevPivLo !== null && nextPivLo !== null && nextPivLo < prevPivLo) ? 1 : 0);
+    }
+
+    const label = combineMode === 'and'
+      ? (methodLabels.every(l => l === 1) ? 1 : 0)
+      : (methodLabels.some(l  => l === 1) ? 1 : 0);
+
+    X.push(Array.from(feat));
+    y.push(label);
+  }
+
+  return { X, y, n: X.length, nPos: y.reduce((a, b) => a + b, 0) };
+}
+
+// ── Serialize model for HIGHS → mlScoreHigh() ─────────────────
+function _mltSerializeHigh(trees, intercept, lr, meta) {
+  function compact(node) {
+    if (node.v !== undefined) return { v: +node.v.toFixed(6) };
+    return { f: node.f, t: +node.t.toFixed(6), l: compact(node.l), r: compact(node.r) };
+  }
+  const data = JSON.stringify({
+    b: +intercept.toFixed(6), lr, feat: ML_FEAT_N,
+    trees: trees.map(compact),
+  });
+
+  return `// AUTO-GENERATED by USE Optimizer — TOPS model (pivot-highs / short signals)
+// Баров: ${meta.bars}  Сигналов: ${meta.n}  Положит(вершина): ${meta.nPos} (${(100*meta.nPos/meta.n).toFixed(1)}%)
+// AUC: ${meta.auc.toFixed(4)}  Train: ${meta.trainN}  Test: ${meta.testN}
+// Методы разметки: ${meta.methods}  Комбинация: ${meta.combineMode}
+const _mGBTH=${data};
+function _mPNH(nd,x){if(nd.v!==undefined)return nd.v;return x[nd.f]<=nd.t?_mPNH(nd.l,x):_mPNH(nd.r,x);}
+function mlScoreHigh(features){
+  if(_mGBTH.feat&&features.length!==_mGBTH.feat)return 0.5;
+  const x=Array.from(features);let s=_mGBTH.b;
+  for(const t of _mGBTH.trees)s+=_mGBTH.lr*_mPNH(t,x);
+  return 1/(1+Math.exp(-Math.max(-50,Math.min(50,s))));
+}`;
+}
+
+// ── Main training function for HIGHS ──────────────────────────
+async function mlTrainHighInBrowser(params, onProgress) {
+  const {
+    nTrees      = 100,
+    maxDepth    = 5,
+    lr          = 0.08,
+    subsample   = 0.8,
+    labelBars   = 20,
+    nBars       = DATA.length,
+    minLeaf     = 3,
+    nFeatSub    = 6,
+    pvL         = ML_PVL,
+    pvR         = ML_PVR,
+    useMethodPct    = true,  fallPct    = 0.02,
+    useMethodAtr    = false, fallAtr    = 2.0,
+    useMethodStruct = false,
+    combineMode     = 'or',
+  } = params;
+
+  if (onProgress) onProgress(0, 0, nTrees, 'dataset');
+  await new Promise(r => setTimeout(r, 0));
+
+  const ds = _mltBuildDatasetHigh({
+    nBars, labelBars, pvL, pvR,
+    useMethodPct, fallPct, useMethodAtr, fallAtr, useMethodStruct, combineMode,
+  });
+  if (ds.n < 50)
+    throw new Error(`Слишком мало вершин: ${ds.n}. Нужно ≥50. Загрузите больше данных.`);
+
+  const splitAt = Math.floor(ds.n * 0.7);
+  let trainIdx = Array.from({ length: splitAt }, (_, i) => i);
+  const testIdx = Array.from({ length: ds.n - splitAt }, (_, i) => splitAt + i);
+  if (trainIdx.length > _MLT_MAX_TRAIN)
+    trainIdx = trainIdx.slice(trainIdx.length - _MLT_MAX_TRAIN);
+
+  const { X, y } = ds;
+  const sigmoid = v => 1 / (1 + Math.exp(-Math.max(-50, Math.min(50, v))));
+  const p0 = Math.max(0.01, Math.min(0.99, ds.nPos / ds.n));
+  const intercept = Math.log(p0 / (1 - p0));
+  const F = new Float64Array(ds.n).fill(intercept);
+  const trees = [];
+
+  for (let t = 0; t < nTrees; t++) {
+    const residuals = new Float64Array(ds.n);
+    for (let i = 0; i < ds.n; i++) residuals[i] = y[i] - sigmoid(F[i]);
+    const bagN = Math.floor(trainIdx.length * subsample);
+    const bag = trainIdx.slice().sort(() => Math.random() - 0.5).slice(0, bagN);
+    const tree = _mltFitNode(X, bag, residuals, 0, maxDepth, minLeaf, nFeatSub);
+    trees.push(tree);
+    for (let i = 0; i < ds.n; i++) F[i] += lr * _mltPredNode(tree, X[i]);
+    if (onProgress) onProgress((t + 1) / nTrees, t + 1, nTrees, 'training');
+    if ((t + 1) % 5 === 0) await new Promise(r => setTimeout(r, 0));
+  }
+
+  const testScores = testIdx.map(i => sigmoid(F[i]));
+  const testLabels = testIdx.map(i => y[i]);
+  const auc = _mltAUC(testScores, testLabels);
+  if (onProgress) onProgress(1, nTrees, nTrees, 'done');
+
+  const methods = [
+    useMethodPct    && `%падение${(fallPct*100).toFixed(1)}%`,
+    useMethodAtr    && `ATR×${fallAtr}`,
+    useMethodStruct && 'структ.разрыв',
+  ].filter(Boolean).join('+');
+
+  return {
+    code: _mltSerializeHigh(trees, intercept, lr, {
+      auc, n: ds.n, nPos: ds.nPos,
+      trainN: trainIdx.length, testN: testIdx.length,
+      bars: DATA.length, methods, combineMode,
+    }),
+    auc, n: ds.n, nPos: ds.nPos,
+    trainN: trainIdx.length, testN: testIdx.length,
+    bars: DATA.length,
+  };
 }
 
 </script>
@@ -12757,7 +13133,8 @@ function parseCSV(text) {
   const vi = hdr.findIndex(h => h.toLowerCase() === 'volume' || h.toLowerCase().includes('vol'));
   HAS_VOLUME = vi >= 0;
   DATA = [];
-  if (typeof _mlScoresArrCache !== 'undefined') _mlScoresArrCache = { arr: null, len: -1 }; // ##ML_FILTER
+  if (typeof _mlScoresArrCache     !== 'undefined') _mlScoresArrCache     = { arr: null, len: -1 }; // ##ML_FILTER
+  if (typeof _mlHighScoresArrCache !== 'undefined') _mlHighScoresArrCache = { arr: null, len: -1 }; // ##ML_FILTER_HIGH
   for (let i = 1; i < lines.length; i++) {
     const c = lines[i].split(',');
     if (c.length > Math.max(oi,hi,li,ci)) {
@@ -12775,7 +13152,8 @@ function applyMaxBars() {
   const n = parseInt($('c_maxbars')?.value) || 0;
   const total = _rawDATA.length;
   DATA = (n > 0 && n < total) ? _rawDATA.slice(total - n) : _rawDATA;
-  if (typeof _mlScoresArrCache !== 'undefined') _mlScoresArrCache = { arr: null, len: -1 }; // ##ML_FILTER
+  if (typeof _mlScoresArrCache     !== 'undefined') _mlScoresArrCache     = { arr: null, len: -1 }; // ##ML_FILTER
+  if (typeof _mlHighScoresArrCache !== 'undefined') _mlHighScoresArrCache = { arr: null, len: -1 }; // ##ML_FILTER_HIGH
   // Сохраняем мастер-копию для ресэмплинга в multi-TF режиме
   window.DATA_1M = DATA.slice();
   const used = DATA.length;
@@ -14976,9 +15354,14 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
 
       // --- C. Исполнение входа ---
       if (doDir !== 0 && ac > 0) {
-        // ML-фильтр: блокировать вход если ML-оценка ниже порога
-        if (cfg.mlScoresArr && cfg.mlScoresArr[i] >= 0 &&
+        // ML-фильтр лонгов: блокировать лонг-вход если ML-оценка ниже порога ##ML_FILTER
+        if (doDir === 1 && cfg.mlScoresArr && cfg.mlScoresArr[i] >= 0 &&
             cfg.mlScoresArr[i] < (cfg.mlThreshold || 0.5)) {
+          doDir = 0;
+        }
+        // ML-фильтр шортов: блокировать шорт-вход если оценка вершины ниже порога ##ML_FILTER_HIGH
+        if (doDir === -1 && cfg.mlHighScoresArr && cfg.mlHighScoresArr[i] >= 0 &&
+            cfg.mlHighScoresArr[i] < (cfg.mlHighThreshold || 0.5)) {
           doDir = 0;
         }
       }
@@ -16142,8 +16525,10 @@ async function runOpt() {
   const erThresh      = $n('f_ert') || 0.3;
   const useKalmanMA   = $c('f_kalman');      // ##KALMAN_MA##
   const kalmanLen     = $n('f_kalmanl') || 20; // ##KALMAN_MA##
-  const useMLFilter   = $c('c_ml_filter') && typeof mlScore === 'function'; // ##ML_FILTER##
-  const mlThreshold   = $n('c_ml_thresh') || 0.55; // ##ML_FILTER##
+  const useMLFilter     = $c('c_ml_filter')      && typeof mlScore     === 'function'; // ##ML_FILTER##
+  const mlThreshold     = $n('c_ml_thresh')      || 0.55; // ##ML_FILTER##
+  const useMLHighFilter = $c('c_ml_high_filter') && typeof mlScoreHigh === 'function'; // ##ML_FILTER_HIGH##
+  const mlHighThreshold = $n('c_ml_high_thresh') || 0.55; // ##ML_FILTER_HIGH##
   // Precompute ML scores once on full DATA — IS/OOS срезы используют те же индексы ##ML_FILTER
   const _precompMlScores = useMLFilter
     ? (() => {
@@ -16151,6 +16536,17 @@ async function runOpt() {
         for (let i = 52; i < N; i++) {
           const f = mlComputeFeatures(i);
           if (f) try { arr[i] = mlScore(f); } catch(e) { arr[i] = 0.5; }
+        }
+        return arr;
+      })()
+    : null;
+  // Precompute ML HIGH scores for short-side filter ##ML_FILTER_HIGH
+  const _precompMlHighScores = useMLHighFilter
+    ? (() => {
+        const arr = new Float32Array(N).fill(-1);
+        for (let i = 52; i < N; i++) {
+          const f = mlComputeFeaturesHigh(i);
+          if (f) try { arr[i] = mlScoreHigh(f); } catch(e) { arr[i] = 0.5; }
         }
         return arr;
       })()
@@ -17055,6 +17451,7 @@ async function runOpt() {
         useER:_fCombo.useER??useER,erArr,erPeriod:erPeriod||10,erThresh,
         useKalmanMA:_fCombo.useKalmanMA??useKalmanMA,kalmanArr,kalmanLen, // ##KALMAN_MA##
         useMLFilter,mlThreshold,mlScoresArr:_precompMlScores, // ##ML_FILTER## горячий цикл IS
+        useMLHighFilter,mlHighThreshold,mlHighScoresArr:_precompMlHighScores, // ##ML_FILTER_HIGH##
         start:Math.max(
           (_effUseMa&&maP>0?(maP||0)*(htfRatio||1)*(_mType==='EMA'||_mType==='DEMA'||_mType==='TEMA'?3:1):0),
           (_effUseConfirm&&confN>0?(confN||0)*(_confHtf||1)*(_confType==='EMA'||_confType==='DEMA'||_confType==='TEMA'?3:1):0),
@@ -17125,6 +17522,7 @@ async function runOpt() {
               useMacdFilter:_fCombo.useMacdFilter??useMacdFilter,
               useER:_fCombo.useER??useER,erPeriod:erPeriod||10,erThresh,
               useMLFilter,mlThreshold,mlScoresArr:_precompMlScores, // ##ML_FILTER##
+              useMLHighFilter,mlHighThreshold,mlHighScoresArr:_precompMlHighScores, // ##ML_FILTER_HIGH##
               atrPeriod:atrP,commission:commTotal,baseComm:comm,spreadVal:spread*2,
               revSkip,revCooldown,revSrc,markToMarket:_mkm};
           results.push({name,pnl:r.pnl,wr:r.wr,n:r.n,dd:r.dd,pdd,avg:r.avg,sig,gt,
@@ -17409,6 +17807,7 @@ async function runOpt() {
         useER:_fCombo.useER??useER,erArr,erPeriod:erPeriod||10,erThresh,
         useKalmanMA:_fCombo.useKalmanMA??useKalmanMA,kalmanArr,kalmanLen, // ##KALMAN_MA##
         useMLFilter,mlThreshold,mlScoresArr:_precompMlScores, // ##ML_FILTER## горячий цикл IS
+        useMLHighFilter,mlHighThreshold,mlHighScoresArr:_precompMlHighScores, // ##ML_FILTER_HIGH##
         start:Math.max(
           (_effUseMa&&maP>0?(maP||0)*(htfRatio||1)*(_mType==='EMA'||_mType==='DEMA'||_mType==='TEMA'?3:1):0),
           (_effUseConfirm&&confN>0?(confN||0)*(_confHtf||1)*(_confType==='EMA'||_confType==='DEMA'||_confType==='TEMA'?3:1):0),
@@ -17514,6 +17913,7 @@ async function runOpt() {
               useMacdFilter:_fCombo.useMacdFilter??useMacdFilter,
               useER:_fCombo.useER??useER,erPeriod:erPeriod||10,erThresh,
               useMLFilter,mlThreshold,mlScoresArr:_precompMlScores, // ##ML_FILTER##
+              useMLHighFilter,mlHighThreshold,mlHighScoresArr:_precompMlHighScores, // ##ML_FILTER_HIGH##
               atrPeriod:atrP,commission:commTotal,baseComm:comm,spreadVal:spread*2,markToMarket:_mkm};
           // OOS и тяжёлые метрики НЕ вызываем здесь — это горячий цикл
           // CVR/UPI/Sortino/kRatio вычислятся батчем после завершения TPE
@@ -18049,7 +18449,9 @@ async function runOpt() {
                                       useFat,fatConsec,fatVolDrop,
                                       useKalmanMA,kalmanArr,kalmanLen, // ##KALMAN_MA##
                                       useMacdFilter,useER,erArr:erArrEx,erPeriod:erPArr[0]||10,erThresh,
-                                      useMLFilter,mlThreshold,mlScoresArr:_precompMlScores, // ##ML_FILTER## горячий цикл IS
+                                      useMLFilter,mlThreshold,mlScoresArr:_precompMlScores, // ##ML_FILTER##
+              useMLHighFilter,mlHighThreshold,mlHighScoresArr:_precompMlHighScores, // ##ML_FILTER_HIGH## горячий цикл IS
+        useMLHighFilter,mlHighThreshold,mlHighScoresArr:_precompMlHighScores, // ##ML_FILTER_HIGH##
                                       bodyAvg:bodyAvgArr,
                                       start:Math.max(
                                         (useMa&&maP>0?(maP||0)*(htfRatio||1)*(mType==='EMA'||mType==='DEMA'||mType==='TEMA'?3:1):0),
@@ -18148,6 +18550,7 @@ async function runOpt() {
                                           useKalmanMA, kalmanLen, // ##KALMAN_MA##
                                           useMacdFilter, useER, erPeriod:erPArr[0]||10, erThresh,
                                           useMLFilter, mlThreshold, mlScoresArr:_precompMlScores, // ##ML_FILTER##
+                                          useMLHighFilter, mlHighThreshold, mlHighScoresArr:_precompMlHighScores, // ##ML_FILTER_HIGH##
                                           atrPeriod:atrP, commission:commTotal, baseComm:comm, spreadVal:spread*2,
                                           markToMarket:_mkm
                                         };
@@ -18666,6 +19069,18 @@ function _calcIndicators(cfg) {
           return arr;
         })()
       : null,
+    mlHighScoresArr: cfg.useMLHighFilter && typeof mlComputeFeaturesHigh === 'function' && typeof mlScoreHigh === 'function' // ##ML_FILTER_HIGH
+      ? (() => {
+          if (_mlHighScoresArrCache.arr && N <= _mlHighScoresArrCache.len) return _mlHighScoresArrCache.arr;
+          const arr = new Float32Array(N).fill(-1);
+          for (let i = 52; i < N; i++) {
+            const f = mlComputeFeaturesHigh(i);
+            if (f) try { arr[i] = mlScoreHigh(f); } catch(e) { arr[i] = 0.5; }
+          }
+          _mlHighScoresArrCache = { arr, len: N };
+          return arr;
+        })()
+      : null,
   };
 }
 
@@ -18893,9 +19308,12 @@ function buildBtCfg(cfg, ind) {
     kalmanCrossArr: ind.kalmanCrossArr,
     kalmanCrossLen: cfg.kalmanCrossLen || 20,
 
-    useMLFilter:  cfg.useMLFilter  || false, // ##ML_FILTER##
-    mlThreshold:  cfg.mlThreshold  || 0.55,
-    mlScoresArr:  ind.mlScoresArr  || null,  // HC/robustness используют кеш; _attachOOS передаёт useMLFilter:false
+    useMLFilter:      cfg.useMLFilter      || false, // ##ML_FILTER##
+    mlThreshold:      cfg.mlThreshold      || 0.55,
+    mlScoresArr:      ind.mlScoresArr      || null,  // HC/robustness используют кеш; _attachOOS передаёт useMLFilter:false
+    useMLHighFilter:  cfg.useMLHighFilter  || false, // ##ML_FILTER_HIGH##
+    mlHighThreshold:  cfg.mlHighThreshold  || 0.55,
+    mlHighScoresArr:  ind.mlHighScoresArr  || null,
 
     start: Math.max(
       (cfg.useMA      ? (maP || 0)       * (cfg.htfRatio     || 1) * (cfg.maType==='EMA'||cfg.maType==='DEMA'||cfg.maType==='TEMA'?3:1) : 0),
@@ -22816,7 +23234,8 @@ let _massRobRunning = false;
 // ##ML_FILTER## — кеш mlScoresArr: вычисляется один раз для полных данных,
 // переиспользуется для IS/OOS срезов (индексы баров совпадают).
 // Инвалидируется при смене модели (ui.js) и при загрузке новых данных.
-let _mlScoresArrCache = { arr: null, len: -1 };
+let _mlScoresArrCache     = { arr: null, len: -1 };
+let _mlHighScoresArrCache = { arr: null, len: -1 }; // ##ML_FILTER_HIGH
 
 async function runMassRobust() {
   if (!DATA) { alert('Нет данных'); return; }
@@ -26602,7 +27021,8 @@ function _mlActivateCode(code) {
     window.mlScore = scoreFn;
     if (typeof mlResetCache === 'function') mlResetCache();
     // Инвалидируем кеш ML-скоров при смене модели (opt.js)
-    if (typeof _mlScoresArrCache !== 'undefined') _mlScoresArrCache = { arr: null, len: -1 };
+    if (typeof _mlScoresArrCache     !== 'undefined') _mlScoresArrCache     = { arr: null, len: -1 };
+    if (typeof _mlHighScoresArrCache !== 'undefined') _mlHighScoresArrCache = { arr: null, len: -1 };
     return true;
   } catch(e) {
     console.error('[ML activate]', e);
@@ -26660,6 +27080,8 @@ async function openMLModal(tab) {
   const activeId = _mlActiveId;
   const hasBuiltin = typeof mlScore === 'function';
 
+  const hasBuiltinHigh = typeof mlScoreHigh === 'function';
+
   const tabBtn = (id, label) =>
     `<button onclick="openMLModal('${id}')" style="background:${tab===id?'rgba(139,92,246,.2)':'none'};border:1px solid ${tab===id?'rgba(139,92,246,.6)':'#444'};color:var(--fg,#cdd6f4);border-radius:4px;padding:4px 14px;cursor:pointer;font-size:.82em">${label}</button>`;
 
@@ -26668,11 +27090,13 @@ async function openMLModal(tab) {
       <span style="font-weight:600">🤖 ML-модели</span>
       <button onclick="document.getElementById('ml-modal').remove()" style="background:none;border:none;color:var(--fg,#cdd6f4);cursor:pointer;font-size:1.2em">✕</button>
     </div>
-    <div style="display:flex;gap:6px;margin-bottom:14px">
-      ${tabBtn('models','Модели')} ${tabBtn('scan','Скан')}
+    <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap">
+      ${tabBtn('models','📉 Доньи')} ${tabBtn('tops','📈 Вершины')} ${tabBtn('scan','🔍 Скан')}
     </div>
     <div id="ml-modal-content">
-      ${tab === 'models' ? _mlModelsTab(models, activeId, hasBuiltin) : _mlScanTab()}
+      ${tab === 'models' ? _mlModelsTab(models, activeId, hasBuiltin)
+        : tab === 'tops' ? _mlTopsTab(hasBuiltinHigh)
+        : _mlScanTab()}
     </div>`;
 }
 
@@ -26793,58 +27217,239 @@ function _mlModelsTab(models, activeId, hasBuiltin) {
     </div>`;
 }
 
+function _mlTopsTab(hasBuiltinHigh) {
+  return `
+    <div style="font-size:.82em;color:#888;margin-bottom:10px">
+      Модель вершин: <span style="color:#a78bfa">${hasBuiltinHigh ? '✅ загружена' : '—'}</span>
+      ${!hasBuiltinHigh ? ' <span style="color:#f9e2af">Обучите модель ниже для коротких сигналов</span>' : ''}
+    </div>
+    <div style="font-size:.75em;color:#555;margin-bottom:12px;line-height:1.6">
+      Обучает отдельную модель для <b>обнаружения вершин</b> (сигнал на шорт).<br>
+      Использует зеркальные признаки: верхний хвост свечи, перекупленность RSI,
+      цена выше EMA, бычья серия баров, наклон тренда вверх.<br>
+      После обучения функция <code>mlScoreHigh()</code> используется для фильтрации шорт-входов.
+    </div>
+
+    <div style="font-size:.8em;font-weight:600;color:#a78bfa;margin-bottom:8px">▶ Методы разметки (что считать «хорошей вершиной»)</div>
+    <div style="background:var(--bg3,#313244);border-radius:6px;padding:10px 12px;margin-bottom:10px;display:flex;flex-direction:column;gap:8px">
+
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:.82em">
+        <input type="checkbox" id="ml-high-m1" checked onchange="_mlTopsUpdateUI()">
+        <span style="color:#cdd6f4">Метод 1: % падение</span>
+        <span style="color:#555;margin-left:auto">цена упала на</span>
+        <input id="ml-high-pct" type="number" value="2.0" min="0.1" max="30" step="0.1"
+          style="width:55px;padding:2px 5px;background:var(--bg2,#1e1e2e);border:1px solid #555;border-radius:3px;color:var(--fg,#cdd6f4);font-size:.9em">
+        <span style="color:#555">% в течение</span>
+        <input id="ml-high-bars" type="number" value="20" min="5" max="200"
+          style="width:48px;padding:2px 5px;background:var(--bg2,#1e1e2e);border:1px solid #555;border-radius:3px;color:var(--fg,#cdd6f4);font-size:.9em">
+        <span style="color:#555">баров</span>
+      </label>
+
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:.82em">
+        <input type="checkbox" id="ml-high-m2" onchange="_mlTopsUpdateUI()">
+        <span style="color:#cdd6f4">Метод 2: ATR-падение</span>
+        <span style="color:#555;margin-left:auto">упала на</span>
+        <input id="ml-high-atr" type="number" value="2.0" min="0.1" max="20" step="0.1"
+          style="width:55px;padding:2px 5px;background:var(--bg2,#1e1e2e);border:1px solid #555;border-radius:3px;color:var(--fg,#cdd6f4);font-size:.9em">
+        <span style="color:#555">× ATR</span>
+      </label>
+
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:.82em">
+        <input type="checkbox" id="ml-high-m3" onchange="_mlTopsUpdateUI()">
+        <span style="color:#cdd6f4">Метод 3: структурный разрыв</span>
+        <span style="color:#888;font-size:.9em">следующий пивот-лоу ниже предыдущего</span>
+      </label>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;font-size:.82em">
+      <span style="color:#888">Комбинация методов:</span>
+      <label style="display:flex;align-items:center;gap:4px;cursor:pointer;color:#cdd6f4">
+        <input type="radio" name="ml-high-combine" value="or" checked> ИЛИ (OR) — хотя бы один
+      </label>
+      <label style="display:flex;align-items:center;gap:4px;cursor:pointer;color:#cdd6f4">
+        <input type="radio" name="ml-high-combine" value="and"> И (AND) — все сразу
+      </label>
+    </div>
+
+    <div style="font-size:.8em;font-weight:600;color:#a78bfa;margin-bottom:8px">▶ Параметры обучения</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+      <label style="font-size:.78em;color:#888;display:flex;flex-direction:column;gap:3px">Название
+        <input id="ml-high-name" type="text" placeholder="TOPS BTC 1H"
+          style="padding:4px 7px;background:var(--bg3,#313244);border:1px solid #555;border-radius:4px;color:var(--fg,#cdd6f4);font-size:1em">
+      </label>
+      <label style="font-size:.78em;color:#888;display:flex;flex-direction:column;gap:3px">Деревьев
+        <input id="ml-high-ntrees" type="number" value="100" min="20" max="400"
+          style="padding:4px 7px;background:var(--bg3,#313244);border:1px solid #555;border-radius:4px;color:var(--fg,#cdd6f4);font-size:1em">
+      </label>
+      <label style="font-size:.78em;color:#888;display:flex;flex-direction:column;gap:3px">Глубина дерева
+        <input id="ml-high-depth" type="number" value="5" min="2" max="8"
+          style="padding:4px 7px;background:var(--bg3,#313244);border:1px solid #555;border-radius:4px;color:var(--fg,#cdd6f4);font-size:1em">
+      </label>
+      <label style="font-size:.78em;color:#888;display:flex;flex-direction:column;gap:3px">Баров обучения
+        <input id="ml-high-trainbars" type="number" value="" placeholder="все"
+          style="padding:4px 7px;background:var(--bg3,#313244);border:1px solid #555;border-radius:4px;color:var(--fg,#cdd6f4);font-size:1em">
+      </label>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:10px">
+      <button onclick="_mlStartTrainingHigh()"
+        style="padding:5px 18px;background:rgba(139,92,246,.25);border:1px solid rgba(139,92,246,.6);border-radius:4px;color:#a78bfa;cursor:pointer;font-size:.82em;font-weight:600">
+        ⚡ Обучить модель вершин
+      </button>
+      <div id="ml-high-status" style="font-size:.78em;color:#888"></div>
+    </div>
+    <div id="ml-high-bar-wrap" style="margin-top:8px;display:none">
+      <div style="background:#333;border-radius:4px;height:6px;overflow:hidden">
+        <div id="ml-high-bar" style="background:#7c3aed;height:100%;width:0%;transition:width .1s"></div>
+      </div>
+    </div>
+
+    <div style="margin-top:14px;font-size:.72em;color:#555;line-height:1.5">
+      Модель сохраняется в памяти браузера как <code>mlScoreHigh()</code>.<br>
+      Чтобы использовать: в настройках стратегии включите <b>ML-фильтр шортов</b> (шорт-сторона требует mlScoreHigh ≥ порога).
+    </div>`;
+}
+
+function _mlTopsUpdateUI() { /* placeholder — layout static */ }
+
+async function _mlStartTrainingHigh() {
+  if (typeof mlTrainHighInBrowser !== 'function') {
+    toast('⚠️ Модуль обучения не загружен', 2500); return;
+  }
+  if (!DATA || DATA.length < 100) {
+    toast('⚠️ Нет данных. Загрузите CSV.', 2500); return;
+  }
+  const nameEl = document.getElementById('ml-high-name');
+  const name = nameEl?.value.trim();
+  if (!name) { toast('Введите название модели', 2000); nameEl?.focus(); return; }
+
+  const useMethodPct    = document.getElementById('ml-high-m1')?.checked ?? true;
+  const useMethodAtr    = document.getElementById('ml-high-m2')?.checked ?? false;
+  const useMethodStruct = document.getElementById('ml-high-m3')?.checked ?? false;
+  if (!useMethodPct && !useMethodAtr && !useMethodStruct) {
+    toast('⚠️ Выберите хотя бы один метод разметки', 2500); return;
+  }
+
+  const fallPct  = (parseFloat(document.getElementById('ml-high-pct')?.value)   || 2.0) / 100;
+  const fallAtr  = parseFloat(document.getElementById('ml-high-atr')?.value)    || 2.0;
+  const labelBars = parseInt(document.getElementById('ml-high-bars')?.value)    || 20;
+  const nTrees   = parseInt(document.getElementById('ml-high-ntrees')?.value)   || 100;
+  const depth    = parseInt(document.getElementById('ml-high-depth')?.value)    || 5;
+  const nBars    = parseInt(document.getElementById('ml-high-trainbars')?.value)|| DATA.length;
+  const combineMode = document.querySelector('input[name="ml-high-combine"]:checked')?.value || 'or';
+
+  const statusEl = document.getElementById('ml-high-status');
+  const barWrap  = document.getElementById('ml-high-bar-wrap');
+  const barEl    = document.getElementById('ml-high-bar');
+  const btn      = document.querySelector('[onclick="_mlStartTrainingHigh()"]');
+
+  if (btn)     btn.disabled = true;
+  if (barWrap) barWrap.style.display = 'block';
+  if (statusEl) statusEl.textContent = 'Строим датасет вершин...';
+
+  try {
+    const result = await mlTrainHighInBrowser(
+      { nTrees, maxDepth: depth, nBars, labelBars,
+        useMethodPct, fallPct, useMethodAtr, fallAtr, useMethodStruct, combineMode },
+      (frac, done, total, phase) => {
+        if (barEl)    barEl.style.width = (frac * 100).toFixed(1) + '%';
+        if (statusEl) statusEl.textContent =
+          phase === 'dataset'  ? 'Строим датасет вершин...' :
+          phase === 'training' ? `Обучение: дерево ${done}/${total}` : 'Готово';
+      }
+    );
+
+    // Activate mlScoreHigh in current page context
+    try {
+      const fn = new Function(result.code + '\nreturn mlScoreHigh;');
+      window.mlScoreHigh = fn();
+    } catch(e) {
+      console.warn('[mlTops] activate error', e);
+    }
+
+    // Save to DB with type marker
+    const id = 'mlh_' + Date.now();
+    await _MLModelDB.save({
+      id, name: '📈 ' + name, code: result.code,
+      auc: result.auc, bars: result.bars, signals: result.n,
+      date: new Date().toLocaleDateString('ru-RU', { day:'2-digit', month:'2-digit', year:'2-digit' }),
+    });
+
+    const posPct = (100 * result.nPos / result.n).toFixed(0);
+    const aucColor = result.auc >= 0.62 ? '✅' : result.auc >= 0.55 ? '⚠️' : '❌';
+    toast(`${aucColor} Вершины «${name}» AUC=${result.auc.toFixed(3)} · сигналов=${result.n} · вершин=${posPct}%`, 4000);
+    mlResetCache();
+    await openMLModal('tops');
+
+  } catch(e) {
+    if (statusEl) statusEl.textContent = '⚠️ ' + e.message;
+    if (btn) btn.disabled = false;
+    console.error('[mlTrainHigh]', e);
+  }
+}
+
 function _mlScanTab() {
-  const active = typeof mlScore === 'function';
-  // Check feature mismatch: test model with a dummy 33-feature vector
+  const activeLow  = typeof mlScore     === 'function';
+  const activeHigh = typeof mlScoreHigh === 'function';
+  // Check feature mismatch for lows model
   let featWarn = '';
-  if (active && typeof ML_FEAT_N !== 'undefined') {
+  if (activeLow && typeof ML_FEAT_N !== 'undefined') {
     try {
       const dummy = new Float64Array(ML_FEAT_N);
       const r = mlScore(dummy);
       if (r === 0.5 && ML_FEAT_N !== 21) featWarn = `
         <div style="margin-top:6px;padding:5px 8px;background:rgba(249,226,175,.08);border:1px solid rgba(249,226,175,.3);border-radius:4px;font-size:.78em;color:#f9e2af">
-          ⚠️ Активная модель обучена на старых признаках. Перейдите в «Модели» и нажмите <b>⚡ Обучить</b> заново.
+          ⚠️ Модель доньев обучена на старых признаках. Перейдите в «📉 Доньи» → ⚡ Обучить заново.
         </div>`;
     } catch(e) {}
   }
   return `
-    <div style="font-size:.82em;color:#888;margin-bottom:10px">
-      Активная модель: <span style="color:#a78bfa">${_mlActiveName||'Встроенная'}</span>
-      ${active ? '' : ' <span style="color:#f38ba8">— не загружена. Перейдите в «Модели» → ⚡ Обучить</span>'}
-      ${featWarn}
+    <div style="font-size:.82em;color:#888;margin-bottom:10px;display:flex;flex-wrap:wrap;gap:12px">
+      <span>📉 Доньи: <span style="color:${activeLow?'#a78bfa':'#f38ba8'}">${activeLow?(_mlActiveName||'Встроенная'):'не загружена'}</span></span>
+      <span>📈 Вершины: <span style="color:${activeHigh?'#a78bfa':'#555'}">${activeHigh?'загружена':'—'}</span></span>
     </div>
+    ${featWarn}
     <div style="font-size:.75em;color:#555;margin-bottom:12px;line-height:1.5">
-      Сканирует pivot-low сигналы и оценивает каждый по 33 признакам:<br>
-      цена · объём · RSI · расст. от EMA20/50 · структура свечи · режим волатильности · тренд
+      Сканирует pivot-low/high сигналы и оценивает каждый по 33 признакам.
     </div>
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap">
       <label style="font-size:.82em;color:#aaa">Последних баров:</label>
       <input id="ml-scan-bars" type="number" value="500" min="50" max="50000"
         style="width:80px;padding:4px 6px;background:var(--bg3,#313244);border:1px solid #555;border-radius:4px;color:var(--fg,#cdd6f4);font-size:.82em">
-      <button onclick="_mlRunScan()"
-        style="padding:5px 16px;background:rgba(139,92,246,.2);border:1px solid rgba(139,92,246,.5);border-radius:4px;color:#a78bfa;cursor:pointer;font-size:.82em">
-        ▶ Сканировать
+      <button onclick="_mlRunScan('low')"
+        style="padding:5px 14px;background:rgba(139,92,246,.2);border:1px solid rgba(139,92,246,.5);border-radius:4px;color:#a78bfa;cursor:pointer;font-size:.82em">
+        📉 Доньи
+      </button>
+      <button onclick="_mlRunScan('high')"
+        style="padding:5px 14px;background:rgba(139,92,246,.2);border:1px solid rgba(249,226,175,.4);border-radius:4px;color:#f9e2af;cursor:pointer;font-size:.82em">
+        📈 Вершины
       </button>
     </div>
-    <div id="ml-scan-results" style="font-size:.82em;color:#666">Нажмите «Сканировать»</div>`;
+    <div id="ml-scan-results" style="font-size:.82em;color:#666">Нажмите кнопку для сканирования</div>`;
 }
 
-function _mlRunScan() {
-  if (typeof mlScore !== 'function') {
-    document.getElementById('ml-scan-results').innerHTML =
-      '<span style="color:#f38ba8">⚠️ Модель не загружена. Перейдите на вкладку «Модели» и активируйте</span>';
+function _mlRunScan(type) {
+  type = type || 'low';
+  const isHigh = type === 'high';
+  const res = document.getElementById('ml-scan-results');
+
+  if (isHigh && typeof mlScoreHigh !== 'function') {
+    res.innerHTML = '<span style="color:#f38ba8">⚠️ Модель вершин не загружена. Перейдите на вкладку «📈 Вершины» → ⚡ Обучить</span>';
+    return;
+  }
+  if (!isHigh && typeof mlScore !== 'function') {
+    res.innerHTML = '<span style="color:#f38ba8">⚠️ Модель доньев не загружена. Перейдите на вкладку «📉 Доньи» → ⚡ Обучить</span>';
     return;
   }
   if (!DATA || DATA.length < 50) {
-    document.getElementById('ml-scan-results').innerHTML = '<span style="color:#f38ba8">⚠️ Нет данных</span>';
+    res.innerHTML = '<span style="color:#f38ba8">⚠️ Нет данных</span>';
     return;
   }
   const nBars = parseInt(document.getElementById('ml-scan-bars')?.value) || 500;
-  const res = document.getElementById('ml-scan-results');
   res.innerHTML = '<span style="color:#888">Сканирование...</span>';
 
   setTimeout(() => {
-    const results = mlScanSignals(nBars);
+    const results = isHigh ? mlScanHighSignals(nBars) : mlScanSignals(nBars);
     if (!results.length) { res.innerHTML = '<span style="color:#888">Сигналов не найдено</span>'; return; }
 
     const fmt = ts => {
@@ -26863,8 +27468,12 @@ function _mlRunScan() {
       </tr>`;
     }).join('');
 
+    const label = isHigh ? 'вершин (📈 шорт-сигналов)' : 'доньев (📉 лонг-сигналов)';
+    const hint  = isHigh
+      ? '≥65% высокая вероятность значимого падения · <50% слабый сигнал'
+      : '≥65% высокая · 50–65% средняя · <50% низкая вероятность прибыльного входа';
     res.innerHTML = `
-      <div style="color:#666;margin-bottom:8px">Найдено: ${results.length} сигналов · топ-50 по ML-оценке</div>
+      <div style="color:#666;margin-bottom:8px">Найдено: ${results.length} ${label} · топ-50 по ML-оценке</div>
       <table style="width:100%;border-collapse:collapse">
         <thead><tr style="color:#555;border-bottom:1px solid #333">
           <th style="padding:3px 8px;text-align:left">#</th>
@@ -26874,7 +27483,7 @@ function _mlRunScan() {
         </tr></thead>
         <tbody>${rows}</tbody>
       </table>
-      <div style="color:#555;margin-top:8px">≥65% высокая · 50–65% средняя · &lt;50% низкая вероятность прибыльного входа</div>`;
+      <div style="color:#555;margin-top:8px">${hint}</div>`;
   }, 20);
 }
 
@@ -28133,7 +28742,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774788778469;
+window._BUILD_TS = 1774789428819;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;

@@ -176,9 +176,127 @@ function mlComputeFeatures(barIdx) {
   return feat;
 }
 
+// ── Feature vector for pivot-HIGHS (33 features, mirrors mlComputeFeatures) ──
+// barIdx = confirmation bar index (pivot high was at barIdx - ML_PVR)
+// Returns Float64Array(33) or null if insufficient data
+
+function mlComputeFeaturesHigh(barIdx) {
+  if (!DATA || barIdx < 52 || barIdx >= DATA.length) return null;
+  _mlEnsureCache();
+  const { atr, ema20, ema50, rsi, hasVol } = _mlCache;
+
+  const i  = barIdx;
+  const c0 = DATA[i - 1].c;
+  const a0 = atr[i - 1];
+  if (a0 <= 0 || c0 <= 0) return null;
+
+  const feat = new Float64Array(ML_FEAT_N);
+
+  // [0-18] Normalized log-returns (same as lows model)
+  const WINDOW = 20;
+  let rSum = 0, rSum2 = 0;
+  const lr = new Float64Array(WINDOW - 1);
+  for (let k = 0; k < WINDOW - 1; k++) {
+    const bi = i - WINDOW + k;
+    const ca = DATA[bi].c, cb = DATA[bi + 1].c;
+    lr[k] = (ca > 0 && cb > 0) ? Math.log(cb / ca) : 0;
+    rSum += lr[k]; rSum2 += lr[k] * lr[k];
+  }
+  const lrMean = rSum / 19;
+  const lrStd  = Math.sqrt(rSum2 / 19 - lrMean * lrMean) + 1e-8;
+  for (let k = 0; k < 19; k++) feat[k] = (lr[k] - lrMean) / lrStd;
+
+  // [19] ATR normalised
+  feat[19] = a0 / c0;
+
+  // [20] Efficiency Ratio over 10 bars
+  const ER_P = 10;
+  if (i > ER_P) {
+    const net = Math.abs(DATA[i - 1].c - DATA[i - 1 - ER_P].c);
+    let path = 0;
+    for (let j = i - ER_P; j < i; j++) path += Math.abs(DATA[j].c - DATA[j - 1].c);
+    feat[20] = path > 0 ? net / path : 0;
+  }
+
+  // [21] Volume ratio / [22] Volume z-score
+  if (hasVol) {
+    let vSum = 0, vSum2 = 0, vN = 0;
+    for (let j = Math.max(0, i - 21); j < i - 1; j++) {
+      const v = DATA[j].v || 0;
+      vSum += v; vSum2 += v * v; vN++;
+    }
+    const vMean = vN > 0 ? vSum / vN : 1;
+    const vStd  = vN > 1 ? Math.sqrt(Math.max(0, vSum2 / vN - vMean * vMean)) + 1e-8 : 1;
+    const vNow  = DATA[i - 1].v || 0;
+    feat[21] = vMean > 0 ? vNow / vMean : 1;
+    feat[22] = (vNow - vMean) / vStd;
+  } else {
+    feat[21] = 1; feat[22] = 0;
+  }
+
+  // [23] RSI(14) / 100
+  feat[23] = rsi[i - 1] / 100;
+
+  // [24] Distance ABOVE EMA20 in ATR units (positive = price > EMA, overbought)
+  // [25] Distance above EMA50
+  feat[24] = (c0 - ema20[i - 1]) / a0;
+  feat[25] = (c0 - ema50[i - 1]) / a0;
+
+  // [26] Upper wick at pivot bar (rejection candle strength for highs)
+  // [27] Body size at pivot bar
+  const pvBar = Math.max(0, i - ML_PVR);
+  feat[26] = (DATA[pvBar].h - DATA[pvBar].c) / a0;
+  feat[27] = Math.abs((DATA[pvBar].o || DATA[pvBar].c) - DATA[pvBar].c) / a0;
+
+  // [28] ATR regime
+  let atrSum = 0, atrN = 0;
+  for (let j = Math.max(1, i - 51); j < i - 1; j++) {
+    if (atr[j] > 0) { atrSum += atr[j]; atrN++; }
+  }
+  feat[28] = atrN > 0 ? a0 / (atrSum / atrN) : 1;
+
+  // [29] Consecutive bullish closes before confirmation (/ 10, capped) — overbought streak
+  let streak = 0;
+  for (let j = i - 1; j > Math.max(1, i - 11) && DATA[j].c > DATA[j - 1].c; j--) streak++;
+  feat[29] = streak / 10;
+
+  // [30] Price position in 20-bar high-low channel (0=bottom, 1=top) — high = near top
+  let lo = Infinity, hi = -Infinity;
+  for (let j = Math.max(0, i - 20); j < i; j++) {
+    if (DATA[j].l < lo) lo = DATA[j].l;
+    if (DATA[j].h > hi) hi = DATA[j].h;
+  }
+  feat[30] = hi > lo ? (c0 - lo) / (hi - lo) : 0.5;
+
+  // [31] 20-bar linear regression slope / ATR (positive = uptrend, overbought)
+  {
+    const N = Math.min(20, i);
+    let sx = 0, sy = 0, sxy = 0, sx2 = 0;
+    for (let j = 0; j < N; j++) {
+      const c = DATA[i - N + j].c;
+      sx += j; sy += c; sxy += j * c; sx2 += j * j;
+    }
+    const denom = N * sx2 - sx * sx;
+    feat[31] = denom > 0 ? (N * sxy - sx * sy) / denom / a0 : 0;
+  }
+
+  // [32] Bollinger Band width (4σ / close)
+  {
+    const N = Math.min(20, i);
+    let s = 0, s2 = 0;
+    for (let j = i - N; j < i; j++) { s += DATA[j].c; s2 += DATA[j].c * DATA[j].c; }
+    const bMean = s / N;
+    const bStd  = Math.sqrt(Math.max(0, s2 / N - bMean * bMean));
+    feat[32] = c0 > 0 ? 4 * bStd / c0 : 0;
+  }
+
+  return feat;
+}
+
 // ── Signal scoring and scanning ────────────────────────────────
 
 function mlModelLoaded() { return typeof mlScore === 'function'; }
+function mlModelHighLoaded() { return typeof mlScoreHigh === 'function'; }
 
 // Scan last nBars for pivot-low signals, return array sorted by score desc
 function mlScanSignals(nBars) {
@@ -211,4 +329,57 @@ function mlScanSignals(nBars) {
   }
 
   return results.sort((a, b) => b.score - a.score);
+}
+
+// Scan last nBars for pivot-high signals, return array sorted by score desc
+function mlScanHighSignals(nBars) {
+  if (!mlModelHighLoaded() || !DATA || DATA.length < 50) return [];
+  _mlEnsureCache();
+
+  const n = DATA.length;
+  const start = Math.max(ML_PVL + ML_PVR, n - nBars);
+  const results = [];
+
+  for (let i = start + ML_PVR; i < n - 1; i++) {
+    const idx = i - ML_PVR;
+    if (idx < ML_PVL) continue;
+
+    // Check if idx is a pivot high
+    const v = DATA[idx].h;
+    let ok = true;
+    for (let j = idx - ML_PVL; j < idx; j++)        { if (DATA[j].h > v) { ok = false; break; } }
+    if (ok) for (let j = idx + 1; j <= idx + ML_PVR; j++) { if (j < n && DATA[j].h >= v) { ok = false; break; } }
+    if (!ok) continue;
+
+    const feat = mlComputeFeaturesHigh(i);
+    if (!feat) continue;
+
+    let score;
+    try { score = mlScoreHigh(feat); } catch(e) { continue; }
+    if (typeof score !== 'number' || isNaN(score)) continue;
+
+    results.push({ bar: i, time: DATA[i].t, close: DATA[i].c, score });
+  }
+
+  return results.sort((a, b) => b.score - a.score);
+}
+
+// ── Precompute scores array for full DATA (used in backtest filter) ──────────
+// Returns Float64Array(DATA.length) for lows or highs model
+function mlPrecomputeScores(useHigh) {
+  if (!DATA) return null;
+  const fn = useHigh ? mlComputeFeaturesHigh : mlComputeFeatures;
+  const scoreFn = useHigh ? (typeof mlScoreHigh === 'function' ? mlScoreHigh : null)
+                          : (typeof mlScore === 'function' ? mlScore : null);
+  if (!scoreFn) return null;
+  _mlEnsureCache();
+  const n = DATA.length;
+  const scores = new Float64Array(n);
+  for (let i = 0; i < n; i++) {
+    const feat = fn(i);
+    if (!feat) { scores[i] = 0; continue; }
+    try { const s = scoreFn(feat); scores[i] = (typeof s === 'number' && !isNaN(s)) ? s : 0; }
+    catch(e) { scores[i] = 0; }
+  }
+  return scores;
 }
