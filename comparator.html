@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Market Structure Comparator</title>
+<style>
+:root {
+  --bg:#1e1e2e;--bg2:#181825;--bg3:#313244;--bg4:#45475a;
+  --fg:#cdd6f4;--fg2:#a6adc8;--border:#45475a;
+  --green:#a6e3a1;--red:#f38ba8;--yellow:#f9e2af;
+  --blue:#89b4fa;--purple:#cba6f7;--accent:#89dceb;
+  --teal:#94e2d5;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--fg);font-family:'Segoe UI',system-ui,sans-serif;font-size:13px;padding:18px;max-width:1100px;margin:0 auto}
+a{color:var(--blue);text-decoration:none}a:hover{text-decoration:underline}
+h1{font-size:1em;color:var(--purple);margin-bottom:2px}
+.subtitle{font-size:.75em;color:var(--fg2);margin-bottom:16px}
+h2{font-size:.85em;color:var(--blue);margin:18px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--border)}
+h3{font-size:.78em;color:var(--fg2);margin:8px 0 5px}
+
+/* Upload */
+.upload-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:12px 0}
+.upload-zone{border:2px dashed var(--border);border-radius:8px;padding:18px 14px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s;position:relative}
+.upload-zone:hover{border-color:var(--purple);background:rgba(203,166,247,.04)}
+.upload-zone.drag{border-color:var(--purple);background:rgba(203,166,247,.08)}
+.upload-zone.loaded{border-color:var(--green);border-style:solid;background:rgba(166,227,161,.04)}
+.upload-zone input[type=file]{display:none}
+.upload-icon{font-size:1.5em;margin-bottom:6px}
+.upload-title{font-size:.82em;color:var(--fg);font-weight:600;margin-bottom:2px}
+.upload-hint{font-size:.7em;color:var(--fg2)}
+.upload-status{font-size:.72em;margin-top:6px;color:var(--green)}
+.period-label{display:inline-block;padding:1px 8px;border-radius:10px;font-size:.7em;font-weight:700;margin-bottom:6px}
+.period-a{background:rgba(137,180,250,.15);color:var(--blue);border:1px solid rgba(137,180,250,.3)}
+.period-b{background:rgba(203,166,247,.15);color:var(--purple);border:1px solid rgba(203,166,247,.3)}
+
+/* Buttons */
+.btn{padding:6px 18px;background:rgba(139,92,246,.2);border:1px solid rgba(139,92,246,.5);border-radius:4px;color:var(--purple);cursor:pointer;font-size:.82em;font-weight:600;transition:background .15s}
+.btn:hover{background:rgba(139,92,246,.35)}
+.btn:disabled{opacity:.4;cursor:default}
+.btn-row{display:flex;gap:10px;align-items:center;margin:10px 0}
+
+/* Results */
+#results{display:none;margin-top:20px}
+
+/* Regime cards */
+.regime-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:8px 0 16px}
+.regime-card{background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:12px 14px}
+.regime-card.a{border-top:2px solid var(--blue)}
+.regime-card.b{border-top:2px solid var(--purple)}
+.regime-name{font-size:.78em;font-weight:700;margin-bottom:6px}
+.regime-desc{font-size:.75em;color:var(--fg2);line-height:1.6}
+.tag{display:inline-block;padding:1px 6px;border-radius:3px;font-size:.68em;font-weight:700;margin:1px 2px}
+.tag-trend{background:rgba(137,180,250,.18);color:var(--blue)}
+.tag-mr{background:rgba(203,166,247,.18);color:var(--purple)}
+.tag-random{background:rgba(166,173,200,.12);color:var(--fg2)}
+.tag-vol-hi{background:rgba(243,139,168,.18);color:var(--red)}
+.tag-vol-lo{background:rgba(166,227,161,.18);color:var(--green)}
+.tag-bull{background:rgba(166,227,161,.12);color:var(--green)}
+.tag-bear{background:rgba(243,139,168,.12);color:var(--red)}
+.tag-neutral{background:rgba(166,173,200,.1);color:var(--fg2)}
+
+/* Metrics table */
+.metrics-section{margin:0 0 20px}
+.cat-header td{background:var(--bg3)!important;color:var(--fg2);font-size:.7em;font-weight:700;padding:4px 8px;letter-spacing:.04em;text-transform:uppercase}
+table.mt{width:100%;border-collapse:collapse;font-size:.78em}
+table.mt th{padding:5px 8px;text-align:left;color:var(--fg2);font-size:.72em;border-bottom:1px solid var(--border);background:var(--bg2);white-space:nowrap}
+table.mt th.r{text-align:right}
+table.mt td{padding:4px 8px;border-bottom:1px solid rgba(69,71,90,.35);vertical-align:middle}
+table.mt td.r{text-align:right}
+table.mt td.label{color:var(--fg);max-width:180px}
+table.mt td.desc{color:var(--fg2);font-size:.7em;max-width:220px}
+table.mt tr:hover td{background:rgba(49,50,68,.6)}
+
+.val-a{color:var(--blue)}
+.val-b{color:var(--purple)}
+.chg{font-size:.72em;padding:1px 5px;border-radius:3px}
+.chg-up{color:var(--green);background:rgba(166,227,161,.1)}
+.chg-dn{color:var(--red);background:rgba(243,139,168,.1)}
+.chg-no{color:var(--fg2)}
+
+/* Stability badge */
+.stab{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:10px;font-size:.71em;font-weight:700;white-space:nowrap}
+.stab-hi{background:rgba(166,227,161,.14);color:var(--green);border:1px solid rgba(166,227,161,.28)}
+.stab-md{background:rgba(249,226,175,.12);color:var(--yellow);border:1px solid rgba(249,226,175,.28)}
+.stab-lo{background:rgba(243,139,168,.12);color:var(--red);border:1px solid rgba(243,139,168,.28)}
+
+/* Mini bar */
+.mini-bar-row{display:flex;align-items:center;gap:4px;min-width:90px}
+.mini-bar{height:6px;border-radius:2px;min-width:2px;transition:width .3s}
+
+/* Recommendation boxes */
+.rec-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:8px 0}
+.rec-box{background:var(--bg2);border-radius:6px;padding:12px 14px}
+.rec-box.good{border-left:3px solid var(--green)}
+.rec-box.warn{border-left:3px solid var(--red)}
+.rec-box h3{margin-bottom:8px}
+.rec-item{font-size:.75em;padding:3px 0;color:var(--fg2);display:flex;gap:6px;align-items:flex-start}
+.rec-item strong{color:var(--fg)}
+.rec-icon{flex-shrink:0;margin-top:1px}
+
+/* Signal grid */
+.sig-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:8px 0}
+.sig-card{background:var(--bg2);border:1px solid var(--border);border-radius:5px;padding:8px 10px}
+.sig-card .sc-label{font-size:.68em;color:var(--fg2);margin-bottom:4px}
+.sig-card .sc-vals{display:flex;gap:10px;flex-wrap:wrap}
+.sc-val{font-size:.8em}
+.sc-val .p{font-size:.65em;color:var(--fg2)}
+
+/* Verdict */
+.verdict{background:var(--bg3);border-radius:8px;padding:14px 16px;margin:12px 0;font-size:.8em;line-height:1.7}
+.verdict strong{color:var(--accent)}
+
+/* Misc */
+.dimmed{color:var(--fg2)}
+.err{color:var(--red);font-size:.78em;padding:6px 0}
+@media(max-width:680px){
+  .upload-grid,.regime-grid,.rec-grid,.sig-grid{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<h1>📊 Market Structure Comparator</h1>
+<p class="subtitle">Загрузи два CSV-периода из TradingView и узнай что стабильно, а что изменилось</p>
+<p style="font-size:.72em;color:var(--fg2);margin-bottom:12px">
+  Формат CSV: <code style="color:var(--accent)">time, open, high, low, close, Volume, MA, Equity %, Zero, XL, XS, EL, ES</code>
+  — экспорт из Pine Script индикатора
+</p>
+
+<div class="upload-grid">
+  <label class="upload-zone" id="zone-a" ondragover="dragOver(event,'a')" ondragleave="dragLeave('a')" ondrop="dropFile(event,'a')">
+    <div class="period-label period-a">Период A</div>
+    <div class="upload-icon">📂</div>
+    <div class="upload-title">Старый период</div>
+    <div class="upload-hint">CSV или перетащи файл</div>
+    <div class="upload-status" id="status-a"></div>
+    <input type="file" id="file-a" accept=".csv,.txt" onchange="loadFile('a',this)">
+  </label>
+  <label class="upload-zone" id="zone-b" ondragover="dragOver(event,'b')" ondragleave="dragLeave('b')" ondrop="dropFile(event,'b')">
+    <div class="period-label period-b">Период B</div>
+    <div class="upload-icon">📂</div>
+    <div class="upload-title">Новый период</div>
+    <div class="upload-hint">CSV или перетащи файл</div>
+    <div class="upload-status" id="status-b"></div>
+    <input type="file" id="file-b" accept=".csv,.txt" onchange="loadFile('b',this)">
+  </label>
+</div>
+
+<div class="btn-row">
+  <button class="btn" id="btn-analyze" onclick="runAnalysis()" disabled>▶ Анализировать</button>
+  <span id="analyze-status" style="font-size:.75em;color:var(--fg2)"></span>
+</div>
+
+<div id="results">
+  <div id="regime-section"></div>
+  <div id="metrics-section"></div>
+  <div id="signals-section"></div>
+  <div id="recommendations-section"></div>
+</div>
+
+<script>
+'use strict';
+// ═══════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════
+const _csvData = { a: null, b: null };
+
+// ═══════════════════════════════════════════════════════════════
+// FILE LOADING
+// ═══════════════════════════════════════════════════════════════
+function dragOver(e, period) {
+  e.preventDefault();
+  document.getElementById('zone-' + period).classList.add('drag');
+}
+function dragLeave(period) {
+  document.getElementById('zone-' + period).classList.remove('drag');
+}
+function dropFile(e, period) {
+  e.preventDefault();
+  dragLeave(period);
+  const file = e.dataTransfer?.files?.[0];
+  if (file) readFile(period, file);
+}
+function loadFile(period, input) {
+  const file = input.files[0];
+  if (file) readFile(period, file);
+}
+function readFile(period, file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    const text = e.target.result;
+    const parsed = parseCSV(text);
+    if (!parsed || parsed.rows.length < 20) {
+      document.getElementById('status-' + period).textContent = '⚠️ Не удалось разобрать CSV';
+      return;
+    }
+    _csvData[period] = parsed;
+    const zone = document.getElementById('zone-' + period);
+    zone.classList.add('loaded');
+    zone.classList.remove('drag');
+    document.getElementById('status-' + period).textContent =
+      `✓ ${file.name} · ${parsed.rows.length} строк`;
+    if (_csvData.a && _csvData.b) {
+      document.getElementById('btn-analyze').disabled = false;
+    }
+  };
+  reader.readAsText(file);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CSV PARSER
+// ═══════════════════════════════════════════════════════════════
+function parseCSV(text) {
+  const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim().split('\n');
+  if (lines.length < 3) return null;
+
+  // Detect separator: tab or comma
+  const sep = lines[0].includes('\t') ? '\t' : ',';
+
+  // Clean header
+  const headers = lines[0].split(sep).map(h => h.trim().replace(/^"|"$/g, ''));
+
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+    const parts = splitCSVLine(line, sep);
+    if (parts.length < 4) continue;
+    const row = {};
+    headers.forEach((h, j) => {
+      row[h] = (parts[j] || '').trim().replace(/^"|"$/g, '');
+    });
+    rows.push(row);
+  }
+  return { headers, rows };
+}
+
+function splitCSVLine(line, sep) {
+  // Simple split — handles quoted fields
+  const result = [];
+  let cur = '', inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') { inQ = !inQ; continue; }
+    if (c === sep && !inQ) { result.push(cur); cur = ''; continue; }
+    cur += c;
+  }
+  result.push(cur);
+  return result;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// COLUMN MAP
+// ═══════════════════════════════════════════════════════════════
+function mapColumns(headers) {
+  const find = (...names) => {
+    for (const n of names) {
+      const h = headers.find(h => h.toLowerCase() === n.toLowerCase());
+      if (h) return h;
+    }
+    // partial match fallback
+    for (const n of names) {
+      const h = headers.find(h => h.toLowerCase().includes(n.toLowerCase()));
+      if (h) return h;
+    }
+    return null;
+  };
+  return {
+    time:   find('time','date','datetime'),
+    open:   find('open'),
+    high:   find('high'),
+    low:    find('low'),
+    close:  find('close'),
+    volume: find('Volume','volume','vol'),
+    ma:     find('MA','ma','ema','sma'),
+    equity: find('Equity %','equity','pnl','equity%'),
+    el:     find('EL','el','entry long','entrylong'),
+    es:     find('ES','es','entry short','entryshort'),
+    xl:     find('XL','xl','exit long','exitlong'),
+    xs:     find('XS','xs','exit short','exitshort'),
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MATH UTILITIES
+// ═══════════════════════════════════════════════════════════════
+
+/** Linear regression slope of ys on xs */
+function linRegSlope(xs, ys) {
+  const n = xs.length;
+  if (n < 2) return NaN;
+  let sx=0, sy=0, sxy=0, sx2=0;
+  for (let i=0; i<n; i++) { sx+=xs[i]; sy+=ys[i]; sxy+=xs[i]*ys[i]; sx2+=xs[i]*xs[i]; }
+  const d = n*sx2 - sx*sx;
+  return d !== 0 ? (n*sxy - sx*sy) / d : NaN;
+}
+
+/** Mean of array */
+function mean(arr) {
+  if (!arr.length) return NaN;
+  return arr.reduce((a,b)=>a+b,0)/arr.length;
+}
+
+/** Std dev of array */
+function std(arr) {
+  if (arr.length < 2) return NaN;
+  const m = mean(arr);
+  return Math.sqrt(arr.reduce((s,v)=>s+(v-m)**2,0)/arr.length);
+}
+
+/** Median */
+function median(arr) {
+  if (!arr.length) return NaN;
+  const s = [...arr].sort((a,b)=>a-b);
+  const m = Math.floor(s.length/2);
+  return s.length%2 ? s[m] : (s[m-1]+s[m])/2;
+}
+
+/** Mean, std, skewness, excess kurtosis */
+function moments(arr) {
+  const n = arr.length;
+  if (n < 4) return { mean:NaN, std:NaN, skew:NaN, kurt:NaN };
+  const m = mean(arr);
+  let m2=0, m3=0, m4=0;
+  for (const x of arr) { const d=x-m; m2+=d*d; m3+=d*d*d; m4+=d*d*d*d; }
+  m2/=n; m3/=n; m4/=n;
+  const s = Math.sqrt(m2);
+  return {
+    mean: m,
+    std: s,
+    skew: s>0 ? m3/s**3 : 0,
+    kurt: s>0 ? m4/s**4 - 3 : 0,
+  };
+}
+
+/** Autocorrelation at given lag */
+function acfAt(arr, lag) {
+  const n = arr.length;
+  if (n <= lag) return NaN;
+  const m = mean(arr);
+  let num=0, den=0;
+  for (let i=0; i<n-lag; i++) num += (arr[i]-m)*(arr[i+lag]-m);
+  for (const v of arr) den += (v-m)**2;
+  return den > 0 ? num/den : 0;
+}
+
+/** Kolmogorov-Smirnov distance between two samples (0=identical, 1=max) */
+function ksDist(a, b) {
+  if (!a.length || !b.length) return NaN;
+  // Sample for performance
+  const MAX = 600;
+  const sa = uniformSample([...a].sort((x,y)=>x-y), MAX);
+  const sb = uniformSample([...b].sort((x,y)=>x-y), MAX);
+  const na=sa.length, nb=sb.length;
+  let i=0, j=0, maxD=0;
+  while (i<na && j<nb) {
+    const cdfA=(i+1)/na, cdfB=(j+1)/nb;
+    maxD = Math.max(maxD, Math.abs(cdfA-cdfB));
+    if (sa[i]<=sb[j]) i++; else j++;
+  }
+  return maxD;
+}
+
+function uniformSample(sorted, n) {
+  if (sorted.length <= n) return sorted;
+  const result=[];
+  for (let i=0; i<n; i++) result.push(sorted[Math.floor(i*(sorted.length-1)/(n-1))]);
+  return result;
+}
+
+/** Hurst exponent via R/S analysis */
+function computeHurst(closes) {
+  const n = closes.length;
+  if (n < 50) return NaN;
+  const cap = Math.min(n, 2000);
+  const c = closes.slice(closes.length - cap);
+
+  const rets = [];
+  for (let i=1; i<c.length; i++) {
+    if (c[i]>0 && c[i-1]>0) rets.push(Math.log(c[i]/c[i-1]));
+  }
+  if (rets.length < 30) return NaN;
+
+  const logRS=[], logN=[];
+  for (let sz=8; sz<=rets.length/3; sz=Math.ceil(sz*1.6)) {
+    const nChunks = Math.floor(rets.length/sz);
+    if (nChunks < 2) break;
+    let rsSum=0, cnt=0;
+    for (let chunk=0; chunk<nChunks; chunk++) {
+      const seg = rets.slice(chunk*sz, (chunk+1)*sz);
+      const m = mean(seg);
+      let cum=0, mn=0, mx=0, ss=0;
+      for (const r of seg) {
+        cum += r-m; if(cum>mx) mx=cum; if(cum<mn) mn=cum;
+        ss += (r-m)**2;
+      }
+      const R = mx-mn, S = Math.sqrt(ss/sz);
+      if (S>0 && R>0) { rsSum += R/S; cnt++; }
+    }
+    if (cnt>0) { logRS.push(Math.log(rsSum/cnt)); logN.push(Math.log(sz)); }
+  }
+  if (logN.length < 3) return NaN;
+  const h = linRegSlope(logN, logRS);
+  return isFinite(h) ? Math.max(0.1, Math.min(0.9, h)) : NaN;
+}
+
+/** Stability score 0-1 from two scalar values + optional distribution arrays */
+function stabilityScore(vA, vB, minScale, distA, distB) {
+  if (isNaN(vA) || isNaN(vB)) return NaN;
+  // Relative change component
+  const scale = Math.max(Math.abs(vA), Math.abs(vB), minScale);
+  const relChg = Math.abs(vB-vA)/scale;
+  const stabChg = Math.max(0, 1 - relChg*2.5); // 40% change → 0
+  // Distribution component
+  let stabDist = 1;
+  if (distA && distB && distA.length>15 && distB.length>15) {
+    stabDist = 1 - ksDist(distA, distB);
+  }
+  const w = (distA && distB) ? 0.45 : 0;
+  return Math.max(0, Math.min(1, (1-w)*stabChg + w*stabDist));
+}
+
+/** Format number: sign + fixed decimals */
+function fmt(v, dec=3, suffix='') {
+  if (v===null||v===undefined||isNaN(v)) return '—';
+  return v.toFixed(dec) + suffix;
+}
+function fmtPct(v, dec=1) { return fmt(v, dec, '%'); }
+function fmtChg(a, b) {
+  if (isNaN(a)||isNaN(b)||a===0) return '';
+  const pct = (b-a)/Math.abs(a)*100;
+  const s = (pct>=0?'+':'')+pct.toFixed(1)+'%';
+  const cls = Math.abs(pct)<3?'chg-no':pct>0?'chg-up':'chg-dn';
+  return `<span class="chg ${cls}">${s}</span>`;
+}
+
+function stabBadge(score, labelOverride) {
+  if (isNaN(score)) return '<span class="stab stab-md">—</span>';
+  const pct = Math.round(score*100);
+  const [cls,icon] = pct>=75?['stab-hi','●']:pct>=50?['stab-md','◐']:['stab-lo','○'];
+  const label = labelOverride || (pct>=75?'Стабильно':pct>=50?'Умеренно':'Нестабильно');
+  return `<span class="stab ${cls}" title="${pct}%">${icon} ${label} ${pct}%</span>`;
+}
+
+function miniBar(score) {
+  if (isNaN(score)) return '';
+  const pct = Math.round(score*100);
+  const color = pct>=75?'var(--green)':pct>=50?'var(--yellow)':'var(--red)';
+  return `<div class="mini-bar-row"><div class="mini-bar" style="width:${pct}%;background:${color}"></div><span style="font-size:.65em;color:var(--fg2)">${pct}%</span></div>`;
+}
+
+function isSignal(v) {
+  if (v===undefined||v===null||v===''||v.toLowerCase()==='nan'||v.toLowerCase()==='na') return false;
+  const n = parseFloat(v);
+  return !isNaN(n) && n !== 0;
+}
+</script>
+</body>
+</html>
