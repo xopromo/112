@@ -446,6 +446,23 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
   background: rgba(8,11,16,0.6);
   backdrop-filter: blur(3px);
 }
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(8,11,16,0.6);
+  backdrop-filter: blur(3px);
+  z-index: 9999;
+}
+.modal-content {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 20px;
+  max-width: 900px;
+  max-height: 90vh;
+  overflow: auto;
+  box-shadow: 0 20px 60px rgba(0,0,0,.6);
+}
 #detail-panel {
   position: fixed;
   top: 0; right: 0; bottom: 0;
