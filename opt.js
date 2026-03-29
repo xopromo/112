@@ -1727,10 +1727,37 @@ async function runOpt() {
     // Only build cross-product for params with >1 value
     const _multi = _allIp.filter(([,a])=>a.length>1);
     let combos = [{}];
-    for (const [n,arr] of _multi) {
-      const next=[];
-      for (const c of combos) for (const v of arr) next.push({...c,[n]:v});
-      combos=next;
+    // Проверяем размер до построения — при большом пространстве используем подвыборку
+    const MAX_IP_COMBOS = 10000;
+    let _ipTotal = 1;
+    for (const [,a] of _multi) {
+      _ipTotal *= a.length;
+      if (_ipTotal > 1e9) { _ipTotal = Infinity; break; } // защита от переполнения
+    }
+    if (_ipTotal > MAX_IP_COMBOS) {
+      // Случайная подвыборка через декодирование индексов (аналог MC LHS)
+      const _ipNames = _multi.map(([n]) => n);
+      const _ipArrs  = _multi.map(([,a]) => a);
+      const _ipSizes = _ipArrs.map(a => a.length);
+      const sampleN  = MAX_IP_COMBOS;
+      const indices  = new Set();
+      const safeTotal = Number.isFinite(_ipTotal) ? _ipTotal : 1e15;
+      while (indices.size < sampleN) indices.add(Math.floor(Math.random() * safeTotal));
+      combos = Array.from(indices).map(idx => {
+        const obj = {}; let rem = idx;
+        for (let d = _ipSizes.length - 1; d >= 0; d--) {
+          obj[_ipNames[d]] = _ipArrs[d][rem % _ipSizes[d]]; rem = Math.floor(rem / _ipSizes[d]);
+        }
+        return obj;
+      });
+      const _ipLabel = Number.isFinite(_ipTotal) ? _ipTotal.toExponential(2) : '∞';
+      console.warn(`[_ipCombos] Пространство внутр. параметров (${_ipLabel}) → подвыборка ${sampleN}`);
+    } else {
+      for (const [n,arr] of _multi) {
+        const next=[];
+        for (const c of combos) for (const v of arr) next.push({...c,[n]:v});
+        combos=next;
+      }
     }
     window._ipCombos = combos.length ? combos : [{}];
   } catch (initErr) {
@@ -2808,6 +2835,7 @@ async function runOpt() {
     return;
   }
   // ─────────────────────────────────────────────────────────────────
+  updateETA(0, total, 0); await yieldToUI(); // показать начальное состояние (кнопку Стоп) до цикла
 
   for(const pvL of pvLs) { for(const pvR of pvRs) {
     if(_mcDone) break;
@@ -3130,8 +3158,8 @@ async function runOpt() {
                                       equities[name]=r.eq;
                                       } // end else (не дубль)
                                     } // end if(r passed filter)
-                                    // Yield: в prune режиме реже (1000 ит.), в обычном — чаще (300 ит.)
-                                    const _yieldEvery = optMode === 'prune' ? 1000 : 300;
+                                    // Yield каждые 300 итераций для отзывчивости UI (кнопка Стоп)
+                                    const _yieldEvery = 300;
                                     if(done%_yieldEvery===0||done===total) {
                                       if(optMode==='mc' && done===300) setMcPhase('⚡ Перебор…');
                                       updateETA(done, total, results.length);
