@@ -319,10 +319,12 @@ function _calcSerenity(eq) {
   let sumNeg = 0;
   for (const r of neg) sumNeg += r;
   const meanNeg = -sumNeg / neg.length;
-  neg.sort((a, b) => a - b); // ascending (worst first)
+  // ОПТИМИЗАЦИЯ: quickselect для k наихудших (most negative) вместо full sort
   const k = Math.max(1, Math.floor(neg.length * 0.05));
+  const negMutable = Array.from(neg);
+  _quickselect(negMutable, k - 1); // первые k элементов теперь ≤ negMutable[k-1]
   let cvarSum = 0;
-  for (let i = 0; i < k; i++) cvarSum += neg[i];
+  for (let i = 0; i < k; i++) cvarSum += negMutable[i]; // суммируем k наихудших
   const cvar5 = -cvarSum / k;
   const tailFactor = meanNeg > 0.001 ? Math.max(1, cvar5 / meanNeg) : 1;
   return Math.round(eq[N - 1] / (ui * tailFactor) * 10) / 10;
@@ -425,6 +427,21 @@ function _calcFilterAblation(cfg) {
 // ── HMM Regime Detector — Tier 3 ─────────────────────────────────
 // Gaussian HMM (2 состояния: bull/bear) на log-returns из DATA.
 // Baum-Welch 5 итераций → Viterbi для меток состояний.
+// O(n) quickselect для нахождения k-го элемента (медиана при k=n/2)
+// ОПТИМИЗАЦИЯ: вместо Array.from().sort() O(n log n), используем quickselect O(n)
+function _quickselect(arr, k, left = 0, right = arr.length - 1) {
+  if (left === right) return arr[left];
+  const pivotIdx = Math.floor(Math.random() * (right - left + 1)) + left;
+  let pivot = arr[pivotIdx];
+  let i = left, j = right;
+  [arr[pivotIdx], arr[right]] = [arr[right], arr[pivotIdx]];
+  for (let x = left; x < right; x++) {
+    if (arr[x] < pivot) { [arr[x], arr[i]] = [arr[i], arr[x]]; i++; }
+  }
+  [arr[i], arr[right]] = [arr[right], arr[i]];
+  return k === i ? arr[i] : k < i ? _quickselect(arr, k, left, i - 1) : _quickselect(arr, k, i + 1, right);
+}
+
 // Возвращает { bullPct, bearPct, regimes Int8Array, bullState, m0, m1, s0, s1, stayProb[] }
 // Вычисляется лениво в showDetail. Откат: удалить + ##HMM / ##REGIME_PERF в ui.js
 function _calcHMM() {
@@ -432,9 +449,9 @@ function _calcHMM() {
   const N = DATA.length, M = N - 1;
   const obs = new Float64Array(M);
   for (let i = 1; i < N; i++) obs[i - 1] = Math.log(DATA[i].c / DATA[i - 1].c);
-  // Init: split at median
-  const sorted = Array.from(obs).sort((a, b) => a - b);
-  const med = sorted[Math.floor(M / 2)];
+  // Init: split at median (ОПТИМИЗАЦИЯ: O(n) quickselect вместо O(n log n) sort)
+  const obsMutable = Array.from(obs);
+  const med = _quickselect(obsMutable, Math.floor(M / 2));
   let m0 = 0, m1 = 0, c0 = 0, c1 = 0;
   for (let i = 0; i < M; i++) { if (obs[i] <= med) { m0 += obs[i]; c0++; } else { m1 += obs[i]; c1++; } }
   m0 /= c0 || 1; m1 /= c1 || 1;
@@ -1387,14 +1404,16 @@ async function runOpt() {
     // При большом sLen — почти все пивоты в окне (как старое поведение).
     // При малом sLen — только свежие; если их < 2 — структура нейтральна,
     // фильтр не блокирует ни лонг ни шорт.
+    // ОПТИМИЗАЦИЯ: использую индекс вместо shift() для O(1) удаления
     const qHi=[], qLo=[];
-    let pHi=0, pLo=0;
+    let pHi=0, pLo=0, qHiStart=0, qLoStart=0;
     for(let i=pvL+pvR;i<N2;i++) {
       while(pHi<pvHiArr.length && pvHiArr[pHi].idx+pvR<=i) { qHi.push(pvHiArr[pHi]); pHi++; }
       while(pLo<pvLoArr.length && pvLoArr[pLo].idx+pvR<=i) { qLo.push(pvLoArr[pLo]); pLo++; }
-      while(qHi.length>0 && qHi[0].idx < i-sLen) qHi.shift();
-      while(qLo.length>0 && qLo[0].idx < i-sLen) qLo.shift();
-      if(qHi.length>=2 && qLo.length>=2) {
+      while(qHiStart<qHi.length && qHi[qHiStart].idx < i-sLen) qHiStart++;
+      while(qLoStart<qLo.length && qLo[qLoStart].idx < i-sLen) qLoStart++;
+      const qHiLen=qHi.length-qHiStart, qLoLen=qLo.length-qLoStart;
+      if(qHiLen>=2 && qLoLen>=2) {
         const hi1=qHi[qHi.length-1].v, hi2=qHi[qHi.length-2].v;
         const lo1=qLo[qLo.length-1].v, lo2=qLo[qLo.length-2].v;
         if(hi1>hi2&&lo1>lo2) bull[i]=1;
@@ -1861,13 +1880,15 @@ async function runOpt() {
 
     const _mType = $v('f_mat') || 'EMA';
     updateETA(0, mcTotal, 0); await yieldToUI(); // показать начальное состояние до цикла
+    // ОПТИМИЗАЦИЯ: переиспользуем _di вместо new Array() на каждую итерацию
+    const _diReuse = new Array(_mcDims.length);
     for (let _mi = 0; _mi < mcTotal && !stopped; _mi++) {
       try {
       // Декодируем индекс в параметры через деление с остатком
       let _idx = _mcSampled[_mi];
       const _dims = _mcDims;
       const _dsz  = _mcDimSizes;
-      const _di = new Array(_dims.length);
+      const _di = _diReuse;
       for (let d = _dims.length - 1; d >= 0; d--) {
         _di[d] = _idx % _dsz[d];
         _idx = Math.floor(_idx / _dsz[d]);
@@ -2704,16 +2725,19 @@ async function runOpt() {
       for (let oi = 0; oi < results.length; oi++) {
         const _eq = equities[results[oi].name];
         if (_eq) {
-          results[oi].eq      = _eq;
-          results[oi].cvr     = _calcCVR(_eq);
-          results[oi].upi     = _calcUlcerIdx(_eq);
-          results[oi].sortino = _calcSortino(_eq);
-          results[oi].kRatio  = _calcKRatio(_eq);
-          results[oi].omega    = _calcOmega(_eq);    // ##OMG
-          results[oi].pain     = _calcPainRatio(_eq); // ##PAIN
-          results[oi].burke    = _calcBurke(_eq);    // ##BURKE
-          results[oi].serenity = _calcSerenity(_eq); // ##SRNTY
-          results[oi].ir       = _calcInfoRatio(_eq); // ##IR
+          results[oi].eq = _eq;
+          // ОПТИМИЗАЦИЯ: переиспользуем метрики из _oos если они уже вычислены (в _attachOOS),
+          // иначе вычисляем сейчас. Избегаем двойного вычисления O(N) функций.
+          const _oosForward = results[oi].cfg._oos?.forward;
+          results[oi].cvr     = _oosForward?.cvr ?? _calcCVR(_eq);
+          results[oi].upi     = _oosForward?.upi ?? _calcUlcerIdx(_eq);
+          results[oi].sortino = _oosForward?.sortino ?? _calcSortino(_eq);
+          results[oi].kRatio  = _oosForward?.kRatio ?? _calcKRatio(_eq);
+          results[oi].omega   = _oosForward?.omega ?? _calcOmega(_eq);    // ##OMG
+          results[oi].pain    = _oosForward?.pain ?? _calcPainRatio(_eq); // ##PAIN
+          results[oi].burke   = _oosForward?.burke ?? _calcBurke(_eq);    // ##BURKE
+          results[oi].serenity= _oosForward?.serenity ?? _calcSerenity(_eq); // ##SRNTY
+          results[oi].ir      = _oosForward?.ir ?? _calcInfoRatio(_eq);   // ##IR
         }
         if (oi % 100 === 0) { await yieldToUI(); }
       }
@@ -3485,13 +3509,14 @@ function _calcIndicators(cfg) {
       if (isL) pvLoArr.push({ idx: i, v: DATA[i].l });
     }
     const qHi = [], qLo = [];
-    let pHi = 0, pLo = 0;
+    let pHi = 0, pLo = 0, qHiStart = 0, qLoStart = 0;
     for (let i = spvL + spvR; i < N; i++) {
       while (pHi < pvHiArr.length && pvHiArr[pHi].idx + spvR <= i) { qHi.push(pvHiArr[pHi]); pHi++; }
       while (pLo < pvLoArr.length && pvLoArr[pLo].idx + spvR <= i) { qLo.push(pvLoArr[pLo]); pLo++; }
-      while (qHi.length > 0 && qHi[0].idx < i - sLen) qHi.shift();
-      while (qLo.length > 0 && qLo[0].idx < i - sLen) qLo.shift();
-      if (qHi.length >= 2 && qLo.length >= 2) {
+      while (qHiStart < qHi.length && qHi[qHiStart].idx < i - sLen) qHiStart++;
+      while (qLoStart < qLo.length && qLo[qLoStart].idx < i - sLen) qLoStart++;
+      const qHiLen = qHi.length - qHiStart, qLoLen = qLo.length - qLoStart;
+      if (qHiLen >= 2 && qLoLen >= 2) {
         const hi1 = qHi[qHi.length-1].v, hi2 = qHi[qHi.length-2].v;
         const lo1 = qLo[qLo.length-1].v, lo2 = qLo[qLo.length-2].v;
         if (hi1 > hi2 && lo1 > lo2) structBull[i] = 1;
@@ -4049,7 +4074,7 @@ async function runRobustScoreFor(r, tests, _fastMode) {
       const ind   = _calcIndicators(cfg);
       const btCfg = buildBtCfg(cfg, ind);
       const _res  = backtest(ind.pvLo, ind.pvHi, ind.atrArr, btCfg);
-      _robSliceCache.set(_sk, _res);
+      _robSliceCacheSet(_sk, _res);
       return _res;
     } catch(e) { return null; }
     finally { DATA = origDATA; }
@@ -4254,8 +4279,18 @@ let _hcSourceResult = null;
 const _robCache = new Map(); // key → {score, tests, dataHash}
 // Per-slice indicator+backtest result cache (shared across multiple rob test calls for same cfg)
 // Key: cfgKey + '|' + sliceKey  Value: backtest result
+// ОПТИМИЗАЦИЯ: ограничен 500 записями (FIFO). Без лимита при HC-1000 итерациях
+// с 100k баров: 1000 × 800 КБ (eq[]) = ~800 МБ. С лимитом: max ~400 МБ.
+const _ROB_SLICE_CACHE_MAX = 500;
 const _robSliceCache = new Map();
 let _robSliceCacheDataHash = '';
+function _robSliceCacheSet(key, value) {
+  if (_robSliceCache.size >= _ROB_SLICE_CACHE_MAX) {
+    // Map.keys() итерирует в порядке вставки — удаляем самый старый
+    _robSliceCache.delete(_robSliceCache.keys().next().value);
+  }
+  _robSliceCache.set(key, value);
+}
 // ── HC_NUMERIC_PARAMS ────────────────────────────────────────────────
 // ЕДИНЫЙ ИСТОЧНИК ИСТИНЫ для всех числовых параметров HC.
 // Добавить новый параметр = добавить одну строку сюда.

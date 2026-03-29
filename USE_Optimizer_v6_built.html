@@ -754,15 +754,35 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
 #oos-chart-wrap { display:none; background:var(--bg2); border:1px solid var(--border); border-radius:6px; margin:6px 0; }
 #oos-eqc { width:100%; height:150px; display:block; border-radius:6px; cursor:crosshair; }
 
-/* Звёздочки — три уровня яркости + размер */
-[data-fav] { cursor:pointer; user-select:none; transition:color .15s, font-size .15s, text-shadow .15s; display:inline-block; line-height:1; }
-[data-fav][data-level="0"] { color:rgba(150,150,150,0.35); font-size:.72em; }
-[data-fav][data-level="1"] { color:rgba(190,190,190,0.65); font-size:.88em; }
-[data-fav][data-level="2"] { color:rgba(255,200,50,0.92);  font-size:1.05em; }
-[data-fav][data-level="3"] { color:#ffd700; text-shadow:0 0 8px rgba(255,215,0,.75); font-size:1.25em; }
-/* Кнопка удаления из избранного */
-.fav-del-btn { float:right; cursor:pointer; color:rgba(255,61,87,.38); font-size:1.1em; line-height:1; padding:0 1px 0 6px; transition:color .15s; user-select:none; }
-.fav-del-btn:hover { color:rgba(255,61,87,.9); }
+/* Звёздочки — три уровня яркости */
+[data-fav] { cursor:pointer; user-select:none; transition:color .15s, text-shadow .15s; }
+[data-fav][data-level="0"] { color:rgba(150,150,150,0.35); }
+[data-fav][data-level="1"] { color:rgba(190,190,190,0.65); }
+[data-fav][data-level="2"] { color:rgba(255,200,50,0.92); }
+[data-fav][data-level="3"] { color:#ffd700; text-shadow:0 0 8px rgba(255,215,0,.75); }
+/* OOS table header sticky positioning */
+#oos-rtbl thead {
+  position: sticky;
+  top: 0;
+  z-index: 11;
+}
+#oos-rtbl thead tr {
+  background: var(--bg3);
+}
+#oos-rtbl thead th {
+  background: var(--bg3);
+  color: var(--accent);
+  padding: 5px 7px;
+  border-bottom: 1px solid var(--border2);
+  position: relative;
+  z-index: 11;
+}
+#oos-rtbl thead tr:last-child {
+  background: var(--bg2);
+}
+#oos-rtbl thead tr:last-child td {
+  background: var(--bg2);
+}
 /* OOS tbody строки */
 #oos-rtbl td { padding:4px 7px; border-bottom:1px solid var(--border); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 #oos-rtbl tr:hover td { background:var(--bg3); }
@@ -15715,10 +15735,12 @@ function _calcSerenity(eq) {
   let sumNeg = 0;
   for (const r of neg) sumNeg += r;
   const meanNeg = -sumNeg / neg.length;
-  neg.sort((a, b) => a - b); // ascending (worst first)
+  // ОПТИМИЗАЦИЯ: quickselect для k наихудших (most negative) вместо full sort
   const k = Math.max(1, Math.floor(neg.length * 0.05));
+  const negMutable = Array.from(neg);
+  _quickselect(negMutable, k - 1); // первые k элементов теперь ≤ negMutable[k-1]
   let cvarSum = 0;
-  for (let i = 0; i < k; i++) cvarSum += neg[i];
+  for (let i = 0; i < k; i++) cvarSum += negMutable[i]; // суммируем k наихудших
   const cvar5 = -cvarSum / k;
   const tailFactor = meanNeg > 0.001 ? Math.max(1, cvar5 / meanNeg) : 1;
   return Math.round(eq[N - 1] / (ui * tailFactor) * 10) / 10;
@@ -15821,6 +15843,21 @@ function _calcFilterAblation(cfg) {
 // ── HMM Regime Detector — Tier 3 ─────────────────────────────────
 // Gaussian HMM (2 состояния: bull/bear) на log-returns из DATA.
 // Baum-Welch 5 итераций → Viterbi для меток состояний.
+// O(n) quickselect для нахождения k-го элемента (медиана при k=n/2)
+// ОПТИМИЗАЦИЯ: вместо Array.from().sort() O(n log n), используем quickselect O(n)
+function _quickselect(arr, k, left = 0, right = arr.length - 1) {
+  if (left === right) return arr[left];
+  const pivotIdx = Math.floor(Math.random() * (right - left + 1)) + left;
+  let pivot = arr[pivotIdx];
+  let i = left, j = right;
+  [arr[pivotIdx], arr[right]] = [arr[right], arr[pivotIdx]];
+  for (let x = left; x < right; x++) {
+    if (arr[x] < pivot) { [arr[x], arr[i]] = [arr[i], arr[x]]; i++; }
+  }
+  [arr[i], arr[right]] = [arr[right], arr[i]];
+  return k === i ? arr[i] : k < i ? _quickselect(arr, k, left, i - 1) : _quickselect(arr, k, i + 1, right);
+}
+
 // Возвращает { bullPct, bearPct, regimes Int8Array, bullState, m0, m1, s0, s1, stayProb[] }
 // Вычисляется лениво в showDetail. Откат: удалить + ##HMM / ##REGIME_PERF в ui.js
 function _calcHMM() {
@@ -15828,9 +15865,9 @@ function _calcHMM() {
   const N = DATA.length, M = N - 1;
   const obs = new Float64Array(M);
   for (let i = 1; i < N; i++) obs[i - 1] = Math.log(DATA[i].c / DATA[i - 1].c);
-  // Init: split at median
-  const sorted = Array.from(obs).sort((a, b) => a - b);
-  const med = sorted[Math.floor(M / 2)];
+  // Init: split at median (ОПТИМИЗАЦИЯ: O(n) quickselect вместо O(n log n) sort)
+  const obsMutable = Array.from(obs);
+  const med = _quickselect(obsMutable, Math.floor(M / 2));
   let m0 = 0, m1 = 0, c0 = 0, c1 = 0;
   for (let i = 0; i < M; i++) { if (obs[i] <= med) { m0 += obs[i]; c0++; } else { m1 += obs[i]; c1++; } }
   m0 /= c0 || 1; m1 /= c1 || 1;
@@ -16783,14 +16820,16 @@ async function runOpt() {
     // При большом sLen — почти все пивоты в окне (как старое поведение).
     // При малом sLen — только свежие; если их < 2 — структура нейтральна,
     // фильтр не блокирует ни лонг ни шорт.
+    // ОПТИМИЗАЦИЯ: использую индекс вместо shift() для O(1) удаления
     const qHi=[], qLo=[];
-    let pHi=0, pLo=0;
+    let pHi=0, pLo=0, qHiStart=0, qLoStart=0;
     for(let i=pvL+pvR;i<N2;i++) {
       while(pHi<pvHiArr.length && pvHiArr[pHi].idx+pvR<=i) { qHi.push(pvHiArr[pHi]); pHi++; }
       while(pLo<pvLoArr.length && pvLoArr[pLo].idx+pvR<=i) { qLo.push(pvLoArr[pLo]); pLo++; }
-      while(qHi.length>0 && qHi[0].idx < i-sLen) qHi.shift();
-      while(qLo.length>0 && qLo[0].idx < i-sLen) qLo.shift();
-      if(qHi.length>=2 && qLo.length>=2) {
+      while(qHiStart<qHi.length && qHi[qHiStart].idx < i-sLen) qHiStart++;
+      while(qLoStart<qLo.length && qLo[qLoStart].idx < i-sLen) qLoStart++;
+      const qHiLen=qHi.length-qHiStart, qLoLen=qLo.length-qLoStart;
+      if(qHiLen>=2 && qLoLen>=2) {
         const hi1=qHi[qHi.length-1].v, hi2=qHi[qHi.length-2].v;
         const lo1=qLo[qLo.length-1].v, lo2=qLo[qLo.length-2].v;
         if(hi1>hi2&&lo1>lo2) bull[i]=1;
@@ -17257,13 +17296,15 @@ async function runOpt() {
 
     const _mType = $v('f_mat') || 'EMA';
     updateETA(0, mcTotal, 0); await yieldToUI(); // показать начальное состояние до цикла
+    // ОПТИМИЗАЦИЯ: переиспользуем _di вместо new Array() на каждую итерацию
+    const _diReuse = new Array(_mcDims.length);
     for (let _mi = 0; _mi < mcTotal && !stopped; _mi++) {
       try {
       // Декодируем индекс в параметры через деление с остатком
       let _idx = _mcSampled[_mi];
       const _dims = _mcDims;
       const _dsz  = _mcDimSizes;
-      const _di = new Array(_dims.length);
+      const _di = _diReuse;
       for (let d = _dims.length - 1; d >= 0; d--) {
         _di[d] = _idx % _dsz[d];
         _idx = Math.floor(_idx / _dsz[d]);
@@ -18100,16 +18141,19 @@ async function runOpt() {
       for (let oi = 0; oi < results.length; oi++) {
         const _eq = equities[results[oi].name];
         if (_eq) {
-          results[oi].eq      = _eq;
-          results[oi].cvr     = _calcCVR(_eq);
-          results[oi].upi     = _calcUlcerIdx(_eq);
-          results[oi].sortino = _calcSortino(_eq);
-          results[oi].kRatio  = _calcKRatio(_eq);
-          results[oi].omega    = _calcOmega(_eq);    // ##OMG
-          results[oi].pain     = _calcPainRatio(_eq); // ##PAIN
-          results[oi].burke    = _calcBurke(_eq);    // ##BURKE
-          results[oi].serenity = _calcSerenity(_eq); // ##SRNTY
-          results[oi].ir       = _calcInfoRatio(_eq); // ##IR
+          results[oi].eq = _eq;
+          // ОПТИМИЗАЦИЯ: переиспользуем метрики из _oos если они уже вычислены (в _attachOOS),
+          // иначе вычисляем сейчас. Избегаем двойного вычисления O(N) функций.
+          const _oosForward = results[oi].cfg._oos?.forward;
+          results[oi].cvr     = _oosForward?.cvr ?? _calcCVR(_eq);
+          results[oi].upi     = _oosForward?.upi ?? _calcUlcerIdx(_eq);
+          results[oi].sortino = _oosForward?.sortino ?? _calcSortino(_eq);
+          results[oi].kRatio  = _oosForward?.kRatio ?? _calcKRatio(_eq);
+          results[oi].omega   = _oosForward?.omega ?? _calcOmega(_eq);    // ##OMG
+          results[oi].pain    = _oosForward?.pain ?? _calcPainRatio(_eq); // ##PAIN
+          results[oi].burke   = _oosForward?.burke ?? _calcBurke(_eq);    // ##BURKE
+          results[oi].serenity= _oosForward?.serenity ?? _calcSerenity(_eq); // ##SRNTY
+          results[oi].ir      = _oosForward?.ir ?? _calcInfoRatio(_eq);   // ##IR
         }
         if (oi % 100 === 0) { await yieldToUI(); }
       }
@@ -18881,13 +18925,14 @@ function _calcIndicators(cfg) {
       if (isL) pvLoArr.push({ idx: i, v: DATA[i].l });
     }
     const qHi = [], qLo = [];
-    let pHi = 0, pLo = 0;
+    let pHi = 0, pLo = 0, qHiStart = 0, qLoStart = 0;
     for (let i = spvL + spvR; i < N; i++) {
       while (pHi < pvHiArr.length && pvHiArr[pHi].idx + spvR <= i) { qHi.push(pvHiArr[pHi]); pHi++; }
       while (pLo < pvLoArr.length && pvLoArr[pLo].idx + spvR <= i) { qLo.push(pvLoArr[pLo]); pLo++; }
-      while (qHi.length > 0 && qHi[0].idx < i - sLen) qHi.shift();
-      while (qLo.length > 0 && qLo[0].idx < i - sLen) qLo.shift();
-      if (qHi.length >= 2 && qLo.length >= 2) {
+      while (qHiStart < qHi.length && qHi[qHiStart].idx < i - sLen) qHiStart++;
+      while (qLoStart < qLo.length && qLo[qLoStart].idx < i - sLen) qLoStart++;
+      const qHiLen = qHi.length - qHiStart, qLoLen = qLo.length - qLoStart;
+      if (qHiLen >= 2 && qLoLen >= 2) {
         const hi1 = qHi[qHi.length-1].v, hi2 = qHi[qHi.length-2].v;
         const lo1 = qLo[qLo.length-1].v, lo2 = qLo[qLo.length-2].v;
         if (hi1 > hi2 && lo1 > lo2) structBull[i] = 1;
@@ -19842,15 +19887,12 @@ function renderVisibleResults() {
   const end   = Math.min(start + _pageSize, total);
   const page  = _visibleResults.slice(start, end);
 
-  console.log(`[RENDER] renderVisibleResults: total=${total}, page_length=${page.length}, _tableMode=${_tableMode}, _curPage=${_curPage}, _totalPages=${_totalPages}`);
-  if (total > 0 && page.length > 0) {
-    const first = _visibleResults[0];
-    console.log('[RENDER] Первый результат:', `pnl=${first.pnl}, wr=${first.wr}, n=${first.n}, dd=${first.dd}, gt=${first.gt}`);
-  }
-
   // Строим HTML строкой — намного быстрее чем createElement в цикле
   // ── OOS-режим: рендер через applyOOSFilters (своя фильтрация) ──
   if (_tableMode === 'oos') {
+    // Скрываем основную таблицу в OOS режиме (никогда не показывать обе таблицы одновременно)
+    const stdScroll = document.querySelector('.tbl-scroll');
+    if (stdScroll) stdScroll.style.display = 'none';
     applyOOSFilters();
     return; // дальнейший рендер не нужен
   }
@@ -19967,22 +20009,10 @@ function renderVisibleResults() {
       '<td></td></tr>';
   }
 
-  // ОТЛАДКА: первые 400 символов HTML
-  const htmlPreview = html.substring(0, 400);
-  console.log('[RENDER] HTML preview:', htmlPreview.substring(0, 200) + '...');
-
   const tbody = $('tb');
-  console.log(`[RENDER] tbody element: exists=${!!tbody}, html_length=${html.length}`);
-
-  if (!tbody) {
-    console.error('[RENDER] КРИТИЧЕСКАЯ ОШИБКА: element tb не найден!');
-    return;
-  }
+  if (!tbody) return;
 
   tbody.innerHTML = html;
-  const firstTr = tbody.querySelector('tr');
-  const trs = tbody.querySelectorAll('tr');
-  console.log(`[RENDER] HTML вставлен. Всего строк: ${trs.length}, firstTr существует: ${!!firstTr}`);
 
   // Применяем настройки видимости колонок к только что созданным td
   if (typeof _applyColSettings === 'function') _applyColSettings(getColSettings());
@@ -23052,7 +23082,15 @@ function selectRow(idx) {
     return; // renderVisibleResults восстановит выделение сам
   }
 
-  // Обновляем выделение
+  // В OOS режиме не пытаемся выделить строку в основной таблице (она скрыта)
+  if (_tableMode === 'oos') {
+    const r = _visibleResults[idx];
+    if (!r) return;
+    drawEquityForResult(r);
+    return;
+  }
+
+  // Обновляем выделение в основной таблице
   const prevSel = document.querySelector('#tb tr.sel');
   if (prevSel) prevSel.classList.remove('sel');
   const tr = document.querySelector(`#tb tr[data-i="${idx}"]`);
@@ -23339,7 +23377,7 @@ async function runRobustScoreFor(r, tests, _fastMode) {
       const ind   = _calcIndicators(cfg);
       const btCfg = buildBtCfg(cfg, ind);
       const _res  = backtest(ind.pvLo, ind.pvHi, ind.atrArr, btCfg);
-      _robSliceCache.set(_sk, _res);
+      _robSliceCacheSet(_sk, _res);
       return _res;
     } catch(e) { return null; }
     finally { DATA = origDATA; }
@@ -23590,8 +23628,18 @@ let _hcSourceResult = null;
 const _robCache = new Map(); // key → {score, tests, dataHash}
 // Per-slice indicator+backtest result cache (shared across multiple rob test calls for same cfg)
 // Key: cfgKey + '|' + sliceKey  Value: backtest result
+// ОПТИМИЗАЦИЯ: ограничен 500 записями (FIFO). Без лимита при HC-1000 итерациях
+// с 100k баров: 1000 × 800 КБ (eq[]) = ~800 МБ. С лимитом: max ~400 МБ.
+const _ROB_SLICE_CACHE_MAX = 500;
 const _robSliceCache = new Map();
 let _robSliceCacheDataHash = '';
+function _robSliceCacheSet(key, value) {
+  if (_robSliceCache.size >= _ROB_SLICE_CACHE_MAX) {
+    // Map.keys() итерирует в порядке вставки — удаляем самый старый
+    _robSliceCache.delete(_robSliceCache.keys().next().value);
+  }
+  _robSliceCache.set(key, value);
+}
 // ── HC_NUMERIC_PARAMS ────────────────────────────────────────────────
 // ЕДИНЫЙ ИСТОЧНИК ИСТИНЫ для всех числовых параметров HC.
 // Добавить новый параметр = добавить одну строку сюда.
@@ -24375,11 +24423,12 @@ function _saveColSettings(settings) {
 }
 
 function _applyColSettings(settings) {
-  // Применяем показ/скрытие через CSS класс col-hidden
-  // Используем nth-child для td/th — через data-col атрибут
+  // ОПТИМИЗАЦИЯ: если все колонки видимы — пропускаем querySelectorAll (дефолт после рендера)
+  const hiddenCols = _COL_DEFS.filter(col => settings[col.id] === false);
+  if (hiddenCols.length === 0) return;
+  // Применяем показ/скрытие через CSS класс col-hidden только для изменённых колонок
   _COL_DEFS.forEach(col => {
     const visible = settings[col.id] !== false;
-    // Скрываем все элементы с этим классом
     document.querySelectorAll('.' + col.id).forEach(el => {
       el.classList.toggle('col-hidden', !visible);
     });
@@ -24772,7 +24821,7 @@ function _hcRunBacktest(cfg) {
     const ind    = _calcIndicators(cfg);
     const btCfg  = buildBtCfg(cfg, ind);
     const _hcRes = backtest(ind.pvLo, ind.pvHi, ind.atrArr, btCfg);
-    _robSliceCache.set(_hcsk, _hcRes);
+    _robSliceCacheSet(_hcsk, _hcRes);
     return _hcRes;
   } catch(e) { return null; }
 }
@@ -25303,13 +25352,10 @@ async function runHillClimbing() {
         await yieldToUI();
 
         _hcRobRunning = true; // разрешаем noise/MC работать в фазе 2
-        console.log('[HC Фаза2] robTests=', robTests, 'totalPhase2=', totalPhase2, '_hcRobRunning=', _hcRobRunning);
         for (let pi = 0; pi < totalPhase2 && _hcRunning; pi++) {
           const { nc, r } = phase1Passed[pi];
           const fakeR2 = { cfg: nc };
-          console.log('[HC Фаза2] кандидат', pi, '/', totalPhase2, 'nc=', JSON.stringify(nc).slice(0,80));
           const { score: robScore, details: robDetails2 } = await runRobustScoreForDetailed(fakeR2, robTests, true); // fastMode=true для скорости
-          console.log('[HC Фаза2] кандидат', pi, 'robScore=', robScore, 'details=', robDetails2);
           if (!_hcRunning) break;
           r._robScore = robScore; r.robDetails = robDetails2;
           const pdd = r.dd > 0 ? r.pnl / r.dd : (r.pnl > 0 ? 99 : 0);
@@ -26254,6 +26300,12 @@ let _oosSortDir = -1; // -1 = desc
 
 // ── OOS фильтрация (собственная, независимая от applyFilters) ─
 function applyOOSFilters() {
+  // УЛУЧШЕНИЕ: убедиться что основная таблица скрыта в OOS режиме
+  const stdScroll = document.querySelector('.tbl-scroll');
+  if (stdScroll) stdScroll.style.display = 'none';
+  const oosTbl = document.getElementById('oos-tbl-wrap');
+  if (oosTbl) oosTbl.style.display = '';
+
   const fname  = document.getElementById('oof_name')?.value.trim().toLowerCase() || '';
   const fopnl  = parseFloat(document.getElementById('oof_opnl')?.value);
   const fnpnl  = parseFloat(document.getElementById('oof_npnl')?.value);
@@ -28886,7 +28938,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774796832701;
+window._BUILD_TS = 1774797008653;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
