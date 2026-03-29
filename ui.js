@@ -7105,9 +7105,9 @@ function sortOOSCompare() {
   const deltaCls = v => v === null ? 'neu' : v > 0.5 ? 'up' : v < -0.5 ? 'dn' : 'neu';
   const score = r => {
     if (r.new_pnl === null) return '❓';
-    if (r.new_pnl > 0 && r.delta_pnl >= 0) return '<span class="oos-cmp-badge up">✅ стабильна</span>';
-    if (r.new_pnl > 0 && r.delta_pnl < 0)  return '<span class="oos-cmp-badge neu">⚠️ хуже, но +</span>';
-    if (r.new_pnl <= 0 && r.old_pnl > 0)   return '<span class="oos-cmp-badge dn">❌ сломалась</span>';
+    if (r.new_pnl > 0 && r.new_pnl >= r.old_pnl) return '<span class="oos-cmp-badge up">✅ стабильна</span>';
+    if (r.new_pnl > 0)                            return '<span class="oos-cmp-badge neu">⚠️ хуже, но +</span>';
+    if (r.new_pnl <= 0 && r.old_pnl > 0)          return '<span class="oos-cmp-badge dn">❌ сломалась</span>';
     return '<span class="oos-cmp-badge dn">❌ убыток</span>';
   };
 
@@ -7132,7 +7132,7 @@ function sortOOSCompare() {
 
   // Сводка
   const pos   = data.filter(r => r.new_pnl > 0).length;
-  const stable = data.filter(r => r.new_pnl > 0 && r.delta_pnl >= 0).length;
+  const stable = data.filter(r => r.new_pnl > 0 && r.new_pnl >= r.old_pnl).length;
   const broken = data.filter(r => r.new_pnl !== null && r.new_pnl <= 0 && r.old_pnl > 0).length;
   const sumEl = document.getElementById('oos-cmp-summary');
   if (sumEl) sumEl.innerHTML =
@@ -7194,7 +7194,7 @@ function _applyOOSHeaders(oosMode) {
       <th class="col-fav" style="width:26px">⭐</th>
       <th class="oos-th-hist" onclick="doOOSSort('old_pnl')" style="min-width:58px;resize:horizontal;overflow:auto" title="PnL ист (${nOld} баров)">PnL% ист ↕</th>
       <th class="oos-th-new"  onclick="doOOSSort('new_pnl')" style="min-width:58px;resize:horizontal;overflow:auto" title="PnL нов (${nNew} баров)">PnL% нов ↕</th>
-      <th class="oos-th-delta" onclick="doOOSSort('delta_pnl')" style="min-width:54px;resize:horizontal;overflow:auto">ΔPnL ↕</th>
+      <th class="oos-th-delta" onclick="doOOSSort('delta_pnl')" style="min-width:54px;resize:horizontal;overflow:auto" title="Итоговый PnL = ист + нов (суммарный результат за оба периода)">Σ PnL ↕</th>
       <th class="oos-th-hist" onclick="doOOSSort('apt_old')" style="min-width:60px;resize:horizontal;overflow:auto" title="Ср. PnL% на сделку — история">Avg/tr ист ↕</th>
       <th class="oos-th-new"  onclick="doOOSSort('apt_new')" style="min-width:60px;resize:horizontal;overflow:auto" title="Ср. PnL% на сделку — новые">Avg/tr нов ↕</th>
       <th class="oos-th-delta" onclick="doOOSSort('delta_apt')" style="min-width:56px;resize:horizontal;overflow:auto">ΔAvg/tr ↕</th>
@@ -8226,7 +8226,7 @@ async function runOOSOnNewData() {
       new_dd:    rNew ? rNew.dd  : null,
       new_pdd:   rNew && rNew.dd > 0 ? rNew.pnl / rNew.dd : null,
       new_kRatio: rNew && rNew.eq ? _calcKRatio(rNew.eq) : null,
-      delta_pnl: (rOld && rNew) ? rNew.pnl - rOld.pnl : null,
+      delta_pnl: (rOld && rNew) ? rOld.pnl + rNew.pnl : null,
       delta_wr:  (rOld && rNew) ? rNew.wr  - rOld.wr  : null,
       delta_dd:  (rOld && rNew) ? rNew.dd - rOld.dd : null,
       delta_pdd: (rOld && rOld.dd > 0 && rNew && rNew.dd > 0) ? (rNew.pnl / rNew.dd) - (rOld.pnl / rOld.dd) : null,
