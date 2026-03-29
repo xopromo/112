@@ -1619,6 +1619,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
     </div>
     <button class="tbl-mode-btn" onclick="_downloadSources()" title="Скачать исходные файлы: core.js, opt.js, ui.js, shell.html, build.py, README.md">⬇ Исходники</button>
     <button class="tbl-mode-btn" id="btn-ml-scan" onclick="openMLModal()" title="ML-модели: обучить / управлять / скан сигналов" style="border-color:rgba(139,92,246,.5);color:var(--purple)">🤖 ML</button>
+    <a class="tbl-mode-btn" href="comparator.html" target="_blank" title="Сравни два периода CSV: что стабильно, что изменилось — Hurst, пивоты, волатильность, сигналы" style="border-color:rgba(137,220,235,.4);color:var(--accent);text-decoration:none">📊 Comparator</a>
   </div>
   <div class="tbl-scroll">
     <div style="padding:3px 8px 3px;font-size:.62em;color:var(--text2);background:var(--bg2);border-bottom:1px solid var(--border);user-select:none">
@@ -24038,15 +24039,16 @@ async function runQueue() {
   if (stopBtn) stopBtn.style.display = 'inline-block';
   if (progEl)  progEl.style.display  = 'block';
 
-  const totalRepeats = tasks.reduce((s, t) => s + t.repeats, 0);
+  const totalRepeats = tasks.reduce((s, t) => s + Math.max(1, parseInt(t.repeats) || 1), 0);
   let doneRepeats = 0;
 
   try {
     for (let ti = 0; ti < tasks.length; ti++) {
       if (_queueStopFlag) break;
       const task = tasks[ti];
+      const repeats = Math.max(1, parseInt(task.repeats) || 1); // защита от undefined/0
 
-      for (let rep = 0; rep < task.repeats; rep++) {
+      for (let rep = 0; rep < repeats; rep++) {
         if (_queueStopFlag) break;
 
         _queueRestore(task.snapshot);
@@ -24056,7 +24058,7 @@ async function runQueue() {
         if (_queueStopFlag) break;
 
         if (progEl) progEl.textContent =
-          `Задача ${ti+1}/${tasks.length} · Повтор ${rep+1}/${task.repeats} · Найдено: ${(window.results||[]).length.toLocaleString()} результатов`;
+          `Задача ${ti+1}/${tasks.length} · Повтор ${rep+1}/${repeats} · Найдено: ${(window.results||[]).length.toLocaleString()} результатов`;
 
         // Запустить — results НЕ сбрасываются (window._queueMode=true).
         // runOptMultiTF читает c_tf_range из снапшота и ресэмплирует DATA.
@@ -24073,14 +24075,14 @@ async function runQueue() {
         if (!_queueStopFlag && task.snapshot?.checks?.['queue-task-autoclean']) {
           const removed = _queueApplyCutoff();
           if (progEl && removed > 0) {
-            progEl.textContent = `🗑 Удалено ${removed} слабых результатов · Задача ${ti+1}/${tasks.length} · Повтор ${rep+1}/${task.repeats}`;
+            progEl.textContent = `🗑 Удалено ${removed} слабых результатов · Задача ${ti+1}/${tasks.length} · Повтор ${rep+1}/${repeats}`;
             await yieldToUI(); // не тротлится в фоне
           }
         }
 
         // Rob-тест после оптимизации
         if (!_queueStopFlag && task.snapshot?.checks?.['queue-task-rob']) {
-          if (progEl) progEl.textContent = `🔬 Rob-тест · Задача ${ti+1}/${tasks.length} · Повтор ${rep+1}/${task.repeats} · ${(window.results||[]).length} результатов`;
+          if (progEl) progEl.textContent = `🔬 Rob-тест · Задача ${ti+1}/${tasks.length} · Повтор ${rep+1}/${repeats} · ${(window.results||[]).length} результатов`;
           // applyFilters заблокирован в queue-режиме, поэтому _visibleResults может быть устаревшим.
           // Синхронизируем вручную — чтобы runMassRobust видел актуальные результаты.
           _visibleResults = (window.results || results || []).filter(r => !!r.cfg);
@@ -24088,6 +24090,12 @@ async function runQueue() {
           if (typeof runMassRobust === 'function') await runMassRobust();
         }
       }
+    }
+  } catch (_queueErr) {
+    console.error('[runQueue] Ошибка в очереди:', _queueErr);
+    if (progEl) {
+      progEl.textContent = `❌ Ошибка очереди: ${_queueErr?.message || String(_queueErr)}`;
+      progEl.style.color = '#ff5555';
     }
   } finally {
     _queueRunning = false;
@@ -28878,7 +28886,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774795874842;
+window._BUILD_TS = 1774796832701;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;

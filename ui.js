@@ -4735,15 +4735,16 @@ async function runQueue() {
   if (stopBtn) stopBtn.style.display = 'inline-block';
   if (progEl)  progEl.style.display  = 'block';
 
-  const totalRepeats = tasks.reduce((s, t) => s + t.repeats, 0);
+  const totalRepeats = tasks.reduce((s, t) => s + Math.max(1, parseInt(t.repeats) || 1), 0);
   let doneRepeats = 0;
 
   try {
     for (let ti = 0; ti < tasks.length; ti++) {
       if (_queueStopFlag) break;
       const task = tasks[ti];
+      const repeats = Math.max(1, parseInt(task.repeats) || 1); // защита от undefined/0
 
-      for (let rep = 0; rep < task.repeats; rep++) {
+      for (let rep = 0; rep < repeats; rep++) {
         if (_queueStopFlag) break;
 
         _queueRestore(task.snapshot);
@@ -4753,7 +4754,7 @@ async function runQueue() {
         if (_queueStopFlag) break;
 
         if (progEl) progEl.textContent =
-          `Задача ${ti+1}/${tasks.length} · Повтор ${rep+1}/${task.repeats} · Найдено: ${(window.results||[]).length.toLocaleString()} результатов`;
+          `Задача ${ti+1}/${tasks.length} · Повтор ${rep+1}/${repeats} · Найдено: ${(window.results||[]).length.toLocaleString()} результатов`;
 
         // Запустить — results НЕ сбрасываются (window._queueMode=true).
         // runOptMultiTF читает c_tf_range из снапшота и ресэмплирует DATA.
@@ -4770,14 +4771,14 @@ async function runQueue() {
         if (!_queueStopFlag && task.snapshot?.checks?.['queue-task-autoclean']) {
           const removed = _queueApplyCutoff();
           if (progEl && removed > 0) {
-            progEl.textContent = `🗑 Удалено ${removed} слабых результатов · Задача ${ti+1}/${tasks.length} · Повтор ${rep+1}/${task.repeats}`;
+            progEl.textContent = `🗑 Удалено ${removed} слабых результатов · Задача ${ti+1}/${tasks.length} · Повтор ${rep+1}/${repeats}`;
             await yieldToUI(); // не тротлится в фоне
           }
         }
 
         // Rob-тест после оптимизации
         if (!_queueStopFlag && task.snapshot?.checks?.['queue-task-rob']) {
-          if (progEl) progEl.textContent = `🔬 Rob-тест · Задача ${ti+1}/${tasks.length} · Повтор ${rep+1}/${task.repeats} · ${(window.results||[]).length} результатов`;
+          if (progEl) progEl.textContent = `🔬 Rob-тест · Задача ${ti+1}/${tasks.length} · Повтор ${rep+1}/${repeats} · ${(window.results||[]).length} результатов`;
           // applyFilters заблокирован в queue-режиме, поэтому _visibleResults может быть устаревшим.
           // Синхронизируем вручную — чтобы runMassRobust видел актуальные результаты.
           _visibleResults = (window.results || results || []).filter(r => !!r.cfg);
@@ -4785,6 +4786,12 @@ async function runQueue() {
           if (typeof runMassRobust === 'function') await runMassRobust();
         }
       }
+    }
+  } catch (_queueErr) {
+    console.error('[runQueue] Ошибка в очереди:', _queueErr);
+    if (progEl) {
+      progEl.textContent = `❌ Ошибка очереди: ${_queueErr?.message || String(_queueErr)}`;
+      progEl.style.color = '#ff5555';
     }
   } finally {
     _queueRunning = false;
