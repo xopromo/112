@@ -7106,9 +7106,21 @@ function applyOOSFilters() {
 
   const tbody = document.getElementById('oos-tb');
   if (!tbody) return;
+
+  // Обновляем _visibleResults для использования в selectRow() и фильтрах
+  _visibleResults = src;
+
+  // Применяем пагинацию как в основной таблице
+  _totalPages = Math.max(1, Math.ceil(src.length / _pageSize));
+  if (_curPage >= _totalPages) _curPage = _totalPages - 1;
+
+  const start = _curPage * _pageSize;
+  const end = Math.min(start + _pageSize, src.length);
+  const page = src.slice(start, end);
+
   let html = '';
-  for (let i = 0; i < src.length; i++) {
-    const r = src[i];
+  for (let i = 0; i < page.length; i++) {
+    const r = page[i];
     const globalIdx = _oosTableResults.indexOf(r);
     const oosLvl = getFavLevel(r.name);
     const isFavRow = oosLvl > 0;
@@ -7147,6 +7159,32 @@ function applyOOSFilters() {
       `</tr>`;
   }
   tbody.innerHTML = html;
+
+  // Обновляем пагинацию (как в renderVisibleResults)
+  const pg = $('pagination');
+  if (pg) {
+    if (_totalPages <= 1) {
+      pg.style.display = 'none';
+    } else {
+      pg.style.display = 'flex';
+      $('pg-first').disabled = _curPage === 0;
+      $('pg-prev').disabled  = _curPage === 0;
+      $('pg-next').disabled  = _curPage >= _totalPages - 1;
+      $('pg-last').disabled  = _curPage >= _totalPages - 1;
+      // Страницы
+      const winHalf = 3;
+      let lo = Math.max(0, _curPage - winHalf);
+      let hi = Math.min(_totalPages - 1, _curPage + winHalf);
+      if (hi - lo < winHalf * 2) { lo = Math.max(0, hi - winHalf * 2); hi = Math.min(_totalPages - 1, lo + winHalf * 2); }
+      let pgHtml = '';
+      for (let p = lo; p <= hi; p++) {
+        pgHtml += `<button class="pg-btn${p === _curPage ? ' active' : ''}" onclick="goPage(${p})">${p + 1}</button>`;
+      }
+      $('pg-pages').innerHTML = pgHtml;
+      $('pg-info').textContent = `${start + 1}–${end} из ${src.length}`;
+    }
+  }
+
   _renderOOSSummary();
 }
 
