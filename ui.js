@@ -3447,9 +3447,28 @@ function _drawOOSGraphicForResult(r) {
   const eq_old = r.old_eq;
   const eq_new = r.new_eq;
 
+  // Определяем пересечение данных по timestamps
+  let overlapIdx = 0; // индекс в NEW_DATA где начинаются новые бары без пересечения
+  if (DATA && NEW_DATA && DATA.length > 0 && NEW_DATA.length > 0) {
+    const lastOldT = DATA[DATA.length - 1].t;
+    const firstNewT = NEW_DATA[0].t;
+
+    if (lastOldT && firstNewT) {
+      // Есть timestamps - ищем пересечение
+      for (let i = 0; i < NEW_DATA.length; i++) {
+        if (NEW_DATA[i].t && NEW_DATA[i].t > lastOldT) {
+          overlapIdx = i;
+          break;
+        }
+      }
+    }
+  }
+
+  // Пропускаем пересекающиеся бары из eq_new
+  let newEqClean = eq_new.slice(overlapIdx);
+
   // Рассчитаем прогрев для новых данных (игнорируем первые N баров)
-  let newEqClean = eq_new;
-  if (eq_new && eq_new.length > 0) {
+  if (newEqClean && newEqClean.length > 0) {
     const cfg = r.cfg || {};
     // Минимальный прогрев: макс из MA, pivot, ATR периодов
     const maWarmup = cfg.useMA ? (cfg.maP || 20) : 0;
@@ -3458,15 +3477,15 @@ function _drawOOSGraphicForResult(r) {
     const warmup = Math.max(maWarmup, pivotWarmup, atrWarmup, 1);
 
     // Пропускаем первые warmup баров из equity кривой (убираем прогрев)
-    const warmupEndIdx = Math.min(warmup, eq_new.length - 1);
-    if (warmupEndIdx > 0 && warmupEndIdx < eq_new.length) {
-      // Берём значение при окончании прогрева и смещаем так чтобы начало было от нуля
-      const warmupValue = eq_new[warmupEndIdx];
-      newEqClean = eq_new.slice(warmupEndIdx).map(v => v - warmupValue);
+    const warmupEndIdx = Math.min(warmup, newEqClean.length - 1);
+    if (warmupEndIdx > 0 && warmupEndIdx < newEqClean.length) {
+      // Берём значение при окончании прогрева и смещаем
+      const warmupValue = newEqClean[warmupEndIdx];
+      newEqClean = newEqClean.slice(warmupEndIdx).map(v => v - warmupValue);
     }
   }
 
-  // Concatenate: новый сегмент продолжает с последнего значения истории
+  // Concatenate: новый сегмент продолжает с последнего значения истории (без пересечения)
   const lastOld = eq_old[eq_old.length - 1];
   const combined = [...eq_old, ...newEqClean.map(v => v + lastOld)];
   const splitIdx  = eq_old.length;
@@ -7637,9 +7656,28 @@ function drawOOSChart(idx, rowEl) {
   const eq_old = r.old_eq;
   const eq_new = r.new_eq;
 
+  // Определяем пересечение данных по timestamps
+  let overlapIdx = 0; // индекс в NEW_DATA где начинаются новые бары без пересечения
+  if (DATA && NEW_DATA && DATA.length > 0 && NEW_DATA.length > 0) {
+    const lastOldT = DATA[DATA.length - 1].t;
+    const firstNewT = NEW_DATA[0].t;
+
+    if (lastOldT && firstNewT) {
+      // Есть timestamps - ищем пересечение
+      for (let i = 0; i < NEW_DATA.length; i++) {
+        if (NEW_DATA[i].t && NEW_DATA[i].t > lastOldT) {
+          overlapIdx = i;
+          break;
+        }
+      }
+    }
+  }
+
+  // Пропускаем пересекающиеся бары из eq_new
+  let newEqClean = eq_new.slice(overlapIdx);
+
   // Рассчитаем прогрев для новых данных (игнорируем первые N баров)
-  let newEqClean = eq_new;
-  if (eq_new && eq_new.length > 0) {
+  if (newEqClean && newEqClean.length > 0) {
     const cfg = r.cfg || {};
     // Минимальный прогрев: макс из MA, pivot, ATR периодов
     const maWarmup = cfg.useMA ? (cfg.maP || 20) : 0;
@@ -7648,15 +7686,15 @@ function drawOOSChart(idx, rowEl) {
     const warmup = Math.max(maWarmup, pivotWarmup, atrWarmup, 1);
 
     // Пропускаем первые warmup баров из equity кривой (убираем прогрев)
-    const warmupEndIdx = Math.min(warmup, eq_new.length - 1);
-    if (warmupEndIdx > 0 && warmupEndIdx < eq_new.length) {
-      // Берём значение при окончании прогрева и смещаем так чтобы начало было от нуля
-      const warmupValue = eq_new[warmupEndIdx];
-      newEqClean = eq_new.slice(warmupEndIdx).map(v => v - warmupValue);
+    const warmupEndIdx = Math.min(warmup, newEqClean.length - 1);
+    if (warmupEndIdx > 0 && warmupEndIdx < newEqClean.length) {
+      // Берём значение при окончании прогрева и смещаем
+      const warmupValue = newEqClean[warmupEndIdx];
+      newEqClean = newEqClean.slice(warmupEndIdx).map(v => v - warmupValue);
     }
   }
 
-  // Concatenate: новый сегмент продолжает с последнего значения истории
+  // Concatenate: новый сегмент продолжает с последнего значения истории (без пересечения)
   const lastOld = eq_old[eq_old.length - 1];
   const combined = [...eq_old, ...newEqClean.map(v => v + lastOld)];
   const splitIdx  = eq_old.length;
