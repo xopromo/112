@@ -16728,10 +16728,37 @@ async function runOpt() {
     // Only build cross-product for params with >1 value
     const _multi = _allIp.filter(([,a])=>a.length>1);
     let combos = [{}];
-    for (const [n,arr] of _multi) {
-      const next=[];
-      for (const c of combos) for (const v of arr) next.push({...c,[n]:v});
-      combos=next;
+    // Проверяем размер до построения — при большом пространстве используем подвыборку
+    const MAX_IP_COMBOS = 10000;
+    let _ipTotal = 1;
+    for (const [,a] of _multi) {
+      _ipTotal *= a.length;
+      if (_ipTotal > 1e9) { _ipTotal = Infinity; break; } // защита от переполнения
+    }
+    if (_ipTotal > MAX_IP_COMBOS) {
+      // Случайная подвыборка через декодирование индексов (аналог MC LHS)
+      const _ipNames = _multi.map(([n]) => n);
+      const _ipArrs  = _multi.map(([,a]) => a);
+      const _ipSizes = _ipArrs.map(a => a.length);
+      const sampleN  = MAX_IP_COMBOS;
+      const indices  = new Set();
+      const safeTotal = Number.isFinite(_ipTotal) ? _ipTotal : 1e15;
+      while (indices.size < sampleN) indices.add(Math.floor(Math.random() * safeTotal));
+      combos = Array.from(indices).map(idx => {
+        const obj = {}; let rem = idx;
+        for (let d = _ipSizes.length - 1; d >= 0; d--) {
+          obj[_ipNames[d]] = _ipArrs[d][rem % _ipSizes[d]]; rem = Math.floor(rem / _ipSizes[d]);
+        }
+        return obj;
+      });
+      const _ipLabel = Number.isFinite(_ipTotal) ? _ipTotal.toExponential(2) : '∞';
+      console.warn(`[_ipCombos] Пространство внутр. параметров (${_ipLabel}) → подвыборка ${sampleN}`);
+    } else {
+      for (const [n,arr] of _multi) {
+        const next=[];
+        for (const c of combos) for (const v of arr) next.push({...c,[n]:v});
+        combos=next;
+      }
     }
     window._ipCombos = combos.length ? combos : [{}];
   } catch (initErr) {
@@ -28106,7 +28133,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774728434986;
+window._BUILD_TS = 1774787202032;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
