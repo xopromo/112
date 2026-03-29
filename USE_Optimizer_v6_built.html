@@ -18098,16 +18098,19 @@ async function runOpt() {
       for (let oi = 0; oi < results.length; oi++) {
         const _eq = equities[results[oi].name];
         if (_eq) {
-          results[oi].eq      = _eq;
-          results[oi].cvr     = _calcCVR(_eq);
-          results[oi].upi     = _calcUlcerIdx(_eq);
-          results[oi].sortino = _calcSortino(_eq);
-          results[oi].kRatio  = _calcKRatio(_eq);
-          results[oi].omega    = _calcOmega(_eq);    // ##OMG
-          results[oi].pain     = _calcPainRatio(_eq); // ##PAIN
-          results[oi].burke    = _calcBurke(_eq);    // ##BURKE
-          results[oi].serenity = _calcSerenity(_eq); // ##SRNTY
-          results[oi].ir       = _calcInfoRatio(_eq); // ##IR
+          results[oi].eq = _eq;
+          // ОПТИМИЗАЦИЯ: переиспользуем метрики из _oos если они уже вычислены (в _attachOOS),
+          // иначе вычисляем сейчас. Избегаем двойного вычисления O(N) функций.
+          const _oosForward = results[oi].cfg._oos?.forward;
+          results[oi].cvr     = _oosForward?.cvr ?? _calcCVR(_eq);
+          results[oi].upi     = _oosForward?.upi ?? _calcUlcerIdx(_eq);
+          results[oi].sortino = _oosForward?.sortino ?? _calcSortino(_eq);
+          results[oi].kRatio  = _oosForward?.kRatio ?? _calcKRatio(_eq);
+          results[oi].omega   = _oosForward?.omega ?? _calcOmega(_eq);    // ##OMG
+          results[oi].pain    = _oosForward?.pain ?? _calcPainRatio(_eq); // ##PAIN
+          results[oi].burke   = _oosForward?.burke ?? _calcBurke(_eq);    // ##BURKE
+          results[oi].serenity= _oosForward?.serenity ?? _calcSerenity(_eq); // ##SRNTY
+          results[oi].ir      = _oosForward?.ir ?? _calcInfoRatio(_eq);   // ##IR
         }
         if (oi % 100 === 0) { await yieldToUI(); }
       }
@@ -28855,7 +28858,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774794679992;
+window._BUILD_TS = 1774794727457;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
