@@ -451,15 +451,21 @@ function switchTableMode(mode) {
     const btn = document.getElementById('tbl-btn-' + m);
     if (btn) btn.classList.toggle('active', m === mode);
   });
-  // Показываем/скрываем нужную таблицу
-  const stdScroll = document.querySelector('.tbl-scroll');
-  const oosTbl    = document.getElementById('oos-tbl-wrap');
+  // Показываем/скрываем нужную таблицу и графики
+  const stdScroll   = document.querySelector('.tbl-scroll');
+  const oosTbl      = document.getElementById('oos-tbl-wrap');
+  const eqWrap      = document.getElementById('eq-wrap');
+  const oosChrtWrap = document.getElementById('oos-chart-wrap');
   if (mode === 'oos') {
-    if (stdScroll) stdScroll.style.display = 'none';
-    if (oosTbl)    oosTbl.style.display = '';
+    if (stdScroll)   stdScroll.style.display   = 'none';
+    if (oosTbl)      oosTbl.style.display       = '';
+    if (eqWrap)      eqWrap.style.display       = 'none'; // стандартный график скрыть
+    // OOS график покажет drawOOSChart при клике по строке
   } else {
-    if (stdScroll) stdScroll.style.display = '';
-    if (oosTbl)    oosTbl.style.display = 'none';
+    if (stdScroll)   stdScroll.style.display   = '';
+    if (oosTbl)      oosTbl.style.display       = 'none';
+    if (oosChrtWrap) oosChrtWrap.style.display  = 'none'; // OOS график скрыть
+    // eq-wrap управляет собственной видимостью через drawEquityData
   }
   // Панель новых данных — во всех режимах
   const newDataBar = document.getElementById('new-data-bar');
@@ -976,11 +982,12 @@ function renderVisibleResults() {
       const cls = v >= 1 ? 'pos' : 'neg';
       return `<td class="${cls} col-rob-${key}" title="${key}: ${v ? 'пройден' : 'провален'}">${v}</td>`;
     };
-    const fav = isFav(r.name) ? '⭐' : '☆';
+    const favLvl = getFavLevel(r.name);
+    const fav = favLvl > 0 ? '★' : '☆';
     html +=
       `<tr data-i="${rii}" style="cursor:pointer">` +
       `<td class="accent" style="font-size:.66em;max-width:380px;overflow:hidden;text-overflow:ellipsis;user-select:text;cursor:text" title="${r.name}">${r.name}</td>` +
-      `<td class="col-fav" style="cursor:pointer;font-size:.85em" data-fav="${rii}">${fav}</td>` +
+      `<td class="col-fav" style="font-size:.85em" data-fav="${rii}" data-level="${favLvl}">${fav}</td>` +
       `<td class="col-pnl ${pnlCls}">${r.pnl.toFixed(1)}</td>` +
       `<td class="col-wr">${r.wr.toFixed(1)}</td>` +
       `<td class="col-n muted">${r.n}</td>` +
@@ -1079,7 +1086,9 @@ function renderVisibleResults() {
       const r = _visibleResults[idx];
       if (!r) return;
       toggleFav(r, e);
-      e.target.textContent = isFav(r.name) ? '⭐' : '☆';
+      const lvl = getFavLevel(r.name);
+      e.target.textContent = lvl > 0 ? '★' : '☆';
+      e.target.dataset.level = lvl;
       return;
     }
     selectRow(idx);
@@ -2283,15 +2292,30 @@ function toast(msg, duration) { showTplToast(msg, duration); }
 function isFav(name) {
   return favourites.some(f => f.name===name && (f.ns||'')===_favNs);
 }
-function toggleFav(idx, event) {
+// Возвращает уровень яркости звезды: 0=нет, 1=тусклая, 2=золотая, 3=яркая
+function getFavLevel(name) {
+  const f = favourites.find(f => f.name===name && (f.ns||'')===_favNs);
+  return f ? (f.level || 1) : 0;
+}
+// HTML звёздочки с уровнем яркости (через data-level на родителе td)
+function _favStarText(name) {
+  return getFavLevel(name) > 0 ? '★' : '☆';
+}
+// Добавить/обновить уровень избранного: 0→startLevel→2→3→0 (цикл)
+function toggleFav(idx, event, startLevel) {
   if (event) event.stopPropagation();
   const r = typeof idx === 'number' ? results[idx] : idx;
   if (!r) return;
-  const fi = favourites.findIndex(f => f.name===r.name);
+  const fi = favourites.findIndex(f => f.name===r.name && (f.ns||'')===_favNs);
   if (fi >= 0) {
-    favourites.splice(fi,1);
+    const cur = favourites[fi].level || 1;
+    if (cur >= 3) {
+      favourites.splice(fi, 1); // убрать из избранного
+    } else {
+      favourites[fi].level = cur + 1; // повысить уровень
+    }
   } else {
-    favourites.push({ name:r.name, ns:_favNs, stats:{
+    favourites.push({ name:r.name, ns:_favNs, level: startLevel || 1, stats:{
       pnl:r.pnl, wr:r.wr, n:r.n, dd:r.dd, pdd:r.pdd,
       dwr:r.dwr||0, avg:r.avg||0, p1:r.p1||0, p2:r.p2||0, c1:r.c1||0, c2:r.c2||0,
       nL:r.nL||0, pL:r.pL||0, wrL:r.wrL, nS:r.nS||0, pS:r.pS||0, wrS:r.wrS, dwrLS:r.dwrLS,
@@ -2305,22 +2329,39 @@ function toggleFav(idx, event) {
   }
   storeSave(_favKey(), favourites);
   renderFavBar();
-  // НЕ вызываем renderResults() — это сбрасывает режим и фильтры!
-  // Только перерисовываем звёздочки в текущем виде
   _refreshFavStars();
+}
+// Добавить в избранное из OOS таблицы (уровень 2 — проверено на новых данных)
+function toggleOOSFav(idx, event) {
+  if (event) event.stopPropagation();
+  const r = _oosTableResults[idx];
+  if (!r) return;
+  toggleFav(r, event, 2); // startLevel=2: из OOS = проверено на новых данных
 }
 
 // Обновляет только звёздочки в текущей таблице без сброса фильтров
 function _refreshFavStars() {
-  const rows = document.querySelectorAll('#tb tr[data-i]');
-  rows.forEach(tr => {
-    const i = +tr.dataset.i;
-    const r = _visibleResults[i];
+  // Основная таблица результатов
+  document.querySelectorAll('#tb tr[data-i]').forEach(tr => {
+    const r = _visibleResults[+tr.dataset.i];
     if (!r) return;
     const starEl = tr.querySelector('[data-fav]');
-    if (starEl) starEl.textContent = isFav(r.name) ? '⭐' : '☆';
+    if (!starEl) return;
+    const lvl = getFavLevel(r.name);
+    starEl.textContent = lvl > 0 ? '★' : '☆';
+    starEl.dataset.level = lvl;
   });
-  // Если мы в режиме fav — обновляем список полностью
+  // OOS таблица
+  document.querySelectorAll('#oos-tb tr[data-i]').forEach(tr => {
+    const r = _oosTableResults[+tr.dataset.i];
+    if (!r) return;
+    const starEl = tr.querySelector('[data-fav]');
+    if (!starEl) return;
+    const lvl = getFavLevel(r.name);
+    starEl.textContent = lvl > 0 ? '★' : '☆';
+    starEl.dataset.level = lvl;
+    tr.classList.toggle('fav-row', lvl > 0);
+  });
   if (_tableMode === 'fav') applyFilters(true);
 }
 function renderFavBar() { /* панель убрана — избранные доступны в таблице (вкладка Избранные) */ }
@@ -4134,7 +4175,7 @@ document.addEventListener('keydown', function(e) {
       const tr = document.querySelector(`#tb tr[data-i="${_selectedIdx}"]`);
       if (tr) {
         const favTd = tr.querySelector('[data-fav]');
-        if (favTd) favTd.textContent = isFav(r.name) ? '⭐' : '☆';
+        if (favTd) { const lvl=getFavLevel(r.name); favTd.textContent=lvl>0?'★':'☆'; favTd.dataset.level=lvl; }
       }
     }
   }
@@ -6915,8 +6956,9 @@ function applyOOSFilters() {
   for (let i = 0; i < src.length; i++) {
     const r = src[i];
     const globalIdx = _oosTableResults.indexOf(r);
-    const isFavRow = isFav(r.name);
-    const fav = isFavRow ? '⭐' : '☆';
+    const oosLvl = getFavLevel(r.name);
+    const isFavRow = oosLvl > 0;
+    const fav = oosLvl > 0 ? '★' : '☆';
     const apt_old = (r.old_n > 0 && r.old_pnl != null) ? r.old_pnl / r.old_n : null;
     const apt_new = (r.new_n > 0 && r.new_pnl != null) ? r.new_pnl / r.new_n : null;
     const delta_apt = (apt_old != null && apt_new != null) ? apt_new - apt_old : null;
@@ -6935,7 +6977,7 @@ function applyOOSFilters() {
     html +=
       `<tr data-i="${globalIdx}" data-name="${_esc(r.name)}" class="${isFavRow?'fav-row':''}" onclick="drawOOSChart(${globalIdx},this)" ondblclick="showOOSDetail(${globalIdx})">` +
       `<td title="${_esc(r.name)}" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_esc(r.name)}</td>` +
-      `<td style="text-align:center;cursor:pointer" onclick="toggleFav(${globalIdx},event)">${fav}</td>` +
+      `<td style="text-align:center;font-size:.9em" data-fav="${globalIdx}" data-level="${oosLvl}" onclick="toggleOOSFav(${globalIdx},event)">${fav}</td>` +
       `<td class="${r.old_pnl!=null&&r.old_pnl>0?'pos':'neg'}">${f1(r.old_pnl)}%</td>` +
       `<td class="${r.new_pnl!=null&&r.new_pnl>0?'pos':'neg'}">${f1(r.new_pnl)}%</td>` +
       `<td class="${pCls(r.delta_pnl)}">${dStr(r.delta_pnl)}</td>` +

@@ -751,8 +751,15 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
 .oos-th-new   { background:var(--bg3); color:var(--accent); padding:6px 8px; border-bottom:1px solid var(--border2); border-left:2px solid rgba(0,212,255,.3); cursor:pointer; white-space:nowrap; font-size:.72em; }
 .oos-th-delta { background:var(--bg3); color:var(--orange,#ffaa44); padding:6px 8px; border-bottom:1px solid var(--border2); border-left:1px solid var(--border2); cursor:pointer; white-space:nowrap; font-size:.72em; }
 /* OOS chart */
-#oos-chart-wrap { display:none; background:var(--bg2); border-top:1px solid var(--border); padding:0; }
-#oos-eqc { width:100%; height:160px; display:block; border-radius:0; }
+#oos-chart-wrap { display:none; background:var(--bg2); border:1px solid var(--border); border-radius:6px; margin:6px 0; }
+#oos-eqc { width:100%; height:150px; display:block; border-radius:6px; cursor:crosshair; }
+
+/* Звёздочки — три уровня яркости */
+[data-fav] { cursor:pointer; user-select:none; transition:color .15s, text-shadow .15s; }
+[data-fav][data-level="0"] { color:rgba(150,150,150,0.35); }
+[data-fav][data-level="1"] { color:rgba(190,190,190,0.65); }
+[data-fav][data-level="2"] { color:rgba(255,200,50,0.92); }
+[data-fav][data-level="3"] { color:#ffd700; text-shadow:0 0 8px rgba(255,215,0,.75); }
 /* OOS tbody строки */
 #oos-rtbl td { padding:4px 7px; border-bottom:1px solid var(--border); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 #oos-rtbl tr:hover td { background:var(--bg3); }
@@ -1505,6 +1512,9 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
   <canvas id="eqc"></canvas>
   <canvas id="eq-crosshair"></canvas>
 </div>
+<div id="oos-chart-wrap">
+  <canvas id="oos-eqc"></canvas>
+</div>
 
 <div class="tbl-wrap">
   <!-- Mass-robust панель -->
@@ -1802,9 +1812,6 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
       </thead>
       <tbody id="oos-tb"></tbody>
     </table>
-  </div>
-  <div id="oos-chart-wrap">
-    <canvas id="oos-eqc"></canvas>
   </div>
 
 </div>
@@ -19347,15 +19354,21 @@ function switchTableMode(mode) {
     const btn = document.getElementById('tbl-btn-' + m);
     if (btn) btn.classList.toggle('active', m === mode);
   });
-  // Показываем/скрываем нужную таблицу
-  const stdScroll = document.querySelector('.tbl-scroll');
-  const oosTbl    = document.getElementById('oos-tbl-wrap');
+  // Показываем/скрываем нужную таблицу и графики
+  const stdScroll   = document.querySelector('.tbl-scroll');
+  const oosTbl      = document.getElementById('oos-tbl-wrap');
+  const eqWrap      = document.getElementById('eq-wrap');
+  const oosChrtWrap = document.getElementById('oos-chart-wrap');
   if (mode === 'oos') {
-    if (stdScroll) stdScroll.style.display = 'none';
-    if (oosTbl)    oosTbl.style.display = '';
+    if (stdScroll)   stdScroll.style.display   = 'none';
+    if (oosTbl)      oosTbl.style.display       = '';
+    if (eqWrap)      eqWrap.style.display       = 'none'; // стандартный график скрыть
+    // OOS график покажет drawOOSChart при клике по строке
   } else {
-    if (stdScroll) stdScroll.style.display = '';
-    if (oosTbl)    oosTbl.style.display = 'none';
+    if (stdScroll)   stdScroll.style.display   = '';
+    if (oosTbl)      oosTbl.style.display       = 'none';
+    if (oosChrtWrap) oosChrtWrap.style.display  = 'none'; // OOS график скрыть
+    // eq-wrap управляет собственной видимостью через drawEquityData
   }
   // Панель новых данных — во всех режимах
   const newDataBar = document.getElementById('new-data-bar');
@@ -19872,11 +19885,12 @@ function renderVisibleResults() {
       const cls = v >= 1 ? 'pos' : 'neg';
       return `<td class="${cls} col-rob-${key}" title="${key}: ${v ? 'пройден' : 'провален'}">${v}</td>`;
     };
-    const fav = isFav(r.name) ? '⭐' : '☆';
+    const favLvl = getFavLevel(r.name);
+    const fav = favLvl > 0 ? '★' : '☆';
     html +=
       `<tr data-i="${rii}" style="cursor:pointer">` +
       `<td class="accent" style="font-size:.66em;max-width:380px;overflow:hidden;text-overflow:ellipsis;user-select:text;cursor:text" title="${r.name}">${r.name}</td>` +
-      `<td class="col-fav" style="cursor:pointer;font-size:.85em" data-fav="${rii}">${fav}</td>` +
+      `<td class="col-fav" style="font-size:.85em" data-fav="${rii}" data-level="${favLvl}">${fav}</td>` +
       `<td class="col-pnl ${pnlCls}">${r.pnl.toFixed(1)}</td>` +
       `<td class="col-wr">${r.wr.toFixed(1)}</td>` +
       `<td class="col-n muted">${r.n}</td>` +
@@ -19975,7 +19989,9 @@ function renderVisibleResults() {
       const r = _visibleResults[idx];
       if (!r) return;
       toggleFav(r, e);
-      e.target.textContent = isFav(r.name) ? '⭐' : '☆';
+      const lvl = getFavLevel(r.name);
+      e.target.textContent = lvl > 0 ? '★' : '☆';
+      e.target.dataset.level = lvl;
       return;
     }
     selectRow(idx);
@@ -21179,15 +21195,30 @@ function toast(msg, duration) { showTplToast(msg, duration); }
 function isFav(name) {
   return favourites.some(f => f.name===name && (f.ns||'')===_favNs);
 }
-function toggleFav(idx, event) {
+// Возвращает уровень яркости звезды: 0=нет, 1=тусклая, 2=золотая, 3=яркая
+function getFavLevel(name) {
+  const f = favourites.find(f => f.name===name && (f.ns||'')===_favNs);
+  return f ? (f.level || 1) : 0;
+}
+// HTML звёздочки с уровнем яркости (через data-level на родителе td)
+function _favStarText(name) {
+  return getFavLevel(name) > 0 ? '★' : '☆';
+}
+// Добавить/обновить уровень избранного: 0→startLevel→2→3→0 (цикл)
+function toggleFav(idx, event, startLevel) {
   if (event) event.stopPropagation();
   const r = typeof idx === 'number' ? results[idx] : idx;
   if (!r) return;
-  const fi = favourites.findIndex(f => f.name===r.name);
+  const fi = favourites.findIndex(f => f.name===r.name && (f.ns||'')===_favNs);
   if (fi >= 0) {
-    favourites.splice(fi,1);
+    const cur = favourites[fi].level || 1;
+    if (cur >= 3) {
+      favourites.splice(fi, 1); // убрать из избранного
+    } else {
+      favourites[fi].level = cur + 1; // повысить уровень
+    }
   } else {
-    favourites.push({ name:r.name, ns:_favNs, stats:{
+    favourites.push({ name:r.name, ns:_favNs, level: startLevel || 1, stats:{
       pnl:r.pnl, wr:r.wr, n:r.n, dd:r.dd, pdd:r.pdd,
       dwr:r.dwr||0, avg:r.avg||0, p1:r.p1||0, p2:r.p2||0, c1:r.c1||0, c2:r.c2||0,
       nL:r.nL||0, pL:r.pL||0, wrL:r.wrL, nS:r.nS||0, pS:r.pS||0, wrS:r.wrS, dwrLS:r.dwrLS,
@@ -21201,22 +21232,39 @@ function toggleFav(idx, event) {
   }
   storeSave(_favKey(), favourites);
   renderFavBar();
-  // НЕ вызываем renderResults() — это сбрасывает режим и фильтры!
-  // Только перерисовываем звёздочки в текущем виде
   _refreshFavStars();
+}
+// Добавить в избранное из OOS таблицы (уровень 2 — проверено на новых данных)
+function toggleOOSFav(idx, event) {
+  if (event) event.stopPropagation();
+  const r = _oosTableResults[idx];
+  if (!r) return;
+  toggleFav(r, event, 2); // startLevel=2: из OOS = проверено на новых данных
 }
 
 // Обновляет только звёздочки в текущей таблице без сброса фильтров
 function _refreshFavStars() {
-  const rows = document.querySelectorAll('#tb tr[data-i]');
-  rows.forEach(tr => {
-    const i = +tr.dataset.i;
-    const r = _visibleResults[i];
+  // Основная таблица результатов
+  document.querySelectorAll('#tb tr[data-i]').forEach(tr => {
+    const r = _visibleResults[+tr.dataset.i];
     if (!r) return;
     const starEl = tr.querySelector('[data-fav]');
-    if (starEl) starEl.textContent = isFav(r.name) ? '⭐' : '☆';
+    if (!starEl) return;
+    const lvl = getFavLevel(r.name);
+    starEl.textContent = lvl > 0 ? '★' : '☆';
+    starEl.dataset.level = lvl;
   });
-  // Если мы в режиме fav — обновляем список полностью
+  // OOS таблица
+  document.querySelectorAll('#oos-tb tr[data-i]').forEach(tr => {
+    const r = _oosTableResults[+tr.dataset.i];
+    if (!r) return;
+    const starEl = tr.querySelector('[data-fav]');
+    if (!starEl) return;
+    const lvl = getFavLevel(r.name);
+    starEl.textContent = lvl > 0 ? '★' : '☆';
+    starEl.dataset.level = lvl;
+    tr.classList.toggle('fav-row', lvl > 0);
+  });
   if (_tableMode === 'fav') applyFilters(true);
 }
 function renderFavBar() { /* панель убрана — избранные доступны в таблице (вкладка Избранные) */ }
@@ -23030,7 +23078,7 @@ document.addEventListener('keydown', function(e) {
       const tr = document.querySelector(`#tb tr[data-i="${_selectedIdx}"]`);
       if (tr) {
         const favTd = tr.querySelector('[data-fav]');
-        if (favTd) favTd.textContent = isFav(r.name) ? '⭐' : '☆';
+        if (favTd) { const lvl=getFavLevel(r.name); favTd.textContent=lvl>0?'★':'☆'; favTd.dataset.level=lvl; }
       }
     }
   }
@@ -26208,8 +26256,9 @@ function applyOOSFilters() {
   for (let i = 0; i < src.length; i++) {
     const r = src[i];
     const globalIdx = _oosTableResults.indexOf(r);
-    const isFavRow = isFav(r.name);
-    const fav = isFavRow ? '⭐' : '☆';
+    const oosLvl = getFavLevel(r.name);
+    const isFavRow = oosLvl > 0;
+    const fav = oosLvl > 0 ? '★' : '☆';
     const apt_old = (r.old_n > 0 && r.old_pnl != null) ? r.old_pnl / r.old_n : null;
     const apt_new = (r.new_n > 0 && r.new_pnl != null) ? r.new_pnl / r.new_n : null;
     const delta_apt = (apt_old != null && apt_new != null) ? apt_new - apt_old : null;
@@ -26228,7 +26277,7 @@ function applyOOSFilters() {
     html +=
       `<tr data-i="${globalIdx}" data-name="${_esc(r.name)}" class="${isFavRow?'fav-row':''}" onclick="drawOOSChart(${globalIdx},this)" ondblclick="showOOSDetail(${globalIdx})">` +
       `<td title="${_esc(r.name)}" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_esc(r.name)}</td>` +
-      `<td style="text-align:center;cursor:pointer" onclick="toggleFav(${globalIdx},event)">${fav}</td>` +
+      `<td style="text-align:center;font-size:.9em" data-fav="${globalIdx}" data-level="${oosLvl}" onclick="toggleOOSFav(${globalIdx},event)">${fav}</td>` +
       `<td class="${r.old_pnl!=null&&r.old_pnl>0?'pos':'neg'}">${f1(r.old_pnl)}%</td>` +
       `<td class="${r.new_pnl!=null&&r.new_pnl>0?'pos':'neg'}">${f1(r.new_pnl)}%</td>` +
       `<td class="${pCls(r.delta_pnl)}">${dStr(r.delta_pnl)}</td>` +
@@ -28803,7 +28852,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774793626368;
+window._BUILD_TS = 1774793686440;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
