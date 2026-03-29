@@ -462,6 +462,13 @@ function switchTableMode(mode) {
     if (oosTbl)      oosTbl.style.display       = '';
     if (eqWrap)      eqWrap.style.display       = 'none'; // стандартный график скрыть
     // OOS график покажет drawOOSChart при клике по строке
+    // Инициализация настроек столбиков OOS
+    _initOOSColSettings();
+    // Подвесить слушатель на кнопку настроек
+    const oosColBtn = document.getElementById('oos-col-settings-btn');
+    if (oosColBtn) {
+      oosColBtn.onclick = toggleOOSColSettings;
+    }
   } else {
     if (stdScroll)   stdScroll.style.display   = '';
     if (oosTbl)      oosTbl.style.display       = 'none';
@@ -5178,7 +5185,21 @@ const _COL_DEFS = [
   { id: 'col-rob-mc',     label: '🔬 MC',               default: true },
 ];
 
+// OOS таблица столбики (аналогично _COL_DEFS)
+const _OOS_COL_DEFS = [
+  { id: 'oos-col-fav',     label: '⭐ Избранное',      default: true },
+  { id: 'oos-col-pnl',     label: 'PnL%',              default: true },
+  { id: 'oos-col-dd',      label: 'DD%',               default: true },
+  { id: 'oos-col-pdd',     label: 'P/DD',              default: true },
+  { id: 'oos-col-apt',     label: 'Avg/tr',            default: true },
+  { id: 'oos-col-wr',      label: 'WR%',               default: true },
+  { id: 'oos-col-kr',      label: 'K-Ratio',           default: true },
+  { id: 'oos-col-n',       label: '# сделок',          default: true },
+  { id: 'oos-col-score',   label: 'Оценка',            default: true },
+];
+
 let _colSettings = null; // null = не загружен
+let _oosColSettings = null; // null = не загружен
 
 function _loadColSettings() {
   try {
@@ -5290,6 +5311,99 @@ function _colHideRob() {
 function _initColSettings() {
   const s = getColSettings();
   _applyColSettings(s);
+}
+
+// ─────────────────────────────────────────────────────────────────
+// OOS таблица — настраиваемые колонки
+// ─────────────────────────────────────────────────────────────────
+
+function _loadOOSColSettings() {
+  try {
+    const saved = localStorage.getItem('use_oos_col_settings');
+    if (saved) return JSON.parse(saved);
+  } catch(e) {}
+  const def = {};
+  _OOS_COL_DEFS.forEach(c => def[c.id] = c.default);
+  return def;
+}
+
+function _saveOOSColSettings(settings) {
+  try { localStorage.setItem('use_oos_col_settings', JSON.stringify(settings)); } catch(e) {}
+}
+
+function _applyOOSColSettings(settings) {
+  const hiddenCols = _OOS_COL_DEFS.filter(col => settings[col.id] === false);
+  if (hiddenCols.length === 0) return;
+  _OOS_COL_DEFS.forEach(col => {
+    const visible = settings[col.id] !== false;
+    document.querySelectorAll('.' + col.id).forEach(el => {
+      el.classList.toggle('col-hidden', !visible);
+    });
+  });
+}
+
+function getOOSColSettings() {
+  if (!_oosColSettings) _oosColSettings = _loadOOSColSettings();
+  return _oosColSettings;
+}
+
+function setOOSColVisible(colId, visible) {
+  const s = getOOSColSettings();
+  s[colId] = visible;
+  _oosColSettings = s;
+  _saveOOSColSettings(s);
+  _applyOOSColSettings(s);
+}
+
+let _oosColPanelOpen = false;
+function toggleOOSColSettings() {
+  const btn = document.getElementById('oos-col-settings-btn');
+  if (!btn) return;
+  const oldPanel = document.getElementById('oos-col-settings-panel');
+  if (oldPanel) { oldPanel.remove(); _oosColPanelOpen = false; return; }
+  _oosColPanelOpen = true;
+  const settings = getOOSColSettings();
+  const panel = document.createElement('div');
+  panel.id = 'oos-col-settings-panel';
+  panel.innerHTML = '<div style="font-weight:600;margin-bottom:6px;color:var(--text3);font-size:.9em">Столбики OOS</div>' +
+    _OOS_COL_DEFS.map(col => {
+      const checked = settings[col.id] !== false ? 'checked' : '';
+      return `<label><input type="checkbox" ${checked} onchange="setOOSColVisible('${col.id}',this.checked)"> ${col.label}</label>`;
+    }).join('') +
+    '<div style="margin-top:8px;display:flex;gap:6px">' +
+    '<button class="tpl-btn2" style="font-size:.8em;padding:2px 6px" onclick="_oosColShowAll()">Все</button>' +
+    '</div>';
+  const rect = btn.getBoundingClientRect();
+  panel.style.position = 'fixed';
+  panel.style.top = (rect.bottom + 4) + 'px';
+  const panelWidth = 240;
+  const rightSpace = window.innerWidth - rect.right;
+  if (rightSpace < panelWidth) {
+    panel.style.left = (rect.left - panelWidth + rect.width) + 'px';
+    panel.style.right = 'auto';
+  } else {
+    panel.style.right = (window.innerWidth - rect.right) + 'px';
+    panel.style.left = 'auto';
+  }
+  document.body.appendChild(panel);
+  setTimeout(() => {
+    document.addEventListener('click', function _closePanelOOS(e) {
+      if (!panel.contains(e.target) && e.target.id !== 'oos-col-settings-btn') {
+        panel.remove(); _oosColPanelOpen = false;
+        document.removeEventListener('click', _closePanelOOS);
+      }
+    });
+  }, 50);
+}
+
+function _oosColShowAll() {
+  _OOS_COL_DEFS.forEach(c => setOOSColVisible(c.id, true));
+  document.querySelectorAll('#oos-col-settings-panel input[type=checkbox]').forEach((cb,i) => cb.checked = true);
+}
+
+function _initOOSColSettings() {
+  const s = getOOSColSettings();
+  _applyOOSColSettings(s);
 }
 
 
@@ -7173,28 +7287,28 @@ function applyOOSFilters() {
     html +=
       `<tr data-i="${globalIdx}" data-name="${_esc(r.name)}" class="${isFavRow?'fav-row':''}" onclick="drawOOSChart(${globalIdx},this)" ondblclick="showOOSDetail(${globalIdx})">` +
       `<td title="${_esc(r.name)}" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_esc(r.name)}</td>` +
-      `<td style="text-align:center;font-size:.9em" data-fav="${globalIdx}" data-level="${oosLvl}" onclick="toggleOOSFav(${globalIdx},event)">${fav}</td>` +
-      `<td class="${r.old_pnl!=null&&r.old_pnl>0?'pos':'neg'}">${f1(r.old_pnl)}%</td>` +
-      `<td class="${r.new_pnl!=null&&r.new_pnl>0?'pos':'neg'}">${f1(r.new_pnl)}%</td>` +
-      `<td class="${pCls(r.delta_pnl)}">${dStr(r.delta_pnl)}</td>` +
-      `<td class="${r.old_dd!=null&&r.old_dd<50?'pos':'neg'}">${f1(r.old_dd)}%</td>` +
-      `<td class="${r.new_dd!=null&&r.new_dd<50?'pos':'neg'}">${f1(r.new_dd)}%</td>` +
-      `<td class="${pCls(r.delta_dd)}">${r.delta_dd != null ? (r.delta_dd >= 0 ? '+' : '') + r.delta_dd.toFixed(1) + '%' : '—'}</td>` +
-      `<td class="${pCls(r.old_pdd)}">${f2(r.old_pdd)}</td>` +
-      `<td class="${pCls(r.new_pdd)}">${f2(r.new_pdd)}</td>` +
-      `<td class="${pCls(r.delta_pdd)}">${r.delta_pdd != null ? (r.delta_pdd >= 0 ? '+' : '') + r.delta_pdd.toFixed(2) : '—'}</td>` +
-      `<td class="${pCls(apt_old)}">${f2(apt_old)}%</td>` +
-      `<td class="${pCls(apt_new)}">${f2(apt_new)}%</td>` +
-      `<td class="${pCls(delta_apt)}">${dStr(delta_apt,2)}</td>` +
-      `<td class="muted">${f1(r.old_wr)}%</td>` +
-      `<td class="muted">${f1(r.new_wr)}%</td>` +
-      `<td class="${pCls(r.delta_wr)}">${dStr(r.delta_wr)}</td>` +
-      `<td class="${pCls(r.old_kRatio)}">${r.old_kRatio != null ? r.old_kRatio.toFixed(2) : '—'}</td>` +
-      `<td class="${pCls(r.new_kRatio)}">${r.new_kRatio != null ? r.new_kRatio.toFixed(2) : '—'}</td>` +
-      `<td class="${pCls(r.delta_kRatio)}">${r.delta_kRatio != null ? (r.delta_kRatio >= 0 ? '+' : '') + r.delta_kRatio.toFixed(2) : '—'}</td>` +
-      `<td class="muted" style="text-align:center">${r.old_n??'—'}</td>` +
-      `<td class="muted" style="text-align:center">${r.new_n??'—'}</td>` +
-      `<td style="text-align:center"><span class="oos-badge ${badge} ${oosCls}">${oosScore}</span></td>` +
+      `<td class="oos-col-fav" style="text-align:center;font-size:.9em" data-fav="${globalIdx}" data-level="${oosLvl}" onclick="toggleOOSFav(${globalIdx},event)">${fav}</td>` +
+      `<td class="oos-col-pnl ${r.old_pnl!=null&&r.old_pnl>0?'pos':'neg'}">${f1(r.old_pnl)}%</td>` +
+      `<td class="oos-col-pnl ${r.new_pnl!=null&&r.new_pnl>0?'pos':'neg'}">${f1(r.new_pnl)}%</td>` +
+      `<td class="oos-col-pnl ${pCls(r.delta_pnl)}">${dStr(r.delta_pnl)}</td>` +
+      `<td class="oos-col-dd ${r.old_dd!=null&&r.old_dd<50?'pos':'neg'}">${f1(r.old_dd)}%</td>` +
+      `<td class="oos-col-dd ${r.new_dd!=null&&r.new_dd<50?'pos':'neg'}">${f1(r.new_dd)}%</td>` +
+      `<td class="oos-col-dd ${pCls(r.delta_dd)}">${r.delta_dd != null ? (r.delta_dd >= 0 ? '+' : '') + r.delta_dd.toFixed(1) + '%' : '—'}</td>` +
+      `<td class="oos-col-pdd ${pCls(r.old_pdd)}">${f2(r.old_pdd)}</td>` +
+      `<td class="oos-col-pdd ${pCls(r.new_pdd)}">${f2(r.new_pdd)}</td>` +
+      `<td class="oos-col-pdd ${pCls(r.delta_pdd)}">${r.delta_pdd != null ? (r.delta_pdd >= 0 ? '+' : '') + r.delta_pdd.toFixed(2) : '—'}</td>` +
+      `<td class="oos-col-apt ${pCls(apt_old)}">${f2(apt_old)}%</td>` +
+      `<td class="oos-col-apt ${pCls(apt_new)}">${f2(apt_new)}%</td>` +
+      `<td class="oos-col-apt ${pCls(delta_apt)}">${dStr(delta_apt,2)}</td>` +
+      `<td class="oos-col-wr muted">${f1(r.old_wr)}%</td>` +
+      `<td class="oos-col-wr muted">${f1(r.new_wr)}%</td>` +
+      `<td class="oos-col-wr ${pCls(r.delta_wr)}">${dStr(r.delta_wr)}</td>` +
+      `<td class="oos-col-kr ${pCls(r.old_kRatio)}">${r.old_kRatio != null ? r.old_kRatio.toFixed(2) : '—'}</td>` +
+      `<td class="oos-col-kr ${pCls(r.new_kRatio)}">${r.new_kRatio != null ? r.new_kRatio.toFixed(2) : '—'}</td>` +
+      `<td class="oos-col-kr ${pCls(r.delta_kRatio)}">${r.delta_kRatio != null ? (r.delta_kRatio >= 0 ? '+' : '') + r.delta_kRatio.toFixed(2) : '—'}</td>` +
+      `<td class="oos-col-n muted" style="text-align:center">${r.old_n??'—'}</td>` +
+      `<td class="oos-col-n muted" style="text-align:center">${r.new_n??'—'}</td>` +
+      `<td class="oos-col-score" style="text-align:center"><span class="oos-badge ${badge} ${oosCls}">${oosScore}</span></td>` +
       `</tr>`;
   }
   tbody.innerHTML = html;
