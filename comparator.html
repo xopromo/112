@@ -727,7 +727,297 @@ function analyzeData(parsed) {
     _pvHighDepths: pvSt.highDepths,
   };
 }
+
+// ═══════════════════════════════════════════════════════════════
+// METRIC DEFINITIONS
+// key, label, description, format fn, minScale, category, distKey
+// ═══════════════════════════════════════════════════════════════
+const METRIC_DEFS = [
+  // ── Market structure ──
+  { key:'hurst',       cat:'structure', label:'Hurst Exponent',
+    desc:'Трендовость: >0.5 тренд, <0.5 mean-reversion, 0.5 случайность',
+    fmt:v=>fmt(v,3), ms:0.05 },
+  { key:'ac1',         cat:'structure', label:'Автокорр. (lag 1)',
+    desc:'Серийная корреляция доходностей на 1 бар — краткосрочный импульс',
+    fmt:v=>fmt(v,3), ms:0.02 },
+  { key:'ac5',         cat:'structure', label:'Автокорр. (lag 5)',
+    desc:'Серийная корреляция на 5 баров — среднесрочный импульс',
+    fmt:v=>fmt(v,3), ms:0.02 },
+  { key:'volClustering', cat:'structure', label:'Кластеризация волатильности',
+    desc:'Автокорр. |доходностей| — насколько волатильность группируется',
+    fmt:v=>fmt(v,3), ms:0.05, distKey:'_returns' },
+  { key:'erMean',      cat:'structure', label:'Efficiency Ratio (20-бар)',
+    desc:'Насколько эффективно цена движется — 0 хаос, 1 чистый тренд',
+    fmt:v=>fmt(v,3), ms:0.05 },
+  { key:'retSkew',     cat:'structure', label:'Skewness доходностей',
+    desc:'Асимметрия: >0 правый хвост (редкий рост), <0 левый (редкий обвал)',
+    fmt:v=>fmt(v,3), ms:0.2, distKey:'_returns' },
+  { key:'retKurt',     cat:'structure', label:'Kurtosis доходностей',
+    desc:'Толщина хвостов (excess): >0 fat tails — больше экстремальных движений',
+    fmt:v=>fmt(v,2), ms:0.5, distKey:'_returns' },
+  { key:'bullish',     cat:'structure', label:'% бычьих баров',
+    desc:'Доля баров где close >= open — направленный bias',
+    fmt:v=>fmtPct(v), ms:5 },
+  // ── Volatility ──
+  { key:'atrPctMean',  cat:'volatility', label:'ATR% средний',
+    desc:'Средняя волатильность (ATR/цена) — абсолютный уровень',
+    fmt:v=>fmt(v,3,'%'), ms:0.1, distKey:'_atrPct' },
+  { key:'atrPctCoV',   cat:'volatility', label:'ATR CoV',
+    desc:'Изменчивость волатильности (std/mean) — режим: стабильный или рваный',
+    fmt:v=>fmt(v,3), ms:0.1, distKey:'_atrPct' },
+  { key:'retStd',      cat:'volatility', label:'StdDev доходностей',
+    desc:'Стандартное отклонение баровых доходностей',
+    fmt:v=>fmt(v,4,'%'), ms:0.01, distKey:'_returns' },
+  // ── Pivots ──
+  { key:'pivFreq',     cat:'pivots', label:'Частота пивотов',
+    desc:'Количество пивотов (hi+lo) на 100 баров',
+    fmt:v=>fmt(v,2), ms:0.5 },
+  { key:'pivDepthLow', cat:'pivots', label:'Глубина пивот-лоу (ATR)',
+    desc:'Средняя глубина минимума пивота в единицах ATR',
+    fmt:v=>fmt(v,3), ms:0.1, distKey:'_pvLowDepths' },
+  { key:'pivDepthHigh',cat:'pivots', label:'Высота пивот-хай (ATR)',
+    desc:'Средняя высота максимума пивота в единицах ATR',
+    fmt:v=>fmt(v,3), ms:0.1, distKey:'_pvHighDepths' },
+  // ── Indicator ──
+  { key:'pctAboveMA',  cat:'indicator', label:'% баров выше MA',
+    desc:'Доля времени когда цена выше скользящей средней',
+    fmt:v=>fmtPct(v), ms:5 },
+  { key:'maDistMean',  cat:'indicator', label:'Расстояние от MA (%)',
+    desc:'Среднее отклонение цены от MA — характеризует "упругость"',
+    fmt:v=>fmt(v,2,'%'), ms:0.5, distKey:'_maDist' },
+  { key:'maCrossFreq', cat:'indicator', label:'Кросс-частота MA',
+    desc:'Пересечений цены и MA на 100 баров — выше = рваный рынок',
+    fmt:v=>fmt(v,2), ms:0.2 },
+  // ── Signals ──
+  { key:'elFreq',      cat:'signals', label:'Лонг-входов / 100 баров',
+    desc:'Частота EL сигналов',
+    fmt:v=>fmt(v,2), ms:0.1 },
+  { key:'esFreq',      cat:'signals', label:'Шорт-входов / 100 баров',
+    desc:'Частота ES сигналов',
+    fmt:v=>fmt(v,2), ms:0.1 },
+  { key:'avgLongHold', cat:'signals', label:'Удержание лонга (баров)',
+    desc:'Среднее количество баров в лонг-позиции',
+    fmt:v=>fmt(v,1), ms:1 },
+  { key:'avgShortHold',cat:'signals', label:'Удержание шорта (баров)',
+    desc:'Среднее количество баров в шорт-позиции',
+    fmt:v=>fmt(v,1), ms:1 },
+];
+
+const CAT_LABELS = {
+  structure: '⚙️ Структура рынка',
+  volatility:'📈 Волатильность',
+  pivots:    '📍 Пивоты',
+  indicator: '〰️ Индикатор (MA)',
+  signals:   '🎯 Сигналы стратегии',
+};
+
+// ═══════════════════════════════════════════════════════════════
+// COMPARISON — returns enriched metric rows
+// ═══════════════════════════════════════════════════════════════
+function compareMetrics(mA, mB) {
+  return METRIC_DEFS.map(def => {
+    const vA = mA[def.key], vB = mB[def.key];
+    const dA = def.distKey ? mA[def.distKey] : null;
+    const dB = def.distKey ? mB[def.distKey] : null;
+    const score = stabilityScore(vA, vB, def.ms||0.01, dA, dB);
+    return { ...def, vA, vB, score };
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// REGIME PROFILE — one-line description of a period
+// ═══════════════════════════════════════════════════════════════
+function regimeProfile(m) {
+  const tags=[];
+  // Hurst
+  if (!isNaN(m.hurst)) {
+    if (m.hurst>0.58)      tags.push('<span class="tag tag-trend">Трендовый</span>');
+    else if (m.hurst<0.42) tags.push('<span class="tag tag-mr">Mean-reversion</span>');
+    else                   tags.push('<span class="tag tag-random">Нейтральный</span>');
+  }
+  // Volatility
+  if (!isNaN(m.atrPctMean)) {
+    if (m.atrPctMean>1.5)       tags.push('<span class="tag tag-vol-hi">Высокая волат.</span>');
+    else if (m.atrPctMean<0.5)  tags.push('<span class="tag tag-vol-lo">Низкая волат.</span>');
+    else                        tags.push('<span class="tag tag-neutral">Умер. волат.</span>');
+  }
+  // Bullish bias
+  if (!isNaN(m.bullish)) {
+    if (m.bullish>55)      tags.push('<span class="tag tag-bull">Бычий уклон</span>');
+    else if (m.bullish<45) tags.push('<span class="tag tag-bear">Медвежий уклон</span>');
+    else                   tags.push('<span class="tag tag-neutral">Без уклона</span>');
+  }
+  // Efficiency
+  if (!isNaN(m.erMean)) {
+    if (m.erMean>0.35) tags.push('<span class="tag tag-trend">Эффективн. движение</span>');
+    else               tags.push('<span class="tag tag-mr">Хаотичн. движение</span>');
+  }
+
+  const lines=[];
+  if(!isNaN(m.hurst))      lines.push(`Hurst=${m.hurst.toFixed(3)}`);
+  if(!isNaN(m.atrPctMean)) lines.push(`ATR=${m.atrPctMean.toFixed(2)}%`);
+  if(!isNaN(m.pivFreq))    lines.push(`пивотов=${m.pivFreq.toFixed(1)}/100б`);
+  if(!isNaN(m.bullish))    lines.push(`бычьих=${m.bullish.toFixed(0)}%`);
+
+  return { tags: tags.join(' '), stats: lines.join(' · '), n: m.n, start: m.dateStart, end: m.dateEnd };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// RENDER
+// ═══════════════════════════════════════════════════════════════
+function renderRegime(mA, mB) {
+  const pA = regimeProfile(mA), pB = regimeProfile(mB);
+  return `
+  <h2>🌍 Режим рынка</h2>
+  <div class="regime-grid">
+    <div class="regime-card a">
+      <div class="regime-name"><span class="period-label period-a">Период A</span> ${pA.start} — ${pA.end} <span class="dimmed">(${pA.n} баров)</span></div>
+      <div style="margin-bottom:6px">${pA.tags}</div>
+      <div class="regime-desc">${pA.stats}</div>
+    </div>
+    <div class="regime-card b">
+      <div class="regime-name"><span class="period-label period-b">Период B</span> ${pB.start} — ${pB.end} <span class="dimmed">(${pB.n} баров)</span></div>
+      <div style="margin-bottom:6px">${pB.tags}</div>
+      <div class="regime-desc">${pB.stats}</div>
+    </div>
+  </div>`;
+}
+
+function renderMetricsTable(rows) {
+  let html = '<h2>📐 Метрики: сравнение и стабильность</h2>';
+  html += '<div class="metrics-section"><table class="mt"><thead><tr>';
+  html += '<th style="width:180px">Метрика</th>';
+  html += '<th class="r" style="width:90px"><span style="color:var(--blue)">Период A</span></th>';
+  html += '<th class="r" style="width:90px"><span style="color:var(--purple)">Период B</span></th>';
+  html += '<th class="r" style="width:70px">Изменение</th>';
+  html += '<th style="width:160px">Стабильность</th>';
+  html += '<th class="desc" style="min-width:180px">Что означает</th>';
+  html += '</tr></thead><tbody>';
+
+  let prevCat = null;
+  for (const r of rows) {
+    if (r.cat !== prevCat) {
+      prevCat = r.cat;
+      html += `<tr class="cat-header"><td colspan="6">${CAT_LABELS[r.cat]||r.cat}</td></tr>`;
+    }
+    const skip = (isNaN(r.vA) && isNaN(r.vB));
+    if (skip) continue;
+    const fA = r.fmt(r.vA), fB = r.fmt(r.vB);
+    html += `<tr>
+      <td class="label" title="${r.desc}">${r.label}</td>
+      <td class="r val-a">${fA}</td>
+      <td class="r val-b">${fB}</td>
+      <td class="r">${fmtChg(r.vA, r.vB)}</td>
+      <td>${miniBar(r.score)} ${stabBadge(r.score)}</td>
+      <td class="desc dimmed">${r.desc}</td>
+    </tr>`;
+  }
+  html += '</tbody></table></div>';
+  return html;
+}
+
+function renderSignals(mA, mB) {
+  if (!mA.hasSignals && !mB.hasSignals) return '';
+  const row = (label, vA, vB) =>
+    `<div class="sig-card"><div class="sc-label">${label}</div><div class="sc-vals">
+      <div class="sc-val"><span class="val-a">${vA}</span> <span class="p">A</span></div>
+      <div class="sc-val"><span class="val-b">${vB}</span> <span class="p">B</span></div>
+    </div></div>`;
+
+  return `<h2>🎯 Сигналы стратегии</h2>
+  <div class="sig-grid">
+    ${row('Лонг-входов / 100б', fmt(mA.elFreq,2), fmt(mB.elFreq,2))}
+    ${row('Шорт-входов / 100б', fmt(mA.esFreq,2), fmt(mB.esFreq,2))}
+    ${row('Всего сделок', mA.longCount+mA.shortCount, mB.longCount+mB.shortCount)}
+    ${row('Удержание лонга (б)', fmt(mA.avgLongHold,1), fmt(mB.avgLongHold,1))}
+    ${row('Удержание шорта (б)', fmt(mA.avgShortHold,1), fmt(mB.avgShortHold,1))}
+    ${row('WR лонг', fmtPct(mA.longWR), fmtPct(mB.longWR))}
+    ${row('WR шорт', fmtPct(mA.shortWR), fmtPct(mB.shortWR))}
+    ${row('Equity итог A→B', fmtPct(mA.totalReturn,1), fmtPct(mB.totalReturn,1))}
+    ${row('MaxDD A→B', fmtPct(mA.maxDD,1), fmtPct(mB.maxDD,1))}
+  </div>`;
+}
+
+function renderRecommendations(rows) {
+  const sorted = rows.filter(r=>!isNaN(r.score)).sort((a,b)=>b.score-a.score);
+  const stable   = sorted.filter(r=>r.score>=0.75).slice(0,7);
+  const unstable = sorted.filter(r=>r.score< 0.50).sort((a,b)=>a.score-b.score).slice(0,7);
+
+  // Verdict text
+  const avgScore = sorted.length ? mean(sorted.map(r=>r.score)) : 0.5;
+  let verdict='';
+  if (avgScore>=0.75)
+    verdict=`<strong>Структура рынка стабильна</strong> — большинство метрик сохранили характер. Стратегии, построенные на этих данных, имеют высокий шанс перенести свойства в будущее.`;
+  else if (avgScore>=0.55)
+    verdict=`<strong>Умеренные изменения</strong> — часть метрик устойчива, часть сдвинулась. Стабильные метрики можно брать как основу; параметры нестабильных нужно адаптировать.`;
+  else
+    verdict=`<strong>Рынок значительно изменился</strong> — параметры стратегий из периода A могут плохо работать в B. Переобучи пороги на свежих данных.`;
+
+  const stableItems = stable.map(r=>`
+    <div class="rec-item">
+      <span class="rec-icon">🟢</span>
+      <span><strong>${r.label}</strong> — A=${r.fmt(r.vA)}, B=${r.fmt(r.vB)}</span>
+    </div>`).join('');
+
+  const unstableItems = unstable.map(r=>`
+    <div class="rec-item">
+      <span class="rec-icon">🔴</span>
+      <span><strong>${r.label}</strong> — A=${r.fmt(r.vA)}, B=${r.fmt(r.vB)} (${fmtChg(r.vA,r.vB)||'—'})</span>
+    </div>`).join('');
+
+  return `<h2>💡 Выводы и рекомендации</h2>
+  <div class="verdict">${verdict}</div>
+  <div class="rec-grid">
+    <div class="rec-box good">
+      <h3>✅ Строй стратегию на этом</h3>
+      ${stableItems||'<div class="rec-item dimmed">нет метрик с высокой стабильностью</div>'}
+    </div>
+    <div class="rec-box warn">
+      <h3>⚠️ Это изменилось — не зашивай в параметры</h3>
+      ${unstableItems||'<div class="rec-item dimmed">нет нестабильных метрик</div>'}
+    </div>
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MAIN ENTRY POINT
+// ═══════════════════════════════════════════════════════════════
+async function runAnalysis() {
+  const btn = document.getElementById('btn-analyze');
+  const status = document.getElementById('analyze-status');
+  btn.disabled = true;
+  status.textContent = 'Анализирую...';
+
+  // yield to browser
+  await new Promise(r=>setTimeout(r,10));
+
+  try {
+    const mA = analyzeData(_csvData.a);
+    const mB = analyzeData(_csvData.b);
+
+    if (!mA || !mB) {
+      status.textContent = '⚠️ Недостаточно данных в одном из файлов (нужно ≥30 баров)';
+      btn.disabled = false;
+      return;
+    }
+
+    const comparedRows = compareMetrics(mA, mB);
+
+    document.getElementById('regime-section').innerHTML      = renderRegime(mA, mB);
+    document.getElementById('metrics-section').innerHTML     = renderMetricsTable(comparedRows);
+    document.getElementById('signals-section').innerHTML     = renderSignals(mA, mB);
+    document.getElementById('recommendations-section').innerHTML = renderRecommendations(comparedRows);
+    document.getElementById('results').style.display = 'block';
+    document.getElementById('results').scrollIntoView({behavior:'smooth'});
+    status.textContent = `✓ Готово · ${mA.n} + ${mB.n} баров`;
+  } catch(e) {
+    status.textContent = '⚠️ Ошибка: ' + e.message;
+    console.error('[comparator]', e);
+  }
+  btn.disabled = false;
+}
 </script>
 </body>
 </html>
+
 
