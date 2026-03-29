@@ -27214,8 +27214,15 @@ async function runOOSOnNewData() {
 
     const origDATA = DATA;
     let rOld = null, rNew = null;
-    try { DATA = origDATA; rOld = _hcRunBacktest(r.cfg); } catch(e) {}
-    try { DATA = NEW_DATA; rNew = _hcRunBacktest(r.cfg); } catch(e) {}
+
+    // Для old результата используем существующий результат из srcList (уже содержит IS метрики)
+    rOld = r;
+
+    // Для new результата пересчитываем на новых данных
+    try {
+      DATA = NEW_DATA;
+      rNew = _hcRunBacktest(r.cfg);
+    } catch(e) { }
     DATA = origDATA;
 
     _oosTableResults.push({
@@ -29653,7 +29660,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774806814556;
+window._BUILD_TS = 1774813072366;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;

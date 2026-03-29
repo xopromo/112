@@ -7814,8 +7814,15 @@ async function runOOSOnNewData() {
 
     const origDATA = DATA;
     let rOld = null, rNew = null;
-    try { DATA = origDATA; rOld = _hcRunBacktest(r.cfg); } catch(e) {}
-    try { DATA = NEW_DATA; rNew = _hcRunBacktest(r.cfg); } catch(e) {}
+
+    // Для old результата используем существующий результат из srcList (уже содержит IS метрики)
+    rOld = r;
+
+    // Для new результата пересчитываем на новых данных
+    try {
+      DATA = NEW_DATA;
+      rNew = _hcRunBacktest(r.cfg);
+    } catch(e) { }
     DATA = origDATA;
 
     _oosTableResults.push({
