@@ -5248,7 +5248,18 @@ function toggleColSettings() {
     const tblRect = tbl.getBoundingClientRect();
     panel.style.position = 'fixed';
     panel.style.top = (rect.bottom + 4) + 'px';
-    panel.style.right = (window.innerWidth - rect.right) + 'px';
+    // Проверяем место вправо, если не влазит - позиционируем влево
+    const panelWidth = 280; // примерная ширина панели
+    const rightSpace = window.innerWidth - rect.right;
+    if (rightSpace < panelWidth) {
+      // Позиционируем от левого края кнопки
+      panel.style.left = (rect.left - panelWidth + rect.width) + 'px';
+      panel.style.right = 'auto';
+    } else {
+      // Позиционируем от правого края
+      panel.style.right = (window.innerWidth - rect.right) + 'px';
+      panel.style.left = 'auto';
+    }
   }
   document.body.appendChild(panel);
   // Закрыть при клике вне
@@ -7080,6 +7091,7 @@ function applyOOSFilters() {
   if (oosTbl) oosTbl.style.display = '';
 
   const fname  = document.getElementById('oof_name')?.value.trim().toLowerCase() || '';
+  const ffav   = document.getElementById('oof_fav')?.value || '';
   const fopnl  = parseFloat(document.getElementById('oof_opnl')?.value);
   const fnpnl  = parseFloat(document.getElementById('oof_npnl')?.value);
   const fdpnl  = parseFloat(document.getElementById('oof_dpnl')?.value);
@@ -7091,6 +7103,11 @@ function applyOOSFilters() {
 
   const src = _oosTableResults.filter(r => {
     if (fname && !r.name.toLowerCase().includes(fname)) return false;
+    if (ffav) {
+      const oosLvl = getFavLevel(r.name);
+      if (ffav === 'fav' && oosLvl === 0) return false;
+      if (ffav === 'no' && oosLvl > 0) return false;
+    }
     if (!isNaN(fopnl) && (r.old_pnl ?? -Infinity) < fopnl) return false;
     if (!isNaN(fnpnl) && (r.new_pnl ?? -Infinity) < fnpnl) return false;
     if (!isNaN(fdpnl) && (r.delta_pnl ?? -Infinity) < fdpnl) return false;

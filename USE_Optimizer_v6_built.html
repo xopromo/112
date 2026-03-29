@@ -1820,7 +1820,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
         </tr>
         <tr id="oos-filter-row" style="background:var(--bg2)">
           <td style="padding:1px 3px"><input id="oof_name" placeholder="поиск..." oninput="applyOOSFilters()" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border2);border-radius:3px;color:var(--text);font-size:.65em;padding:1px 4px;font-family:var(--font-mono)"></td>
-          <td></td>
+          <td style="padding:1px 2px"><select id="oof_fav" onchange="applyOOSFilters()" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border2);border-radius:3px;color:var(--text);font-size:.65em;padding:1px 1px"><option value="">все</option><option value="fav">⭐</option><option value="no">☆</option></select></td>
           <td style="padding:1px 2px"><input id="oof_opnl" type="number" placeholder="≥" oninput="applyOOSFilters()" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border2);border-radius:3px;color:var(--text);font-size:.65em;padding:1px 3px"></td>
           <td style="padding:1px 2px"><input id="oof_npnl" type="number" placeholder="≥" oninput="applyOOSFilters()" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border2);border-radius:3px;color:var(--text);font-size:.65em;padding:1px 3px"></td>
           <td style="padding:1px 2px"><input id="oof_dpnl" type="number" placeholder="≥" oninput="applyOOSFilters()" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border2);border-radius:3px;color:var(--text);font-size:.65em;padding:1px 3px"></td>
@@ -24613,7 +24613,18 @@ function toggleColSettings() {
     const tblRect = tbl.getBoundingClientRect();
     panel.style.position = 'fixed';
     panel.style.top = (rect.bottom + 4) + 'px';
-    panel.style.right = (window.innerWidth - rect.right) + 'px';
+    // Проверяем место вправо, если не влазит - позиционируем влево
+    const panelWidth = 280; // примерная ширина панели
+    const rightSpace = window.innerWidth - rect.right;
+    if (rightSpace < panelWidth) {
+      // Позиционируем от левого края кнопки
+      panel.style.left = (rect.left - panelWidth + rect.width) + 'px';
+      panel.style.right = 'auto';
+    } else {
+      // Позиционируем от правого края
+      panel.style.right = (window.innerWidth - rect.right) + 'px';
+      panel.style.left = 'auto';
+    }
   }
   document.body.appendChild(panel);
   // Закрыть при клике вне
@@ -26445,6 +26456,7 @@ function applyOOSFilters() {
   if (oosTbl) oosTbl.style.display = '';
 
   const fname  = document.getElementById('oof_name')?.value.trim().toLowerCase() || '';
+  const ffav   = document.getElementById('oof_fav')?.value || '';
   const fopnl  = parseFloat(document.getElementById('oof_opnl')?.value);
   const fnpnl  = parseFloat(document.getElementById('oof_npnl')?.value);
   const fdpnl  = parseFloat(document.getElementById('oof_dpnl')?.value);
@@ -26456,6 +26468,11 @@ function applyOOSFilters() {
 
   const src = _oosTableResults.filter(r => {
     if (fname && !r.name.toLowerCase().includes(fname)) return false;
+    if (ffav) {
+      const oosLvl = getFavLevel(r.name);
+      if (ffav === 'fav' && oosLvl === 0) return false;
+      if (ffav === 'no' && oosLvl > 0) return false;
+    }
     if (!isNaN(fopnl) && (r.old_pnl ?? -Infinity) < fopnl) return false;
     if (!isNaN(fnpnl) && (r.new_pnl ?? -Infinity) < fnpnl) return false;
     if (!isNaN(fdpnl) && (r.delta_pnl ?? -Infinity) < fdpnl) return false;
@@ -29467,7 +29484,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774806798508;
+window._BUILD_TS = 1774806801255;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
