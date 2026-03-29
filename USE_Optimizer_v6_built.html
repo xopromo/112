@@ -28349,83 +28349,106 @@ function _checkMSCConfig() {
   try { cfg = JSON.parse(raw); } catch(e) { localStorage.removeItem('msc_config'); return; }
   if (!cfg || !cfg.apply) return;
 
+  localStorage.removeItem('msc_config');
+
   const meta = cfg.meta || {};
-  const periodLabel = (meta.periodBStart && meta.periodBEnd)
-    ? `период B: ${meta.periodBStart} → ${meta.periodBEnd}`
-    : 'период B';
+  const periodB = meta.periodB || {};
+  const periodLabel = (periodB.start && periodB.end)
+    ? `${periodB.start} — ${periodB.end}`
+    : new Date().toLocaleDateString('ru-RU');
+  const tplName = `📊 Comparator · ${periodLabel}`;
 
-  // Build apply rows HTML
-  const applyEntries = Object.entries(cfg.apply);
-  const applyRows = applyEntries.map(([id, val]) => {
-    const displayVal = typeof val === 'boolean' ? (val ? '✅ вкл' : '❌ выкл') : val;
-    return `<span style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.06);border-radius:6px;padding:3px 8px;font-size:12px">
-      <code style="color:var(--accent)">${id}</code>
-      <span style="color:var(--fg2)">→</span>
-      <b style="color:var(--fg)">${displayVal}</b>
-    </span>`;
-  }).join(' ');
+  // ── Build template settings: start from current DOM, then wipe entries/filters ──
+  const settings = gatherSettings();
 
+  // Disable ALL entry (e_*), filter (f_*), SL (s_*), TP (t_*) checkboxes → clean slate
+  Object.keys(settings.chks).forEach(k => {
+    if (/^[efst]_/.test(k)) settings.chks[k] = false;
+  });
+
+  // Apply comparator recommendations on top
+  Object.entries(cfg.apply).forEach(([id, val]) => {
+    if (typeof val === 'boolean') settings.chks[id] = val;
+    else settings.vals[id] = String(val);
+  });
+
+  // Save as named template
+  const existIdx = templates.findIndex(t => t.name === tplName);
+  if (existIdx >= 0) {
+    templates[existIdx].settings = settings;
+    templates[existIdx].ts = Date.now();
+    _activeTplIdx = existIdx;
+  } else {
+    templates.push({ name: tplName, settings, isDefault: false, ts: Date.now() });
+    _activeTplIdx = templates.length - 1;
+  }
+  storeSave('use6_tpl', templates);
+
+  // Build hints HTML
   const hintsHtml = (cfg.hints || []).map(h =>
-    `<div style="font-size:12px;color:var(--fg2);line-height:1.4">${h.icon || '•'} ${h.text}</div>`
+    `<div style="font-size:12px;color:var(--fg2);line-height:1.5">${h.icon || '•'} ${h.text}</div>`
   ).join('');
 
+  // Build what-was-enabled summary
+  const enabledRows = Object.entries(cfg.apply).map(([id, val]) => {
+    const label = { f_ma:'MA-фильтр', f_strend:'Простой тренд', s_atr:'SL ×ATR',
+      s_atrv:'Множитель ATR', t_rr:'TP R:R', t_rrv:'Множитель R:R' }[id] || id;
+    const display = typeof val === 'boolean' ? (val ? '✅' : '❌') : `<b style="color:var(--accent)">${val}</b>`;
+    return `<span style="display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,.06);
+      border-radius:5px;padding:2px 8px;font-size:12px;white-space:nowrap">
+      ${display} <span style="color:var(--fg2)">${label}</span>
+    </span>`;
+  }).join('');
+
+  // Show banner
   const banner = document.createElement('div');
   banner.id = 'msc-banner';
   banner.style.cssText = `
     position:fixed;bottom:16px;left:50%;transform:translateX(-50%);
     background:var(--bg2,#1e1e2e);border:1px solid rgba(137,220,235,.4);
     border-radius:10px;padding:14px 18px;z-index:9999;
-    box-shadow:0 4px 20px rgba(0,0,0,.5);max-width:680px;width:calc(100vw - 32px);
+    box-shadow:0 4px 20px rgba(0,0,0,.5);max-width:700px;width:calc(100vw - 32px);
     display:flex;flex-direction:column;gap:10px;
   `;
   banner.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
-      <div style="font-size:13px;font-weight:600;color:var(--accent)">
-        📊 Конфигурация от Comparator
-        <span style="font-weight:400;color:var(--fg2);margin-left:6px;font-size:12px">${periodLabel}</span>
+      <div>
+        <span style="font-size:13px;font-weight:600;color:var(--accent)">📊 Шаблон от Comparator</span>
+        <span style="color:var(--fg2);font-size:12px;margin-left:8px">${periodLabel}</span>
       </div>
       <button onclick="document.getElementById('msc-banner').remove()" style="
-        background:none;border:none;color:var(--fg2);cursor:pointer;font-size:16px;line-height:1;padding:0;flex-shrink:0
-      ">✕</button>
+        background:none;border:none;color:var(--fg2);cursor:pointer;font-size:16px;padding:0;flex-shrink:0">✕</button>
     </div>
-    <div style="display:flex;flex-wrap:wrap;gap:6px">${applyRows}</div>
-    ${hintsHtml ? `<div id="msc-hints" style="display:none;border-top:1px solid rgba(255,255,255,.08);padding-top:8px;display:flex;flex-direction:column;gap:4px">${hintsHtml}</div>` : ''}
-    <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <div style="font-size:11px;color:var(--fg2)">
+      Все входные сигналы, фильтры, SL и TP <b style="color:var(--fg)">отключены</b>. Включено только:
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:5px">${enabledRows}</div>
+    ${hintsHtml ? `
+    <div id="msc-hints" style="display:none;flex-direction:column;gap:4px;border-top:1px solid rgba(255,255,255,.08);padding-top:8px">
+      ${hintsHtml}
+    </div>` : ''}
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
       <button id="msc-apply-btn" style="
         background:var(--accent,#89dceb);color:#1e1e2e;border:none;border-radius:6px;
-        padding:6px 16px;font-size:13px;font-weight:600;cursor:pointer
-      ">✅ Применить</button>
+        padding:7px 18px;font-size:13px;font-weight:700;cursor:pointer
+      ">✅ Загрузить шаблон</button>
       ${hintsHtml ? `<button onclick="
         const h=document.getElementById('msc-hints');
-        if(h){h.style.display=h.style.display==='none'?'flex':'none';this.textContent=h.style.display==='none'?'💡 Подробнее':'💡 Скрыть'}
-      " style="background:rgba(255,255,255,.08);color:var(--fg);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:6px 12px;font-size:13px;cursor:pointer">💡 Подробнее</button>` : ''}
-      <button onclick="localStorage.removeItem('msc_config');document.getElementById('msc-banner').remove()" style="
-        background:none;border:1px solid rgba(255,255,255,.15);color:var(--fg2);
-        border-radius:6px;padding:6px 12px;font-size:13px;cursor:pointer
-      ">Закрыть</button>
+        if(h){h.style.display=h.style.display==='none'?'flex':'none';
+              this.textContent=h.style.display==='none'?'💡 Советы':'💡 Скрыть';}
+      " style="background:rgba(255,255,255,.07);color:var(--fg);border:1px solid rgba(255,255,255,.15);
+        border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer">💡 Советы</button>` : ''}
+      <span style="font-size:11px;color:var(--fg2)">Шаблон «${tplName}» уже сохранён в 📂 Шаблоны</span>
     </div>
   `;
-
   document.body.appendChild(banner);
 
   document.getElementById('msc-apply-btn').addEventListener('click', function() {
-    applyEntries.forEach(([id, val]) => {
-      const el = document.getElementById(id);
-      if (!el) return;
-      if (typeof val === 'boolean') {
-        if (el.checked !== val) {
-          el.checked = val;
-          el.dispatchEvent(new Event('change', { bubbles: true }));
-        }
-      } else {
-        el.value = String(val);
-        el.dispatchEvent(new Event('change', { bubbles: true }));
-      }
-    });
-    localStorage.removeItem('msc_config');
-    const btn = document.getElementById('msc-apply-btn');
-    if (btn) { btn.textContent = '✅ Применено'; btn.disabled = true; btn.style.opacity = '0.6'; }
-    setTimeout(() => { const b = document.getElementById('msc-banner'); if (b) b.remove(); }, 1500);
+    applySettings(settings);
+    _updateActiveTplBadge();
+    showTplToast(`📊 Шаблон "${tplName}" загружен`);
+    const b = document.getElementById('msc-banner');
+    if (b) b.remove();
   });
 }
 
@@ -29196,7 +29219,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774803537447;
+window._BUILD_TS = 1774805486481;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
