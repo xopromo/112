@@ -4108,7 +4108,15 @@ function selectRow(idx) {
     return; // renderVisibleResults восстановит выделение сам
   }
 
-  // Обновляем выделение
+  // В OOS режиме не пытаемся выделить строку в основной таблице (она скрыта)
+  if (_tableMode === 'oos') {
+    const r = _visibleResults[idx];
+    if (!r) return;
+    drawEquityForResult(r);
+    return;
+  }
+
+  // Обновляем выделение в основной таблице
   const prevSel = document.querySelector('#tb tr.sel');
   if (prevSel) prevSel.classList.remove('sel');
   const tr = document.querySelector(`#tb tr[data-i="${idx}"]`);
