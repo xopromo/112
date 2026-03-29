@@ -7563,20 +7563,16 @@ function drawOOSChart(idx, rowEl) {
   // Сохраняем параметры графика для mouse tracking
   window._oosChartParams = { combined, mn, range, pad, W, H, splitFrac, splitIdx };
 
-  // Добавляем mouse tracking к OOS canvas
-  const oosCanvas = document.getElementById('oos-eqc');
+  // Добавляем mouse tracking к OOS crosshair canvas (уже отрисован в overlayе)
   const oosCharts = document.getElementById('oos-crosshair');
-  if (oosCanvas && oosCharts) {
+  if (oosCharts) {
     // Синхронизируем размер crosshair canvas с основным
-    oosCharts.width = oosCanvas.width;
-    oosCharts.height = oosCanvas.height;
+    oosCharts.width = canvas.width;
+    oosCharts.height = canvas.height;
 
-    // Удаляем старые обработчики если были
-    const newOosCanvas = oosCanvas.cloneNode(true);
-    oosCanvas.parentNode.replaceChild(newOosCanvas, oosCanvas);
-
-    newOosCanvas.addEventListener('mousemove', _drawOOSCrosshair);
-    newOosCanvas.addEventListener('mouseleave', _clearOOSCrosshair);
+    // Добавляем обработчики mouse (они будут работать на oosCharts overlay)
+    oosCharts.addEventListener('mousemove', _drawOOSCrosshair, { once: false });
+    oosCharts.addEventListener('mouseleave', _clearOOSCrosshair, { once: false });
   }
 }
 
@@ -7584,11 +7580,10 @@ function drawOOSChart(idx, rowEl) {
 function _drawOOSCrosshair(e) {
   const p = window._oosChartParams;
   if (!p) return;
-  const canvas = document.getElementById('oos-eqc');
-  const ch = document.getElementById('oos-crosshair');
-  if (!canvas || !ch) return;
+  const ch = e.target; // сам crosshair canvas
+  if (!ch) return;
 
-  const rect = canvas.getBoundingClientRect();
+  const rect = ch.getBoundingClientRect();
   const scaleX = canvas.width / rect.width;
   const scaleY = canvas.height / rect.height;
 
