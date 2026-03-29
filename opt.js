@@ -1880,13 +1880,15 @@ async function runOpt() {
 
     const _mType = $v('f_mat') || 'EMA';
     updateETA(0, mcTotal, 0); await yieldToUI(); // показать начальное состояние до цикла
+    // ОПТИМИЗАЦИЯ: переиспользуем _di вместо new Array() на каждую итерацию
+    const _diReuse = new Array(_mcDims.length);
     for (let _mi = 0; _mi < mcTotal && !stopped; _mi++) {
       try {
       // Декодируем индекс в параметры через деление с остатком
       let _idx = _mcSampled[_mi];
       const _dims = _mcDims;
       const _dsz  = _mcDimSizes;
-      const _di = new Array(_dims.length);
+      const _di = _diReuse;
       for (let d = _dims.length - 1; d >= 0; d--) {
         _di[d] = _idx % _dsz[d];
         _idx = Math.floor(_idx / _dsz[d]);
