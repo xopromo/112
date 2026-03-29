@@ -20544,6 +20544,7 @@ function showDetail(r) {
       `<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">`+
       `<input type="file" id="fi-tv-csv" accept=".csv,.tsv" style="display:none" onchange="loadTVcsv(event)">`+
       `<button class="tpl-btn2" style="padding:3px 10px;font-size:.85em" onclick="document.getElementById('fi-tv-csv').click()">📂 TV CSV</button>`+
+      `<button class="tpl-btn2" style="padding:3px 10px;font-size:.85em;border-color:#fbbf24;color:#fbbf24" onclick="openOOSDiagnostic()">🔍 OOS Диагностика</button>`+
       `<span id="tv-cmp-status" style="font-size:.78em;color:var(--text3)">файл не загружен</span>`+
       `</div><div id="tv-cmp-results" style="margin-top:6px"></div>`;
     html = section('📡', 'СРАВНЕНИЕ С TRADINGVIEW (E2E)', _tvSec) + html;
@@ -26811,11 +26812,135 @@ function _oosGetBadge(r) {
 }
 
 
-// Детальный вид OOS результата с расширенной диагностикой
+// Детальный вид OOS результата
 function showOOSDetail(idx) {
   const r = _oosTableResults[idx];
   if (!r || !r.cfg) return;
-  _showOOSDiagnostic(r, idx);
+  showDetail(r);
+}
+
+// Диагностика OOS расхождений для текущего результата в detail панели
+function openOOSDiagnostic() {
+  const r = _robustResult;
+  if (!r) { alert('Сначала откройте результат из таблицы'); return; }
+  if (!_oosTableResults || _oosTableResults.length === 0) {
+    alert('Сначала запустите сравнение OOS (Новые данные)');
+    return;
+  }
+
+  // Найдем соответствующий результат в OOS таблице
+  const oosR = _oosTableResults.find(or => or.name === r.name && or.cfg === r.cfg);
+  if (!oosR || !oosR.old_pnl) {
+    alert('Этот результат не найден в OOS сравнении');
+    return;
+  }
+
+  // Генерируем текст диагностики
+  let text = `${'='.repeat(70)}\n`;
+  text += `📊 ДИАГНОСТИКА OOS: ${oosR.name}\n`;
+  text += `${'='.repeat(70)}\n\n`;
+
+  text += `📍 ИСХОДНЫЙ ПЕРИОД (История · IS):\n`;
+  text += `   PnL: ${(oosR.old_pnl ?? '—').toFixed(2)}% | WR: ${(oosR.old_wr ?? '—').toFixed(1)}% | Сделок: ${oosR.old_n ?? '—'} | DD: ${(oosR.old_dd ?? '—').toFixed(2)}% | P/DD: ${(oosR.old_pdd ?? '—').toFixed(2)}\n\n`;
+
+  text += `📍 НОВЫЙ ПЕРИОД (Загруженные данные · OOS):\n`;
+  text += `   PnL: ${(oosR.new_pnl ?? '—').toFixed(2)}% | WR: ${(oosR.new_wr ?? '—').toFixed(1)}% | Сделок: ${oosR.new_n ?? '—'} | DD: ${(oosR.new_dd ?? '—').toFixed(2)}% | P/DD: ${(oosR.new_pdd ?? '—').toFixed(2)}\n\n`;
+
+  text += `📊 ДЕЛЬТА (изменения OOS - IS):\n`;
+  if (oosR.old_pnl != null && oosR.new_pnl != null) {
+    const dPnl = oosR.new_pnl - oosR.old_pnl;
+    const status = dPnl > 0 ? '✅' : dPnl < 0 ? '❌' : '⚪';
+    text += `   ΔPnL: ${dPnl >= 0 ? '+' : ''}${dPnl.toFixed(2)}% ${status}\n`;
+  }
+  if (oosR.old_wr != null && oosR.new_wr != null) {
+    const dWr = oosR.new_wr - oosR.old_wr;
+    const status = Math.abs(dWr) > 10 ? '⚠️' : '✅';
+    text += `   ΔWR: ${dWr >= 0 ? '+' : ''}${dWr.toFixed(1)}% ${status}\n`;
+  }
+  if (oosR.old_n != null && oosR.new_n != null) {
+    const dN = oosR.new_n - oosR.old_n;
+    const status = dN < 0 ? '⚠️' : '✅';
+    text += `   ΔТрейдов: ${dN >= 0 ? '+' : ''}${dN} ${status}\n`;
+  }
+  if (oosR.old_dd != null && oosR.new_dd != null) {
+    const dDd = oosR.new_dd - oosR.old_dd;
+    const status = dDd > 10 ? '❌' : dDd > 0 ? '⚠️' : '✅';
+    text += `   ΔDD: ${dDd >= 0 ? '+' : ''}${dDd.toFixed(2)}% ${status}\n`;
+  }
+  text += `\n`;
+
+  text += `⚠️ АНАЛИЗ:\n`;
+  let hasIssues = false;
+
+  if (oosR.old_pnl != null && oosR.new_pnl != null) {
+    const dPnl = oosR.new_pnl - oosR.old_pnl;
+    if (dPnl < -50) {
+      text += `   ❌ КРИТИЧЕСКОЕ ПАДЕНИЕ PnL на ${Math.abs(dPnl).toFixed(1)}%\n`;
+      hasIssues = true;
+    } else if (dPnl < -10) {
+      text += `   ⚠️  Значительное снижение PnL на ${Math.abs(dPnl).toFixed(1)}%\n`;
+    } else if (dPnl > 20) {
+      text += `   ✅ Улучшение результатов на +${dPnl.toFixed(1)}%\n`;
+    }
+  }
+
+  if (oosR.old_wr != null && oosR.new_wr != null) {
+    const dWr = oosR.new_wr - oosR.old_wr;
+    if (Math.abs(dWr) > 20) {
+      text += `   ⚠️  Резкое изменение WR на ${dWr > 0 ? '+' : ''}${dWr.toFixed(1)}% (переоптимизация?)\n`;
+    }
+  }
+
+  if (oosR.old_n != null && oosR.new_n != null) {
+    const ratio = oosR.new_n / Math.max(oosR.old_n, 1);
+    if (ratio < 0.5) {
+      text += `   ⚠️  Кол-во сделок упало на ${Math.round((1 - ratio) * 100)}% (нет условий на новых данных?)\n`;
+    }
+  }
+
+  if (oosR.old_dd != null && oosR.new_dd != null) {
+    const dDd = oosR.new_dd - oosR.old_dd;
+    if (dDd > 20) {
+      text += `   ❌ DD критически вырос на ${dDd.toFixed(1)}% (управление риском?)\n`;
+      hasIssues = true;
+    }
+  }
+
+  if (!hasIssues && oosR.new_pnl > 0) {
+    text += `   ✅ Результаты стабильны между периодами\n`;
+  }
+
+  text += `\n📋 Параметры стратегии:\n`;
+  const cfg = oosR.cfg || {};
+  const cfgStr = JSON.stringify(cfg, null, 2);
+  text += cfgStr + `\n\n`;
+  text += `${'='.repeat(70)}\n`;
+
+  // Открываем модальное окно
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+  modal.style.display = 'flex';
+  modal.style.alignItems = 'center';
+  modal.style.justifyContent = 'center';
+  modal.style.zIndex = 9999;
+  modal.onclick = e => { if (e.target === modal) modal.remove(); };
+
+  const content = document.createElement('div');
+  content.style.cssText = 'background:var(--bg);border-radius:8px;padding:20px;max-width:800px;max-height:80vh;overflow:auto;border:1px solid var(--border)';
+
+  content.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px">
+      <h2 style="margin:0;color:var(--accent)">📊 OOS Диагностика</h2>
+      <button onclick="this.closest('.modal-overlay').remove()" style="cursor:pointer;border:none;background:none;font-size:1.5em;color:var(--text3)">✕</button>
+    </div>
+    <pre style="margin:0;padding:12px;background:var(--bg2);border-radius:6px;border:1px solid var(--border);overflow:auto;max-height:50vh;font-size:.85em;color:var(--text2);font-family:monospace">${text.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre>
+    <div style="margin-top:15px;display:flex;gap:10px">
+      <button class="tpl-btn2" style="padding:8px 16px;font-size:.9em;flex:1;border-color:#4ade80;color:#4ade80" onclick="navigator.clipboard.writeText(\`${text.replace(/`/g, '\\`')}\`).then(()=>{this.textContent='✅ Скопировано!';setTimeout(()=>this.textContent='📋 Копировать',2000)})">📋 Копировать</button>
+    </div>
+  `;
+
+  modal.appendChild(content);
+  document.body.appendChild(modal);
 }
 
 function _showOOSDiagnostic(r, idx) {
@@ -29929,7 +30054,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774819286592;
+window._BUILD_TS = 1774820102052;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
