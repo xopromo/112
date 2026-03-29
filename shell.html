@@ -355,6 +355,22 @@ th:hover { background: var(--bg4); }
   padding: 3px 0; cursor: pointer; white-space: nowrap;
 }
 #col-settings-panel label:hover { color: var(--accent); }
+#oos-col-settings-panel {
+  position: fixed;
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  border-radius: 6px;
+  padding: 8px 12px;
+  z-index: 999;
+  min-width: 200px;
+  box-shadow: 0 4px 16px rgba(0,0,0,.4);
+  font-size: .72em;
+}
+#oos-col-settings-panel label {
+  display: flex; align-items: center; gap: 6px;
+  padding: 3px 0; cursor: pointer; white-space: nowrap;
+}
+#oos-col-settings-panel label:hover { color: var(--accent); }
 td {
   padding: 3px 7px;
   border-bottom: 1px solid var(--border);
@@ -1785,12 +1801,21 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
         <col style="width:76px"> <!-- PnL% ист -->
         <col style="width:76px"> <!-- PnL% нов -->
         <col style="width:70px"> <!-- ΔPnL -->
+        <col style="width:66px"> <!-- DD% ист -->
+        <col style="width:66px"> <!-- DD% нов -->
+        <col style="width:60px"> <!-- ΔDD -->
+        <col style="width:66px"> <!-- P/DD ист -->
+        <col style="width:66px"> <!-- P/DD нов -->
+        <col style="width:60px"> <!-- ΔP/DD -->
         <col style="width:78px"> <!-- Avg/tr ист -->
         <col style="width:78px"> <!-- Avg/tr нов -->
         <col style="width:72px"> <!-- ΔAvg/tr -->
         <col style="width:66px"> <!-- WR% ист -->
         <col style="width:66px"> <!-- WR% нов -->
         <col style="width:60px"> <!-- ΔWR -->
+        <col style="width:60px"> <!-- K-Ratio ист -->
+        <col style="width:60px"> <!-- K-Ratio нов -->
+        <col style="width:60px"> <!-- ΔK-Ratio -->
         <col style="width:46px"> <!-- # ист -->
         <col style="width:46px"> <!-- # нов -->
         <col style="width:104px"><!-- Оценка -->
@@ -1798,27 +1823,43 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
       <thead>
         <tr id="oos-header-row">
           <th onclick="doOOSSort('name')"      style="text-align:left;overflow:hidden;text-overflow:ellipsis;background:var(--bg3);color:var(--accent);padding:5px 7px;border-bottom:1px solid var(--border2);cursor:pointer;resize:horizontal">Стратегия ↕</th>
-          <th style="background:var(--bg3);padding:5px 4px;border-bottom:1px solid var(--border2)">⭐</th>
-          <th onclick="doOOSSort('old_pnl')"   class="oos-th-hist" style="resize:horizontal">PnL ист ↕</th>
-          <th onclick="doOOSSort('new_pnl')"   class="oos-th-new"  style="resize:horizontal">PnL нов ↕</th>
-          <th onclick="doOOSSort('delta_pnl')" class="oos-th-delta" style="resize:horizontal">ΔPnL ↕</th>
-          <th onclick="doOOSSort('apt_old')"   class="oos-th-hist"  style="resize:horizontal" title="Avg/сделку — история">Avg/tr ист ↕</th>
-          <th onclick="doOOSSort('apt_new')"   class="oos-th-new"   style="resize:horizontal" title="Avg/сделку — новые">Avg/tr нов ↕</th>
-          <th onclick="doOOSSort('delta_apt')" class="oos-th-delta" style="resize:horizontal">ΔAvg/tr ↕</th>
-          <th onclick="doOOSSort('old_wr')"    class="oos-th-hist"  style="resize:horizontal">WR ист ↕</th>
-          <th onclick="doOOSSort('new_wr')"    class="oos-th-new"   style="resize:horizontal">WR нов ↕</th>
-          <th onclick="doOOSSort('delta_wr')"  class="oos-th-delta" style="resize:horizontal">ΔWR ↕</th>
-          <th class="oos-th-hist"># ист</th>
-          <th class="oos-th-new" ># нов</th>
-          <th onclick="doOOSSort('score')" style="overflow:hidden;background:var(--bg3);color:var(--accent);padding:5px 7px;border-bottom:1px solid var(--border2);cursor:pointer;resize:horizontal">Оценка ↕</th>
+          <th class="oos-col-fav" style="background:var(--bg3);padding:5px 4px;border-bottom:1px solid var(--border2)">⭐</th>
+          <th onclick="doOOSSort('old_pnl')"   class="oos-col-pnl oos-th-hist" style="resize:horizontal">PnL ист ↕</th>
+          <th onclick="doOOSSort('new_pnl')"   class="oos-col-pnl oos-th-new"  style="resize:horizontal">PnL нов ↕</th>
+          <th onclick="doOOSSort('delta_pnl')" class="oos-col-pnl oos-th-delta" style="resize:horizontal">ΔPnL ↕</th>
+          <th onclick="doOOSSort('old_dd')"    class="oos-col-dd oos-th-hist"  style="resize:horizontal" title="DrawDown % — максимальная просадка">DD ист ↕</th>
+          <th onclick="doOOSSort('new_dd')"    class="oos-col-dd oos-th-new"   style="resize:horizontal" title="DrawDown % — максимальная просадка">DD нов ↕</th>
+          <th onclick="doOOSSort('delta_dd')"  class="oos-col-dd oos-th-delta" style="resize:horizontal">ΔDD ↕</th>
+          <th onclick="doOOSSort('old_pdd')"   class="oos-col-pdd oos-th-hist"  style="resize:horizontal" title="P/DD = PnL / MaxDD. Выше = лучше. ≥3 = хорошо">P/DD ист ↕</th>
+          <th onclick="doOOSSort('new_pdd')"   class="oos-col-pdd oos-th-new"   style="resize:horizontal" title="P/DD = PnL / MaxDD. Выше = лучше. ≥3 = хорошо">P/DD нов ↕</th>
+          <th onclick="doOOSSort('delta_pdd')" class="oos-col-pdd oos-th-delta" style="resize:horizontal">ΔP/DD ↕</th>
+          <th onclick="doOOSSort('apt_old')"   class="oos-col-apt oos-th-hist"  style="resize:horizontal" title="Avg/сделку — история">Avg/tr ист ↕</th>
+          <th onclick="doOOSSort('apt_new')"   class="oos-col-apt oos-th-new"   style="resize:horizontal" title="Avg/сделку — новые">Avg/tr нов ↕</th>
+          <th onclick="doOOSSort('delta_apt')" class="oos-col-apt oos-th-delta" style="resize:horizontal">ΔAvg/tr ↕</th>
+          <th onclick="doOOSSort('old_wr')"    class="oos-col-wr oos-th-hist"  style="resize:horizontal">WR ист ↕</th>
+          <th onclick="doOOSSort('new_wr')"    class="oos-col-wr oos-th-new"   style="resize:horizontal">WR нов ↕</th>
+          <th onclick="doOOSSort('delta_wr')"  class="oos-col-wr oos-th-delta" style="resize:horizontal">ΔWR ↕</th>
+          <th onclick="doOOSSort('old_kRatio')" class="oos-col-kr oos-th-hist" style="resize:horizontal" title="K-Ratio = slope/se(slope). Равномерность роста. ≥2 = отлично">K-Ratio ист ↕</th>
+          <th onclick="doOOSSort('new_kRatio')" class="oos-col-kr oos-th-new" style="resize:horizontal" title="K-Ratio = slope/se(slope). Равномерность роста. ≥2 = отлично">K-Ratio нов ↕</th>
+          <th onclick="doOOSSort('delta_kRatio')" class="oos-col-kr oos-th-delta" style="resize:horizontal">ΔK-Ratio ↕</th>
+          <th class="oos-col-n oos-th-hist"># ист</th>
+          <th class="oos-col-n oos-th-new" ># нов</th>
+          <th onclick="doOOSSort('score')" class="oos-col-score" style="overflow:hidden;background:var(--bg3);color:var(--accent);padding:5px 7px;border-bottom:1px solid var(--border2);cursor:pointer;resize:horizontal">Оценка ↕</th>
+          <th id="oos-col-settings-btn" title="Настройки столбиков" style="cursor:pointer;width:20px;padding:2px 4px;background:var(--bg3);border-bottom:1px solid var(--border2)">⚙</th>
         </tr>
         <tr id="oos-filter-row" style="background:var(--bg2)">
           <td style="padding:1px 3px"><input id="oof_name" placeholder="поиск..." oninput="applyOOSFilters()" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border2);border-radius:3px;color:var(--text);font-size:.65em;padding:1px 4px;font-family:var(--font-mono)"></td>
-          <td></td>
+          <td style="padding:1px 2px"><select id="oof_fav" onchange="applyOOSFilters()" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border2);border-radius:3px;color:var(--text);font-size:.65em;padding:1px 1px"><option value="">все</option><option value="fav">⭐</option><option value="no">☆</option></select></td>
           <td style="padding:1px 2px"><input id="oof_opnl" type="number" placeholder="≥" oninput="applyOOSFilters()" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border2);border-radius:3px;color:var(--text);font-size:.65em;padding:1px 3px"></td>
           <td style="padding:1px 2px"><input id="oof_npnl" type="number" placeholder="≥" oninput="applyOOSFilters()" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border2);border-radius:3px;color:var(--text);font-size:.65em;padding:1px 3px"></td>
           <td style="padding:1px 2px"><input id="oof_dpnl" type="number" placeholder="≥" oninput="applyOOSFilters()" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border2);border-radius:3px;color:var(--text);font-size:.65em;padding:1px 3px"></td>
           <td></td><td></td>
+          <td style="padding:1px 2px"><input id="oof_oddd" type="number" placeholder="≤" oninput="applyOOSFilters()" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border2);border-radius:3px;color:var(--text);font-size:.65em;padding:1px 3px"></td>
+          <td style="padding:1px 2px"><input id="oof_nddd" type="number" placeholder="≤" oninput="applyOOSFilters()" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border2);border-radius:3px;color:var(--text);font-size:.65em;padding:1px 3px"></td>
+          <td></td>
+          <td style="padding:1px 2px"><input id="oof_opdd" type="number" placeholder="≥" oninput="applyOOSFilters()" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border2);border-radius:3px;color:var(--text);font-size:.65em;padding:1px 3px"></td>
+          <td style="padding:1px 2px"><input id="oof_npdd" type="number" placeholder="≥" oninput="applyOOSFilters()" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border2);border-radius:3px;color:var(--text);font-size:.65em;padding:1px 3px"></td>
+          <td></td>
           <td style="padding:1px 2px"><input id="oof_dapt" type="number" placeholder="≥" oninput="applyOOSFilters()" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border2);border-radius:3px;color:var(--text);font-size:.65em;padding:1px 3px"></td>
           <td></td><td></td>
           <td style="padding:1px 2px"><input id="oof_dwr" type="number" placeholder="≥" oninput="applyOOSFilters()" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border2);border-radius:3px;color:var(--text);font-size:.65em;padding:1px 3px"></td>

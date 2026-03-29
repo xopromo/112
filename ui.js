@@ -462,6 +462,13 @@ function switchTableMode(mode) {
     if (oosTbl)      oosTbl.style.display       = '';
     if (eqWrap)      eqWrap.style.display       = 'none'; // стандартный график скрыть
     // OOS график покажет drawOOSChart при клике по строке
+    // Инициализация настроек столбиков OOS
+    _initOOSColSettings();
+    // Подвесить слушатель на кнопку настроек
+    const oosColBtn = document.getElementById('oos-col-settings-btn');
+    if (oosColBtn) {
+      oosColBtn.onclick = toggleOOSColSettings;
+    }
   } else {
     if (stdScroll)   stdScroll.style.display   = '';
     if (oosTbl)      oosTbl.style.display       = 'none';
@@ -3439,9 +3446,29 @@ function _drawOOSGraphicForResult(r) {
 
   const eq_old = r.old_eq;
   const eq_new = r.new_eq;
+
+  // Рассчитаем прогрев для новых данных (игнорируем первые N баров)
+  let newEqClean = eq_new;
+  if (eq_new && eq_new.length > 0) {
+    const cfg = r.cfg || {};
+    // Минимальный прогрев: макс из MA, pivot, ATR периодов
+    const maWarmup = cfg.useMA ? (cfg.maP || 20) : 0;
+    const pivotWarmup = cfg.usePivot ? ((cfg.pvL || 5) + (cfg.pvR || 2) + 5) : 0;
+    const atrWarmup = cfg.useATR ? (cfg.atrPeriod || 14) * 3 : 0;
+    const warmup = Math.max(maWarmup, pivotWarmup, atrWarmup, 1);
+
+    // Пропускаем первые warmup баров из equity кривой (убираем прогрев)
+    const warmupEndIdx = Math.min(warmup, eq_new.length - 1);
+    if (warmupEndIdx > 0 && warmupEndIdx < eq_new.length) {
+      // Берём значение при окончании прогрева и смещаем так чтобы начало было от нуля
+      const warmupValue = eq_new[warmupEndIdx];
+      newEqClean = eq_new.slice(warmupEndIdx).map(v => v - warmupValue);
+    }
+  }
+
   // Concatenate: новый сегмент продолжает с последнего значения истории
   const lastOld = eq_old[eq_old.length - 1];
-  const combined = [...eq_old, ...eq_new.map(v => v + lastOld)];
+  const combined = [...eq_old, ...newEqClean.map(v => v + lastOld)];
   const splitIdx  = eq_old.length;
   const splitFrac = (splitIdx - 1) / (combined.length - 1);
 
@@ -4260,7 +4287,11 @@ function selectRow(idx) {
     if (!r) return;
     // Найдём индекс в _oosTableResults (глобальный индекс для drawOOSChart)
     const globalIdx = _oosTableResults.indexOf(r);
-    if (globalIdx >= 0) drawOOSChart(globalIdx);
+    if (globalIdx >= 0) {
+      // Обновляем выделение в OOS таблице вручную (drawOOSChart сделает это, но нужно передать rowEl)
+      const rowEl = document.querySelector(`#oos-rtbl tr[data-i="${globalIdx}"]`);
+      drawOOSChart(globalIdx, rowEl);
+    }
     return;
   }
 
@@ -5174,7 +5205,21 @@ const _COL_DEFS = [
   { id: 'col-rob-mc',     label: '🔬 MC',               default: true },
 ];
 
+// OOS таблица столбики (аналогично _COL_DEFS)
+const _OOS_COL_DEFS = [
+  { id: 'oos-col-fav',     label: '⭐ Избранное',      default: true },
+  { id: 'oos-col-pnl',     label: 'PnL%',              default: true },
+  { id: 'oos-col-dd',      label: 'DD%',               default: true },
+  { id: 'oos-col-pdd',     label: 'P/DD',              default: true },
+  { id: 'oos-col-apt',     label: 'Avg/tr',            default: true },
+  { id: 'oos-col-wr',      label: 'WR%',               default: true },
+  { id: 'oos-col-kr',      label: 'K-Ratio',           default: true },
+  { id: 'oos-col-n',       label: '# сделок',          default: true },
+  { id: 'oos-col-score',   label: 'Оценка',            default: true },
+];
+
 let _colSettings = null; // null = не загружен
+let _oosColSettings = null; // null = не загружен
 
 function _loadColSettings() {
   try {
@@ -5244,7 +5289,18 @@ function toggleColSettings() {
     const tblRect = tbl.getBoundingClientRect();
     panel.style.position = 'fixed';
     panel.style.top = (rect.bottom + 4) + 'px';
-    panel.style.right = (window.innerWidth - rect.right) + 'px';
+    // Проверяем место вправо, если не влазит - позиционируем влево
+    const panelWidth = 280; // примерная ширина панели
+    const rightSpace = window.innerWidth - rect.right;
+    if (rightSpace < panelWidth) {
+      // Позиционируем от левого края кнопки
+      panel.style.left = (rect.left - panelWidth + rect.width) + 'px';
+      panel.style.right = 'auto';
+    } else {
+      // Позиционируем от правого края
+      panel.style.right = (window.innerWidth - rect.right) + 'px';
+      panel.style.left = 'auto';
+    }
   }
   document.body.appendChild(panel);
   // Закрыть при клике вне
@@ -5275,6 +5331,99 @@ function _colHideRob() {
 function _initColSettings() {
   const s = getColSettings();
   _applyColSettings(s);
+}
+
+// ─────────────────────────────────────────────────────────────────
+// OOS таблица — настраиваемые колонки
+// ─────────────────────────────────────────────────────────────────
+
+function _loadOOSColSettings() {
+  try {
+    const saved = localStorage.getItem('use_oos_col_settings');
+    if (saved) return JSON.parse(saved);
+  } catch(e) {}
+  const def = {};
+  _OOS_COL_DEFS.forEach(c => def[c.id] = c.default);
+  return def;
+}
+
+function _saveOOSColSettings(settings) {
+  try { localStorage.setItem('use_oos_col_settings', JSON.stringify(settings)); } catch(e) {}
+}
+
+function _applyOOSColSettings(settings) {
+  const hiddenCols = _OOS_COL_DEFS.filter(col => settings[col.id] === false);
+  if (hiddenCols.length === 0) return;
+  _OOS_COL_DEFS.forEach(col => {
+    const visible = settings[col.id] !== false;
+    document.querySelectorAll('.' + col.id).forEach(el => {
+      el.classList.toggle('col-hidden', !visible);
+    });
+  });
+}
+
+function getOOSColSettings() {
+  if (!_oosColSettings) _oosColSettings = _loadOOSColSettings();
+  return _oosColSettings;
+}
+
+function setOOSColVisible(colId, visible) {
+  const s = getOOSColSettings();
+  s[colId] = visible;
+  _oosColSettings = s;
+  _saveOOSColSettings(s);
+  _applyOOSColSettings(s);
+}
+
+let _oosColPanelOpen = false;
+function toggleOOSColSettings() {
+  const btn = document.getElementById('oos-col-settings-btn');
+  if (!btn) return;
+  const oldPanel = document.getElementById('oos-col-settings-panel');
+  if (oldPanel) { oldPanel.remove(); _oosColPanelOpen = false; return; }
+  _oosColPanelOpen = true;
+  const settings = getOOSColSettings();
+  const panel = document.createElement('div');
+  panel.id = 'oos-col-settings-panel';
+  panel.innerHTML = '<div style="font-weight:600;margin-bottom:6px;color:var(--text3);font-size:.9em">Столбики OOS</div>' +
+    _OOS_COL_DEFS.map(col => {
+      const checked = settings[col.id] !== false ? 'checked' : '';
+      return `<label><input type="checkbox" ${checked} onchange="setOOSColVisible('${col.id}',this.checked)"> ${col.label}</label>`;
+    }).join('') +
+    '<div style="margin-top:8px;display:flex;gap:6px">' +
+    '<button class="tpl-btn2" style="font-size:.8em;padding:2px 6px" onclick="_oosColShowAll()">Все</button>' +
+    '</div>';
+  const rect = btn.getBoundingClientRect();
+  panel.style.position = 'fixed';
+  panel.style.top = (rect.bottom + 4) + 'px';
+  const panelWidth = 240;
+  const rightSpace = window.innerWidth - rect.right;
+  if (rightSpace < panelWidth) {
+    panel.style.left = (rect.left - panelWidth + rect.width) + 'px';
+    panel.style.right = 'auto';
+  } else {
+    panel.style.right = (window.innerWidth - rect.right) + 'px';
+    panel.style.left = 'auto';
+  }
+  document.body.appendChild(panel);
+  setTimeout(() => {
+    document.addEventListener('click', function _closePanelOOS(e) {
+      if (!panel.contains(e.target) && e.target.id !== 'oos-col-settings-btn') {
+        panel.remove(); _oosColPanelOpen = false;
+        document.removeEventListener('click', _closePanelOOS);
+      }
+    });
+  }, 50);
+}
+
+function _oosColShowAll() {
+  _OOS_COL_DEFS.forEach(c => setOOSColVisible(c.id, true));
+  document.querySelectorAll('#oos-col-settings-panel input[type=checkbox]').forEach((cb,i) => cb.checked = true);
+}
+
+function _initOOSColSettings() {
+  const s = getOOSColSettings();
+  _applyOOSColSettings(s);
 }
 
 
@@ -7076,9 +7225,14 @@ function applyOOSFilters() {
   if (oosTbl) oosTbl.style.display = '';
 
   const fname  = document.getElementById('oof_name')?.value.trim().toLowerCase() || '';
+  const ffav   = document.getElementById('oof_fav')?.value || '';
   const fopnl  = parseFloat(document.getElementById('oof_opnl')?.value);
   const fnpnl  = parseFloat(document.getElementById('oof_npnl')?.value);
   const fdpnl  = parseFloat(document.getElementById('oof_dpnl')?.value);
+  const foddd  = parseFloat(document.getElementById('oof_oddd')?.value);
+  const fnddd  = parseFloat(document.getElementById('oof_nddd')?.value);
+  const fopdd  = parseFloat(document.getElementById('oof_opdd')?.value);
+  const fnpdd  = parseFloat(document.getElementById('oof_npdd')?.value);
   const fdapt  = parseFloat(document.getElementById('oof_dapt')?.value);
   const fdwr   = parseFloat(document.getElementById('oof_dwr')?.value);
   const fon    = parseFloat(document.getElementById('oof_on')?.value);
@@ -7087,9 +7241,18 @@ function applyOOSFilters() {
 
   const src = _oosTableResults.filter(r => {
     if (fname && !r.name.toLowerCase().includes(fname)) return false;
+    if (ffav) {
+      const oosLvl = getFavLevel(r.name);
+      if (ffav === 'fav' && oosLvl === 0) return false;
+      if (ffav === 'no' && oosLvl > 0) return false;
+    }
     if (!isNaN(fopnl) && (r.old_pnl ?? -Infinity) < fopnl) return false;
     if (!isNaN(fnpnl) && (r.new_pnl ?? -Infinity) < fnpnl) return false;
     if (!isNaN(fdpnl) && (r.delta_pnl ?? -Infinity) < fdpnl) return false;
+    if (!isNaN(foddd) && (r.old_dd ?? Infinity) > foddd) return false;
+    if (!isNaN(fnddd) && (r.new_dd ?? Infinity) > fnddd) return false;
+    if (!isNaN(fopdd) && (r.old_pdd ?? -Infinity) < fopdd) return false;
+    if (!isNaN(fnpdd) && (r.new_pdd ?? -Infinity) < fnpdd) return false;
     if (!isNaN(fon)   && (r.old_n ?? -Infinity) < fon) return false;
     if (!isNaN(fnn)   && (r.new_n ?? -Infinity) < fnn) return false;
     if (!isNaN(fdapt) || !isNaN(fdwr)) {
@@ -7144,19 +7307,28 @@ function applyOOSFilters() {
     html +=
       `<tr data-i="${globalIdx}" data-name="${_esc(r.name)}" class="${isFavRow?'fav-row':''}" onclick="drawOOSChart(${globalIdx},this)" ondblclick="showOOSDetail(${globalIdx})">` +
       `<td title="${_esc(r.name)}" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_esc(r.name)}</td>` +
-      `<td style="text-align:center;font-size:.9em" data-fav="${globalIdx}" data-level="${oosLvl}" onclick="toggleOOSFav(${globalIdx},event)">${fav}</td>` +
-      `<td class="${r.old_pnl!=null&&r.old_pnl>0?'pos':'neg'}">${f1(r.old_pnl)}%</td>` +
-      `<td class="${r.new_pnl!=null&&r.new_pnl>0?'pos':'neg'}">${f1(r.new_pnl)}%</td>` +
-      `<td class="${pCls(r.delta_pnl)}">${dStr(r.delta_pnl)}</td>` +
-      `<td class="${pCls(apt_old)}">${f2(apt_old)}%</td>` +
-      `<td class="${pCls(apt_new)}">${f2(apt_new)}%</td>` +
-      `<td class="${pCls(delta_apt)}">${dStr(delta_apt,2)}</td>` +
-      `<td class="muted">${f1(r.old_wr)}%</td>` +
-      `<td class="muted">${f1(r.new_wr)}%</td>` +
-      `<td class="${pCls(r.delta_wr)}">${dStr(r.delta_wr)}</td>` +
-      `<td class="muted" style="text-align:center">${r.old_n??'—'}</td>` +
-      `<td class="muted" style="text-align:center">${r.new_n??'—'}</td>` +
-      `<td style="text-align:center"><span class="oos-badge ${badge} ${oosCls}">${oosScore}</span></td>` +
+      `<td class="oos-col-fav" style="text-align:center;font-size:.9em" data-fav="${globalIdx}" data-level="${oosLvl}" onclick="toggleOOSFav(${globalIdx},event)">${fav}</td>` +
+      `<td class="oos-col-pnl ${r.old_pnl!=null&&r.old_pnl>0?'pos':'neg'}">${f1(r.old_pnl)}%</td>` +
+      `<td class="oos-col-pnl ${r.new_pnl!=null&&r.new_pnl>0?'pos':'neg'}">${f1(r.new_pnl)}%</td>` +
+      `<td class="oos-col-pnl ${pCls(r.delta_pnl)}">${dStr(r.delta_pnl)}</td>` +
+      `<td class="oos-col-dd ${r.old_dd!=null&&r.old_dd<50?'pos':'neg'}">${f1(r.old_dd)}%</td>` +
+      `<td class="oos-col-dd ${r.new_dd!=null&&r.new_dd<50?'pos':'neg'}">${f1(r.new_dd)}%</td>` +
+      `<td class="oos-col-dd ${pCls(r.delta_dd)}">${r.delta_dd != null ? (r.delta_dd >= 0 ? '+' : '') + r.delta_dd.toFixed(1) + '%' : '—'}</td>` +
+      `<td class="oos-col-pdd ${pCls(r.old_pdd)}">${f2(r.old_pdd)}</td>` +
+      `<td class="oos-col-pdd ${pCls(r.new_pdd)}">${f2(r.new_pdd)}</td>` +
+      `<td class="oos-col-pdd ${pCls(r.delta_pdd)}">${r.delta_pdd != null ? (r.delta_pdd >= 0 ? '+' : '') + r.delta_pdd.toFixed(2) : '—'}</td>` +
+      `<td class="oos-col-apt ${pCls(apt_old)}">${f2(apt_old)}%</td>` +
+      `<td class="oos-col-apt ${pCls(apt_new)}">${f2(apt_new)}%</td>` +
+      `<td class="oos-col-apt ${pCls(delta_apt)}">${dStr(delta_apt,2)}</td>` +
+      `<td class="oos-col-wr muted">${f1(r.old_wr)}%</td>` +
+      `<td class="oos-col-wr muted">${f1(r.new_wr)}%</td>` +
+      `<td class="oos-col-wr ${pCls(r.delta_wr)}">${dStr(r.delta_wr)}</td>` +
+      `<td class="oos-col-kr ${pCls(r.old_kRatio)}">${r.old_kRatio != null ? r.old_kRatio.toFixed(2) : '—'}</td>` +
+      `<td class="oos-col-kr ${pCls(r.new_kRatio)}">${r.new_kRatio != null ? r.new_kRatio.toFixed(2) : '—'}</td>` +
+      `<td class="oos-col-kr ${pCls(r.delta_kRatio)}">${r.delta_kRatio != null ? (r.delta_kRatio >= 0 ? '+' : '') + r.delta_kRatio.toFixed(2) : '—'}</td>` +
+      `<td class="oos-col-n muted" style="text-align:center">${r.old_n??'—'}</td>` +
+      `<td class="oos-col-n muted" style="text-align:center">${r.new_n??'—'}</td>` +
+      `<td class="oos-col-score" style="text-align:center"><span class="oos-badge ${badge} ${oosCls}">${oosScore}</span></td>` +
       `</tr>`;
   }
   tbody.innerHTML = html;
@@ -7201,14 +7373,246 @@ function _oosGetBadge(r) {
 }
 
 
-// Детальный вид OOS результата (дабл-клик по строке)
+// Детальный вид OOS результата с диагностикой расхождений
 function showOOSDetail(idx) {
   const r = _oosTableResults[idx];
   if (!r || !r.cfg) return;
-  // showDetail ожидает r.eq для построения equity-графика;
-  // маппируем old_eq → eq (история = то, на чём стратегия была найдена)
-  if (!r.eq && r.old_eq) r.eq = r.old_eq;
-  showDetail(r);
+  _showOOSDiagnostic(r, idx);
+}
+
+function _showOOSDiagnostic(r, idx) {
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+  modal.style.display = 'flex';
+  modal.style.alignItems = 'center';
+  modal.style.justifyContent = 'center';
+  modal.style.zIndex = 9999;
+  modal.onclick = e => { if (e.target === modal) modal.remove(); };
+
+  const cfg = r.cfg || {};
+  const hasOld = r.old_pnl != null;
+  const hasNew = r.new_pnl != null;
+
+  // Рассчитаем индикаторы для диагностики
+  const origData = DATA;
+  let diagOld = null, diagNew = null;
+
+  try {
+    DATA = origData;
+    diagOld = hasOld ? _hcRunBacktest(cfg) : null;
+  } catch(e) { diagOld = null; }
+
+  try {
+    DATA = NEW_DATA;
+    diagNew = hasNew ? _hcRunBacktest(cfg) : null;
+  } catch(e) { diagNew = null; }
+
+  DATA = origData;
+
+  // Анализ расхождений
+  const analysis = _analyzeOOSDiscrepancy(r, diagOld, diagNew);
+
+  let html = `
+    <div class="modal-content" style="max-width:900px;max-height:90vh;overflow:auto;background:var(--bg);border-radius:8px;padding:20px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px">
+        <h2 style="margin:0;color:var(--accent)">${_esc(r.name)}</h2>
+        <button onclick="this.closest('.modal-overlay').remove()" style="cursor:pointer;border:none;background:none;font-size:1.2em;color:var(--text3)">✕</button>
+      </div>
+
+      <!-- Критерии на Исходном Периоде -->
+      <div style="margin-bottom:20px;border:1px solid var(--border);padding:12px;border-radius:6px;background:var(--bg2)">
+        <h3 style="margin-top:0;color:#0099ff">📊 Исходный период (история)</h3>
+        ${_renderOOSDiagnosticTable(diagOld, r.old_pnl, r.old_wr, r.old_n, r.old_dd, r.old_kRatio, DATA)}
+      </div>
+
+      <!-- Критерии на Новом Периоде -->
+      <div style="margin-bottom:20px;border:1px solid var(--border);padding:12px;border-radius:6px;background:var(--bg2)">
+        <h3 style="margin-top:0;color:#ff9900">📊 Новый период (загруженные данные)</h3>
+        ${_renderOOSDiagnosticTable(diagNew, r.new_pnl, r.new_wr, r.new_n, r.new_dd, r.new_kRatio, NEW_DATA)}
+      </div>
+
+      <!-- Анализ расхождений -->
+      <div style="margin-bottom:20px;border:1px solid var(--border);padding:12px;border-radius:6px;background:var(--bg2)">
+        <h3 style="margin-top:0;color:var(--accent)">🔍 Анализ расхождений</h3>
+        ${_renderOOSAnalysis(analysis, r, diagOld, diagNew)}
+      </div>
+
+      <!-- Параметры конфигурации -->
+      <div style="border:1px solid var(--border);padding:12px;border-radius:6px;background:var(--bg2)">
+        <h3 style="margin-top:0;color:var(--accent)">⚙️ Параметры конфигурации</h3>
+        <pre style="margin:0;font-size:.75em;max-height:300px;overflow:auto;background:var(--bg);padding:8px;border-radius:4px;color:var(--text3)">${JSON.stringify(cfg, null, 2)}</pre>
+      </div>
+    </div>
+  `;
+
+  modal.innerHTML = html;
+  document.body.appendChild(modal);
+}
+
+function _renderOOSDiagnosticTable(diag, pnl, wr, n, dd, kr, data) {
+  if (!diag) {
+    return '<div style="color:var(--text3);font-style:italic">❌ Ошибка при расчёте или данные недоступны</div>';
+  }
+
+  const bars = data ? data.length : 0;
+  const pdd = dd && dd > 0 ? pnl / dd : null;
+  const apt = n && n > 0 ? pnl / n : null;
+
+  return `
+    <table style="width:100%;border-collapse:collapse;font-size:.85em">
+      <tr style="background:var(--bg);border-bottom:1px solid var(--border)">
+        <td style="padding:6px;text-align:left">Прибыль (PnL)</td>
+        <td style="padding:6px;text-align:right;font-weight:600;color:${pnl > 0 ? '#4ade80' : '#ef4444'}">${pnl?.toFixed(2) || '—'}%</td>
+      </tr>
+      <tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:6px;text-align:left">Win Rate</td>
+        <td style="padding:6px;text-align:right;font-weight:600">${wr?.toFixed(1) || '—'}%</td>
+      </tr>
+      <tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:6px;text-align:left">Кол-во сделок</td>
+        <td style="padding:6px;text-align:right;font-weight:600">${n || '—'}</td>
+      </tr>
+      <tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:6px;text-align:left">Max DrawDown</td>
+        <td style="padding:6px;text-align:right;font-weight:600">${dd?.toFixed(2) || '—'}%</td>
+      </tr>
+      <tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:6px;text-align:left">P/DD (Profit/Risk)</td>
+        <td style="padding:6px;text-align:right;font-weight:600;color:${pdd > 3 ? '#4ade80' : pdd > 1 ? '#fbbf24' : '#ef4444'}">${pdd?.toFixed(2) || '—'}</td>
+      </tr>
+      <tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:6px;text-align:left">Avg/trade</td>
+        <td style="padding:6px;text-align:right;font-weight:600">${apt?.toFixed(2) || '—'}%</td>
+      </tr>
+      <tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:6px;text-align:left">K-Ratio (линейность)</td>
+        <td style="padding:6px;text-align:right;font-weight:600;color:${kr > 2 ? '#4ade80' : kr > 1 ? '#fbbf24' : '#ef4444'}">${kr?.toFixed(2) || '—'}</td>
+      </tr>
+      <tr>
+        <td style="padding:6px;text-align:left;color:var(--text3)">Кол-во баров</td>
+        <td style="padding:6px;text-align:right;color:var(--text3)">${bars}</td>
+      </tr>
+    </table>
+  `;
+}
+
+function _analyzeOOSDiscrepancy(r, diagOld, diagNew) {
+  const analysis = {
+    pnlChange: null,
+    wrChange: null,
+    tradeCountChange: null,
+    ddChange: null,
+    mainFactors: [],
+    recommendations: []
+  };
+
+  if (r.old_pnl != null && r.new_pnl != null) {
+    analysis.pnlChange = r.new_pnl - r.old_pnl;
+
+    if (analysis.pnlChange < -5) {
+      analysis.mainFactors.push('⚠️ Значительное снижение прибыли на новых данных');
+      analysis.recommendations.push('1. Проверить волатильность цен на новом периоде');
+      analysis.recommendations.push('2. Анализировать паттерны, на которых сделаны основные убытки');
+    } else if (analysis.pnlChange > 5) {
+      analysis.mainFactors.push('✅ Улучшение результатов на новых данных');
+    }
+  }
+
+  if (r.old_wr != null && r.new_wr != null) {
+    analysis.wrChange = r.new_wr - r.old_wr;
+    if (Math.abs(analysis.wrChange) > 10) {
+      analysis.mainFactors.push(`⚠️ WR изменился на ${analysis.wrChange > 0 ? '+' : ''}${analysis.wrChange.toFixed(1)}%`);
+    }
+  }
+
+  if (r.old_n != null && r.new_n != null) {
+    analysis.tradeCountChange = r.new_n - r.old_n;
+    const expectedRatio = NEW_DATA && DATA ? NEW_DATA.length / DATA.length : 1;
+    const actualRatio = r.new_n / Math.max(r.old_n, 1);
+    if (actualRatio < expectedRatio * 0.5) {
+      analysis.mainFactors.push('⚠️ Кол-во сделок значительно ниже ожидаемого');
+      analysis.recommendations.push('Возможно, на новых данных нет подходящих условий для входа');
+    }
+  }
+
+  if (r.old_dd != null && r.new_dd != null) {
+    analysis.ddChange = r.new_dd - r.old_dd;
+    if (analysis.ddChange > 10) {
+      analysis.mainFactors.push('⚠️ DrawDown значительно увеличился');
+      analysis.recommendations.push('Стратегия хуже управляет риском на новых данных');
+    }
+  }
+
+  if (analysis.mainFactors.length === 0) {
+    analysis.mainFactors.push('✅ Результаты стабильны');
+  }
+
+  return analysis;
+}
+
+function _renderOOSAnalysis(analysis, r, diagOld, diagNew) {
+  let html = '<div style="font-size:.85em">';
+
+  // Основные факторы
+  html += '<div style="margin-bottom:12px">';
+  html += '<strong style="color:var(--accent)">Ключевые факторы изменения:</strong>';
+  analysis.mainFactors.forEach(f => {
+    html += `<div style="margin:4px 0;padding:4px 8px;background:var(--bg);border-radius:3px;border-left:3px solid var(--accent)">${f}</div>`;
+  });
+  html += '</div>';
+
+  // Детальное сравнение метрик
+  html += '<div style="margin-bottom:12px">';
+  html += '<strong style="color:var(--accent)">Сравнение метрик:</strong>';
+  html += '<table style="width:100%;border-collapse:collapse;font-size:.9em;margin-top:6px">';
+  html += '<tr style="background:var(--bg);border-bottom:1px solid var(--border)">';
+  html += '<td style="padding:4px;font-weight:600">Метрика</td>';
+  html += '<td style="padding:4px;text-align:center;color:#0099ff">История</td>';
+  html += '<td style="padding:4px;text-align:center;color:#ff9900">Новые данные</td>';
+  html += '<td style="padding:4px;text-align:center">Изменение</td>';
+  html += '</tr>';
+
+  const metrics = [
+    { name: 'PnL%', old: r.old_pnl, new: r.new_pnl, format: (v) => v?.toFixed(2) + '%' },
+    { name: 'WR%', old: r.old_wr, new: r.new_wr, format: (v) => v?.toFixed(1) + '%' },
+    { name: '# сделок', old: r.old_n, new: r.new_n, format: (v) => v?.toString() },
+    { name: 'DD%', old: r.old_dd, new: r.new_dd, format: (v) => v?.toFixed(2) + '%' },
+    { name: 'P/DD', old: r.old_pdd, new: r.new_pdd, format: (v) => v?.toFixed(2) },
+    { name: 'K-Ratio', old: r.old_kRatio, new: r.new_kRatio, format: (v) => v?.toFixed(2) }
+  ];
+
+  metrics.forEach(m => {
+    if (m.old != null || m.new != null) {
+      const oldStr = m.old != null ? m.format(m.old) : '—';
+      const newStr = m.new != null ? m.format(m.new) : '—';
+      const delta = (m.old != null && m.new != null) ? m.new - m.old : null;
+      const deltaStr = delta != null ? `${delta >= 0 ? '+' : ''}${delta.toFixed(2)}` : '—';
+      const deltaColor = delta == null ? '' : delta > 0 && ['PnL%', 'WR%', '# сделок', 'P/DD', 'K-Ratio'].includes(m.name) ? '#4ade80' : delta < 0 && ['PnL%', 'WR%', '# сделок', 'P/DD', 'K-Ratio'].includes(m.name) ? '#ef4444' : delta > 0 && m.name === 'DD%' ? '#ef4444' : delta < 0 && m.name === 'DD%' ? '#4ade80' : '';
+
+      html += `<tr style="border-bottom:1px solid var(--border)">`;
+      html += `<td style="padding:4px;font-weight:500">${m.name}</td>`;
+      html += `<td style="padding:4px;text-align:right">${oldStr}</td>`;
+      html += `<td style="padding:4px;text-align:right">${newStr}</td>`;
+      html += `<td style="padding:4px;text-align:right;color:${deltaColor}">${deltaStr}</td>`;
+      html += `</tr>`;
+    }
+  });
+
+  html += '</table>';
+  html += '</div>';
+
+  // Рекомендации
+  if (analysis.recommendations.length > 0) {
+    html += '<div>';
+    html += '<strong style="color:var(--accent)">Что проверить:</strong>';
+    analysis.recommendations.forEach(rec => {
+      html += `<div style="margin:4px 0;padding:4px 8px;background:var(--bg);border-radius:3px;border-left:3px solid #fbbf24">${rec}</div>`;
+    });
+    html += '</div>';
+  }
+
+  html += '</div>';
+  return html;
 }
 
 // Графическое сравнение equity: история (синий) + новые данные (оранжевый)
@@ -7430,8 +7834,15 @@ async function runOOSOnNewData() {
 
     const origDATA = DATA;
     let rOld = null, rNew = null;
-    try { DATA = origDATA; rOld = _hcRunBacktest(r.cfg); } catch(e) {}
-    try { DATA = NEW_DATA; rNew = _hcRunBacktest(r.cfg); } catch(e) {}
+
+    // Для old результата используем существующий результат из srcList (уже содержит IS метрики)
+    rOld = r;
+
+    // Для new результата пересчитываем на новых данных
+    try {
+      DATA = NEW_DATA;
+      rNew = _hcRunBacktest(r.cfg);
+    } catch(e) { }
     DATA = origDATA;
 
     _oosTableResults.push({
@@ -7451,11 +7862,20 @@ async function runOOSOnNewData() {
       old_pnl:   rOld ? rOld.pnl : null,
       old_wr:    rOld ? rOld.wr  : null,
       old_n:     rOld ? rOld.n   : null,
+      old_dd:    rOld ? rOld.dd  : null,
+      old_pdd:   rOld && rOld.dd > 0 ? rOld.pnl / rOld.dd : null,
+      old_kRatio: rOld && rOld.eq ? _calcKRatio(rOld.eq) : null,
       new_pnl:   rNew ? rNew.pnl : null,
       new_wr:    rNew ? rNew.wr  : null,
       new_n:     rNew ? rNew.n   : null,
+      new_dd:    rNew ? rNew.dd  : null,
+      new_pdd:   rNew && rNew.dd > 0 ? rNew.pnl / rNew.dd : null,
+      new_kRatio: rNew && rNew.eq ? _calcKRatio(rNew.eq) : null,
       delta_pnl: (rOld && rNew) ? rNew.pnl - rOld.pnl : null,
       delta_wr:  (rOld && rNew) ? rNew.wr  - rOld.wr  : null,
+      delta_dd:  (rOld && rNew) ? rNew.dd - rOld.dd : null,
+      delta_pdd: (rOld && rOld.dd > 0 && rNew && rNew.dd > 0) ? (rNew.pnl / rNew.dd) - (rOld.pnl / rOld.dd) : null,
+      delta_kRatio: (rOld && rOld.eq && rNew && rNew.eq) ? (_calcKRatio(rNew.eq) ?? 0) - (_calcKRatio(rOld.eq) ?? 0) : null,
       old_bars:  DATA ? DATA.length : null,
       new_bars:  NEW_DATA ? NEW_DATA.length : null,
       old_eq:    rOld ? rOld.eq  : null,   // equity curve на истории
