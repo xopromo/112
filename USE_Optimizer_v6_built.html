@@ -786,6 +786,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
 /* OOS chart */
 #oos-chart-wrap { display:none; background:var(--bg2); border:1px solid var(--border); border-radius:6px; margin:6px 0; position:sticky; top:0; z-index:9; }
 #oos-eqc { width:100%; height:150px; display:block; border-radius:6px; cursor:crosshair; }
+#oos-crosshair { width:100%; height:150px; display:block; border-radius:6px; }
 
 /* Звёздочки — три уровня яркости */
 [data-fav] { cursor:pointer; user-select:none; transition:color .15s, text-shadow .15s; }
@@ -1568,8 +1569,9 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
   <canvas id="eqc"></canvas>
   <canvas id="eq-crosshair"></canvas>
 </div>
-<div id="oos-chart-wrap">
+<div id="oos-chart-wrap" style="position:relative">
   <canvas id="oos-eqc"></canvas>
+  <canvas id="oos-crosshair" style="position:absolute;top:0;left:0;cursor:crosshair"></canvas>
 </div>
 
 <div class="tbl-wrap">
@@ -26976,7 +26978,101 @@ function drawOOSChart(idx, rowEl) {
   ctx.fillStyle = 'rgba(0,212,255,0.45)';
   ctx.font = '8px JetBrains Mono,monospace';
   ctx.fillText(nameShort, pad, H - 4);
+
+  // Сохраняем параметры графика для mouse tracking
+  window._oosChartParams = { combined, mn, range, pad, W, H, splitFrac, splitIdx };
+
+  // Добавляем mouse tracking к OOS canvas
+  const oosCanvas = document.getElementById('oos-eqc');
+  const oosCharts = document.getElementById('oos-crosshair');
+  if (oosCanvas && oosCharts) {
+    // Синхронизируем размер crosshair canvas с основным
+    oosCharts.width = oosCanvas.width;
+    oosCharts.height = oosCanvas.height;
+
+    // Удаляем старые обработчики если были
+    const newOosCanvas = oosCanvas.cloneNode(true);
+    oosCanvas.parentNode.replaceChild(newOosCanvas, oosCanvas);
+
+    newOosCanvas.addEventListener('mousemove', _drawOOSCrosshair);
+    newOosCanvas.addEventListener('mouseleave', _clearOOSCrosshair);
+  }
 }
+
+// Функции mouse tracking для OOS графика
+function _drawOOSCrosshair(e) {
+  const p = window._oosChartParams;
+  if (!p) return;
+  const canvas = document.getElementById('oos-eqc');
+  const ch = document.getElementById('oos-crosshair');
+  if (!canvas || !ch) return;
+
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+
+  const cx = (e.clientX - rect.left) * scaleX / 2;
+  const cy = (e.clientY - rect.top) * scaleY / 2;
+
+  const { combined, mn, range, pad, W, H } = p;
+
+  if (cx < pad || cx > W - pad || cy < pad || cy > H - pad) {
+    ch.getContext('2d').clearRect(0, 0, ch.width, ch.height);
+    return;
+  }
+
+  const nPx = W - 2 * pad;
+  const px = Math.max(0, Math.min(nPx - 1, Math.round(cx - pad)));
+  const clampedIdx = Math.round(px * (combined.length - 1) / Math.max(nPx - 1, 1));
+  const val = combined[clampedIdx];
+
+  const valY = H - pad - ((val - mn) / range * (H - 2 * pad));
+  const progress = clampedIdx / Math.max(combined.length - 1, 1);
+
+  const ctx = ch.getContext('2d');
+  ctx.clearRect(0, 0, ch.width, ch.height);
+  ctx.save();
+  ctx.scale(2, 2);
+
+  // Вертикальная линия
+  ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+  ctx.lineWidth = 0.5;
+  ctx.setLineDash([3, 3]);
+  ctx.beginPath(); ctx.moveTo(cx, pad); ctx.lineTo(cx, H - pad); ctx.stroke();
+
+  // Горизонтальная линия
+  ctx.beginPath(); ctx.moveTo(pad, valY); ctx.lineTo(W - pad, valY); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Точка пересечения
+  ctx.fillStyle = '#00e676';
+  ctx.beginPath(); ctx.arc(cx, valY, 3, 0, Math.PI * 2); ctx.fill();
+
+  // Метка значения Y (слева)
+  const valTxt = (val >= 0 ? '+' : '') + val.toFixed(2) + '%';
+  ctx.font = 'bold 8px JetBrains Mono,monospace';
+  const tw = ctx.measureText(valTxt).width;
+  const labelX = cx > W / 2 ? pad + 1 : W - pad - tw - 1;
+  ctx.fillStyle = 'rgba(0,0,0,0.7)';
+  ctx.fillRect(labelX - 1, valY - 9, tw + 2, 10);
+  ctx.fillStyle = val >= 0 ? '#00e676' : '#ff3d57';
+  ctx.fillText(valTxt, labelX, valY - 1);
+
+  // Метка прогресса X (снизу)
+  const pctTxt = Math.round(progress * 100) + '%  #' + (clampedIdx + 1);
+  const pw = ctx.measureText(pctTxt).width;
+  const labelXb = Math.min(W - pad - pw - 2, Math.max(pad, cx - pw / 2));
+  ctx.fillStyle = 'rgba(0,0,0,0.7)';
+  ctx.fillRect(labelXb - 1, H - pad - 11, pw + 2, 10);
+  ctx.fillStyle = 'rgba(200,220,240,0.85)';
+  ctx.fillText(pctTxt, labelXb, H - pad - 3);
+
+  ctx.restore();
+}
+
+function _clearOOSCrosshair() {
+  const ch = document.getElementById('oos-crosshair');
+  if (ch) ch.getContext('2d').clearRect(0, 0, ch.width, ch.height);
 
 function doOOSSort(key) {
   if (_oosSortKey === key) _oosSortDir *= -1;
@@ -27075,8 +27171,11 @@ async function runOOSOnNewData() {
     const origDATA = DATA;
     let rOld = null, rNew = null;
 
-    // Для old результата используем существующий результат из srcList (уже содержит IS метрики)
-    rOld = r;
+    // Пересчитываем ПОЛНЫЙ результат на исходных 100% данных (не IS часть)
+    try {
+      DATA = origDATA;
+      rOld = _hcRunBacktest(r.cfg);
+    } catch(e) { }
 
     // Для new результата пересчитываем на новых данных
     try {
@@ -29520,7 +29619,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774816109316;
+window._BUILD_TS = 1774816878194;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
