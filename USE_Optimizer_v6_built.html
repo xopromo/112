@@ -16779,14 +16779,16 @@ async function runOpt() {
     // При большом sLen — почти все пивоты в окне (как старое поведение).
     // При малом sLen — только свежие; если их < 2 — структура нейтральна,
     // фильтр не блокирует ни лонг ни шорт.
+    // ОПТИМИЗАЦИЯ: использую индекс вместо shift() для O(1) удаления
     const qHi=[], qLo=[];
-    let pHi=0, pLo=0;
+    let pHi=0, pLo=0, qHiStart=0, qLoStart=0;
     for(let i=pvL+pvR;i<N2;i++) {
       while(pHi<pvHiArr.length && pvHiArr[pHi].idx+pvR<=i) { qHi.push(pvHiArr[pHi]); pHi++; }
       while(pLo<pvLoArr.length && pvLoArr[pLo].idx+pvR<=i) { qLo.push(pvLoArr[pLo]); pLo++; }
-      while(qHi.length>0 && qHi[0].idx < i-sLen) qHi.shift();
-      while(qLo.length>0 && qLo[0].idx < i-sLen) qLo.shift();
-      if(qHi.length>=2 && qLo.length>=2) {
+      while(qHiStart<qHi.length && qHi[qHiStart].idx < i-sLen) qHiStart++;
+      while(qLoStart<qLo.length && qLo[qLoStart].idx < i-sLen) qLoStart++;
+      const qHiLen=qHi.length-qHiStart, qLoLen=qLo.length-qLoStart;
+      if(qHiLen>=2 && qLoLen>=2) {
         const hi1=qHi[qHi.length-1].v, hi2=qHi[qHi.length-2].v;
         const lo1=qLo[qLo.length-1].v, lo2=qLo[qLo.length-2].v;
         if(hi1>hi2&&lo1>lo2) bull[i]=1;
@@ -18877,13 +18879,14 @@ function _calcIndicators(cfg) {
       if (isL) pvLoArr.push({ idx: i, v: DATA[i].l });
     }
     const qHi = [], qLo = [];
-    let pHi = 0, pLo = 0;
+    let pHi = 0, pLo = 0, qHiStart = 0, qLoStart = 0;
     for (let i = spvL + spvR; i < N; i++) {
       while (pHi < pvHiArr.length && pvHiArr[pHi].idx + spvR <= i) { qHi.push(pvHiArr[pHi]); pHi++; }
       while (pLo < pvLoArr.length && pvLoArr[pLo].idx + spvR <= i) { qLo.push(pvLoArr[pLo]); pLo++; }
-      while (qHi.length > 0 && qHi[0].idx < i - sLen) qHi.shift();
-      while (qLo.length > 0 && qLo[0].idx < i - sLen) qLo.shift();
-      if (qHi.length >= 2 && qLo.length >= 2) {
+      while (qHiStart < qHi.length && qHi[qHiStart].idx < i - sLen) qHiStart++;
+      while (qLoStart < qLo.length && qLo[qLoStart].idx < i - sLen) qLoStart++;
+      const qHiLen = qHi.length - qHiStart, qLoLen = qLo.length - qLoStart;
+      if (qHiLen >= 2 && qLoLen >= 2) {
         const hi1 = qHi[qHi.length-1].v, hi2 = qHi[qHi.length-2].v;
         const lo1 = qLo[qLo.length-1].v, lo2 = qLo[qLo.length-2].v;
         if (hi1 > hi2 && lo1 > lo2) structBull[i] = 1;
@@ -28852,7 +28855,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774793760923;
+window._BUILD_TS = 1774794679992;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
