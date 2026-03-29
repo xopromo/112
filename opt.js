@@ -1141,8 +1141,10 @@ async function runOpt() {
   const erThresh      = $n('f_ert') || 0.3;
   const useKalmanMA   = $c('f_kalman');      // ##KALMAN_MA##
   const kalmanLen     = $n('f_kalmanl') || 20; // ##KALMAN_MA##
-  const useMLFilter   = $c('c_ml_filter') && typeof mlScore === 'function'; // ##ML_FILTER##
-  const mlThreshold   = $n('c_ml_thresh') || 0.55; // ##ML_FILTER##
+  const useMLFilter     = $c('c_ml_filter')      && typeof mlScore     === 'function'; // ##ML_FILTER##
+  const mlThreshold     = $n('c_ml_thresh')      || 0.55; // ##ML_FILTER##
+  const useMLHighFilter = $c('c_ml_high_filter') && typeof mlScoreHigh === 'function'; // ##ML_FILTER_HIGH##
+  const mlHighThreshold = $n('c_ml_high_thresh') || 0.55; // ##ML_FILTER_HIGH##
   // Precompute ML scores once on full DATA — IS/OOS срезы используют те же индексы ##ML_FILTER
   const _precompMlScores = useMLFilter
     ? (() => {
@@ -1150,6 +1152,17 @@ async function runOpt() {
         for (let i = 52; i < N; i++) {
           const f = mlComputeFeatures(i);
           if (f) try { arr[i] = mlScore(f); } catch(e) { arr[i] = 0.5; }
+        }
+        return arr;
+      })()
+    : null;
+  // Precompute ML HIGH scores for short-side filter ##ML_FILTER_HIGH
+  const _precompMlHighScores = useMLHighFilter
+    ? (() => {
+        const arr = new Float32Array(N).fill(-1);
+        for (let i = 52; i < N; i++) {
+          const f = mlComputeFeaturesHigh(i);
+          if (f) try { arr[i] = mlScoreHigh(f); } catch(e) { arr[i] = 0.5; }
         }
         return arr;
       })()
@@ -2054,6 +2067,7 @@ async function runOpt() {
         useER:_fCombo.useER??useER,erArr,erPeriod:erPeriod||10,erThresh,
         useKalmanMA:_fCombo.useKalmanMA??useKalmanMA,kalmanArr,kalmanLen, // ##KALMAN_MA##
         useMLFilter,mlThreshold,mlScoresArr:_precompMlScores, // ##ML_FILTER## горячий цикл IS
+        useMLHighFilter,mlHighThreshold,mlHighScoresArr:_precompMlHighScores, // ##ML_FILTER_HIGH##
         start:Math.max(
           (_effUseMa&&maP>0?(maP||0)*(htfRatio||1)*(_mType==='EMA'||_mType==='DEMA'||_mType==='TEMA'?3:1):0),
           (_effUseConfirm&&confN>0?(confN||0)*(_confHtf||1)*(_confType==='EMA'||_confType==='DEMA'||_confType==='TEMA'?3:1):0),
@@ -2124,6 +2138,7 @@ async function runOpt() {
               useMacdFilter:_fCombo.useMacdFilter??useMacdFilter,
               useER:_fCombo.useER??useER,erPeriod:erPeriod||10,erThresh,
               useMLFilter,mlThreshold,mlScoresArr:_precompMlScores, // ##ML_FILTER##
+              useMLHighFilter,mlHighThreshold,mlHighScoresArr:_precompMlHighScores, // ##ML_FILTER_HIGH##
               atrPeriod:atrP,commission:commTotal,baseComm:comm,spreadVal:spread*2,
               revSkip,revCooldown,revSrc,markToMarket:_mkm};
           results.push({name,pnl:r.pnl,wr:r.wr,n:r.n,dd:r.dd,pdd,avg:r.avg,sig,gt,
@@ -2408,6 +2423,7 @@ async function runOpt() {
         useER:_fCombo.useER??useER,erArr,erPeriod:erPeriod||10,erThresh,
         useKalmanMA:_fCombo.useKalmanMA??useKalmanMA,kalmanArr,kalmanLen, // ##KALMAN_MA##
         useMLFilter,mlThreshold,mlScoresArr:_precompMlScores, // ##ML_FILTER## горячий цикл IS
+        useMLHighFilter,mlHighThreshold,mlHighScoresArr:_precompMlHighScores, // ##ML_FILTER_HIGH##
         start:Math.max(
           (_effUseMa&&maP>0?(maP||0)*(htfRatio||1)*(_mType==='EMA'||_mType==='DEMA'||_mType==='TEMA'?3:1):0),
           (_effUseConfirm&&confN>0?(confN||0)*(_confHtf||1)*(_confType==='EMA'||_confType==='DEMA'||_confType==='TEMA'?3:1):0),
@@ -2513,6 +2529,7 @@ async function runOpt() {
               useMacdFilter:_fCombo.useMacdFilter??useMacdFilter,
               useER:_fCombo.useER??useER,erPeriod:erPeriod||10,erThresh,
               useMLFilter,mlThreshold,mlScoresArr:_precompMlScores, // ##ML_FILTER##
+              useMLHighFilter,mlHighThreshold,mlHighScoresArr:_precompMlHighScores, // ##ML_FILTER_HIGH##
               atrPeriod:atrP,commission:commTotal,baseComm:comm,spreadVal:spread*2,markToMarket:_mkm};
           // OOS и тяжёлые метрики НЕ вызываем здесь — это горячий цикл
           // CVR/UPI/Sortino/kRatio вычислятся батчем после завершения TPE
@@ -3048,7 +3065,9 @@ async function runOpt() {
                                       useFat,fatConsec,fatVolDrop,
                                       useKalmanMA,kalmanArr,kalmanLen, // ##KALMAN_MA##
                                       useMacdFilter,useER,erArr:erArrEx,erPeriod:erPArr[0]||10,erThresh,
-                                      useMLFilter,mlThreshold,mlScoresArr:_precompMlScores, // ##ML_FILTER## горячий цикл IS
+                                      useMLFilter,mlThreshold,mlScoresArr:_precompMlScores, // ##ML_FILTER##
+              useMLHighFilter,mlHighThreshold,mlHighScoresArr:_precompMlHighScores, // ##ML_FILTER_HIGH## горячий цикл IS
+        useMLHighFilter,mlHighThreshold,mlHighScoresArr:_precompMlHighScores, // ##ML_FILTER_HIGH##
                                       bodyAvg:bodyAvgArr,
                                       start:Math.max(
                                         (useMa&&maP>0?(maP||0)*(htfRatio||1)*(mType==='EMA'||mType==='DEMA'||mType==='TEMA'?3:1):0),
@@ -3147,6 +3166,7 @@ async function runOpt() {
                                           useKalmanMA, kalmanLen, // ##KALMAN_MA##
                                           useMacdFilter, useER, erPeriod:erPArr[0]||10, erThresh,
                                           useMLFilter, mlThreshold, mlScoresArr:_precompMlScores, // ##ML_FILTER##
+                                          useMLHighFilter, mlHighThreshold, mlHighScoresArr:_precompMlHighScores, // ##ML_FILTER_HIGH##
                                           atrPeriod:atrP, commission:commTotal, baseComm:comm, spreadVal:spread*2,
                                           markToMarket:_mkm
                                         };
@@ -3665,6 +3685,18 @@ function _calcIndicators(cfg) {
           return arr;
         })()
       : null,
+    mlHighScoresArr: cfg.useMLHighFilter && typeof mlComputeFeaturesHigh === 'function' && typeof mlScoreHigh === 'function' // ##ML_FILTER_HIGH
+      ? (() => {
+          if (_mlHighScoresArrCache.arr && N <= _mlHighScoresArrCache.len) return _mlHighScoresArrCache.arr;
+          const arr = new Float32Array(N).fill(-1);
+          for (let i = 52; i < N; i++) {
+            const f = mlComputeFeaturesHigh(i);
+            if (f) try { arr[i] = mlScoreHigh(f); } catch(e) { arr[i] = 0.5; }
+          }
+          _mlHighScoresArrCache = { arr, len: N };
+          return arr;
+        })()
+      : null,
   };
 }
 
@@ -3892,9 +3924,12 @@ function buildBtCfg(cfg, ind) {
     kalmanCrossArr: ind.kalmanCrossArr,
     kalmanCrossLen: cfg.kalmanCrossLen || 20,
 
-    useMLFilter:  cfg.useMLFilter  || false, // ##ML_FILTER##
-    mlThreshold:  cfg.mlThreshold  || 0.55,
-    mlScoresArr:  ind.mlScoresArr  || null,  // HC/robustness используют кеш; _attachOOS передаёт useMLFilter:false
+    useMLFilter:      cfg.useMLFilter      || false, // ##ML_FILTER##
+    mlThreshold:      cfg.mlThreshold      || 0.55,
+    mlScoresArr:      ind.mlScoresArr      || null,  // HC/robustness используют кеш; _attachOOS передаёт useMLFilter:false
+    useMLHighFilter:  cfg.useMLHighFilter  || false, // ##ML_FILTER_HIGH##
+    mlHighThreshold:  cfg.mlHighThreshold  || 0.55,
+    mlHighScoresArr:  ind.mlHighScoresArr  || null,
 
     start: Math.max(
       (cfg.useMA      ? (maP || 0)       * (cfg.htfRatio     || 1) * (cfg.maType==='EMA'||cfg.maType==='DEMA'||cfg.maType==='TEMA'?3:1) : 0),
@@ -3912,7 +3947,8 @@ let _massRobRunning = false;
 // ##ML_FILTER## — кеш mlScoresArr: вычисляется один раз для полных данных,
 // переиспользуется для IS/OOS срезов (индексы баров совпадают).
 // Инвалидируется при смене модели (ui.js) и при загрузке новых данных.
-let _mlScoresArrCache = { arr: null, len: -1 };
+let _mlScoresArrCache     = { arr: null, len: -1 };
+let _mlHighScoresArrCache = { arr: null, len: -1 }; // ##ML_FILTER_HIGH
 
 async function runMassRobust() {
   if (!DATA) { alert('Нет данных'); return; }

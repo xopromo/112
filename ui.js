@@ -214,7 +214,8 @@ function parseCSV(text) {
   const vi = hdr.findIndex(h => h.toLowerCase() === 'volume' || h.toLowerCase().includes('vol'));
   HAS_VOLUME = vi >= 0;
   DATA = [];
-  if (typeof _mlScoresArrCache !== 'undefined') _mlScoresArrCache = { arr: null, len: -1 }; // ##ML_FILTER
+  if (typeof _mlScoresArrCache     !== 'undefined') _mlScoresArrCache     = { arr: null, len: -1 }; // ##ML_FILTER
+  if (typeof _mlHighScoresArrCache !== 'undefined') _mlHighScoresArrCache = { arr: null, len: -1 }; // ##ML_FILTER_HIGH
   for (let i = 1; i < lines.length; i++) {
     const c = lines[i].split(',');
     if (c.length > Math.max(oi,hi,li,ci)) {
@@ -232,7 +233,8 @@ function applyMaxBars() {
   const n = parseInt($('c_maxbars')?.value) || 0;
   const total = _rawDATA.length;
   DATA = (n > 0 && n < total) ? _rawDATA.slice(total - n) : _rawDATA;
-  if (typeof _mlScoresArrCache !== 'undefined') _mlScoresArrCache = { arr: null, len: -1 }; // ##ML_FILTER
+  if (typeof _mlScoresArrCache     !== 'undefined') _mlScoresArrCache     = { arr: null, len: -1 }; // ##ML_FILTER
+  if (typeof _mlHighScoresArrCache !== 'undefined') _mlHighScoresArrCache = { arr: null, len: -1 }; // ##ML_FILTER_HIGH
   // Сохраняем мастер-копию для ресэмплинга в multi-TF режиме
   window.DATA_1M = DATA.slice();
   const used = DATA.length;
@@ -7859,7 +7861,8 @@ function _mlActivateCode(code) {
     window.mlScore = scoreFn;
     if (typeof mlResetCache === 'function') mlResetCache();
     // Инвалидируем кеш ML-скоров при смене модели (opt.js)
-    if (typeof _mlScoresArrCache !== 'undefined') _mlScoresArrCache = { arr: null, len: -1 };
+    if (typeof _mlScoresArrCache     !== 'undefined') _mlScoresArrCache     = { arr: null, len: -1 };
+    if (typeof _mlHighScoresArrCache !== 'undefined') _mlHighScoresArrCache = { arr: null, len: -1 };
     return true;
   } catch(e) {
     console.error('[ML activate]', e);
@@ -7917,6 +7920,8 @@ async function openMLModal(tab) {
   const activeId = _mlActiveId;
   const hasBuiltin = typeof mlScore === 'function';
 
+  const hasBuiltinHigh = typeof mlScoreHigh === 'function';
+
   const tabBtn = (id, label) =>
     `<button onclick="openMLModal('${id}')" style="background:${tab===id?'rgba(139,92,246,.2)':'none'};border:1px solid ${tab===id?'rgba(139,92,246,.6)':'#444'};color:var(--fg,#cdd6f4);border-radius:4px;padding:4px 14px;cursor:pointer;font-size:.82em">${label}</button>`;
 
@@ -7925,11 +7930,13 @@ async function openMLModal(tab) {
       <span style="font-weight:600">🤖 ML-модели</span>
       <button onclick="document.getElementById('ml-modal').remove()" style="background:none;border:none;color:var(--fg,#cdd6f4);cursor:pointer;font-size:1.2em">✕</button>
     </div>
-    <div style="display:flex;gap:6px;margin-bottom:14px">
-      ${tabBtn('models','Модели')} ${tabBtn('scan','Скан')}
+    <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap">
+      ${tabBtn('models','📉 Доньи')} ${tabBtn('tops','📈 Вершины')} ${tabBtn('scan','🔍 Скан')}
     </div>
     <div id="ml-modal-content">
-      ${tab === 'models' ? _mlModelsTab(models, activeId, hasBuiltin) : _mlScanTab()}
+      ${tab === 'models' ? _mlModelsTab(models, activeId, hasBuiltin)
+        : tab === 'tops' ? _mlTopsTab(hasBuiltinHigh)
+        : _mlScanTab()}
     </div>`;
 }
 
@@ -8050,58 +8057,239 @@ function _mlModelsTab(models, activeId, hasBuiltin) {
     </div>`;
 }
 
+function _mlTopsTab(hasBuiltinHigh) {
+  return `
+    <div style="font-size:.82em;color:#888;margin-bottom:10px">
+      Модель вершин: <span style="color:#a78bfa">${hasBuiltinHigh ? '✅ загружена' : '—'}</span>
+      ${!hasBuiltinHigh ? ' <span style="color:#f9e2af">Обучите модель ниже для коротких сигналов</span>' : ''}
+    </div>
+    <div style="font-size:.75em;color:#555;margin-bottom:12px;line-height:1.6">
+      Обучает отдельную модель для <b>обнаружения вершин</b> (сигнал на шорт).<br>
+      Использует зеркальные признаки: верхний хвост свечи, перекупленность RSI,
+      цена выше EMA, бычья серия баров, наклон тренда вверх.<br>
+      После обучения функция <code>mlScoreHigh()</code> используется для фильтрации шорт-входов.
+    </div>
+
+    <div style="font-size:.8em;font-weight:600;color:#a78bfa;margin-bottom:8px">▶ Методы разметки (что считать «хорошей вершиной»)</div>
+    <div style="background:var(--bg3,#313244);border-radius:6px;padding:10px 12px;margin-bottom:10px;display:flex;flex-direction:column;gap:8px">
+
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:.82em">
+        <input type="checkbox" id="ml-high-m1" checked onchange="_mlTopsUpdateUI()">
+        <span style="color:#cdd6f4">Метод 1: % падение</span>
+        <span style="color:#555;margin-left:auto">цена упала на</span>
+        <input id="ml-high-pct" type="number" value="2.0" min="0.1" max="30" step="0.1"
+          style="width:55px;padding:2px 5px;background:var(--bg2,#1e1e2e);border:1px solid #555;border-radius:3px;color:var(--fg,#cdd6f4);font-size:.9em">
+        <span style="color:#555">% в течение</span>
+        <input id="ml-high-bars" type="number" value="20" min="5" max="200"
+          style="width:48px;padding:2px 5px;background:var(--bg2,#1e1e2e);border:1px solid #555;border-radius:3px;color:var(--fg,#cdd6f4);font-size:.9em">
+        <span style="color:#555">баров</span>
+      </label>
+
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:.82em">
+        <input type="checkbox" id="ml-high-m2" onchange="_mlTopsUpdateUI()">
+        <span style="color:#cdd6f4">Метод 2: ATR-падение</span>
+        <span style="color:#555;margin-left:auto">упала на</span>
+        <input id="ml-high-atr" type="number" value="2.0" min="0.1" max="20" step="0.1"
+          style="width:55px;padding:2px 5px;background:var(--bg2,#1e1e2e);border:1px solid #555;border-radius:3px;color:var(--fg,#cdd6f4);font-size:.9em">
+        <span style="color:#555">× ATR</span>
+      </label>
+
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:.82em">
+        <input type="checkbox" id="ml-high-m3" onchange="_mlTopsUpdateUI()">
+        <span style="color:#cdd6f4">Метод 3: структурный разрыв</span>
+        <span style="color:#888;font-size:.9em">следующий пивот-лоу ниже предыдущего</span>
+      </label>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;font-size:.82em">
+      <span style="color:#888">Комбинация методов:</span>
+      <label style="display:flex;align-items:center;gap:4px;cursor:pointer;color:#cdd6f4">
+        <input type="radio" name="ml-high-combine" value="or" checked> ИЛИ (OR) — хотя бы один
+      </label>
+      <label style="display:flex;align-items:center;gap:4px;cursor:pointer;color:#cdd6f4">
+        <input type="radio" name="ml-high-combine" value="and"> И (AND) — все сразу
+      </label>
+    </div>
+
+    <div style="font-size:.8em;font-weight:600;color:#a78bfa;margin-bottom:8px">▶ Параметры обучения</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+      <label style="font-size:.78em;color:#888;display:flex;flex-direction:column;gap:3px">Название
+        <input id="ml-high-name" type="text" placeholder="TOPS BTC 1H"
+          style="padding:4px 7px;background:var(--bg3,#313244);border:1px solid #555;border-radius:4px;color:var(--fg,#cdd6f4);font-size:1em">
+      </label>
+      <label style="font-size:.78em;color:#888;display:flex;flex-direction:column;gap:3px">Деревьев
+        <input id="ml-high-ntrees" type="number" value="100" min="20" max="400"
+          style="padding:4px 7px;background:var(--bg3,#313244);border:1px solid #555;border-radius:4px;color:var(--fg,#cdd6f4);font-size:1em">
+      </label>
+      <label style="font-size:.78em;color:#888;display:flex;flex-direction:column;gap:3px">Глубина дерева
+        <input id="ml-high-depth" type="number" value="5" min="2" max="8"
+          style="padding:4px 7px;background:var(--bg3,#313244);border:1px solid #555;border-radius:4px;color:var(--fg,#cdd6f4);font-size:1em">
+      </label>
+      <label style="font-size:.78em;color:#888;display:flex;flex-direction:column;gap:3px">Баров обучения
+        <input id="ml-high-trainbars" type="number" value="" placeholder="все"
+          style="padding:4px 7px;background:var(--bg3,#313244);border:1px solid #555;border-radius:4px;color:var(--fg,#cdd6f4);font-size:1em">
+      </label>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:10px">
+      <button onclick="_mlStartTrainingHigh()"
+        style="padding:5px 18px;background:rgba(139,92,246,.25);border:1px solid rgba(139,92,246,.6);border-radius:4px;color:#a78bfa;cursor:pointer;font-size:.82em;font-weight:600">
+        ⚡ Обучить модель вершин
+      </button>
+      <div id="ml-high-status" style="font-size:.78em;color:#888"></div>
+    </div>
+    <div id="ml-high-bar-wrap" style="margin-top:8px;display:none">
+      <div style="background:#333;border-radius:4px;height:6px;overflow:hidden">
+        <div id="ml-high-bar" style="background:#7c3aed;height:100%;width:0%;transition:width .1s"></div>
+      </div>
+    </div>
+
+    <div style="margin-top:14px;font-size:.72em;color:#555;line-height:1.5">
+      Модель сохраняется в памяти браузера как <code>mlScoreHigh()</code>.<br>
+      Чтобы использовать: в настройках стратегии включите <b>ML-фильтр шортов</b> (шорт-сторона требует mlScoreHigh ≥ порога).
+    </div>`;
+}
+
+function _mlTopsUpdateUI() { /* placeholder — layout static */ }
+
+async function _mlStartTrainingHigh() {
+  if (typeof mlTrainHighInBrowser !== 'function') {
+    toast('⚠️ Модуль обучения не загружен', 2500); return;
+  }
+  if (!DATA || DATA.length < 100) {
+    toast('⚠️ Нет данных. Загрузите CSV.', 2500); return;
+  }
+  const nameEl = document.getElementById('ml-high-name');
+  const name = nameEl?.value.trim();
+  if (!name) { toast('Введите название модели', 2000); nameEl?.focus(); return; }
+
+  const useMethodPct    = document.getElementById('ml-high-m1')?.checked ?? true;
+  const useMethodAtr    = document.getElementById('ml-high-m2')?.checked ?? false;
+  const useMethodStruct = document.getElementById('ml-high-m3')?.checked ?? false;
+  if (!useMethodPct && !useMethodAtr && !useMethodStruct) {
+    toast('⚠️ Выберите хотя бы один метод разметки', 2500); return;
+  }
+
+  const fallPct  = (parseFloat(document.getElementById('ml-high-pct')?.value)   || 2.0) / 100;
+  const fallAtr  = parseFloat(document.getElementById('ml-high-atr')?.value)    || 2.0;
+  const labelBars = parseInt(document.getElementById('ml-high-bars')?.value)    || 20;
+  const nTrees   = parseInt(document.getElementById('ml-high-ntrees')?.value)   || 100;
+  const depth    = parseInt(document.getElementById('ml-high-depth')?.value)    || 5;
+  const nBars    = parseInt(document.getElementById('ml-high-trainbars')?.value)|| DATA.length;
+  const combineMode = document.querySelector('input[name="ml-high-combine"]:checked')?.value || 'or';
+
+  const statusEl = document.getElementById('ml-high-status');
+  const barWrap  = document.getElementById('ml-high-bar-wrap');
+  const barEl    = document.getElementById('ml-high-bar');
+  const btn      = document.querySelector('[onclick="_mlStartTrainingHigh()"]');
+
+  if (btn)     btn.disabled = true;
+  if (barWrap) barWrap.style.display = 'block';
+  if (statusEl) statusEl.textContent = 'Строим датасет вершин...';
+
+  try {
+    const result = await mlTrainHighInBrowser(
+      { nTrees, maxDepth: depth, nBars, labelBars,
+        useMethodPct, fallPct, useMethodAtr, fallAtr, useMethodStruct, combineMode },
+      (frac, done, total, phase) => {
+        if (barEl)    barEl.style.width = (frac * 100).toFixed(1) + '%';
+        if (statusEl) statusEl.textContent =
+          phase === 'dataset'  ? 'Строим датасет вершин...' :
+          phase === 'training' ? `Обучение: дерево ${done}/${total}` : 'Готово';
+      }
+    );
+
+    // Activate mlScoreHigh in current page context
+    try {
+      const fn = new Function(result.code + '\nreturn mlScoreHigh;');
+      window.mlScoreHigh = fn();
+    } catch(e) {
+      console.warn('[mlTops] activate error', e);
+    }
+
+    // Save to DB with type marker
+    const id = 'mlh_' + Date.now();
+    await _MLModelDB.save({
+      id, name: '📈 ' + name, code: result.code,
+      auc: result.auc, bars: result.bars, signals: result.n,
+      date: new Date().toLocaleDateString('ru-RU', { day:'2-digit', month:'2-digit', year:'2-digit' }),
+    });
+
+    const posPct = (100 * result.nPos / result.n).toFixed(0);
+    const aucColor = result.auc >= 0.62 ? '✅' : result.auc >= 0.55 ? '⚠️' : '❌';
+    toast(`${aucColor} Вершины «${name}» AUC=${result.auc.toFixed(3)} · сигналов=${result.n} · вершин=${posPct}%`, 4000);
+    mlResetCache();
+    await openMLModal('tops');
+
+  } catch(e) {
+    if (statusEl) statusEl.textContent = '⚠️ ' + e.message;
+    if (btn) btn.disabled = false;
+    console.error('[mlTrainHigh]', e);
+  }
+}
+
 function _mlScanTab() {
-  const active = typeof mlScore === 'function';
-  // Check feature mismatch: test model with a dummy 33-feature vector
+  const activeLow  = typeof mlScore     === 'function';
+  const activeHigh = typeof mlScoreHigh === 'function';
+  // Check feature mismatch for lows model
   let featWarn = '';
-  if (active && typeof ML_FEAT_N !== 'undefined') {
+  if (activeLow && typeof ML_FEAT_N !== 'undefined') {
     try {
       const dummy = new Float64Array(ML_FEAT_N);
       const r = mlScore(dummy);
       if (r === 0.5 && ML_FEAT_N !== 21) featWarn = `
         <div style="margin-top:6px;padding:5px 8px;background:rgba(249,226,175,.08);border:1px solid rgba(249,226,175,.3);border-radius:4px;font-size:.78em;color:#f9e2af">
-          ⚠️ Активная модель обучена на старых признаках. Перейдите в «Модели» и нажмите <b>⚡ Обучить</b> заново.
+          ⚠️ Модель доньев обучена на старых признаках. Перейдите в «📉 Доньи» → ⚡ Обучить заново.
         </div>`;
     } catch(e) {}
   }
   return `
-    <div style="font-size:.82em;color:#888;margin-bottom:10px">
-      Активная модель: <span style="color:#a78bfa">${_mlActiveName||'Встроенная'}</span>
-      ${active ? '' : ' <span style="color:#f38ba8">— не загружена. Перейдите в «Модели» → ⚡ Обучить</span>'}
-      ${featWarn}
+    <div style="font-size:.82em;color:#888;margin-bottom:10px;display:flex;flex-wrap:wrap;gap:12px">
+      <span>📉 Доньи: <span style="color:${activeLow?'#a78bfa':'#f38ba8'}">${activeLow?(_mlActiveName||'Встроенная'):'не загружена'}</span></span>
+      <span>📈 Вершины: <span style="color:${activeHigh?'#a78bfa':'#555'}">${activeHigh?'загружена':'—'}</span></span>
     </div>
+    ${featWarn}
     <div style="font-size:.75em;color:#555;margin-bottom:12px;line-height:1.5">
-      Сканирует pivot-low сигналы и оценивает каждый по 33 признакам:<br>
-      цена · объём · RSI · расст. от EMA20/50 · структура свечи · режим волатильности · тренд
+      Сканирует pivot-low/high сигналы и оценивает каждый по 33 признакам.
     </div>
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap">
       <label style="font-size:.82em;color:#aaa">Последних баров:</label>
       <input id="ml-scan-bars" type="number" value="500" min="50" max="50000"
         style="width:80px;padding:4px 6px;background:var(--bg3,#313244);border:1px solid #555;border-radius:4px;color:var(--fg,#cdd6f4);font-size:.82em">
-      <button onclick="_mlRunScan()"
-        style="padding:5px 16px;background:rgba(139,92,246,.2);border:1px solid rgba(139,92,246,.5);border-radius:4px;color:#a78bfa;cursor:pointer;font-size:.82em">
-        ▶ Сканировать
+      <button onclick="_mlRunScan('low')"
+        style="padding:5px 14px;background:rgba(139,92,246,.2);border:1px solid rgba(139,92,246,.5);border-radius:4px;color:#a78bfa;cursor:pointer;font-size:.82em">
+        📉 Доньи
+      </button>
+      <button onclick="_mlRunScan('high')"
+        style="padding:5px 14px;background:rgba(139,92,246,.2);border:1px solid rgba(249,226,175,.4);border-radius:4px;color:#f9e2af;cursor:pointer;font-size:.82em">
+        📈 Вершины
       </button>
     </div>
-    <div id="ml-scan-results" style="font-size:.82em;color:#666">Нажмите «Сканировать»</div>`;
+    <div id="ml-scan-results" style="font-size:.82em;color:#666">Нажмите кнопку для сканирования</div>`;
 }
 
-function _mlRunScan() {
-  if (typeof mlScore !== 'function') {
-    document.getElementById('ml-scan-results').innerHTML =
-      '<span style="color:#f38ba8">⚠️ Модель не загружена. Перейдите на вкладку «Модели» и активируйте</span>';
+function _mlRunScan(type) {
+  type = type || 'low';
+  const isHigh = type === 'high';
+  const res = document.getElementById('ml-scan-results');
+
+  if (isHigh && typeof mlScoreHigh !== 'function') {
+    res.innerHTML = '<span style="color:#f38ba8">⚠️ Модель вершин не загружена. Перейдите на вкладку «📈 Вершины» → ⚡ Обучить</span>';
+    return;
+  }
+  if (!isHigh && typeof mlScore !== 'function') {
+    res.innerHTML = '<span style="color:#f38ba8">⚠️ Модель доньев не загружена. Перейдите на вкладку «📉 Доньи» → ⚡ Обучить</span>';
     return;
   }
   if (!DATA || DATA.length < 50) {
-    document.getElementById('ml-scan-results').innerHTML = '<span style="color:#f38ba8">⚠️ Нет данных</span>';
+    res.innerHTML = '<span style="color:#f38ba8">⚠️ Нет данных</span>';
     return;
   }
   const nBars = parseInt(document.getElementById('ml-scan-bars')?.value) || 500;
-  const res = document.getElementById('ml-scan-results');
   res.innerHTML = '<span style="color:#888">Сканирование...</span>';
 
   setTimeout(() => {
-    const results = mlScanSignals(nBars);
+    const results = isHigh ? mlScanHighSignals(nBars) : mlScanSignals(nBars);
     if (!results.length) { res.innerHTML = '<span style="color:#888">Сигналов не найдено</span>'; return; }
 
     const fmt = ts => {
@@ -8120,8 +8308,12 @@ function _mlRunScan() {
       </tr>`;
     }).join('');
 
+    const label = isHigh ? 'вершин (📈 шорт-сигналов)' : 'доньев (📉 лонг-сигналов)';
+    const hint  = isHigh
+      ? '≥65% высокая вероятность значимого падения · <50% слабый сигнал'
+      : '≥65% высокая · 50–65% средняя · <50% низкая вероятность прибыльного входа';
     res.innerHTML = `
-      <div style="color:#666;margin-bottom:8px">Найдено: ${results.length} сигналов · топ-50 по ML-оценке</div>
+      <div style="color:#666;margin-bottom:8px">Найдено: ${results.length} ${label} · топ-50 по ML-оценке</div>
       <table style="width:100%;border-collapse:collapse">
         <thead><tr style="color:#555;border-bottom:1px solid #333">
           <th style="padding:3px 8px;text-align:left">#</th>
@@ -8131,7 +8323,7 @@ function _mlRunScan() {
         </tr></thead>
         <tbody>${rows}</tbody>
       </table>
-      <div style="color:#555;margin-top:8px">≥65% высокая · 50–65% средняя · &lt;50% низкая вероятность прибыльного входа</div>`;
+      <div style="color:#555;margin-top:8px">${hint}</div>`;
   }, 20);
 }
 

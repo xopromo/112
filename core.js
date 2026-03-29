@@ -877,9 +877,14 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
 
       // --- C. Исполнение входа ---
       if (doDir !== 0 && ac > 0) {
-        // ML-фильтр: блокировать вход если ML-оценка ниже порога
-        if (cfg.mlScoresArr && cfg.mlScoresArr[i] >= 0 &&
+        // ML-фильтр лонгов: блокировать лонг-вход если ML-оценка ниже порога ##ML_FILTER
+        if (doDir === 1 && cfg.mlScoresArr && cfg.mlScoresArr[i] >= 0 &&
             cfg.mlScoresArr[i] < (cfg.mlThreshold || 0.5)) {
+          doDir = 0;
+        }
+        // ML-фильтр шортов: блокировать шорт-вход если оценка вершины ниже порога ##ML_FILTER_HIGH
+        if (doDir === -1 && cfg.mlHighScoresArr && cfg.mlHighScoresArr[i] >= 0 &&
+            cfg.mlHighScoresArr[i] < (cfg.mlHighThreshold || 0.5)) {
           doDir = 0;
         }
       }
