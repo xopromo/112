@@ -7158,6 +7158,9 @@ function applyOOSFilters() {
       `<td class="muted">${f1(r.old_wr)}%</td>` +
       `<td class="muted">${f1(r.new_wr)}%</td>` +
       `<td class="${pCls(r.delta_wr)}">${dStr(r.delta_wr)}</td>` +
+      `<td class="${pCls(r.old_kRatio)}">${r.old_kRatio != null ? r.old_kRatio.toFixed(2) : '—'}</td>` +
+      `<td class="${pCls(r.new_kRatio)}">${r.new_kRatio != null ? r.new_kRatio.toFixed(2) : '—'}</td>` +
+      `<td class="${pCls(r.delta_kRatio)}">${r.delta_kRatio != null ? (r.delta_kRatio >= 0 ? '+' : '') + r.delta_kRatio.toFixed(2) : '—'}</td>` +
       `<td class="muted" style="text-align:center">${r.old_n??'—'}</td>` +
       `<td class="muted" style="text-align:center">${r.new_n??'—'}</td>` +
       `<td style="text-align:center"><span class="oos-badge ${badge} ${oosCls}">${oosScore}</span></td>` +
@@ -7687,11 +7690,14 @@ async function runOOSOnNewData() {
       old_pnl:   rOld ? rOld.pnl : null,
       old_wr:    rOld ? rOld.wr  : null,
       old_n:     rOld ? rOld.n   : null,
+      old_kRatio: rOld && rOld.eq ? _calcKRatio(rOld.eq) : null,
       new_pnl:   rNew ? rNew.pnl : null,
       new_wr:    rNew ? rNew.wr  : null,
       new_n:     rNew ? rNew.n   : null,
+      new_kRatio: rNew && rNew.eq ? _calcKRatio(rNew.eq) : null,
       delta_pnl: (rOld && rNew) ? rNew.pnl - rOld.pnl : null,
       delta_wr:  (rOld && rNew) ? rNew.wr  - rOld.wr  : null,
+      delta_kRatio: (rOld && rOld.eq && rNew && rNew.eq) ? (_calcKRatio(rNew.eq) ?? 0) - (_calcKRatio(rOld.eq) ?? 0) : null,
       old_bars:  DATA ? DATA.length : null,
       new_bars:  NEW_DATA ? NEW_DATA.length : null,
       old_eq:    rOld ? rOld.eq  : null,   // equity curve на истории

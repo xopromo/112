@@ -1791,6 +1791,9 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
         <col style="width:66px"> <!-- WR% ист -->
         <col style="width:66px"> <!-- WR% нов -->
         <col style="width:60px"> <!-- ΔWR -->
+        <col style="width:60px"> <!-- K-Ratio ист -->
+        <col style="width:60px"> <!-- K-Ratio нов -->
+        <col style="width:60px"> <!-- ΔK-Ratio -->
         <col style="width:46px"> <!-- # ист -->
         <col style="width:46px"> <!-- # нов -->
         <col style="width:104px"><!-- Оценка -->
@@ -1808,6 +1811,9 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
           <th onclick="doOOSSort('old_wr')"    class="oos-th-hist"  style="resize:horizontal">WR ист ↕</th>
           <th onclick="doOOSSort('new_wr')"    class="oos-th-new"   style="resize:horizontal">WR нов ↕</th>
           <th onclick="doOOSSort('delta_wr')"  class="oos-th-delta" style="resize:horizontal">ΔWR ↕</th>
+          <th onclick="doOOSSort('old_kRatio')" class="oos-th-hist" style="resize:horizontal" title="K-Ratio = slope/se(slope). Равномерность роста. ≥2 = отлично">K-Ratio ист ↕</th>
+          <th onclick="doOOSSort('new_kRatio')" class="oos-th-new" style="resize:horizontal" title="K-Ratio = slope/se(slope). Равномерность роста. ≥2 = отлично">K-Ratio нов ↕</th>
+          <th onclick="doOOSSort('delta_kRatio')" class="oos-th-delta" style="resize:horizontal">ΔK-Ratio ↕</th>
           <th class="oos-th-hist"># ист</th>
           <th class="oos-th-new" ># нов</th>
           <th onclick="doOOSSort('score')" style="overflow:hidden;background:var(--bg3);color:var(--accent);padding:5px 7px;border-bottom:1px solid var(--border2);cursor:pointer;resize:horizontal">Оценка ↕</th>
