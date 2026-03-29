@@ -15711,10 +15711,12 @@ function _calcSerenity(eq) {
   let sumNeg = 0;
   for (const r of neg) sumNeg += r;
   const meanNeg = -sumNeg / neg.length;
-  neg.sort((a, b) => a - b); // ascending (worst first)
+  // ОПТИМИЗАЦИЯ: quickselect для k наихудших (most negative) вместо full sort
   const k = Math.max(1, Math.floor(neg.length * 0.05));
+  const negMutable = Array.from(neg);
+  _quickselect(negMutable, k - 1); // первые k элементов теперь ≤ negMutable[k-1]
   let cvarSum = 0;
-  for (let i = 0; i < k; i++) cvarSum += neg[i];
+  for (let i = 0; i < k; i++) cvarSum += negMutable[i]; // суммируем k наихудших
   const cvar5 = -cvarSum / k;
   const tailFactor = meanNeg > 0.001 ? Math.max(1, cvar5 / meanNeg) : 1;
   return Math.round(eq[N - 1] / (ui * tailFactor) * 10) / 10;
@@ -15817,6 +15819,21 @@ function _calcFilterAblation(cfg) {
 // ── HMM Regime Detector — Tier 3 ─────────────────────────────────
 // Gaussian HMM (2 состояния: bull/bear) на log-returns из DATA.
 // Baum-Welch 5 итераций → Viterbi для меток состояний.
+// O(n) quickselect для нахождения k-го элемента (медиана при k=n/2)
+// ОПТИМИЗАЦИЯ: вместо Array.from().sort() O(n log n), используем quickselect O(n)
+function _quickselect(arr, k, left = 0, right = arr.length - 1) {
+  if (left === right) return arr[left];
+  const pivotIdx = Math.floor(Math.random() * (right - left + 1)) + left;
+  let pivot = arr[pivotIdx];
+  let i = left, j = right;
+  [arr[pivotIdx], arr[right]] = [arr[right], arr[pivotIdx]];
+  for (let x = left; x < right; x++) {
+    if (arr[x] < pivot) { [arr[x], arr[i]] = [arr[i], arr[x]]; i++; }
+  }
+  [arr[i], arr[right]] = [arr[right], arr[i]];
+  return k === i ? arr[i] : k < i ? _quickselect(arr, k, left, i - 1) : _quickselect(arr, k, i + 1, right);
+}
+
 // Возвращает { bullPct, bearPct, regimes Int8Array, bullState, m0, m1, s0, s1, stayProb[] }
 // Вычисляется лениво в showDetail. Откат: удалить + ##HMM / ##REGIME_PERF в ui.js
 function _calcHMM() {
@@ -15824,9 +15841,9 @@ function _calcHMM() {
   const N = DATA.length, M = N - 1;
   const obs = new Float64Array(M);
   for (let i = 1; i < N; i++) obs[i - 1] = Math.log(DATA[i].c / DATA[i - 1].c);
-  // Init: split at median
-  const sorted = Array.from(obs).sort((a, b) => a - b);
-  const med = sorted[Math.floor(M / 2)];
+  // Init: split at median (ОПТИМИЗАЦИЯ: O(n) quickselect вместо O(n log n) sort)
+  const obsMutable = Array.from(obs);
+  const med = _quickselect(obsMutable, Math.floor(M / 2));
   let m0 = 0, m1 = 0, c0 = 0, c1 = 0;
   for (let i = 0; i < M; i++) { if (obs[i] <= med) { m0 += obs[i]; c0++; } else { m1 += obs[i]; c1++; } }
   m0 /= c0 || 1; m1 /= c1 || 1;
@@ -28858,7 +28875,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774794727457;
+window._BUILD_TS = 1774794772999;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
