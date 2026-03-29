@@ -22318,6 +22318,7 @@ function drawEquityData(eq, label, splitPct) {
   if (!eq || !eq.length) return;
   const wrap = document.getElementById('eq-wrap');
   const canvas=$('eqc');
+  if (!canvas) return;
   // Сохраняем позицию скролла — браузер может прыгнуть к canvas при display:none→block
   const _scrollEl = document.querySelector('.tbl-scroll') || document.documentElement;
   const _scrollY = window.scrollY;
@@ -26840,13 +26841,16 @@ function openOOSDiagnostic() {
   text += `📊 ДИАГНОСТИКА OOS: ${oosR.name}\n`;
   text += `${'='.repeat(70)}\n\n`;
 
-  text += `📍 ИСХОДНЫЙ ПЕРИОД (История · IS):\n`;
+  text += `⚠️ ВНИМАНИЕ: Это сравнение JS-бэктеста на двух наборах данных.\n`;
+  text += `Чтобы сравнить с РЕАЛЬНЫМИ данными TradingView, загрузите TV CSV выше.\n\n`;
+
+  text += `📍 ИСХОДНЫЙ ПЕРИОД (История · все 100% данных):\n`;
   text += `   PnL: ${(oosR.old_pnl ?? '—').toFixed(2)}% | WR: ${(oosR.old_wr ?? '—').toFixed(1)}% | Сделок: ${oosR.old_n ?? '—'} | DD: ${(oosR.old_dd ?? '—').toFixed(2)}% | P/DD: ${(oosR.old_pdd ?? '—').toFixed(2)}\n\n`;
 
-  text += `📍 НОВЫЙ ПЕРИОД (Загруженные данные · OOS):\n`;
+  text += `📍 НОВЫЙ ПЕРИОД (Загруженные данные · новый набор):\n`;
   text += `   PnL: ${(oosR.new_pnl ?? '—').toFixed(2)}% | WR: ${(oosR.new_wr ?? '—').toFixed(1)}% | Сделок: ${oosR.new_n ?? '—'} | DD: ${(oosR.new_dd ?? '—').toFixed(2)}% | P/DD: ${(oosR.new_pdd ?? '—').toFixed(2)}\n\n`;
 
-  text += `📊 ДЕЛЬТА (изменения OOS - IS):\n`;
+  text += `📊 ДЕЛЬТА (изменения новые - исходные):\n`;
   if (oosR.old_pnl != null && oosR.new_pnl != null) {
     const dPnl = oosR.new_pnl - oosR.old_pnl;
     const status = dPnl > 0 ? '✅' : dPnl < 0 ? '❌' : '⚪';
@@ -26869,46 +26873,40 @@ function openOOSDiagnostic() {
   }
   text += `\n`;
 
-  text += `⚠️ АНАЛИЗ:\n`;
-  let hasIssues = false;
-
+  text += `💡 ИНТЕРПРЕТАЦИЯ:\n`;
   if (oosR.old_pnl != null && oosR.new_pnl != null) {
     const dPnl = oosR.new_pnl - oosR.old_pnl;
     if (dPnl < -50) {
-      text += `   ❌ КРИТИЧЕСКОЕ ПАДЕНИЕ PnL на ${Math.abs(dPnl).toFixed(1)}%\n`;
-      hasIssues = true;
+      text += `   ❌ КРИТИЧЕСКОЕ ПАДЕНИЕ прибыли на ${Math.abs(dPnl).toFixed(1)}%\n`;
+      text += `      → Стратегия работала только на исходных данных\n`;
+      text += `      → Параметры переоптимизированы\n`;
     } else if (dPnl < -10) {
-      text += `   ⚠️  Значительное снижение PnL на ${Math.abs(dPnl).toFixed(1)}%\n`;
+      text += `   ⚠️  Значительное снижение прибыли на ${Math.abs(dPnl).toFixed(1)}%\n`;
+      text += `      → Проверить условия рынка и волатильность на новом периоде\n`;
     } else if (dPnl > 20) {
       text += `   ✅ Улучшение результатов на +${dPnl.toFixed(1)}%\n`;
-    }
-  }
-
-  if (oosR.old_wr != null && oosR.new_wr != null) {
-    const dWr = oosR.new_wr - oosR.old_wr;
-    if (Math.abs(dWr) > 20) {
-      text += `   ⚠️  Резкое изменение WR на ${dWr > 0 ? '+' : ''}${dWr.toFixed(1)}% (переоптимизация?)\n`;
+      text += `      → Стратегия адаптируется к новым условиям\n`;
+    } else {
+      text += `   ⚠️  Небольшое изменение (${dPnl.toFixed(1)}%)\n`;
+      text += `      → Стратегия относительно стабильна\n`;
     }
   }
 
   if (oosR.old_n != null && oosR.new_n != null) {
     const ratio = oosR.new_n / Math.max(oosR.old_n, 1);
-    if (ratio < 0.5) {
-      text += `   ⚠️  Кол-во сделок упало на ${Math.round((1 - ratio) * 100)}% (нет условий на новых данных?)\n`;
+    if (ratio < 0.3) {
+      text += `   ❌ Кол-во сделок упало критически (${Math.round(ratio * 100)}%)\n`;
+      text += `      → На новых данных отсутствуют условия для входа\n`;
+    } else if (ratio < 0.7) {
+      text += `   ⚠️  Кол-во сделок упало на ${Math.round((1 - ratio) * 100)}%\n`;
+      text += `      → Проверить фильтры входа\n`;
     }
   }
 
-  if (oosR.old_dd != null && oosR.new_dd != null) {
-    const dDd = oosR.new_dd - oosR.old_dd;
-    if (dDd > 20) {
-      text += `   ❌ DD критически вырос на ${dDd.toFixed(1)}% (управление риском?)\n`;
-      hasIssues = true;
-    }
-  }
-
-  if (!hasIssues && oosR.new_pnl > 0) {
-    text += `   ✅ Результаты стабильны между периодами\n`;
-  }
+  text += `\n⚡ ЧТО ДАЛЬШЕ?\n`;
+  text += `1. Загрузите TV CSV (кнопка выше) для сравнения с реальностью\n`;
+  text += `2. Если есть расхождения JS vs TV → это баг в расчётах\n`;
+  text += `3. Если результаты похожи → параметры действительно переоптимизированы\n`;
 
   text += `\n📋 Параметры стратегии:\n`;
   const cfg = oosR.cfg || {};
@@ -29740,7 +29738,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774820709691;
+window._BUILD_TS = 1774821257106;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
