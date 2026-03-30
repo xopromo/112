@@ -8004,7 +8004,7 @@ function openHeatmapModal() {
 
   document.getElementById('hm-status').textContent = '';
   const canvas = document.getElementById('hm-canvas');
-  canvas.width = 0; canvas.height = 0;
+  if (canvas) { canvas.width = 0; canvas.height = 0; }
   document.getElementById('hm-run-btn').textContent = '▶ Запустить';
   document.getElementById('heatmap-overlay').classList.add('open');
 }
@@ -8091,6 +8091,7 @@ async function runHeatmap() {
 function _hmRender(grid, xVals, yVals, xParam, yParam, metric, cX, cY) {
   const canvas = document.getElementById('hm-canvas');
   const wrap   = document.getElementById('hm-canvas-wrap');
+  if (!canvas || !wrap) return;
 
   const PAD_L = 66, PAD_R = 14, PAD_T = 34, PAD_B = 44;
   const cols = xVals.length, rows = yVals.length;
