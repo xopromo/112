@@ -117,18 +117,12 @@ function calcPivotLoHi(data, pvL, pvR) {
     let isL=true;
     for(let j=1;j<=pvL;j++){if(data[i].l>data[i-j].l){isL=false;break;}}
     if(isL)for(let j=1;j<=pvR;j++){if(data[i].l>=data[i+j].l){isL=false;break;}}
-    if(isL){lastLo=data[i].l; lastLoBar=i;}
+    if(isL){lastLo=data[i].l; lastLoBar=i; lo[i]=lastLo; loAge[i]=lastLoBar;}
     // Pivot high: LEFT нестрогое (<, ничья = ok), RIGHT строгое (<=, ничья = fail) — как Pine ta.pivothigh
     let isH=true;
     for(let j=1;j<=pvL;j++){if(data[i].h<data[i-j].h){isH=false;break;}}
     if(isH)for(let j=1;j<=pvR;j++){if(data[i].h<=data[i+j].h){isH=false;break;}}
-    if(isH){lastHi=data[i].h; lastHiBar=i;}
-    // Заполняем с учётом задержки pvR
-    const fillBar = i+pvR;
-    if(fillBar<N){
-      lo[fillBar]=lastLo; hi[fillBar]=lastHi;
-      loAge[fillBar]=lastLoBar; hiAge[fillBar]=lastHiBar;
-    }
+    if(isH){lastHi=data[i].h; lastHiBar=i; hi[i]=lastHi; hiAge[i]=lastHiBar;}
   }
   // Заполняем пробелы вперёд
   let curLo=NaN, curHi=NaN, curLoBar=-1, curHiBar=-1;
