@@ -1,0 +1,219 @@
+# Запрещённые паттерны кодирования
+
+Эти паттерны вызывали баги и техдолг. Если нарушение обнаружится → pre-push hook заблокирует пуш.
+
+---
+
+## 🔴 Запрещено: console.log в исходниках
+
+**Проблема**: Логирует в консоль пользователя, утеком токены обучения
+**Где**: opt.js, ui.js, core.js (только если явная диагностика)
+
+**❌ Неправильно**:
+```javascript
+console.log('Значение:', value);  // ЗАПРЕЩЕНО
+```
+
+**✅ Правильно**:
+```javascript
+if (DEBUG_MODE) console.log('Значение:', value);  // Защищено флагом
+// или просто удалить совсем
+```
+
+**Исключение**: Диагностические функции с явным именем
+```javascript
+function _logOOSDiagnostic(r, analysis) {  // ← имя начинается с _
+  console.log('...');  // OK, это диагностика
+}
+```
+
+---
+
+## 🔴 Запрещено: Hardcoded цвета вместо CSS переменных
+
+**Проблема**: Нарушает тему, усложняет поддержку
+**Где**: ui.js, shell.html
+
+**❌ Неправильно**:
+```javascript
+ctx.fillStyle = '#0099ff';  // прямой цвет
+element.style.color = '#4ade80';  // прямой цвет
+```
+
+**✅ Правильно**:
+```javascript
+// Использовать CSS переменные
+ctx.fillStyle = 'rgba(0, 153, 255, 0.7)'; // только для canvas математики
+// или в CSS:
+color: var(--accent);  // из :root
+```
+
+**Список переменных** (shell.html):
+- `--bg`, `--bg2` — фоны
+- `--text`, `--text2`, `--text3` — текст
+- `--accent`, `--border` — основные
+- `--green`, `--red` — статусы
+
+---
+
+## 🔴 Запрещено: Вложенные ternary > 1 уровня
+
+**Проблема**: Трудно читать, ошибки в логике
+
+**❌ Неправильно**:
+```javascript
+const status = value > 50 ? (value > 80 ? 'high' : 'medium') : 'low';
+```
+
+**✅ Правильно**:
+```javascript
+let status = 'low';
+if (value > 50) status = 'medium';
+if (value > 80) status = 'high';
+```
+
+---
+
+## 🔴 Запрещено: Разные версии _cfg без синхронизации
+
+**Проблема**: OOS split становится неправильным на одном из режимов
+**Где**: opt.js (3 места: MC, TPE, Exhaustive)
+
+**❌ Неправильно**:
+```javascript
+// opt.js ~1909 (MC)
+_cfg.newParam = 5;
+
+// opt.js ~2265 (TPE)
+_cfg_tpe.newParam = 5;
+
+// opt.js ~2847 (Exhaustive) — ЗАБЫЛ!
+// нет _cfg_ex.newParam
+```
+
+**✅ Правильно**: Все 3 места содержат `newParam`
+
+**Проверка**: `grep -n "newParam" opt.js` должен показать ≥3 совпадения
+
+---
+
+## 🔴 Запрещено: Фильтры без warmup проверки
+
+**Проблема**: Первые N баров индикатора = 0 или na, фильтр блокируется неправильно
+**Где**: filter_registry.js (все новые фильтры)
+
+**❌ Неправильно**:
+```javascript
+blocksL: (cfg, i) => {
+  const ma = cfg.maArr[i-1];
+  return ma > DATA[i-1].c;  // не проверяет warmup!
+}
+```
+
+**✅ Правильно**:
+```javascript
+blocksL: (cfg, i) => {
+  const ma = cfg.maArr[i-1];
+  return ma <= 0 || ma > DATA[i-1].c;  // ma<=0 = не прогрелась
+}
+```
+
+---
+
+## 🔴 Запрещено: Функции без проверки входных данных
+
+**Проблема**: null/undefined распространяется дальше, трудно найти баг
+**Где**: Все функции которые берут параметры из UI
+
+**❌ Неправильно**:
+```javascript
+function parseRange(s) {
+  const [a, b] = s.split('-');
+  return [parseFloat(a), parseFloat(b)];  // crash if s=null
+}
+```
+
+**✅ Правильно**:
+```javascript
+function parseRange(s) {
+  if (!s || typeof s !== 'string') return null;
+  const [a, b] = s.split('-');
+  const n1 = parseFloat(a), n2 = parseFloat(b);
+  if (isNaN(n1) || isNaN(n2)) return null;
+  return [n1, n2];
+}
+```
+
+---
+
+## 🟡 Не рекомендуется: Глобальные переменные без префикса
+
+**Проблема**: Путаница, конфликты имён
+
+**⚠️ Плохо**:
+```javascript
+let results = [];  // можно спутать
+```
+
+**✅ Лучше**:
+```javascript
+let _tableResults = [];  // ясно что это глобальная
+```
+
+**Исключение**: Если это явная глобальная API вроде `DATA`, `NEW_DATA`, `RESULTS`
+
+---
+
+## 🟡 Не рекомендуется: Функции > 200 строк
+
+**Проблема**: Трудно тестировать, много context switching
+**Где**: opt.js, ui.js
+
+**Решение**: Разбить на подфункции
+```javascript
+function runOpt() {  // 876 строк — ОК если есть подфункции
+  _initOpt();
+  _runMC();
+  _runTPE();
+  _attachOOS();
+  renderResults();
+}
+```
+
+---
+
+## 🟢 Не запрещено но осторожно: Magic numbers
+
+**Проблема**: Неясно откуда взялось число
+**Где**: Любые вычисления
+
+**⚠️ Плохо**:
+```javascript
+const warmup = Math.max(maWarmup, pivotWarmup, atrWarmup, 1);
+const warmupEndIdx = Math.min(warmup, newEqClean.length - 1);
+```
+
+**✅ Лучше**:
+```javascript
+const MIN_WARMUP = 1;  // минимум чтобы избежать первого бара
+const warmup = Math.max(maWarmup, pivotWarmup, atrWarmup, MIN_WARMUP);
+const warmupEndIdx = Math.min(warmup, newEqClean.length - 1);
+```
+
+---
+
+## Как это проверяется
+
+**Pre-push hook** (`.git/hooks/pre-push`):
+```bash
+#!/bin/bash
+bash scripts/dumb-checks.sh || exit 1
+```
+
+**dumb-checks.sh** содержит регулярные выражения для каждого правила.
+Если нарушение найдено → пуш блокируется.
+
+**Ручная проверка**:
+```bash
+bash scripts/dumb-checks.sh
+```

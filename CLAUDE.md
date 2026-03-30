@@ -1,476 +1,144 @@
-# USE Optimizer — контекст для Claude
+# USE Optimizer — краткая навигация
 
-> Этот файл читается автоматически при каждом старте Claude Code.
-> Обновляй его когда меняется архитектура, статус задач или структура проекта.
+> Этот файл — навигационный слой. Подробно — в `.claude/memory/` и `.claude/rules/`
 
 ---
 
-## Проект: USE Optimizer
+## 📍 Проект: USE Optimizer
 
-Web-инструмент для оптимизации торговых стратегий TradingView.
-Принимает данные из Pine Script, запускает backtест по сетке параметров,
-ранжирует результаты. Всё в браузере, без сервера.
+Web-инструмент оптимизации торговых стратегий TradingView (браузер, без сервера).
+- **Repo**: `xopromo/112`
+- **Branch**: `main` (пуш запрещён, используй `claude/*`)
+- **Deploy**: GitHub Pages → `xopromo.github.io/112/USE_Optimizer_v6_built.html`
 
-**Репозиторий:** `112` (github)
-**Основная ветка:** `main`
-**Рабочая директория:** `/home/user/112/`
+---
 
-### Ключевые файлы проекта
+## 🗂️ Структура файлов
+
 | Файл | Роль |
 |------|------|
-| `opt.js` | Ядро оптимизатора: MC, TPE, exhaustive бэктест, метрики |
-| `core.js` | Бэктест-движок: исполнение сделок, equity curve |
-| `pine_export.js` | Генерация Pine Script v6 из результатов |
-| `ui.js` | UI: таблица результатов, фильтры, сортировка |
-| `shell.html` | Точка входа, импорт всех модулей |
-| `USE_Optimizer_v6_built.html` | Собранный бандл (генерируется через `python build.py`) |
-| `agent/` | Скрипты исследовательского агента (см. ниже) |
+| `opt.js` | Оптимизатор: MC/TPE/Exhaustive, метрики |
+| `core.js:378` | backtest() — ядро |
+| `ui.js` | Таблица, фильтры, детали, HC |
+| `pine_export.js:19` | Экспорт Pine v6 |
+| `shell.html` | Точка входа |
+| `USE_Optimizer_v6_built.html` | Бандл (python build.py) |
 
 ---
 
-## Исследовательский агент
+## 🤖 Исследовательский агент (запускается по крону)
 
-Автоматический pipeline, запускается каждый час по крону.
-Исследует новые алгоритмические идеи и реализует лучшие в проект.
+**3-уровневый pipeline** (агент/research_pipeline.sh):
+1. **Groq** (llama-3.3-70b) — 6 URL, дешево
+2. **Haiku** (~$0.01) — фильтр к 1-2 гипотезам
+3. **Sonnet** (~$0.10) — код (только если есть план)
 
-### Архитектура (3 уровня)
-
-```
-CRON (5 * * * *)
-  └── agent/night_research.sh
-        └── agent/research_pipeline.sh
-              ├── УРОВЕНЬ 1: agent/groq_helper.sh  (Groq/llama-3.3-70b, бесплатно)
-              │     • Скачивает 6 URL источников
-              │     • Пересказывает каждый в 3-5 пунктов
-              │     • Фильтрует "применимо к проекту ДА/НЕТ"
-              │     • Оценивает по шкале 1-10
-              │     • Генерирует черновик отчёта
-              │     • Сохраняет: /tmp/research_digest_YYYY-MM-DD-HH.md
-              │
-              ├── УРОВЕНЬ 2: claude haiku (~$0.01/цикл)
-              │     • Получает только дайджест (не сырые страницы)
-              │     • Выбирает 1-2 лучшие гипотезы
-              │     • Пишет структурированный план (название, оценка/10,
-              │       файл для реализации, 3 пункта что делать)
-              │     • Сохраняет: /tmp/research_plan_YYYY-MM-DD-HH.md
-              │     • Если нечего делать — пишет "ПРОПУСТИТЬ"
-              │
-              └── УРОВЕНЬ 3: claude sonnet (~$0.10/цикл, только если есть план)
-                    • Получает ТОЛЬКО план от Haiku
-                    • Читает нужные файлы проекта
-                    • Пишет рабочий JS-код
-                    • Создаёт финальный отчёт: research_reports/YYYYMMDDHH.md
-                    • Коммитит в ветку claude/research-YYYY-MM-DD-HH
-```
-
-**Экономия:** Sonnet токенов -85%, стоимость цикла $0.09 → $0.014
-
-### Файлы агента
-| Файл | Роль |
-|------|------|
-| `agent/groq_helper.sh` | Уровень 1: Groq API wrapper |
-| `agent/research_pipeline.sh` | Главный pipeline (вызывает все 3 уровня) |
-| `agent/night_research.sh` | Точка входа крона |
-| `agent/setup.sh` | Первоначальная установка (cron + symlinks) |
-| `agent/sources.txt` | 6 URL источников для исследования |
-
-### API ключи
-- Groq: `/home/user/.groq_key` (содержит только ключ, без пробелов)
-- Anthropic: переменная `ANTHROPIC_API_KEY` или `/home/user/.anthropic_key`
-
-### Запуск вручную
-<!-- НЕ ВЫПОЛНЯТЬ АВТОМАТИЧЕСКИ — только по явной просьбе пользователя
-```bash
-cd /home/user/112
-bash agent/research_pipeline.sh
-# или через setup после установки:
-bash /home/user/night_research.sh
-```
--->
-
-### Установка на новой машине
-<!-- НЕ ВЫПОЛНЯТЬ АВТОМАТИЧЕСКИ — только по явной просьбе пользователя
-```bash
-cd /home/user/112
-bash agent/setup.sh
-```
--->
+Результат → `research_reports/YYYYMMDDHH.md`
 
 ---
 
-## Статус реализованных фич
+## 🚀 Правила разработки
 
-### Влито в main
-- [x] **Sig% колонка** — z-тест статистической значимости WR>50%
-  - `opt.js`: `_calcStatSig()`, поле `sig` во всех `results.push()`
-  - `ui.js`: колонка Sig%, зелёный ≥90%, красный <70%, фильтр + сортировка
-- [x] **Pine Script v6** — перевод всех экспортов с v5 на v6
-  - `pine_export.js`: `_addActivePinev6()`, 14 групп toggle→deps
-  - `active=` скрывает rsi_os/ob, ma_period, pivot_left/right и др.
-- [x] **GT-Score** — взвешенная анти-overfitting метрика как цель TPE
-  - `opt.js`: `_calcGTScore()`, чекбокс `c_use_gt`, score = GT вместо P/DD
-  - `ui.js`: колонка GT-Score, зелёный ≥5, красный <2, фильтр + сортировка
-  - Формула: `(pnl/dd) × sig_mult × consistency_mult`
-- [x] **UPI** — Ulcer Performance Index (pnl/ulcerIdx, sqrt(mean(dd²)))
-  - `opt.js`: `_calcUlcerIdx(eq)`, поле `upi` в results.push()
-  - `ui.js`: колонка UPI, зелёный ≥5, жёлтый 2-5, красный <2
-- [x] **CPCV** — блочная walk-forward валидация (5 блоков, ленивый вызов)
-  - `opt.js`: `_calcCPCVScore(cfg)` — НЕ в results.push(), только в showDetail
-  - `ui.js`: секция «📊 CPCV» первой в detail-модале
-
-### Очередь (приоритет по порядку)
-1. **Sortino Ratio** — `pnl/downside_vol`, только equity[], ~15 строк в opt.js
-   - downside_dev = sqrt(mean(min(Δeq_i, 0)²)); Sortino > 2 = хорошо
-   - Источник: research_reports/2026030320.md (поиск 2026-03-03-20)
-2. **K-Ratio** — линейная регрессия log(equity), измеряет равномерность роста
-   - K = slope/se(slope); OLS ~25 строк; без изменений backtest()
-   - Источник: research_reports/2026030320.md
-3. **SQN + per-trade array** — добавить `trades:[{pnl}]` в backtest() return (core.js)
-   - SQN = (mean_trade/std_trade)*sqrt(n); открывает MC permutation test
-   - Источник: research_reports/2026030320.md
-4. **WASM** — перевод backtest-цикла на Rust+WASM для x15 ускорения
-5. **TradingAgents** — LLM multi-agent анализ стратегий
-
----
-
-## Текущее состояние агента
-
-Смотри: `STATE.md` — обновляется автоматически после каждого цикла агента и вручную при слиянии веток.
-⚠️ Поле «Следующий цикл» в STATE.md может быть устаревшим — игнорируй его, агент запускается по крону `5 * * * *`.
-
----
-
-## Workflow для новой сессии
-
-1. Прочитай `STATE.md` — там последний цикл и текущие задачи
-2. Прочитай `research_reports/` — отчёты агента с деталями
-3. Ветки `claude/research-*` содержат готовый код для влития
-4. Если агент не работает — сообщи пользователю, не запускай ничего самостоятельно
-
----
-
-## Веб-поиск — ОБЯЗАТЕЛЬНОЕ ПРАВИЛО
-
-> ⚠️ **ВСЕГДА использовать GitHub Actions для любого поиска.**
-> Никогда не использовать встроенный инструмент `WebSearch` или MCP SearXNG.
-> Единственное исключение — если пользователь явно разрешил.
-
-### Как запустить поиск
+### Перед пушем всегда
 
 ```bash
-# Запустить поиск через GitHub Actions (бесплатно, без ключей)
-gh workflow run search.yml \
-  --repo xopromo/112 \
-  -f query="твой запрос" \
-  -f mode="summarize" \
-  -f max_urls=5
-
-# Подождать завершения (~60-90 сек)
-gh run list --repo xopromo/112 --workflow=search.yml --limit 1
-
-# Получить результаты (из ветки search-results через GitHub API)
-bash /home/user/112/agent/gh_search.sh "твой запрос" summarize 5
-```
-
-### Режимы поиска (mode)
-
-| Mode | Когда использовать |
-|------|--------------------|
-| `snippets_only` | Нужно быстро посмотреть что вообще есть по теме |
-| `summarize` | Нужен обзор темы — 3-5 пунктов на статью |
-| `analyze` | Оценка применимости к USE Optimizer (1-10, идеи, файл) |
-| `extract` | Нужны конкретные формулы / числа / алгоритмы |
-| `full_text` | Нужен полный текст без обработки LLM |
-| `custom` | Любая другая задача — задать свой промпт |
-
-### Дедупликация
-
-Workflow автоматически исключает URL из предыдущих поисков.
-История хранится в `seen_urls.json` в ветке `search-results`.
-Поле `new_results` в итоговом JSON содержит только новые результаты.
-
-### Получение результатов
-
-Результаты сохраняются в `results.json` в ветке `search-results`.
-Для чтения — GitHub API (без checkout):
-```bash
-bash /home/user/112/agent/gh_search.sh <query> <mode> <max_urls>
-```
-
-### SearXNG (устарело, не использовать)
-<!-- SearXNG был заменён на GitHub Actions search. Оставлен как справка.
-- MCP: mcp__searxng__searxng_web_search
-- URL: http://localhost:8888
--->
-
----
-
-## Язык общения
-
-> ⚠️ **ВСЕГДА отвечать и рассуждать на русском языке.**
-> Это касается всех ответов, пояснений, комментариев и размышлений.
-> Исключение — только сам код (переменные, функции, комментарии в коде на английском).
-
----
-
-## Договорённости с пользователем
-
-| Команда | Действие |
-|---------|----------|
-| `"сохрани"` | `git commit` + `git push` |
-| `"сохрани стабильную"` | `git commit` + `git push` + тег `stable-YYYY-MM-DD` (если в день несколько — `stable-YYYY-MM-DD-2` и т.д.) |
-
----
-
-## Сборка и деплой — ОБЯЗАТЕЛЬНЫЙ ФИНАЛЬНЫЙ ШАГ
-
-> ⚠️ **ВСЕГДА выполнять после любых изменений в коде, без исключений.**
-
-### Что делать после каждого изменения:
-```bash
-# 1. Подтянуть main (ОБЯЗАТЕЛЬНО — иначе конфликт в PR!)
 git fetch origin main && git merge origin/main --no-edit || true
-
-# 2. Пересобрать (решает конфликт в USE_Optimizer_v6_built.html)
 python build.py
-
-# 3. Коммит и пуш
+bash .claude/scripts/dumb-checks.sh  # Проверка ошибок
 git add -A && git commit -m "..."
-git push -u origin <claude/ветка>
+git push -u origin claude/ваша-ветка
 ```
 
-> ⚠️ `USE_Optimizer_v6_built.html` всегда конфликтует если не подтянуть main перед пушем.
-> Причина: GitHub Actions создаёт новый коммит в main после каждого мержа.
-> Решение: всегда `git fetch origin main && git merge origin/main` → `python build.py` → пуш.
+### Критичные правила
 
-### Деплой на GitHub Pages (xopromo.github.io/112)
-- GitHub Pages деплоится только из ветки `main`
-- Push в `main` заблокирован прокси (только `claude/...` ветки разрешены)
-- **Поэтому:** после пуша всегда создавать PR и давать пользователю прямую ссылку
-
-**Шаблон ссылки на PR:**
-```
-https://github.com/xopromo/112/compare/main...<ветка>
-```
-
-**Пользователю нужен 1 клик** — нажать Merge pull request.
-После мержа Actions автоматически деплоит (~1 мин).
-
-### Всегда давать пользователю:
-1. **Ссылку на PR** (создать/смержить): `https://github.com/xopromo/112/compare/main...<ветка>`
-2. **Прямую ссылку на сайт** после деплоя: `https://xopromo.github.io/112/USE_Optimizer_v6_built.html`
+| Правило | Файл | Штраф |
+|---------|------|-------|
+| 3 версии _cfg (_cfg, _cfg_tpe, _cfg_ex) одновременно | opt.js:1909,2265,2847 | OOS скалывается |
+| Все фильтры WITH warmup проверка (indicator <= 0) | filter_registry.js | JS ≠ TV |
+| Новый фильтр в 4 местах (ui, opt, filter_registry, buildBtCfg) | Сеч. 🚫 | Баг |
+| Запрещены: console.log, hardcoded цвета, вложенные ternary | .claude/rules/ | Pre-push блокирует |
 
 ---
 
-## Правила работы с кодовой базой (экономия токенов)
+## 📚 Документация
 
-### ⚠️ Никогда не искать код в USE_Optimizer_v6_built.html
-Используй ТОЛЬКО исходники: `opt.js`, `core.js`, `ui.js`, `pine_export.js`.
-Builded HTML генерируется из них — он дублирует весь код, тратит вдвое больше токенов.
-Проверять что фикс попал в build — только после `python build.py`, и только точечной grep.
+- **`.claude/memory/architecture-decisions.md`** — какие решения приняты и почему
+- **`.claude/memory/integration-contracts.md`** — контракты между модулями (backtest, cfg, result)
+- **`.claude/memory/tasks-completed.md`** — архив решённых задач
+- **`.claude/rules/forbidden-patterns.md`** — запрещённые паттерны (dumb-checks.sh их блокирует)
 
-### Автоматическое обновление карты функций
+---
 
-`agent/sync_claude_md.sh` — обновляет номера строк в этой карте автоматически.
+## 🔍 Ключевые функции (компактная карта)
 
+**opt.js**:
+- `parseRange` (23) — парсер диапазона
+- `_calcStatSig` (43) — z-тест WR > 50%
+- `_calcGTScore` (58) — anti-overfitting метрика
+- `_calcIndicators` (3023) — пересчёт MA, ATR и др.
+- `backtest` → через core.js:378
+- `runOpt` (875) — главный цикл (MC/TPE/Ex)
+- `_attachOOS` (941) — IS/OOS split
+- `_hcRunBacktest` — HC с кэшем
+
+**ui.js**:
+- `showDetail` (761) — standard detail панель
+- `switchTableMode` (435) — HC/Fav/Results
+- `openOOSDiagnostic` (7404) — диагностика OOS
+- `runHillClimbing` (4210) — поиск соседей
+
+**core.js**:
+- `backtest(cfg, data)` (378) — основной бэктест
+
+---
+
+## ⚡ Быстрые действия
+
+**Найти баг в расчётах**:
 ```bash
-bash agent/sync_claude_md.sh          # обновить
-bash agent/sync_claude_md.sh --check  # только проверить расхождения
+# 1. Загрузи TV CSV (кнопка в detail панели)
+# 2. Сравни equity% поэтапно
+# 3. Найди первое расхождение > 0.5%
+# 4. Проверь SL/TP логику на этом баре
 ```
 
-**Git post-commit хук** запускает скрипт после каждого коммита:
-```bash
-bash agent/setup.sh   # установить хук (и всё остальное)
-```
-Хук также включается при первоначальной установке агента. При обнаружении изменений строк — автоматически амендит предыдущий коммит.
+**Добавить новый параметр**:
+1. Добавить в `_cfg` (opt.js ~1909)
+2. Добавить в `_cfg_tpe` (opt.js ~2265)
+3. Добавить в `_cfg_ex` (opt.js ~2847)
+4. Добавить в `_calcIndicators` если нужен массив
+5. Добавить в `buildBtCfg`
+6. Добавить в UI если нужна настройка
 
-**Когда обновлять вручную** (хук не поможет):
-- При слиянии веток агента (`git merge`)
-- При изменении архитектуры (новые функции, переименования)
-- При изменении описания функции в карте
-
-### Карта ключевых функций
-
-**⚠️ Строки актуальны на момент последнего коммита.**
-
-**opt.js** (оптимизатор + робастность):
-| Функция | Строка | Описание |
-|---------|--------|----------|
-| `parseRange` | 23 | Парсит диапазон параметров |
-| `_calcStatSig` | 43 | z-тест статистической значимости |
-| `_calcGTScore` | 58 | GT-Score (anti-overfitting метрика) |
-| `buildName` | 741 | Строит имя результата |
-| `runOpt` | 875 | Основная оптимизация (MC/TPE/exhaustive) |
-| `_runOOS` | 926 | Запуск бэктеста на срезе данных (внутри runOpt) |
-| `_attachOOS` | 941 | Вычисляет IS/OOS split и прикрепляет к cfg._oos |
-| `_calcIndicators` | 3023 | Вычисляет индикаторы по DATA |
-| `buildBtCfg` | 3363 | Строит конфиг бэктеста из cfg+ind |
-| `runMassRobust` | 3577 | Массовый тест устойчивости |
-| `runRobustScoreFor` | 3643 | Тест устойчивости для одного результата |
-| `runRobustScoreForDetailed` | 3810 | То же, но с деталями по каждому тесту |
-| `HC_NUMERIC_PARAMS` | 3876 | Единый список числовых параметров HC |
-
-**ui.js** (интерфейс + HC):
-| Функция | Строка | Описание |
-|---------|--------|----------|
-| `switchTableMode` | 435 | Переключение HC/Fav/Results режимов |
-| `resetAllFilters` | 670 | Сброс всех фильтров |
-| `applyFilters` | 685 | Применение фильтров к таблице |
-| `runOOSScan` | 3393 | OOS-скан видимых результатов |
-| `openHCModal` | 3589 | Открыть модал поиска соседей |
-| `_hcRobScore` | 3688 | Робастность для GA-поиска |
-| `_hcRunBacktest` | 3892 | Быстрый бэктест для HC (с кэшем `_robSliceCache`) |
-| `_hcNeighbours` | 4079 | Генерация соседних cfg (содержит `mutate()`) |
-| `runHillClimbing` | 4210 | Главный HC алгоритм |
-| `_hcOpenDetail` | 4971 | Открыть детальный вид из HC модала |
-
-**pine_export.js** (экспорт Pine Script):
-| Функция | Строка | Описание |
-|---------|--------|----------|
-| `generatePineScript` | 19 | Главная функция экспорта в Pine v6 |
-| `fixPineScript` | 1260 | Автоисправление ошибок Pine |
-| `_addActivePinev6` | 1376 | Добавляет `active=` для toggle-групп |
-
-**core.js** (движок бэктеста):
-| Функция | Строка | Описание |
-|---------|--------|----------|
-| `backtest` | 378 | Основной бэктест-цикл |
-
-### Форматы ключевых объектов
-
-Быстрая справка по полям — чтобы не читать код при каждой задаче.
-
-**`backtest()` → результат** (core.js:749):
-```
-{ pnl, wr, n, dd, avg, dwr,
-  p1, w1, c1, p2, w2, c2,   // p=период1/2 win%, w=wr1/2, c=count1/2
-  eq[],                       // equity curve: cumPnL на каждом баре
-  nL, pL, wrL,               // Long: кол-во, PnL, wr
-  nS, pS, wrS,               // Short: кол-во, PnL, wr
-  dwrLS }                    // |wrL - wrS|, null если нет обеих сторон
-```
-
-**`cfg._oos`** — прикрепляется `_attachOOS()` (opt.js:941):
-```
-{
-  isPct: 70,          // % IS от общего DATA (обычно 70)
-  forward: null       // null если rFull не прошёл проверку
-    | {
-        pnl,          // OOS PnL = eq[end] - eq[splitIdx]
-        retention,    // oosRate/isRate, clamp[-2,2]; -1 если IS не вырос значимо
-        isGain,       // IS PnL = eq[splitIdx]
-        pnlFull,      // полный PnL (IS+OOS)
-        n, wr, dd, avg, pdd,         // метрики полного прогона
-        dwr, p1, p2, c1, c2,
-        wrL, nL, wrS, nS, dwrLS,
-        cvr           // _calcCVR(rFull.eq)
-      }
-}
-```
-
-**`results[]` / строка таблицы** (то что попадает в `_hcTableResults`, `results`):
-```
-{ name, cfg,
-  pnl, wr, n, dd, pdd, avg, dwr,
-  p1, p2, c1, c2,
-  sig,               // _calcStatSig(r) — z-тест
-  gt,                // _calcGTScore(r) — GT-Score
-  cvr,               // Calmar-вариант
-  eq[],              // equity curve (от _attachOOS или raw backtest)
-  nL, pL, wrL, nS, pS, wrS, dwrLS,
-  robScore?, robMax?, robDetails?   // только если был rob-тест
-}
-```
-
-**`_hcFoundResults[i]`** (до push в таблицу):
-```
-{ cfg, r: <backtest result>, score, delta, robScore?, robMax?, robDetails? }
-```
-
-**`showDetail(r)` ожидает** (ui.js:761):
-```
-r.cfg._oos          → IS/OOS split + TV-строка (если null — только одна строка)
-r.cfg._oos.forward  → данные TV-строки; null → TV-строка скрыта
-r.eq[]              → equity curve для графика (с full-data если _oos есть)
-r.pnl/wr/n/dd/...   → IS-метрики (первая строка)
-```
-
-### IS/OOS архитектура (как работает split)
-
-Для каждого результата оптимизатора нужен `cfg._oos` чтобы:
-- `drawEquityForResult` рисовал линию разделения IS/OOS на графике (70%/30%)
-- `showDetail` показывал вторую строку "TradingView · полный бэктест"
-- TV-колонки в таблице (`col-tv-score` и др.) не показывали `—`
-
-**TPE/MC результаты** — `cfg._oos` вычисляется батчем в `runOpt()` → `_attachOOS()`:
-- IS backtest = первые 70% данных (`_runOOS(DATA.slice(0, isN), cfg)`)
-- Full backtest = 100% данных (`backtest(...)` на полных данных)
-- `cfg._oos.forward` содержит PnL/DD full-prогона + метрики retention
-
-**HC результаты** — соседи генерируются через `_hcNeighbours.mutate()`:
-- `mutate()` делает `delete c._oos` → соседи НЕ наследуют `_oos` родителя
-- HC результаты в таблице показывают метрики только полного прогона (без TV/IS split)
-- Чтобы добавить split для HC — нужно реализовать `_hcBuildOOS(cfg)` аналогично `_attachOOS`
-  (вызывать при `_hcTableResults.push` и в `_hcOpenDetail`)
-
-### Правило: прогрев индикаторов (warmup) в filter_registry.js
-
-> ⚠️ **При добавлении нового фильтра, использующего MA или любой другой индикатор с периодом прогрева:**
->
-> JS инициализирует `Float64Array` нулями → первые `period-1` баров = 0.
-> Pine возвращает `na` → любое сравнение с `na` = `false` → сигнал заблокирован.
->
-> **Правило:** если `indicatorArr[i-1] <= 0` → **блокировать** сигнал (возвращать `true` из `blocksL`/`blocksS`).
->
-> **Пример правильной реализации:**
-> ```javascript
-> blocksL: (cfg, i) => {
->   if (!cfg.maArr) return false;
->   const ma = cfg.maArr[i-1];
->   return ma <= 0 || DATA[i-1].c <= ma; // ma<=0 = не прогрелась
-> }
-> ```
->
-> **Затронутые индикаторы:** WMA(N) и SMA(N) = 0 для первых N-1 баров. EMA не страдает (seed=close[0]).
-> **Уже исправлено:** фильтры `ma`, `confirm`, `strend` (commit 991ebaf).
-
-### Известные баги (зафиксированы)
-- **_stopCheck() bug**: `_stopCheck = () => !_massRobRunning && !_hcRobRunning` — возвращает true если оба флага false. При запуске тестов всегда нужно установить один из флагов.
-  - ✅ Исправлено для: HC doRobFilter Phase 2, HC rob-metric Phase 2, OOS scan, runHillClimbing (строки 3776, 3930).
-  - ⚠️ НЕ исправлено для: прямых вызовов `runRobustScoreFor` / `runRobustScoreForDetailed` без контекста HC/Mass.
-- **HC без IS/OOS split**: `mutate()` удаляет `cfg._oos` у соседей → HC результаты в таблице не имеют TV-колонок и split-линии на графике. Частично приемлемо (показываются full-data метрики). Полное решение — `_hcBuildOOS()` (не реализовано).
-- **TV колонки "—" при паузе**: `pauseOpt()` вызывала `renderResults()` до OOS-батча → TV показывало "—". ✅ Исправлено: `pauseOpt()` теперь вызывает `window._batchOOS()` (экспортировано из `runOpt`) перед рендером. Отображение "⏳" в TV-ячейках означает что OOS ещё в очереди; "—" означает что OOS считался, но результат null.
+**Добавить новый фильтр**:
+1. Написать в `filter_registry.js`
+2. Добавить в `buildBtCfg` (opt.js)
+3. Добавить в 3 версии _cfg если параметр
+4. ✅ Проверить warmup (indicator <= 0 блокирует)
 
 ---
 
-## Правило: полнота _cfg объектов
+## 🔗 Ссылки
 
-> ⚠️ **Каждый фильтр/параметр в inline `btCfg` ОБЯЗАН присутствовать во ВСЕХ трёх объектах `_cfg`.**
-
-Три объекта хранят параметры для OOS-бэктеста (`_runOOS`) — если поле отсутствует, OOS прогон использует другие параметры чем IS, производя непоследовательные TV-метрики.
-
-| Объект | Файл/строка | Режим |
-|--------|------------|-------|
-| `_cfg`     | opt.js ~1909 | MC |
-| `_cfg_tpe` | opt.js ~2265 | TPE/BO |
-| `_cfg_ex`  | opt.js ~2847 | Exhaustive |
-
-**Чеклист при добавлении нового фильтра:**
-1. Добавить в inline `btCfg` (в каждом режиме где используется)
-2. Добавить флаг в `_cfg` / `_cfg_tpe` / `_cfg_ex` (НЕ массив-кэш, только параметры)
-3. Добавить в `_calcIndicators` для пересчёта массива из cfg при OOS
-4. Добавить в `buildBtCfg` для передачи в backtest
-
-**Что хранить в _cfg**: только скалярные параметры (`useER: true`, `erPeriod: 10`). Массивы (`erArr`) НЕ хранить — `_calcIndicators` их пересчитывает из параметров.
+- **PR**: https://github.com/xopromo/112/compare/main...<ветка>
+- **Site**: https://xopromo.github.io/112/USE_Optimizer_v6_built.html
+- **Memory**: `.claude/memory/` (архитектура, контракты, задачи)
+- **Rules**: `.claude/rules/` (запрещённые паттерны)
 
 ---
 
-## Диагностика TV "—" в таблице
+## 📞 Когда нужна помощь
 
-Если TV колонки показывают "—" или "⏳", проверить по порядку:
+1. Прочитай `.claude/memory/architecture-decisions.md` — ответ часто там
+2. Посмотри `.claude/memory/tasks-completed.md` — может уже реализовано
+3. Запусти `bash .claude/scripts/dumb-checks.sh` — блокирует типичные ошибки
+4. Спроси в PR комментарии
 
-1. **Чекбокс IS/OOS** отключён? → `_useOOS=false` → все "—", нет сообщений в консоли → включить `c_oos`
-2. **Synthesis режим**? → OOS откладывается на detail-модал → "—" в таблице ожидаемо
-3. **Консоль** → `[_runOOS] exception:` → смотреть cfg который бросил исключение
-4. **Консоль** → `[_attachOOS] rFull=null` → `_runOOS` вернул null, причина — в exception выше
-5. **Пауза mid-run**? → теперь исправлено (`window._batchOOS`), должно показывать "⏳" → "данные" после расчёта
+---
+
+## 📝 История версий
+
+- **v6** (текущая) — Pine v6 экспорт, GT-Score, IS/OOS split
+- **v5** (deprecated) — Pine v5, нет IS/OOS
+
+**Стабильные ветки**: `stable-YYYY-MM-DD*` (теги в GitHub)
