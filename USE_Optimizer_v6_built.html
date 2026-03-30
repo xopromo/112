@@ -22318,6 +22318,7 @@ function drawEquityData(eq, label, splitPct) {
   if (!eq || !eq.length) return;
   const wrap = document.getElementById('eq-wrap');
   const canvas=$('eqc');
+  if (!canvas) return;
   // Сохраняем позицию скролла — браузер может прыгнуть к canvas при display:none→block
   const _scrollEl = document.querySelector('.tbl-scroll') || document.documentElement;
   const _scrollY = window.scrollY;
@@ -26840,13 +26841,16 @@ function openOOSDiagnostic() {
   text += `📊 ДИАГНОСТИКА OOS: ${oosR.name}\n`;
   text += `${'='.repeat(70)}\n\n`;
 
-  text += `📍 ИСХОДНЫЙ ПЕРИОД (История · IS):\n`;
+  text += `⚠️ ВНИМАНИЕ: Это сравнение JS-бэктеста на двух наборах данных.\n`;
+  text += `Чтобы сравнить с РЕАЛЬНЫМИ данными TradingView, загрузите TV CSV выше.\n\n`;
+
+  text += `📍 ИСХОДНЫЙ ПЕРИОД (История · все 100% данных):\n`;
   text += `   PnL: ${(oosR.old_pnl ?? '—').toFixed(2)}% | WR: ${(oosR.old_wr ?? '—').toFixed(1)}% | Сделок: ${oosR.old_n ?? '—'} | DD: ${(oosR.old_dd ?? '—').toFixed(2)}% | P/DD: ${(oosR.old_pdd ?? '—').toFixed(2)}\n\n`;
 
-  text += `📍 НОВЫЙ ПЕРИОД (Загруженные данные · OOS):\n`;
+  text += `📍 НОВЫЙ ПЕРИОД (Загруженные данные · новый набор):\n`;
   text += `   PnL: ${(oosR.new_pnl ?? '—').toFixed(2)}% | WR: ${(oosR.new_wr ?? '—').toFixed(1)}% | Сделок: ${oosR.new_n ?? '—'} | DD: ${(oosR.new_dd ?? '—').toFixed(2)}% | P/DD: ${(oosR.new_pdd ?? '—').toFixed(2)}\n\n`;
 
-  text += `📊 ДЕЛЬТА (изменения OOS - IS):\n`;
+  text += `📊 ДЕЛЬТА (изменения новые - исходные):\n`;
   if (oosR.old_pnl != null && oosR.new_pnl != null) {
     const dPnl = oosR.new_pnl - oosR.old_pnl;
     const status = dPnl > 0 ? '✅' : dPnl < 0 ? '❌' : '⚪';
@@ -26869,46 +26873,40 @@ function openOOSDiagnostic() {
   }
   text += `\n`;
 
-  text += `⚠️ АНАЛИЗ:\n`;
-  let hasIssues = false;
-
+  text += `💡 ИНТЕРПРЕТАЦИЯ:\n`;
   if (oosR.old_pnl != null && oosR.new_pnl != null) {
     const dPnl = oosR.new_pnl - oosR.old_pnl;
     if (dPnl < -50) {
-      text += `   ❌ КРИТИЧЕСКОЕ ПАДЕНИЕ PnL на ${Math.abs(dPnl).toFixed(1)}%\n`;
-      hasIssues = true;
+      text += `   ❌ КРИТИЧЕСКОЕ ПАДЕНИЕ прибыли на ${Math.abs(dPnl).toFixed(1)}%\n`;
+      text += `      → Стратегия работала только на исходных данных\n`;
+      text += `      → Параметры переоптимизированы\n`;
     } else if (dPnl < -10) {
-      text += `   ⚠️  Значительное снижение PnL на ${Math.abs(dPnl).toFixed(1)}%\n`;
+      text += `   ⚠️  Значительное снижение прибыли на ${Math.abs(dPnl).toFixed(1)}%\n`;
+      text += `      → Проверить условия рынка и волатильность на новом периоде\n`;
     } else if (dPnl > 20) {
       text += `   ✅ Улучшение результатов на +${dPnl.toFixed(1)}%\n`;
-    }
-  }
-
-  if (oosR.old_wr != null && oosR.new_wr != null) {
-    const dWr = oosR.new_wr - oosR.old_wr;
-    if (Math.abs(dWr) > 20) {
-      text += `   ⚠️  Резкое изменение WR на ${dWr > 0 ? '+' : ''}${dWr.toFixed(1)}% (переоптимизация?)\n`;
+      text += `      → Стратегия адаптируется к новым условиям\n`;
+    } else {
+      text += `   ⚠️  Небольшое изменение (${dPnl.toFixed(1)}%)\n`;
+      text += `      → Стратегия относительно стабильна\n`;
     }
   }
 
   if (oosR.old_n != null && oosR.new_n != null) {
     const ratio = oosR.new_n / Math.max(oosR.old_n, 1);
-    if (ratio < 0.5) {
-      text += `   ⚠️  Кол-во сделок упало на ${Math.round((1 - ratio) * 100)}% (нет условий на новых данных?)\n`;
+    if (ratio < 0.3) {
+      text += `   ❌ Кол-во сделок упало критически (${Math.round(ratio * 100)}%)\n`;
+      text += `      → На новых данных отсутствуют условия для входа\n`;
+    } else if (ratio < 0.7) {
+      text += `   ⚠️  Кол-во сделок упало на ${Math.round((1 - ratio) * 100)}%\n`;
+      text += `      → Проверить фильтры входа\n`;
     }
   }
 
-  if (oosR.old_dd != null && oosR.new_dd != null) {
-    const dDd = oosR.new_dd - oosR.old_dd;
-    if (dDd > 20) {
-      text += `   ❌ DD критически вырос на ${dDd.toFixed(1)}% (управление риском?)\n`;
-      hasIssues = true;
-    }
-  }
-
-  if (!hasIssues && oosR.new_pnl > 0) {
-    text += `   ✅ Результаты стабильны между периодами\n`;
-  }
+  text += `\n⚡ ЧТО ДАЛЬШЕ?\n`;
+  text += `1. Загрузите TV CSV (кнопка выше) для сравнения с реальностью\n`;
+  text += `2. Если есть расхождения JS vs TV → это баг в расчётах\n`;
+  text += `3. Если результаты похожи → параметры действительно переоптимизированы\n`;
 
   text += `\n📋 Параметры стратегии:\n`;
   const cfg = oosR.cfg || {};
@@ -26941,320 +26939,6 @@ function openOOSDiagnostic() {
 
   modal.appendChild(content);
   document.body.appendChild(modal);
-}
-
-function _showOOSDiagnostic(r, idx) {
-  const modal = document.createElement('div');
-  modal.className = 'modal-overlay';
-  modal.style.display = 'flex';
-  modal.style.alignItems = 'center';
-  modal.style.justifyContent = 'center';
-  modal.style.zIndex = 9999;
-  modal.onclick = e => { if (e.target === modal) modal.remove(); };
-
-  // Функция экранирования HTML
-  const _esc = s => String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-
-  const cfg = r.cfg || {};
-
-  // Подробный анализ расхождений
-  console.log(`\n${'='.repeat(60)}`);
-  console.log(`📊 ДИАГНОСТИКА OOS: ${r.name}`);
-  console.log(`${'='.repeat(60)}`);
-
-  const analysis = _analyzeOOSDiscrepancy(r, null, null);
-
-  // Логирование в консоль
-  _logOOSDiagnostic(r, analysis);
-
-  let html = `
-    <div class="modal-content" style="max-width:1000px;max-height:90vh;overflow:auto;background:var(--bg);border-radius:8px;padding:20px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px">
-        <h2 style="margin:0;color:var(--accent);font-size:1em">${_esc(r.name)}</h2>
-        <button onclick="this.closest('.modal-overlay').remove()" style="cursor:pointer;border:none;background:none;font-size:1.2em;color:var(--text3)">✕</button>
-      </div>
-
-      <!-- Исходный период -->
-      <div style="margin-bottom:20px;border:1px solid var(--border);padding:12px;border-radius:6px;background:var(--bg2)">
-        <h3 style="margin-top:0;color:#0099ff">📊 Исходный период (История · IS)</h3>
-        ${_renderOOSMetricsTable(r.old_pnl, r.old_wr, r.old_n, r.old_dd, r.old_pdd, r.old_kRatio, DATA?.length || 0, 'old')}
-      </div>
-
-      <!-- Новый период -->
-      <div style="margin-bottom:20px;border:1px solid var(--border);padding:12px;border-radius:6px;background:var(--bg2)">
-        <h3 style="margin-top:0;color:#ff9900">📊 Новый период (Загруженные данные · OOS)</h3>
-        ${_renderOOSMetricsTable(r.new_pnl, r.new_wr, r.new_n, r.new_dd, r.new_pdd, r.new_kRatio, NEW_DATA?.length || 0, 'new')}
-      </div>
-
-      <!-- Анализ расхождений -->
-      <div style="margin-bottom:20px;border:1px solid var(--border);padding:12px;border-radius:6px;background:var(--bg2)">
-        <h3 style="margin-top:0;color:var(--accent)">🔍 Анализ расхождений и аномалий</h3>
-        ${_renderOOSAnalysis(analysis, r)}
-      </div>
-
-      <!-- Дельта таблица -->
-      <div style="margin-bottom:20px;border:1px solid var(--border);padding:12px;border-radius:6px;background:var(--bg2)">
-        <h3 style="margin-top:0;color:var(--accent)">📈 Сравнение метрик (OOS vs IS)</h3>
-        ${_renderOOSDeltaTable(r)}
-      </div>
-
-      <!-- Параметры конфигурации -->
-      <div style="border:1px solid var(--border);padding:12px;border-radius:6px;background:var(--bg2)">
-        <h3 style="margin-top:0;color:var(--accent)">⚙️ Параметры стратегии</h3>
-        <pre style="margin:0;font-size:.75em;max-height:300px;overflow:auto;background:var(--bg);padding:8px;border-radius:4px;color:var(--text3)">${JSON.stringify(cfg, null, 2)}</pre>
-      </div>
-    </div>
-  `;
-
-  modal.innerHTML = html;
-  document.body.appendChild(modal);
-}
-
-function _logOOSDiagnostic(r, analysis) {
-  console.log(`\n📍 ИСХОДНЫЙ ПЕРИОД (История):`);
-  console.log(`   PnL: ${(r.old_pnl ?? '—').toFixed(2)}% | WR: ${(r.old_wr ?? '—').toFixed(1)}% | Сделок: ${r.old_n ?? '—'} | DD: ${(r.old_dd ?? '—').toFixed(2)}% | K-Ratio: ${(r.old_kRatio ?? '—').toFixed(2)}`);
-
-  console.log(`\n📍 НОВЫЙ ПЕРИОД (Загруженные данные):`);
-  console.log(`   PnL: ${(r.new_pnl ?? '—').toFixed(2)}% | WR: ${(r.new_wr ?? '—').toFixed(1)}% | Сделок: ${r.new_n ?? '—'} | DD: ${(r.new_dd ?? '—').toFixed(2)}% | K-Ratio: ${(r.new_kRatio ?? '—').toFixed(2)}`);
-
-  console.log(`\n📊 ДЕЛЬТА (изменения OOS - IS):`);
-  if (r.old_pnl != null && r.new_pnl != null) {
-    const deltaPnl = r.new_pnl - r.old_pnl;
-    console.log(`   ΔPnL: ${deltaPnl >= 0 ? '+' : ''}${deltaPnl.toFixed(2)}% ${deltaPnl > 0 ? '✅' : '❌'}`);
-  }
-  if (r.old_wr != null && r.new_wr != null) {
-    const deltaWr = r.new_wr - r.old_wr;
-    console.log(`   ΔWR: ${deltaWr >= 0 ? '+' : ''}${deltaWr.toFixed(1)}% ${Math.abs(deltaWr) > 10 ? '⚠️' : '✅'}`);
-  }
-  if (r.old_dd != null && r.new_dd != null) {
-    const deltaDd = r.new_dd - r.old_dd;
-    console.log(`   ΔDD: ${deltaDd >= 0 ? '+' : ''}${deltaDd.toFixed(2)}% ${deltaDd > 10 ? '❌' : '✅'}`);
-  }
-
-  console.log(`\n⚠️ АНОМАЛИИ ОБНАРУЖЕНЫ:`);
-  if (analysis.mainFactors.length === 1 && analysis.mainFactors[0].includes('Результаты стабильны')) {
-    console.log(`   ✅ Стратегия стабильна на обоих периодах`);
-  } else {
-    analysis.mainFactors.forEach(f => console.log(`   • ${f}`));
-  }
-
-  console.log(`\n💡 РЕКОМЕНДАЦИИ:`);
-  if (analysis.recommendations.length > 0) {
-    analysis.recommendations.forEach(rec => console.log(`   • ${rec}`));
-  } else {
-    console.log(`   ✅ Проблем не обнаружено`);
-  }
-
-  console.log(`\n${'='.repeat(60)}\n`);
-}
-
-function _renderOOSMetricsTable(pnl, wr, n, dd, pdd, kr, bars, period) {
-  const apt = n && n > 0 ? pnl / n : null;
-  const apb = bars > 0 ? pnl / bars * 1000 : null;
-
-  return `
-    <table style="width:100%;border-collapse:collapse;font-size:.85em">
-      <tr style="background:var(--bg);border-bottom:1px solid var(--border)">
-        <td style="padding:6px;text-align:left;font-weight:600">Метрика</td>
-        <td style="padding:6px;text-align:right;font-weight:600">Значение</td>
-      </tr>
-      <tr style="border-bottom:1px solid var(--border)">
-        <td style="padding:6px">Прибыль (PnL)</td>
-        <td style="padding:6px;text-align:right;color:${pnl > 0 ? '#4ade80' : pnl < 0 ? '#ef4444' : 'var(--text3)'};font-weight:600">${pnl?.toFixed(2) ?? '—'}%</td>
-      </tr>
-      <tr style="border-bottom:1px solid var(--border)">
-        <td style="padding:6px">Win Rate</td>
-        <td style="padding:6px;text-align:right;color:${wr > 50 ? '#4ade80' : wr < 50 && wr > 0 ? '#fbbf24' : '#ef4444'}">${wr?.toFixed(1) ?? '—'}%</td>
-      </tr>
-      <tr style="border-bottom:1px solid var(--border)">
-        <td style="padding:6px">Кол-во сделок</td>
-        <td style="padding:6px;text-align:right">${n ?? '—'}</td>
-      </tr>
-      <tr style="border-bottom:1px solid var(--border)">
-        <td style="padding:6px">Max Drawdown</td>
-        <td style="padding:6px;text-align:right;color:${dd < 10 ? '#4ade80' : dd < 20 ? '#fbbf24' : '#ef4444'}">${dd?.toFixed(2) ?? '—'}%</td>
-      </tr>
-      <tr style="border-bottom:1px solid var(--border)">
-        <td style="padding:6px">P/DD (Profit/Risk)</td>
-        <td style="padding:6px;text-align:right;font-weight:600;color:${pdd > 2 ? '#4ade80' : pdd > 1 ? '#fbbf24' : '#ef4444'}">${pdd?.toFixed(2) ?? '—'}</td>
-      </tr>
-      <tr style="border-bottom:1px solid var(--border)">
-        <td style="padding:6px">Avg/trade</td>
-        <td style="padding:6px;text-align:right">${apt?.toFixed(3) ?? '—'}%</td>
-      </tr>
-      <tr style="border-bottom:1px solid var(--border)">
-        <td style="padding:6px">K-Ratio (линейность)</td>
-        <td style="padding:6px;text-align:right;font-weight:600;color:${kr > 1 ? '#4ade80' : kr > 0.5 ? '#fbbf24' : '#ef4444'}">${kr?.toFixed(2) ?? '—'}</td>
-      </tr>
-      <tr>
-        <td style="padding:6px;color:var(--text3)">Баров</td>
-        <td style="padding:6px;text-align:right;color:var(--text3)">${bars}</td>
-      </tr>
-    </table>
-  `;
-}
-
-function _renderOOSDeltaTable(r) {
-  const metrics = [
-    { name: 'PnL%', old: r.old_pnl, new: r.new_pnl, format: v => v?.toFixed(2) + '%', good: 'up' },
-    { name: 'WR%', old: r.old_wr, new: r.new_wr, format: v => v?.toFixed(1) + '%', good: 'up' },
-    { name: 'Сделок', old: r.old_n, new: r.new_n, format: v => v?.toString(), good: 'up' },
-    { name: 'DD%', old: r.old_dd, new: r.new_dd, format: v => v?.toFixed(2) + '%', good: 'down' },
-    { name: 'P/DD', old: r.old_pdd, new: r.new_pdd, format: v => v?.toFixed(2), good: 'up' },
-    { name: 'K-Ratio', old: r.old_kRatio, new: r.new_kRatio, format: v => v?.toFixed(2), good: 'up' }
-  ];
-
-  let html = '<table style="width:100%;border-collapse:collapse;font-size:.85em">';
-  html += '<tr style="background:var(--bg);border-bottom:1px solid var(--border)">';
-  html += '<td style="padding:4px;font-weight:600">Метрика</td>';
-  html += '<td style="padding:4px;text-align:center;color:#0099ff">История (IS)</td>';
-  html += '<td style="padding:4px;text-align:center;color:#ff9900">Новые (OOS)</td>';
-  html += '<td style="padding:4px;text-align:center">Δ (дельта)</td>';
-  html += '<td style="padding:4px;text-align:center">Статус</td>';
-  html += '</tr>';
-
-  metrics.forEach(m => {
-    if (m.old != null || m.new != null) {
-      const oldStr = m.old != null ? m.format(m.old) : '—';
-      const newStr = m.new != null ? m.format(m.new) : '—';
-      const delta = (m.old != null && m.new != null) ? m.new - m.old : null;
-      const deltaStr = delta != null ? `${delta >= 0 ? '+' : ''}${delta.toFixed(2)}` : '—';
-
-      let status = '—';
-      let statusColor = '';
-      if (delta != null) {
-        if (m.good === 'up') {
-          status = delta > 0 ? '✅' : delta < 0 ? '❌' : '⚪';
-          statusColor = delta > 0 ? '#4ade80' : delta < 0 ? '#ef4444' : '#999';
-        } else {
-          status = delta < 0 ? '✅' : delta > 0 ? '❌' : '⚪';
-          statusColor = delta < 0 ? '#4ade80' : delta > 0 ? '#ef4444' : '#999';
-        }
-      }
-
-      html += `<tr style="border-bottom:1px solid var(--border)">`;
-      html += `<td style="padding:4px;font-weight:500">${m.name}</td>`;
-      html += `<td style="padding:4px;text-align:right">${oldStr}</td>`;
-      html += `<td style="padding:4px;text-align:right">${newStr}</td>`;
-      html += `<td style="padding:4px;text-align:right;color:${delta > 0 && m.good === 'up' ? '#4ade80' : delta < 0 && m.good === 'up' ? '#ef4444' : delta < 0 && m.good === 'down' ? '#4ade80' : delta > 0 && m.good === 'down' ? '#ef4444' : ''}">${deltaStr}</td>`;
-      html += `<td style="padding:4px;text-align:center;color:${statusColor}">${status}</td>`;
-      html += `</tr>`;
-    }
-  });
-
-  html += '</table>';
-  return html;
-}
-
-function _analyzeOOSDiscrepancy(r) {
-  const analysis = {
-    pnlChange: null,
-    wrChange: null,
-    tradeCountChange: null,
-    ddChange: null,
-    mainFactors: [],
-    recommendations: []
-  };
-
-  if (r.old_pnl != null && r.new_pnl != null) {
-    analysis.pnlChange = r.new_pnl - r.old_pnl;
-    if (analysis.pnlChange < -50) {
-      analysis.mainFactors.push(`❌ Критическое падение прибыли на ${Math.abs(analysis.pnlChange).toFixed(1)}%`);
-      analysis.recommendations.push('⚠️ Срочно проверить волатильность и спреды на новых данных');
-      analysis.recommendations.push('⚠️ Анализировать паттерны, вызвавшие основные убытки');
-    } else if (analysis.pnlChange < -10) {
-      analysis.mainFactors.push(`⚠️ Значительное снижение прибыли на ${Math.abs(analysis.pnlChange).toFixed(1)}%`);
-      analysis.recommendations.push('Проверить условия рынка на новом периоде');
-    } else if (analysis.pnlChange > 20) {
-      analysis.mainFactors.push(`✅ Значительное улучшение результатов (+${analysis.pnlChange.toFixed(1)}%)`);
-    }
-  }
-
-  if (r.old_wr != null && r.new_wr != null) {
-    analysis.wrChange = r.new_wr - r.old_wr;
-    if (Math.abs(analysis.wrChange) > 20) {
-      analysis.mainFactors.push(`⚠️ Резкое изменение WR на ${analysis.wrChange > 0 ? '+' : ''}${analysis.wrChange.toFixed(1)}%`);
-      analysis.recommendations.push('Параметры могут быть переоптимизированы на истории');
-    } else if (Math.abs(analysis.wrChange) > 10) {
-      analysis.mainFactors.push(`⚠️ WR изменился на ${analysis.wrChange > 0 ? '+' : ''}${analysis.wrChange.toFixed(1)}%`);
-    }
-  }
-
-  if (r.old_n != null && r.new_n != null) {
-    analysis.tradeCountChange = r.new_n - r.old_n;
-    const expectedRatio = NEW_DATA && DATA ? NEW_DATA.length / DATA.length : 1;
-    const actualRatio = r.new_n / Math.max(r.old_n, 1);
-    if (actualRatio < expectedRatio * 0.3) {
-      analysis.mainFactors.push(`❌ Кол-во сделок критически упало (${Math.round(actualRatio * 100)}% от ожидаемого)`);
-      analysis.recommendations.push('На новых данных нет условий для входа или сигналы блокированы');
-    } else if (actualRatio < expectedRatio * 0.7) {
-      analysis.mainFactors.push(`⚠️ Кол-во сделок ниже ожидаемого (${Math.round(actualRatio * 100)}% от ожидаемого)`);
-      analysis.recommendations.push('Проверить условия фильтрации входов');
-    }
-  }
-
-  if (r.old_dd != null && r.new_dd != null) {
-    analysis.ddChange = r.new_dd - r.old_dd;
-    if (analysis.ddChange > 20) {
-      analysis.mainFactors.push(`❌ DrawDown критически вырос на ${analysis.ddChange.toFixed(1)}%`);
-      analysis.recommendations.push('Стратегия не управляет риском на новых данных');
-    } else if (analysis.ddChange > 10) {
-      analysis.mainFactors.push(`⚠️ DrawDown значительно увеличился на ${analysis.ddChange.toFixed(1)}%`);
-      analysis.recommendations.push('Проверить размеры SL и TP');
-    }
-  }
-
-  if (r.old_kRatio != null && r.new_kRatio != null) {
-    const krChange = r.new_kRatio - r.old_kRatio;
-    if (r.new_kRatio < 0.5) {
-      analysis.mainFactors.push(`❌ Линейность падения критична (K-Ratio: ${r.new_kRatio.toFixed(2)})`);
-      analysis.recommendations.push('Equity curve нестабильна — возможно случайные результаты');
-    }
-  }
-
-  if (analysis.mainFactors.length === 0) {
-    analysis.mainFactors.push('✅ Результаты стабильны между периодами');
-  }
-
-  return analysis;
-}
-
-function _renderOOSAnalysis(analysis, r) {
-  let html = '<div style="font-size:.85em">';
-
-  // Основные факторы
-  html += '<div style="margin-bottom:12px">';
-  html += '<strong style="color:var(--accent)">🔑 Ключевые факторы:</strong>';
-  analysis.mainFactors.forEach(f => {
-    const color = f.includes('❌') ? '#ef4444' : f.includes('⚠️') ? '#fbbf24' : f.includes('✅') ? '#4ade80' : 'var(--text2)';
-    html += `<div style="margin:4px 0;padding:6px 8px;background:var(--bg);border-radius:3px;border-left:4px solid ${color};color:${color}">${f}</div>`;
-  });
-  html += '</div>';
-
-  // Рекомендации
-  if (analysis.recommendations.length > 0) {
-    html += '<div style="margin-bottom:12px">';
-    html += '<strong style="color:var(--accent)">💡 Что проверить:</strong>';
-    analysis.recommendations.forEach(rec => {
-      html += `<div style="margin:4px 0;padding:6px 8px;background:var(--bg);border-radius:3px;border-left:4px solid #fbbf24">${rec}</div>`;
-    });
-    html += '</div>';
-  }
-
-  // Итоговая оценка
-  let assessment = '✅ Стратегия готова к торговле';
-  let assessColor = '#4ade80';
-  if (analysis.mainFactors.some(f => f.includes('❌'))) {
-    assessment = '❌ Требуется доработка';
-    assessColor = '#ef4444';
-  } else if (analysis.mainFactors.some(f => f.includes('⚠️'))) {
-    assessment = '⚠️ Требуется анализ';
-    assessColor = '#fbbf24';
-  }
-
-  html += `<div style="margin-top:12px;padding:8px;background:${assessColor}22;border-left:4px solid ${assessColor};border-radius:4px;color:${assessColor};font-weight:600">${assessment}</div>`;
-  html += '</div>';
-  return html;
 }
 
 // Графическое сравнение equity: история (синий) + новые данные (оранжевый)
@@ -27739,7 +27423,7 @@ function openHeatmapModal() {
 
   document.getElementById('hm-status').textContent = '';
   const canvas = document.getElementById('hm-canvas');
-  canvas.width = 0; canvas.height = 0;
+  if (canvas) { canvas.width = 0; canvas.height = 0; }
   document.getElementById('hm-run-btn').textContent = '▶ Запустить';
   document.getElementById('heatmap-overlay').classList.add('open');
 }
@@ -27826,6 +27510,7 @@ async function runHeatmap() {
 function _hmRender(grid, xVals, yVals, xParam, yParam, metric, cX, cY) {
   const canvas = document.getElementById('hm-canvas');
   const wrap   = document.getElementById('hm-canvas-wrap');
+  if (!canvas || !wrap) return;
 
   const PAD_L = 66, PAD_R = 14, PAD_T = 34, PAD_B = 44;
   const cols = xVals.length, rows = yVals.length;
@@ -30054,7 +29739,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774820125423;
+window._BUILD_TS = 1774853627268;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
