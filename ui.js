@@ -488,6 +488,9 @@ function switchTableMode(mode) {
   // фильтры основных результатов несовместимы с соседями/избранными
   if (mode === 'hc' || mode === 'fav') {
     if (typeof resetAllFilters === 'function') resetAllFilters();
+  } else if (mode === 'oos') {
+    // OOS режим: применяем OOS-специфичные фильтры
+    applyOOSFilters();
   } else {
     applyFilters(true);
   }
