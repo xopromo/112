@@ -27125,6 +27125,9 @@ function _drawOOSCrosshair(e) {
   const ch = e.target; // сам crosshair canvas
   if (!ch) return;
 
+  const canvas = document.getElementById('oos-eqc');
+  if (!canvas) return;
+
   const rect = ch.getBoundingClientRect();
   const scaleX = canvas.width / rect.width;
   const scaleY = canvas.height / rect.height;
@@ -29739,7 +29742,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774858156731;
+window._BUILD_TS = 1774861080387;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;

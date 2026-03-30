@@ -7706,6 +7706,9 @@ function _drawOOSCrosshair(e) {
   const ch = e.target; // сам crosshair canvas
   if (!ch) return;
 
+  const canvas = document.getElementById('oos-eqc');
+  if (!canvas) return;
+
   const rect = ch.getBoundingClientRect();
   const scaleX = canvas.width / rect.width;
   const scaleY = canvas.height / rect.height;
