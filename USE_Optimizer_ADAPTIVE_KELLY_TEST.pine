@@ -4,7 +4,7 @@
 // Адаптивные TP/SL (зависит от ATR)
 // Kelly Criterion для размера позиции
 // ============================================================
-indicator("USE Adaptive+Kelly TEST", shorttitle="USE_ADAPT_K", overlay=true, max_lines_count=500, max_labels_count=500, max_boxes_count=500)
+indicator("USE Adaptive+Kelly TEST", shorttitle="USE_ADPT_K", overlay=true, max_lines_count=500, max_labels_count=500, max_boxes_count=500)
 
 // ==========================================
 // 1. БАЗОВЫЕ ВХОДЫ (из оптимизатора)
@@ -112,8 +112,14 @@ plot(use_conf_ma ? conf_ma_val : na, "Confirm MA", color=color.new(color.orange,
 // Market structure
 struct_pv_hi_v = ta.pivothigh(high, struct_pv_l, struct_pv_r)
 struct_pv_lo_v = ta.pivotlow(low,  struct_pv_l, struct_pv_r)
-var float struct_hi1 = na, struct_hi2 = na, struct_lo1 = na, struct_lo2 = na
-var int struct_hi1_bar = na, struct_hi2_bar = na, struct_lo1_bar = na, struct_lo2_bar = na
+var float struct_hi1 = 0.0
+var float struct_hi2 = 0.0
+var float struct_lo1 = 0.0
+var float struct_lo2 = 0.0
+var int struct_hi1_bar = 0
+var int struct_hi2_bar = 0
+var int struct_lo1_bar = 0
+var int struct_lo2_bar = 0
 
 if not na(struct_pv_hi_v)
 	struct_hi2 := struct_hi1
@@ -126,8 +132,8 @@ if not na(struct_pv_lo_v)
 	struct_lo1 := low[struct_pv_r]
 	struct_lo1_bar := bar_index - struct_pv_r
 
-bool struct_has_2hi = not na(struct_hi2) and not na(struct_hi2_bar) and (bar_index - struct_hi2_bar) <= struct_len_v
-bool struct_has_2lo = not na(struct_lo2) and not na(struct_lo2_bar) and (bar_index - struct_lo2_bar) <= struct_len_v
+bool struct_has_2hi = struct_hi2 != 0 and struct_hi2_bar != 0 and (bar_index - struct_hi2_bar) <= struct_len_v
+bool struct_has_2lo = struct_lo2 != 0 and struct_lo2_bar != 0 and (bar_index - struct_lo2_bar) <= struct_len_v
 bool struct_bull = struct_has_2hi and struct_has_2lo and struct_hi1 > struct_hi2 and struct_lo1 > struct_lo2
 bool struct_bear = struct_has_2hi and struct_has_2lo and struct_hi1 < struct_hi2 and struct_lo1 < struct_lo2
 bool struct_ok_l = not use_struct or struct_bull
@@ -205,7 +211,7 @@ var int v_dir = 0  // 1=long, -1=short
 var float v_ep = 0.0
 var float v_sl = 0.0
 var float v_tp = 0.0
-var float v_kelly = na
+var float v_kelly = 0.0
 var int v_bar = 0
 
 // Входы
@@ -243,7 +249,7 @@ if v_in
 			line.new(v_bar, v_sl, bar_index, v_sl, color=color.new(color.red, 50), style=line.style_dotted)
 
 // Текущая открытая позиция (рисуем в реал-тайме)
-if v_in
+if v_in and v_bar > 0
 	float tp_pct_final = use_adaptive_tp ? tp_adaptive_pct : tp_pct_val
 	float sl_pct_final = use_adaptive_sl ? sl_adaptive_pct : sl_pct_val
 	v_tp := v_dir == 1 ? v_ep * (1 + tp_pct_final/100) : v_ep * (1 - tp_pct_final/100)
