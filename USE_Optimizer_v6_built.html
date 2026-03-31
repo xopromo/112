@@ -29049,6 +29049,83 @@ function _parseListOfTrades(csvText) {
   return trades.length ? trades : null;
 }
 
+// Парсит стандартный экспорт индикатора USE (time,open,high,low,close,...,EL,ES,XL,XS,...)
+// Реконструирует сделки из сигнальных колонок EL/ES/XL/XS
+function _parseIndicatorExport(csvText) {
+  const lines = csvText.trim().split(/\r?\n/).filter(l => l.trim());
+  if (lines.length < 2) return null;
+  const sep = lines[0].includes('\t') ? '\t' : ',';
+  const hdrs = lines[0].split(sep).map(h => h.trim().replace(/^"|"$/g, '').toLowerCase());
+
+  const eqIdx = hdrs.findIndex(h => h.includes('equity'));
+  if (eqIdx < 0) return null; // не тот формат
+
+  const tIdx  = hdrs.findIndex(h => h === 'time' || h.includes('time'));
+  const cIdx  = hdrs.findIndex(h => h === 'close');
+  const elIdx = hdrs.indexOf('el');
+  const esIdx = hdrs.indexOf('es');
+  const xlIdx = hdrs.indexOf('xl');
+  const xsIdx = hdrs.indexOf('xs');
+
+  if (elIdx < 0 && esIdx < 0) return null; // нет сигналов входа
+
+  const getF = (cols, idx) => idx >= 0 && cols[idx] != null ? parseFloat(cols[idx].trim().replace(/^"|"$/g, '')) : NaN;
+  const getT = (cols) => tIdx >= 0 && cols[tIdx] != null ? _normTime(cols[tIdx].trim().replace(/^"|"$/g, '')) : null;
+
+  const bars = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cols = lines[i].split(sep);
+    const t = getT(cols);
+    if (!t) continue;
+    const c = getF(cols, cIdx);
+    bars.push({
+      t,
+      c: isNaN(c) ? null : c,
+      el: elIdx >= 0 && getF(cols, elIdx) > 0,
+      es: esIdx >= 0 && getF(cols, esIdx) > 0,
+      xl: xlIdx >= 0 && getF(cols, xlIdx) > 0,
+      xs: xsIdx >= 0 && getF(cols, xsIdx) > 0,
+    });
+  }
+  if (!bars.length) return null;
+
+  // Реконструируем сделки из сигналов
+  const trades = [];
+  let inTrade = false, dir = 0, entryIdx = -1;
+
+  for (let i = 0; i < bars.length; i++) {
+    const b = bars[i];
+    if (!inTrade) {
+      if (b.el) { inTrade = true; dir = 1;  entryIdx = i; }
+      else if (b.es) { inTrade = true; dir = -1; entryIdx = i; }
+    } else {
+      const exitSignal = (dir === 1 && b.xl) || (dir === -1 && b.xs);
+      const revSignal  = (dir === 1 && b.es) || (dir === -1 && b.el);
+      if (exitSignal || revSignal) {
+        const eb = bars[entryIdx];
+        const ep = eb.c, xp = b.c;
+        const pnlPct = ep && xp ? (xp - ep) / ep * dir * 100 : null;
+        trades.push({
+          num: trades.length + 1,
+          dir,
+          entryDateStr: eb.t,
+          entryPrice: ep,
+          exitDateStr: b.t,
+          exitPrice: xp,
+          pnlPct,
+          exitReason: revSignal ? 'Rev' : 'Signal',
+        });
+        if (revSignal) {
+          dir = -dir; entryIdx = i; // разворот — сразу открываем противоположную
+        } else {
+          inTrade = false; dir = 0; entryIdx = -1;
+        }
+      }
+    }
+  }
+  return trades.length ? trades : null;
+}
+
 function _rerunWithTradeLog(cfg) {
   if (!NEW_DATA || NEW_DATA.length < 10) return null;
   const origDATA = DATA;
@@ -29344,9 +29421,16 @@ function runOOSTradeDiag(oosIdx, event) {
 
   const reader = new FileReader();
   reader.onload = e => {
-    const tvTrades = _parseListOfTrades(e.target.result);
+    const csvText = e.target.result;
+    // Автодетекция формата: List of Trades или экспорт индикатора (EL/ES/XL/XS)
+    let tvTrades = _parseListOfTrades(csvText);
+    let csvFormat = 'list-of-trades';
     if (!tvTrades || !tvTrades.length) {
-      if (statusEl) statusEl.textContent = '❌ Не удалось прочитать CSV — ожидается List of Trades';
+      tvTrades = _parseIndicatorExport(csvText);
+      csvFormat = 'indicator-export';
+    }
+    if (!tvTrades || !tvTrades.length) {
+      if (statusEl) statusEl.textContent = '❌ Не удалось прочитать CSV. Нужен: List of Trades или экспорт индикатора USE с колонками EL/ES/XL/XS';
       return;
     }
 
@@ -29360,8 +29444,9 @@ function runOOSTradeDiag(oosIdx, event) {
     const report      = _generateTradeCompReport(r, optTrades, tvTrades, matchResult);
 
     const divCount = matchResult.issues.filter(x => !x.types.includes('MISSING_TV') && !x.types.includes('MISSING_OPT')).length;
+    const fmtLabel = csvFormat === 'indicator-export' ? ' [формат: индикатор EL/ES/XL/XS]' : ' [формат: List of Trades]';
     if (statusEl) statusEl.textContent =
-      `✅ TV: ${tvTrades.length} сд. | Опт: ${optTrades.length} сд. | Расхождений: ${matchResult.issues.length} (${divCount} с парой)`;
+      `✅ TV: ${tvTrades.length} сд. | Опт: ${optTrades.length} сд. | Расхождений: ${matchResult.issues.length} (${divCount} с парой)${fmtLabel}`;
     if (textEl)   textEl.value = report;
     if (reportEl) reportEl.style.display = 'block';
   };
@@ -30135,7 +30220,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774959549709;
+window._BUILD_TS = 1774960973762;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
