@@ -17682,6 +17682,9 @@ async function runOpt() {
     (tlPvLs.length?tlPvLs:[5]), (tlPvRs.length?tlPvRs:[3]),
     (confTypeArr.length?confTypeArr:['EMA']), (confHtfArr.length?confHtfArr:[1]),
     (maCrossTypeArr.length?maCrossTypeArr:['EMA']),
+    (dynSLStructMults.length?dynSLStructMults:[0.3]),
+    (tpAtrLens.length?tpAtrLens:[20]), (tpAtrMults.length?tpAtrMults:[1.0]),
+    (slAtrLens.length?slAtrLens:[20]), (slAtrMults.length?slAtrMults:[0.5]),
     _filterCombos  // powerset фильтров (последнее измерение)
   ];
   const _mcDimSizes = _mcDims.map(d => d.length || 1);
@@ -17781,6 +17784,11 @@ async function runOpt() {
       const _confType= _dims[_d][_di[_d++]];
       const _confHtf = _dims[_d][_di[_d++]];
       const _mCrossType= _dims[_d][_di[_d++]];
+      const dynSLStructMult = _dims[_d][_di[_d++]];
+      const tpAtrLen = _dims[_d][_di[_d++]];
+      const tpAtrMult = _dims[_d][_di[_d++]];
+      const slAtrLen = _dims[_d][_di[_d++]];
+      const slAtrMult = _dims[_d][_di[_d++]];
       const _fCombo  = _dims[_d][_di[_d++]]; // powerset: объект с bool-флагами фильтров
       // Эффективные флаги фильтров: берём из _fCombo если там есть, иначе из внешней области
       const _effUseMa      = _fCombo.useMa      ?? useMa;
@@ -17995,6 +18003,8 @@ async function runOpt() {
               slPair,slLogic,tpPair,tpLogic,
               useSLPiv,slPivOff,slPivMax,slPivL,slPivR,slPivTrail,
               useBE,beTrig,beOff,useTrail,trTrig,trDist,useWickTrail,wickOffType,wickMult,
+              useDynSLStruct,dynSLStructMult,
+              useAdaptiveTP,tpAtrLen,tpAtrMult,useAdaptiveSL,slAtrLen,slAtrMult,
               useRev,revBars,revMode,revAct,useTime,timeBars,timeMode,
               usePartial,partRR,partPct,partBE,
               useClimax:useClimaxExit&&HAS_VOLUME,clxVolMult,clxBodyMult,clxMode,
@@ -30836,7 +30846,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774995204107;
+window._BUILD_TS = 1774995375226;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
