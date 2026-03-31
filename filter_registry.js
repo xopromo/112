@@ -35,7 +35,7 @@ const FILTER_REGISTRY = [
       const adx = cfg.adxArr[i-1];
       if (adx <= 0 || adx < cfg.adxThresh) return true;
       if (cfg.useAdxSlope) {
-        const sb = cfg.adxSlopeBars||3;
+        const sb = (cfg.adxSlopeBars||3) * (cfg.adxHtfRatio||1);
         if (i-1 > sb && cfg.adxArr[i-1-sb] > 0) return adx <= cfg.adxArr[i-1-sb];
       }
       return false;
@@ -45,7 +45,7 @@ const FILTER_REGISTRY = [
       const adx = cfg.adxArr[i-1];
       if (adx <= 0 || adx < cfg.adxThresh) return true;
       if (cfg.useAdxSlope) {
-        const sb = cfg.adxSlopeBars||3;
+        const sb = (cfg.adxSlopeBars||3) * (cfg.adxHtfRatio||1);
         if (i-1 > sb && cfg.adxArr[i-1-sb] > 0) return adx <= cfg.adxArr[i-1-sb];
       }
       return false;
