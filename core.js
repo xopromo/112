@@ -516,6 +516,49 @@ function calcWeightedTrend(maArr, atrArr, period, volW, bodyW, distW, useDistMA)
 }
 
 // ============================================================
+// Расчет адаптивных множителей TP/SL на основе ATR
+function _calcAdaptiveMultipliers(atrArr, i, cfg) {
+  let tpAdaptMult = 1.0, slAdaptMult = 1.0;
+
+  // Адаптивный TP: зависит от текущего ATR vs среднего ATR
+  if (cfg.useAdaptiveTP && cfg.tpAtrLen > 0) {
+    // SMA от ATR за период * 2 (как в Pine: ta.sma(atr_tp, tp_atr_len * 2))
+    const avgLen = Math.min(cfg.tpAtrLen * 2, i);
+    let atrSum = 0;
+    for (let k = 0; k < avgLen; k++) {
+      atrSum += atrArr[i - 1 - k];
+    }
+    const atrAvg = atrSum / avgLen;
+    const atrCurr = atrArr[i - 1];
+    if (atrAvg > 0) {
+      const atrRatio = atrCurr / atrAvg;
+      // TP формула: 0.5 + 0.5 * sqrt(ratio)
+      tpAdaptMult = 0.5 + 0.5 * Math.sqrt(atrRatio);
+    }
+  }
+
+  // Адаптивный SL: зависит от ATR мультипликатора
+  if (cfg.useAdaptiveSL && cfg.slAtrLen > 0) {
+    // SMA от ATR за период * 2 (как в Pine: ta.sma(atr_sl, sl_atr_len * 2))
+    const avgLen = Math.min(cfg.slAtrLen * 2, i);
+    let atrSum = 0;
+    for (let k = 0; k < avgLen; k++) {
+      atrSum += atrArr[i - 1 - k];
+    }
+    const atrAvg = atrSum / avgLen;
+    const atrCurr = atrArr[i - 1];
+    if (atrAvg > 0) {
+      const atrRatio = atrCurr / atrAvg;
+      // SL формула: 1.0 - mult*0.5 + mult*0.5*sqrt(ratio)
+      const m = cfg.slAtrMult || 0.5;
+      slAdaptMult = 1.0 - m * 0.5 + m * 0.5 * Math.sqrt(atrRatio);
+    }
+  }
+
+  return { tpAdaptMult, slAdaptMult };
+}
+
+// ============================================================
 // BACKTEST ENGINE
 // ============================================================
 function backtest(pvLo, pvHi, atrArr, cfg) {
@@ -915,6 +958,19 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
         } else if (slCandidates.length===1) { sl1=slCandidates[0]; hasSL2=false; }
         else { sl1 = NaN; hasSL2=false; } // noSL: no exit, matches Pine na
 
+        // Apply adaptive SL multiplier (зависит от волатильности)
+        if (cfg.useAdaptiveSL && !isNaN(sl1)) {
+          const { slAdaptMult } = _calcAdaptiveMultipliers(atrArr, i, cfg);
+          const slDist = Math.abs(entry - sl1);
+          const newSlDist = slDist * slAdaptMult;
+          sl1 = dir === 1 ? entry - newSlDist : entry + newSlDist;
+          if (hasSL2) {
+            const sl2Dist = Math.abs(entry - sl2);
+            const newSl2Dist = sl2Dist * slAdaptMult;
+            sl2 = dir === 1 ? entry - newSl2Dist : entry + newSl2Dist;
+          }
+        }
+
         // Dynamic SL by structure break: if structure broken, tighten SL
         if (cfg.useDynSLStruct && !isNaN(sl1) && cfg.structBull && cfg.structBear) {
           const structOk = cfg.structBull[i] || cfg.structBear[i];
@@ -932,6 +988,21 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
         let tpA = NaN, tpB = NaN;
         if (cfg.hasTPA) tpA = _calcTP(entry, dir, slDist, ac, cfg.tpMode,  cfg.tpMult);
         if (cfg.hasTPB) tpB = _calcTP(entry, dir, slDist, ac, cfg.tpModeB, cfg.tpMultB);
+
+        // Apply adaptive TP multiplier (зависит от волатильности)
+        if (cfg.useAdaptiveTP && (cfg.hasTPA || cfg.hasTPB)) {
+          const { tpAdaptMult } = _calcAdaptiveMultipliers(atrArr, i, cfg);
+          if (!isNaN(tpA)) {
+            const tpDist = Math.abs(tpA - entry);
+            const newTpDist = tpDist * tpAdaptMult;
+            tpA = dir === 1 ? entry + newTpDist : entry - newTpDist;
+          }
+          if (!isNaN(tpB)) {
+            const tpDist = Math.abs(tpB - entry);
+            const newTpDist = tpDist * tpAdaptMult;
+            tpB = dir === 1 ? entry + newTpDist : entry - newTpDist;
+          }
+        }
 
         if (!isNaN(tpA) && !isNaN(tpB)) {
           const distA=Math.abs(tpA-entry), distB=Math.abs(tpB-entry);

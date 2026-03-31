@@ -3846,6 +3846,14 @@ function buildBtCfg(cfg, ind) {
     tpModeB:   tpPair.b ? tpPair.b.type : 'rr',
     tpLogic,
 
+    // ── Адаптивные TP/SL (по волатильности ATR) ───────────────
+    useAdaptiveTP:  cfg.useAdaptiveTP  || false,
+    tpAtrLen:       cfg.tpAtrLen       || 20,
+    tpAtrMult:      cfg.tpAtrMult      || 1.0,
+    useAdaptiveSL:  cfg.useAdaptiveSL  || false,
+    slAtrLen:       cfg.slAtrLen       || 20,
+    slAtrMult:      cfg.slAtrMult      || 0.5,
+
     // ── Exits ─────────────────────────────────────────────────
     useBE:    cfg.useBE    || false,
     beTrig:   cfg.beTrig   || 1,

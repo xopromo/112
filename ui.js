@@ -1738,6 +1738,15 @@ const CFG_HTML_MAP = {
   slPivMax:       {id:'s_pivmax',        type:'val'},
   slPivL:         {id:'s_pivl',          type:'val'},
   slPivR:         {id:'s_pivr',          type:'val'},
+  // ── Адаптивные TP/SL (по волатильности) ────────────────────────────────────
+  useAdaptiveTP:  {id:'x_adaptive_tp',   type:'chk'},
+  tpAtrLen:       {id:'x_tp_atr_len',    type:'val'},
+  tpAtrMult:      {id:'x_tp_atr_mult',   type:'val'},
+  useAdaptiveSL:  {id:'x_adaptive_sl',   type:'chk'},
+  slAtrLen:       {id:'x_sl_atr_len',    type:'val'},
+  slAtrMult:      {id:'x_sl_atr_mult',   type:'val'},
+  useDynSLStruct: {id:'x_dynsl',         type:'chk'},
+  dynSLStructMult:{id:'x_dynsl_m',       type:'val'},
   // ── Механики выхода ────────────────────────────────────────────────────────
   useBE:          {id:'x_be',            type:'chk'},
   beTrig:         {id:'x_bet',           type:'val'},
