@@ -60,7 +60,7 @@ use_kelly = input.bool(true, "Включить Kelly Criterion", group=grp_kelly
 kelly_win_rate = input.float(60.0, "WR% (для расчёта)", minval=40, maxval=90, step=1, group=grp_kelly, active=use_kelly, tooltip="Ожидаемый Win Rate стратегии")
 kelly_avg_win = input.float(3.0, "Средний выигрыш %", minval=0.5, maxval=50, step=0.5, group=grp_kelly, active=use_kelly)
 kelly_avg_loss = input.float(9.0, "Средний убыток %", minval=0.5, maxval=50, step=0.5, group=grp_kelly, active=use_kelly)
-kelly_safety = input.string("Kelly/2", "Коэффициент безопасности", options=["Kelly (опасно)", "Kelly/2 (рекомендовано)", "Kelly/4 (консервативно)"], group=grp_kelly, active=use_kelly)
+kelly_safety = input.string("Kelly/2 (рекомендовано)", "Коэффициент безопасности", options=["Kelly (опасно)", "Kelly/2 (рекомендовано)", "Kelly/4 (консервативно)"], group=grp_kelly, active=use_kelly)
 kelly_max_cap = input.float(25.0, "Максимум % на сделку", minval=5, maxval=50, step=1, group=grp_kelly, active=use_kelly)
 
 // ==========================================
