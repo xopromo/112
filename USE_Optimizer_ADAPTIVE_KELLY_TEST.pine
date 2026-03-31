@@ -1,0 +1,307 @@
+//@version=6
+// ============================================================
+// USE Strategy Engine — ТЕСТОВАЯ ВЕРСИЯ
+// Адаптивные TP/SL (зависит от ATR)
+// Kelly Criterion для размера позиции
+// ============================================================
+indicator("USE Adaptive+Kelly TEST", shorttitle="USE_ADAPT_K", overlay=true, max_lines_count=500, max_labels_count=500, max_boxes_count=500)
+
+// ==========================================
+// 1. БАЗОВЫЕ ВХОДЫ (из оптимизатора)
+// ==========================================
+grp_entry = "🎯 ПАТТЕРНЫ ВХОДА"
+use_free_entry = input.bool(true, "Свободный вход (любой сигнал)", group=grp_entry)
+
+grp_ma = "📈 MA ФИЛЬТР"
+use_int_ma = input.bool(false, "Включить MA фильтр", group=grp_ma)
+ma_type    = input.string("EMA", "Тип MA", options=["SMA","EMA","WMA","HMA"], group=grp_ma)
+ma_len     = input.int(200, "Период MA", group=grp_ma)
+
+grp_conf = "🔍 CONFIRM MA"
+use_conf_ma = input.bool(true, "Включить Confirm MA", group=grp_conf)
+conf_ma_type = input.string("SMA", "Тип", options=["SMA","EMA","WMA"], group=grp_conf)
+conf_ma_len  = input.int(150, "Период", group=grp_conf)
+
+grp_struct = "🏗️ СТРУКТУРА"
+use_struct   = input.bool(true, "Структура рынка HH/HL", group=grp_struct)
+struct_pv_l  = input.int(5, "Pivot left",  minval=2, maxval=100, group=grp_struct, active=use_struct)
+struct_pv_r  = input.int(5, "Pivot right", minval=1, maxval=10,   group=grp_struct, active=use_struct)
+struct_len_v = input.int(65, "Окно (баров)", minval=10, maxval=2000, group=grp_struct, active=use_struct)
+
+grp_macd_f = "📉 MACD ФИЛЬТР"
+use_macd_f = input.bool(true, "MACD направление (фильтр)", group=grp_macd_f)
+macd_fast  = input.int(12, "MACD быстрый", minval=2, maxval=100, group=grp_macd_f)
+macd_slow  = input.int(26, "MACD медленный", minval=3, maxval=200, group=grp_macd_f)
+macd_signal = input.int(9, "MACD сигнал", minval=2, maxval=50, group=grp_macd_f)
+
+// ==========================================
+// 2. НОВЫЕ: АДАПТИВНЫЕ TP/SL (зависят от ATR)
+// ==========================================
+grp_adapt = "⚡ АДАПТИВНЫЕ TP/SL (ATR-зависимые)"
+use_adaptive = input.bool(true, "Включить адаптивный режим", group=grp_adapt)
+
+grp_atp = "📊 АДАПТИВНЫЙ TP"
+use_adaptive_tp = input.bool(true, "Адаптивный TP (зависит от ATR)", group=grp_atp, active=use_adaptive)
+tp_base_pct = input.float(3.0, "Базовый TP %", step=0.5, group=grp_atp, active=use_adaptive_tp)
+tp_atr_len  = input.int(20, "Период ATR для TP", minval=5, maxval=100, group=grp_atp, active=use_adaptive_tp)
+tp_atr_mult = input.float(1.0, "Множитель ATR→TP", step=0.1, tooltip="Как сильно TP реагирует на рост ATR (0.5=половинная, 1.0=полная)", group=grp_atp, active=use_adaptive_tp)
+
+grp_asl = "🛑 АДАПТИВНЫЙ SL"
+use_adaptive_sl = input.bool(true, "Адаптивный SL (зависит от ATR)", group=grp_asl, active=use_adaptive)
+sl_base_pct = input.float(9.0, "Базовый SL %", step=0.5, group=grp_asl, active=use_adaptive_sl)
+sl_atr_len  = input.int(20, "Период ATR для SL", minval=5, maxval=100, group=grp_asl, active=use_adaptive_sl)
+sl_atr_mult = input.float(0.5, "Множитель ATR→SL", step=0.1, tooltip="Как SL реагирует на ATR (0.3=консервативно, 0.5=нормально)", group=grp_asl, active=use_adaptive_sl)
+
+// ==========================================
+// 3. НОВЫЕ: KELLY CRITERION
+// ==========================================
+grp_kelly = "🎯 KELLY CRITERION (размер позиции)"
+use_kelly = input.bool(true, "Включить Kelly Criterion", group=grp_kelly)
+kelly_win_rate = input.float(60.0, "WR% (для расчёта)", minval=40, maxval=90, step=1, group=grp_kelly, active=use_kelly, tooltip="Ожидаемый Win Rate стратегии")
+kelly_avg_win = input.float(3.0, "Средний выигрыш %", minval=0.5, maxval=50, step=0.5, group=grp_kelly, active=use_kelly)
+kelly_avg_loss = input.float(9.0, "Средний убыток %", minval=0.5, maxval=50, step=0.5, group=grp_kelly, active=use_kelly)
+kelly_safety = input.string("Kelly/2", "Коэффициент безопасности", options=["Kelly (опасно)", "Kelly/2 (рекомендовано)", "Kelly/4 (консервативно)"], group=grp_kelly, active=use_kelly)
+kelly_max_cap = input.float(25.0, "Максимум % на сделку", minval=5, maxval=50, step=1, group=grp_kelly, active=use_kelly)
+
+// ==========================================
+// 4. СТОП-ЛОССЫ И ТЕЙК-ПРОФИТЫ (стандартные)
+// ==========================================
+grp_sl = "🛑 STOP LOSS"
+use_sl_pct = input.bool(true, "SL по %", group=grp_sl)
+sl_pct_val = input.float(9.0, "Процент %", step=0.1, group=grp_sl)
+
+grp_tp = "🎯 TAKE PROFIT"
+use_tp_pct = input.bool(true, "TP по %", group=grp_tp)
+tp_pct_val = input.float(3.0, "Процент %", step=0.1, group=grp_tp)
+
+// ==========================================
+// 5. КАПИТАЛ И ATR
+// ==========================================
+grp_strat = "⚙️ КАПИТАЛ"
+start_cap  = input.float(1000.0, "Депозит $", group=grp_strat)
+atr_len    = input.int(17, "Период ATR (основной)", group=grp_strat)
+
+grp_vis = "🎨 ВИЗУАЛИЗАЦИЯ"
+show_tp_line = input.bool(true, "Показывать TP линии", group=grp_vis)
+show_sl_line = input.bool(true, "Показывать SL линии", group=grp_vis)
+show_kelly   = input.bool(true, "Показывать Kelly % на графике", group=grp_vis)
+show_atr_ratio = input.bool(true, "Показывать ATR/средний ratio", group=grp_vis)
+
+// ==========================================
+// 6. ИНДИКАТОРЫ
+// ==========================================
+// MA helpers
+f_dema(s, l) =>
+	e1 = ta.ema(s, l)
+	2.0 * e1 - ta.ema(e1, l)
+
+f_tema(s, l) =>
+	e1 = ta.ema(s, l)
+	e2 = ta.ema(e1, l)
+	3.0 * e1 - 3.0 * e2 + ta.ema(e2, l)
+
+calc_ma(t, s, l) =>
+	t == "SMA" ? ta.sma(s,l) : t == "EMA" ? ta.ema(s,l) : t == "WMA" ? ta.wma(s,l) : ta.hma(s,l)
+
+float ma_val = use_int_ma ? calc_ma(ma_type, close, ma_len) : na
+float conf_ma_val = use_conf_ma ? calc_ma(conf_ma_type, close, conf_ma_len) : na
+
+plot(ma_val, "MA", color=color.new(color.blue,50), linewidth=2, display=use_int_ma ? display.all : display.data_window)
+plot(use_conf_ma ? conf_ma_val : na, "Confirm MA", color=color.new(color.orange,50), linewidth=1)
+
+// Market structure
+struct_pv_hi_v = ta.pivothigh(high, struct_pv_l, struct_pv_r)
+struct_pv_lo_v = ta.pivotlow(low,  struct_pv_l, struct_pv_r)
+var float struct_hi1 = na, struct_hi2 = na, struct_lo1 = na, struct_lo2 = na
+var int struct_hi1_bar = na, struct_hi2_bar = na, struct_lo1_bar = na, struct_lo2_bar = na
+
+if not na(struct_pv_hi_v)
+	struct_hi2 := struct_hi1
+	struct_hi2_bar := struct_hi1_bar
+	struct_hi1 := high[struct_pv_r]
+	struct_hi1_bar := bar_index - struct_pv_r
+if not na(struct_pv_lo_v)
+	struct_lo2 := struct_lo1
+	struct_lo2_bar := struct_lo1_bar
+	struct_lo1 := low[struct_pv_r]
+	struct_lo1_bar := bar_index - struct_pv_r
+
+bool struct_has_2hi = not na(struct_hi2) and not na(struct_hi2_bar) and (bar_index - struct_hi2_bar) <= struct_len_v
+bool struct_has_2lo = not na(struct_lo2) and not na(struct_lo2_bar) and (bar_index - struct_lo2_bar) <= struct_len_v
+bool struct_bull = struct_has_2hi and struct_has_2lo and struct_hi1 > struct_hi2 and struct_lo1 > struct_lo2
+bool struct_bear = struct_has_2hi and struct_has_2lo and struct_hi1 < struct_hi2 and struct_lo1 < struct_lo2
+bool struct_ok_l = not use_struct or struct_bull
+bool struct_ok_s = not use_struct or struct_bear
+
+// Confirm MA filters
+bool conf_ok_l = not use_conf_ma or (not na(conf_ma_val) and close[1] > conf_ma_val)
+bool conf_ok_s = not use_conf_ma or (not na(conf_ma_val) and close[1] < conf_ma_val)
+
+// MACD
+[macd_line_val, macd_sig_val, _macd_hist] = ta.macd(close, macd_fast, macd_slow, macd_signal)
+bool macd_f_ok_l = not use_macd_f or macd_line_val[1] > macd_sig_val[1]
+bool macd_f_ok_s = not use_macd_f or macd_line_val[1] < macd_sig_val[1]
+
+// ==========================================
+// 7. АДАПТИВНЫЕ TP/SL — РАСЧЁТЫ
+// ==========================================
+float atr_main = ta.atr(atr_len)
+float atr_tp = ta.atr(tp_atr_len)
+float atr_sl = ta.atr(sl_atr_len)
+
+// Средний ATR (для ratio)
+float atr_tp_avg = ta.sma(atr_tp, tp_atr_len * 2)
+float atr_sl_avg = ta.sma(atr_sl, sl_atr_len * 2)
+
+float atr_tp_ratio = atr_tp_avg > 0 ? atr_tp / atr_tp_avg : 1.0
+float atr_sl_ratio = atr_sl_avg > 0 ? atr_sl / atr_sl_avg : 1.0
+
+// АДАПТИВНЫЙ TP: если ATR растет → TP растет (но медленнее), если падает → TP падает
+float tp_adaptive_pct = tp_base_pct
+if use_adaptive_tp
+	// Формула: базовый TP × (0.5 + 0.5 × ratio^0.5)
+	// Это означает: если ratio=1 → TP не меняется, если ratio=2 → TP растет на 22%
+	tp_adaptive_pct := tp_base_pct * (0.5 + 0.5 * math.sqrt(atr_tp_ratio))
+
+// АДАПТИВНЫЙ SL: если ATR растет → SL растет (но медленнее), если падает → SL падает
+float sl_adaptive_pct = sl_base_pct
+if use_adaptive_sl
+	// Похожая логика, но с меньшей реакцией (sl_atr_mult)
+	sl_adaptive_pct := sl_base_pct * (1.0 - sl_atr_mult * 0.5 + sl_atr_mult * 0.5 * math.sqrt(atr_sl_ratio))
+
+// ==========================================
+// 8. KELLY CRITERION — РАСЧЁТ РАЗМЕРА ПОЗИЦИИ
+// ==========================================
+float kelly_pct = na
+if use_kelly
+	float p = kelly_win_rate / 100
+	float q = 1 - p
+	float b = kelly_avg_win / kelly_avg_loss
+
+	// Чистый Келли
+	float f_star = (b * p - q) / b
+
+	// Коэффициент безопасности
+	float f_safe = f_star
+	if kelly_safety == "Kelly/2 (рекомендовано)"
+		f_safe := f_star / 2
+	else if kelly_safety == "Kelly/4 (консервативно)"
+		f_safe := f_star / 4
+
+	// Хардкап
+	kelly_pct := math.min(math.max(f_safe * 100, 0), kelly_max_cap)
+
+// ==========================================
+// 9. СИГНАЛЫ ВХОДА/ВЫХОДА
+// ==========================================
+bool sig_l = use_free_entry and conf_ok_l and struct_ok_l and macd_f_ok_l and barstate.isconfirmed
+bool sig_s = use_free_entry and conf_ok_s and struct_ok_s and macd_f_ok_s and barstate.isconfirmed
+
+// ==========================================
+// 10. ВИЗУАЛИЗАЦИЯ СДЕЛОК С АДАПТИВНЫМИ TP/SL
+// ==========================================
+var bool v_in = false
+var int v_dir = 0  // 1=long, -1=short
+var float v_ep = 0.0
+var float v_sl = 0.0
+var float v_tp = 0.0
+var float v_kelly = na
+var int v_bar = 0
+
+// Входы
+if not v_in and (sig_l or sig_s)
+	v_in := true
+	v_dir := sig_l ? 1 : -1
+	v_ep := close
+	v_bar := bar_index
+
+	// Выбираем TP/SL: адаптивные или стандартные
+	float tp_pct_final = use_adaptive_tp ? tp_adaptive_pct : tp_pct_val
+	float sl_pct_final = use_adaptive_sl ? sl_adaptive_pct : sl_pct_val
+
+	v_tp := v_dir == 1 ? v_ep * (1 + tp_pct_final/100) : v_ep * (1 - tp_pct_final/100)
+	v_sl := v_dir == 1 ? v_ep * (1 - sl_pct_final/100) : v_ep * (1 + sl_pct_final/100)
+	v_kelly := kelly_pct
+
+// Выходы
+if v_in
+	bool hit_tp = v_dir == 1 ? (high >= v_tp) : (low <= v_tp)
+	bool hit_sl = v_dir == 1 ? (low <= v_sl) : (high >= v_sl)
+
+	if hit_tp or hit_sl
+		v_in := false
+
+		// Рисуем сделку
+		bool win = hit_tp
+		color box_col = win ? color.new(color.green, 80) : color.new(color.red, 80)
+
+		box.new(v_bar, v_ep, bar_index, win ? v_tp : v_sl, bgcolor=box_col, border_color=na)
+
+		if show_tp_line
+			line.new(v_bar, v_tp, bar_index, v_tp, color=color.new(color.lime, 50), style=line.style_dotted)
+		if show_sl_line
+			line.new(v_bar, v_sl, bar_index, v_sl, color=color.new(color.red, 50), style=line.style_dotted)
+
+// Текущая открытая позиция (рисуем в реал-тайме)
+if v_in
+	float tp_pct_final = use_adaptive_tp ? tp_adaptive_pct : tp_pct_val
+	float sl_pct_final = use_adaptive_sl ? sl_adaptive_pct : sl_pct_val
+	v_tp := v_dir == 1 ? v_ep * (1 + tp_pct_final/100) : v_ep * (1 - tp_pct_final/100)
+	v_sl := v_dir == 1 ? v_ep * (1 - sl_pct_final/100) : v_ep * (1 + sl_pct_final/100)
+
+	if show_tp_line
+		line.new(v_bar, v_tp, bar_index, v_tp, color=color.new(color.lime, 40), style=line.style_dotted, width=2)
+	if show_sl_line
+		line.new(v_bar, v_sl, bar_index, v_sl, color=color.new(color.red, 40), style=line.style_dotted, width=2)
+
+// ==========================================
+// 11. ИНФОРМАЦИОННАЯ ПАНЕЛЬ
+// ==========================================
+var table t = table.new(position.top_right, 3, 15, bgcolor=color.new(color.black,60), border_width=1)
+
+if barstate.islast
+	// Адаптивные значения
+	table.cell(t, 0, 0, "📊 АДАПТИВНЫЕ ЗНАЧЕНИЯ", text_color=color.white, text_size=size.small)
+	table.merge_cells(t, 0, 0, 2, 0)
+
+	table.cell(t, 0, 1, "ATR ratio", text_color=color.gray, text_size=size.small)
+	table.cell(t, 1, 1, str.tostring(atr_tp_ratio, "#.##"), text_color=color.yellow, text_size=size.small)
+	table.cell(t, 2, 1, str.tostring(atr_sl_ratio, "#.##"), text_color=color.yellow, text_size=size.small)
+
+	table.cell(t, 0, 2, "Базовый TP%", text_color=color.gray, text_size=size.small)
+	table.cell(t, 1, 2, str.tostring(tp_base_pct, "#.#"), text_color=color.white, text_size=size.small)
+
+	table.cell(t, 0, 3, "Адаптив TP%", text_color=color.new(color.lime,70), text_size=size.small)
+	table.cell(t, 1, 3, str.tostring(tp_adaptive_pct, "#.#"), text_color=color.lime, text_size=size.small)
+
+	table.cell(t, 0, 4, "Базовый SL%", text_color=color.gray, text_size=size.small)
+	table.cell(t, 1, 4, str.tostring(sl_base_pct, "#.#"), text_color=color.white, text_size=size.small)
+
+	table.cell(t, 0, 5, "Адаптив SL%", text_color=color.new(color.orange,70), text_size=size.small)
+	table.cell(t, 1, 5, str.tostring(sl_adaptive_pct, "#.#"), text_color=color.orange, text_size=size.small)
+
+	// Kelly Criterion
+	table.cell(t, 0, 7, "🎯 KELLY CRITERION", text_color=color.white, text_size=size.small)
+	table.merge_cells(t, 0, 7, 2, 7)
+
+	table.cell(t, 0, 8, "WR%", text_color=color.gray, text_size=size.small)
+	table.cell(t, 1, 8, str.tostring(kelly_win_rate, "#.#"), text_color=color.white, text_size=size.small)
+
+	table.cell(t, 0, 9, "B (W/L)", text_color=color.gray, text_size=size.small)
+	table.cell(t, 1, 9, str.tostring(kelly_avg_win / kelly_avg_loss, "#.##"), text_color=color.white, text_size=size.small)
+
+	table.cell(t, 0, 10, "Kelly %", text_color=color.new(color.cyan,70), text_size=size.small)
+	table.cell(t, 1, 10, str.tostring(kelly_pct, "#.#") + "%", text_color=color.cyan, text_size=size.small)
+
+	table.cell(t, 0, 12, "Статус", text_color=color.gray, text_size=size.small)
+	status_txt = v_in ? (v_dir == 1 ? "LONG" : "SHORT") : "ЖДЕТ"
+	status_col = v_in ? (v_dir == 1 ? color.green : color.red) : color.gray
+	table.cell(t, 1, 12, status_txt, text_color=status_col, text_size=size.small)
+
+// ==========================================
+// 12. ALERT CONDITIONS
+// ==========================================
+plotshape(sig_l, "▲ Long", shape.triangleup, location.belowbar, color.green, size=size.small)
+plotshape(sig_s, "▼ Short", shape.triangledown, location.abovebar, color.red, size=size.small)
+alertcondition(sig_l, "Entry Long", "Сигнал входа LONG")
+alertcondition(sig_s, "Entry Short", "Сигнал входа SHORT")
