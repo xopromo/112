@@ -1948,16 +1948,16 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
       <h3 style="margin:0;color:#c792ea" id="pine-modal-title">🌲 Pine Script v6 — генератор</h3>
       <button class="dp-close" onclick="closePineModal()" style="position:static">✕</button>
     </div>
-    <div style="flex-shrink:0;display:flex;gap:6px;margin-bottom:8px">
-      <button id="pine-tab-indicator" onclick="switchPineTab('indicator')" style="flex:1;padding:5px 8px;font-size:.72em;border-radius:4px;border:1px solid #c792ea;background:#c792ea;color:#000;cursor:pointer">📊 Индикатор</button>
-      <button id="pine-tab-strategy" onclick="switchPineTab('strategy')" style="flex:1;padding:5px 8px;font-size:.72em;border-radius:4px;border:1px solid var(--border);background:var(--bg2);color:var(--text2);cursor:pointer">⚡ Стратегия (strategy.exit)</button>
-    </div>
     <div style="flex-shrink:0;font-size:.65em;color:var(--text2);margin-bottom:8px" id="pine-desc">Готовый индикатор USE для TradingView</div>
     <textarea id="pine-code" readonly spellcheck="false"
       style="flex:1;min-height:420px;font-family:monospace;font-size:.7em;background:#0d1117;color:#a9b1d6;
              border:1px solid var(--border);border-radius:6px;padding:10px;resize:vertical;
              white-space:pre;overflow:auto;tab-size:4"></textarea>
-    <div style="flex-shrink:0;display:flex;gap:8px;margin-top:10px">
+    <div style="flex-shrink:0;display:flex;gap:6px;margin-top:10px">
+      <button id="pine-tab-indicator" onclick="switchPineTab('indicator')" style="flex:1;padding:5px 8px;font-size:.72em;border-radius:4px;border:1px solid #c792ea;background:#c792ea;color:#000;cursor:pointer">📊 Индикатор</button>
+      <button id="pine-tab-strategy" onclick="switchPineTab('strategy')" style="flex:1;padding:5px 8px;font-size:.72em;border-radius:4px;border:1px solid var(--border);background:var(--bg2);color:var(--text2);cursor:pointer">⚡ Стратегия (strategy.exit)</button>
+    </div>
+    <div style="flex-shrink:0;display:flex;gap:8px;margin-top:6px">
       <button class="tpl-btn2" onclick="copyPineCode()" style="flex:1;padding:8px">📋 Скопировать код</button>
       <button class="tpl-btn2" onclick="downloadPineCode()" style="flex:1;padding:8px;border-color:var(--green);color:var(--green)">⬇ Скачать .pine</button>
     </div>
