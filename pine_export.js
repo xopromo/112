@@ -255,6 +255,26 @@ function generatePineScript(r, mode = 'indicator') {
   lines.push(`use_st_exit = input.bool(${b(c.useStExit)}, "Supertrend-выход (смена тренда против позиции)", group=grp_exit)`);
   lines.push(``);
 
+  // ===== АДАПТИВНЫЕ TP/SL И KELLY CRITERION =====
+  lines.push(`grp_adapt = "⚡ АДАПТИВНЫЕ TP/SL (ATR-зависимые)"`);
+  lines.push(`use_adaptive = input.bool(false, "Включить адаптивный режим", group=grp_adapt)`);
+  lines.push(`use_adaptive_tp = input.bool(false, "Адаптивный TP (зависит от ATR)", group=grp_adapt, active=use_adaptive)`);
+  lines.push(`tp_atr_len  = input.int(20, "Период ATR для TP", minval=5, maxval=100, group=grp_adapt, active=use_adaptive_tp)`);
+  lines.push(`tp_atr_mult = input.float(1.0, "Множитель ATR→TP", step=0.1, tooltip="Как сильно TP реагирует на рост ATR", group=grp_adapt, active=use_adaptive_tp)`);
+  lines.push(`use_adaptive_sl = input.bool(false, "Адаптивный SL (зависит от ATR)", group=grp_adapt, active=use_adaptive)`);
+  lines.push(`sl_atr_len  = input.int(20, "Период ATR для SL", minval=5, maxval=100, group=grp_adapt, active=use_adaptive_sl)`);
+  lines.push(`sl_atr_mult = input.float(0.5, "Множитель ATR→SL", step=0.1, tooltip="Как SL реагирует на ATR", group=grp_adapt, active=use_adaptive_sl)`);
+  lines.push(``);
+
+  lines.push(`grp_kelly = "🎯 KELLY CRITERION (размер позиции)"`);
+  lines.push(`use_kelly = input.bool(false, "Включить Kelly Criterion", group=grp_kelly)`);
+  lines.push(`kelly_win_rate = input.float(60.0, "WR% (для расчёта)", minval=40, maxval=90, step=1, group=grp_kelly, active=use_kelly, tooltip="Ожидаемый Win Rate стратегии")`);
+  lines.push(`kelly_avg_win = input.float(${f(tpPctVal,1)}, "Средний выигрыш %", minval=0.5, maxval=50, step=0.5, group=grp_kelly, active=use_kelly)`);
+  lines.push(`kelly_avg_loss = input.float(${f(slPctVal,1)}, "Средний убыток %", minval=0.5, maxval=50, step=0.5, group=grp_kelly, active=use_kelly)`);
+  lines.push(`kelly_safety = input.string("Kelly/2 (рекомендовано)", "Коэффициент безопасности", options=["Kelly (опасно)", "Kelly/2 (рекомендовано)", "Kelly/4 (консервативно)"], group=grp_kelly, active=use_kelly)`);
+  lines.push(`kelly_max_cap = input.float(25.0, "Максимум % на сделку", minval=5, maxval=50, step=1, group=grp_kelly, active=use_kelly)`);
+  lines.push(``);
+
   // Delayed entry
   lines.push(`grp_wait = "⏳ ОТЛОЖЕННЫЙ ВХОД"`);
   lines.push(`use_wait    = input.bool(${b(c.waitBars > 0 || c.waitRetrace)}, "Ждать отката", group=grp_wait)`);
@@ -379,6 +399,30 @@ function generatePineScript(r, mode = 'indicator') {
   lines.push(`bool struct_bear = struct_has_2hi and struct_has_2lo and struct_hi1 < struct_hi2 and struct_lo1 < struct_lo2`);
   lines.push(`bool struct_ok_l = not use_struct or struct_bull`);
   lines.push(`bool struct_ok_s = not use_struct or struct_bear`);
+  lines.push(``);
+  lines.push(`// ===== АДАПТИВНЫЕ TP/SL =====`);
+  lines.push(`float atr_tp = use_adaptive_tp ? ta.atr(tp_atr_len) : na`);
+  lines.push(`float atr_sl = use_adaptive_sl ? ta.atr(sl_atr_len) : na`);
+  lines.push(`float atr_tp_avg = use_adaptive_tp ? ta.sma(atr_tp, tp_atr_len * 2) : na`);
+  lines.push(`float atr_sl_avg = use_adaptive_sl ? ta.sma(atr_sl, sl_atr_len * 2) : na`);
+  lines.push(`float atr_tp_ratio = use_adaptive_tp and atr_tp_avg > 0 ? atr_tp / atr_tp_avg : 1.0`);
+  lines.push(`float atr_sl_ratio = use_adaptive_sl and atr_sl_avg > 0 ? atr_sl / atr_sl_avg : 1.0`);
+  lines.push(`float tp_adaptive_mult = use_adaptive_tp ? (0.5 + 0.5 * math.sqrt(atr_tp_ratio)) : 1.0`);
+  lines.push(`float sl_adaptive_mult = use_adaptive_sl ? (1.0 - sl_atr_mult * 0.5 + sl_atr_mult * 0.5 * math.sqrt(atr_sl_ratio)) : 1.0`);
+  lines.push(``);
+  lines.push(`// ===== KELLY CRITERION =====`);
+  lines.push(`float kelly_pct = na`);
+  lines.push(`if use_kelly`);
+  lines.push(`    float p = kelly_win_rate / 100`);
+  lines.push(`    float q = 1 - p`);
+  lines.push(`    float b = kelly_avg_win / kelly_avg_loss`);
+  lines.push(`    float f_star = (b * p - q) / b`);
+  lines.push(`    float f_safe = f_star`);
+  lines.push(`    if kelly_safety == "Kelly/2 (рекомендовано)"`);
+  lines.push(`        f_safe := f_star / 2`);
+  lines.push(`    else if kelly_safety == "Kelly/4 (консервативно)"`);
+  lines.push(`        f_safe := f_star / 4`);
+  lines.push(`    kelly_pct := math.min(math.max(f_safe * 100, 0), kelly_max_cap)`);
   lines.push(``);
   lines.push(`// MA helpers`);
   lines.push(`f_dema(s, l) =>`);
