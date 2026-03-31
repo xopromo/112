@@ -1198,6 +1198,25 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
     <div class="logic-btn" id="tp_and" onclick="setLogic('tp','and')" data-tip="Выход только после того как ОБА TP пробиты — для лестничной фиксации">И (дальний)</div>
   </div>
   <div class="hint">И = выход только когда ОБА TP пробиты</div>
+
+  <div class="sep"></div>
+  <h3>📈 Адаптивные TP/SL (по ATR)</h3>
+  <div class="cb"><input type="checkbox" id="x_adaptive_tp"><label data-tip="Адаптивный TP: множитель зависит от текущей волатильности (ATR). Расширяет TP на волатильных рынках">Адаптивный TP</label></div>
+  <div class="g2">
+    <div class="field"><label>Период ATR</label><input id="x_tp_atr_len" value="20" data-tip="Количество баров для расчёта среднего ATR (для сравнения с текущим)"></div>
+    <div class="field"><label>Множитель волатильности</label><input id="x_tp_atr_mult" value="1.0" data-tip="Как сильно TP реагирует на изменение ATR. 1.0 = стандартная чувствительность"></div>
+  </div>
+
+  <div class="sep"></div>
+  <div class="cb"><input type="checkbox" id="x_adaptive_sl"><label data-tip="Адаптивный SL: множитель зависит от текущей волатильности. Сужает SL на волатильных рынках для защиты">Адаптивный SL</label></div>
+  <div class="g2">
+    <div class="field"><label>Период ATR</label><input id="x_sl_atr_len" value="20" data-tip="Количество баров для расчёта среднего ATR"></div>
+    <div class="field"><label>Множитель реакции</label><input id="x_sl_atr_mult" value="0.5" data-tip="Чувствительность SL к изменению ATR. 0.5 = умеренная, 1.0 = высокая"></div>
+  </div>
+
+  <div class="sep"></div>
+  <div class="cb"><input type="checkbox" id="x_dynsl"><label data-tip="Dynamic SL: сужает SL когда рыночная структура нарушена (нет HH или LL). Защита от ложных пробоев">Dynamic SL (по структуре)</label></div>
+  <div class="field"><label>Коэффициент сжатия</label><input id="x_dynsl_m" value="0.3" data-tip="0.3 = при нарушении структуры SL становится в 0.3 раза меньше от первоначального расстояния до входа"></div>
 </div>
 
 <!-- EXIT MECHANICS -->
@@ -15334,6 +15353,49 @@ function calcWeightedTrend(maArr, atrArr, period, volW, bodyW, distW, useDistMA)
 }
 
 // ============================================================
+// Расчет адаптивных множителей TP/SL на основе ATR
+function _calcAdaptiveMultipliers(atrArr, i, cfg) {
+  let tpAdaptMult = 1.0, slAdaptMult = 1.0;
+
+  // Адаптивный TP: зависит от текущего ATR vs среднего ATR
+  if (cfg.useAdaptiveTP && cfg.tpAtrLen > 0) {
+    // SMA от ATR за период * 2 (как в Pine: ta.sma(atr_tp, tp_atr_len * 2))
+    const avgLen = Math.min(cfg.tpAtrLen * 2, i);
+    let atrSum = 0;
+    for (let k = 0; k < avgLen; k++) {
+      atrSum += atrArr[i - 1 - k];
+    }
+    const atrAvg = atrSum / avgLen;
+    const atrCurr = atrArr[i - 1];
+    if (atrAvg > 0) {
+      const atrRatio = atrCurr / atrAvg;
+      // TP формула: 0.5 + 0.5 * sqrt(ratio)
+      tpAdaptMult = 0.5 + 0.5 * Math.sqrt(atrRatio);
+    }
+  }
+
+  // Адаптивный SL: зависит от ATR мультипликатора
+  if (cfg.useAdaptiveSL && cfg.slAtrLen > 0) {
+    // SMA от ATR за период * 2 (как в Pine: ta.sma(atr_sl, sl_atr_len * 2))
+    const avgLen = Math.min(cfg.slAtrLen * 2, i);
+    let atrSum = 0;
+    for (let k = 0; k < avgLen; k++) {
+      atrSum += atrArr[i - 1 - k];
+    }
+    const atrAvg = atrSum / avgLen;
+    const atrCurr = atrArr[i - 1];
+    if (atrAvg > 0) {
+      const atrRatio = atrCurr / atrAvg;
+      // SL формула: 1.0 - mult*0.5 + mult*0.5*sqrt(ratio)
+      const m = cfg.slAtrMult || 0.5;
+      slAdaptMult = 1.0 - m * 0.5 + m * 0.5 * Math.sqrt(atrRatio);
+    }
+  }
+
+  return { tpAdaptMult, slAdaptMult };
+}
+
+// ============================================================
 // BACKTEST ENGINE
 // ============================================================
 function backtest(pvLo, pvHi, atrArr, cfg) {
@@ -15733,6 +15795,19 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
         } else if (slCandidates.length===1) { sl1=slCandidates[0]; hasSL2=false; }
         else { sl1 = NaN; hasSL2=false; } // noSL: no exit, matches Pine na
 
+        // Apply adaptive SL multiplier (зависит от волатильности)
+        if (cfg.useAdaptiveSL && !isNaN(sl1)) {
+          const { slAdaptMult } = _calcAdaptiveMultipliers(atrArr, i, cfg);
+          const slDist = Math.abs(entry - sl1);
+          const newSlDist = slDist * slAdaptMult;
+          sl1 = dir === 1 ? entry - newSlDist : entry + newSlDist;
+          if (hasSL2) {
+            const sl2Dist = Math.abs(entry - sl2);
+            const newSl2Dist = sl2Dist * slAdaptMult;
+            sl2 = dir === 1 ? entry - newSl2Dist : entry + newSl2Dist;
+          }
+        }
+
         // Dynamic SL by structure break: if structure broken, tighten SL
         if (cfg.useDynSLStruct && !isNaN(sl1) && cfg.structBull && cfg.structBear) {
           const structOk = cfg.structBull[i] || cfg.structBear[i];
@@ -15750,6 +15825,21 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
         let tpA = NaN, tpB = NaN;
         if (cfg.hasTPA) tpA = _calcTP(entry, dir, slDist, ac, cfg.tpMode,  cfg.tpMult);
         if (cfg.hasTPB) tpB = _calcTP(entry, dir, slDist, ac, cfg.tpModeB, cfg.tpMultB);
+
+        // Apply adaptive TP multiplier (зависит от волатильности)
+        if (cfg.useAdaptiveTP && (cfg.hasTPA || cfg.hasTPB)) {
+          const { tpAdaptMult } = _calcAdaptiveMultipliers(atrArr, i, cfg);
+          if (!isNaN(tpA)) {
+            const tpDist = Math.abs(tpA - entry);
+            const newTpDist = tpDist * tpAdaptMult;
+            tpA = dir === 1 ? entry + newTpDist : entry - newTpDist;
+          }
+          if (!isNaN(tpB)) {
+            const tpDist = Math.abs(tpB - entry);
+            const newTpDist = tpDist * tpAdaptMult;
+            tpB = dir === 1 ? entry + newTpDist : entry - newTpDist;
+          }
+        }
 
         if (!isNaN(tpA) && !isNaN(tpB)) {
           const distA=Math.abs(tpA-entry), distB=Math.abs(tpB-entry);
@@ -19577,6 +19667,14 @@ function buildBtCfg(cfg, ind) {
     tpModeB:   tpPair.b ? tpPair.b.type : 'rr',
     tpLogic,
 
+    // ── Адаптивные TP/SL (по волатильности ATR) ───────────────
+    useAdaptiveTP:  cfg.useAdaptiveTP  || false,
+    tpAtrLen:       cfg.tpAtrLen       || 20,
+    tpAtrMult:      cfg.tpAtrMult      || 1.0,
+    useAdaptiveSL:  cfg.useAdaptiveSL  || false,
+    slAtrLen:       cfg.slAtrLen       || 20,
+    slAtrMult:      cfg.slAtrMult      || 0.5,
+
     // ── Exits ─────────────────────────────────────────────────
     useBE:    cfg.useBE    || false,
     beTrig:   cfg.beTrig   || 1,
@@ -21010,6 +21108,15 @@ const CFG_HTML_MAP = {
   slPivMax:       {id:'s_pivmax',        type:'val'},
   slPivL:         {id:'s_pivl',          type:'val'},
   slPivR:         {id:'s_pivr',          type:'val'},
+  // ── Адаптивные TP/SL (по волатильности) ────────────────────────────────────
+  useAdaptiveTP:  {id:'x_adaptive_tp',   type:'chk'},
+  tpAtrLen:       {id:'x_tp_atr_len',    type:'val'},
+  tpAtrMult:      {id:'x_tp_atr_mult',   type:'val'},
+  useAdaptiveSL:  {id:'x_adaptive_sl',   type:'chk'},
+  slAtrLen:       {id:'x_sl_atr_len',    type:'val'},
+  slAtrMult:      {id:'x_sl_atr_mult',   type:'val'},
+  useDynSLStruct: {id:'x_dynsl',         type:'chk'},
+  dynSLStructMult:{id:'x_dynsl_m',       type:'val'},
   // ── Механики выхода ────────────────────────────────────────────────────────
   useBE:          {id:'x_be',            type:'chk'},
   beTrig:         {id:'x_bet',           type:'val'},
@@ -30693,7 +30800,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774991079225;
+window._BUILD_TS = 1774991672330;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;

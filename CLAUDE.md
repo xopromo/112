@@ -82,25 +82,26 @@ git push -u origin claude/ваша-ветка
 - `_runOOS` (991) — OOS прогон
 - `_attachOOS` (1006) — IS/OOS split
 - `buildBtCfg` (3736) — сборка cfg для бэктеста
-- `runMassRobust` (3984) — массовый тест устойчивости
-- `HC_NUMERIC_PARAMS` (4304) — список параметров HC
+- `runMassRobust` (3992) — массовый тест устойчивости
+- `HC_NUMERIC_PARAMS` (4312) — список параметров HC
 
 **ui.js**:
 - `showDetail` (1263) — standard detail панель
 - `switchTableMode` (447) — HC/Fav/Results
 - `applyFilters` (844) — применение фильтров таблицы
 - `resetAllFilters` (828) — сброс фильтров
-- `runOOSScan` (5286) — OOS сканирование
-- `openHCModal` (5603) — открыть HC окно
-- `_hcRunBacktest` (5906) — HC бэктест с кэшем
-- `_hcNeighbours` (6093) — поиск соседей HC
-- `runHillClimbing` (6224) — главный HC цикл
-- `_hcOpenDetail` (6991) — HC detail панель
-- `openOOSDiagnostic` (7562) — запуск OOS диагностики
-- `showOOSTradeDiag` (10149) — UI диагностики расхождений
+- `runOOSScan` (5295) — OOS сканирование
+- `openHCModal` (5612) — открыть HC окно
+- `_hcRunBacktest` (5915) — HC бэктест с кэшем
+- `_hcNeighbours` (6102) — поиск соседей HC
+- `runHillClimbing` (6233) — главный HC цикл
+- `_hcOpenDetail` (7000) — HC detail панель
+- `openOOSDiagnostic` (7571) — запуск OOS диагностики
+- `showOOSTradeDiag` (10158) — UI диагностики расхождений
 
 **core.js**:
-- `backtest` (521) — основной бэктест (принимает pvLo,pvHi,atrArr,cfg)
+- `_calcAdaptiveMultipliers` (520) — расчет адаптивных множителей TP/SL
+- `backtest` (564) — основной бэктест (принимает pvLo,pvHi,atrArr,cfg)
 - `calcHTFADX` (231) — ADX на HTF через группировку баров
 
 **pine_export.js**:
