@@ -7704,7 +7704,7 @@ function drawOOSChart(idx, rowEl) {
   ctx.fillText(nameShort, pad, H - 4);
 
   // Сохраняем параметры графика для mouse tracking
-  window._oosChartParams = { combined, mn, range, pad, W, H, splitFrac, splitIdx };
+  window._oosChartParams = { combined, mn, range, pad, W, H, splitFrac, splitIdx, dpr };
 
   // Добавляем mouse tracking к OOS crosshair canvas (уже отрисован в overlayе)
   const oosCharts = document.getElementById('oos-crosshair');
@@ -7726,17 +7726,14 @@ function _drawOOSCrosshair(e) {
   const ch = e.target; // сам crosshair canvas
   if (!ch) return;
 
-  const canvas = document.getElementById('oos-eqc');
-  if (!canvas) return;
+  const { combined, mn, range, pad, W, H, dpr: _dpr } = p;
+  const dpr = _dpr || window.devicePixelRatio || 1;
 
   const rect = ch.getBoundingClientRect();
-  const scaleX = canvas.width / rect.width;
-  const scaleY = canvas.height / rect.height;
 
-  const cx = (e.clientX - rect.left) * scaleX / 2;
-  const cy = (e.clientY - rect.top) * scaleY / 2;
-
-  const { combined, mn, range, pad, W, H } = p;
+  // cx/cy в CSS-пикселях = координатное пространство графика (W=offsetWidth, H=offsetHeight)
+  const cx = (e.clientX - rect.left) * (W / rect.width);
+  const cy = (e.clientY - rect.top)  * (H / rect.height);
 
   if (cx < pad || cx > W - pad || cy < pad || cy > H - pad) {
     ch.getContext('2d').clearRect(0, 0, ch.width, ch.height);
@@ -7754,7 +7751,7 @@ function _drawOOSCrosshair(e) {
   const ctx = ch.getContext('2d');
   ctx.clearRect(0, 0, ch.width, ch.height);
   ctx.save();
-  ctx.scale(2, 2);
+  ctx.scale(dpr, dpr);
 
   // Вертикальная линия
   ctx.strokeStyle = 'rgba(255,255,255,0.35)';
