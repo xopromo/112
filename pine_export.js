@@ -1253,7 +1253,8 @@ function generatePineScript(r, mode = 'indicator') {
     lines.push(`var line l_tp = na`);
     lines.push(`var line l_sl = na`);
     lines.push(`var int v_eb = -1`);
-    lines.push(`var int v_xb = -1`);
+    lines.push(`var int v_xb = -1`)
+    lines.push(`var bool v_ib_hit = false`);
     // Pending entry state (vectorized)
     lines.push(`var int v_pd = 0`)
     lines.push(`var int v_pb = -1`)
@@ -1288,6 +1289,14 @@ function generatePineScript(r, mode = 'indicator') {
   lines.push(`            alert(bot_fmt == "json" ? _ib_msg_json_l : _ib_msg_txt_l, alert.freq_once_per_bar)`);
   lines.push(`        else`);
   lines.push(`            alert(bot_fmt == "json" ? _ib_msg_json_s : _ib_msg_txt_s, alert.freq_once_per_bar)`);
+  lines.push(`        // Close trade immediately on TP/SL touch (intrabar)`);
+  lines.push(`        line.delete(l_tp)`);
+  lines.push(`        line.delete(l_sl)`);
+  lines.push(`        l_tp := na`);
+  lines.push(`        l_sl := na`);
+  lines.push(`        v_in    := false`);
+  lines.push(`        v_xb    := bar_index`);
+  lines.push(`        v_ib_hit := true`);
   lines.push(``);
   lines.push(`if bar_index > (last_bar_index - max_bars) and confirmed`);
   lines.push(`    if v_in and bar_index > v_eb`);
@@ -1458,7 +1467,26 @@ function generatePineScript(r, mode = 'indicator') {
     lines.push(`            v_xb := bar_index`);
     lines.push(`            v_sig_skip := 0`);
     lines.push(`            v_cd_bar := -1`);
-  lines.push(`        if v_in and not htr and use_be and not v_bea and be_offset < be_trig`);
+  lines.push(`    // Draw exit label when trade was closed intrabar (TP/SL touched before bar close)`);
+  lines.push(`    if v_ib_hit`);
+  lines.push(`        bool _was_tp = v_dir == 1 ? (high >= v_tp) : (low <= v_tp)`);
+  lines.push(`        float _ib_xp2 = _was_tp ? v_tp : v_sl`);
+  lines.push(`        string _ib_xt2 = _was_tp ? "TP" : "SL"`);
+  lines.push(`        float _vpct2 = v_dir == 1 ? (_ib_xp2 - v_ep)/v_ep*100 : (v_ep - _ib_xp2)/v_ep*100`);
+  lines.push(`        bool _win2 = _vpct2 > 0`);
+  lines.push(`        if show_tr`);
+  lines.push(`            label.new(`);
+  lines.push(`                bar_index,`);
+  lines.push(`                v_dir == 1 ? _ib_xp2 + atr_v[1] * lbl_off_m : _ib_xp2 - atr_v[1] * lbl_off_m,`);
+  lines.push(`                _ib_xt2 + " " + str.tostring(_vpct2, "#.#") + "%",`);
+  lines.push(`                color=_win2 ? color.green : color.red,`);
+  lines.push(`                style=v_dir == 1 ? label.style_label_down : label.style_label_up,`);
+  lines.push(`                size=size.tiny,`);
+  lines.push(`                textcolor=color.white)`);
+  lines.push(`        v_ib_hit := false`);
+  lines.push(`        v_sig_skip := 0`);
+  lines.push(`        v_cd_bar := -1`);
+  lines.push(`    if v_in and not htr and use_be and not v_bea and be_offset < be_trig`);
   lines.push(`            if (v_dir == 1 and high >= v_ep + _u * be_trig) or (v_dir == -1 and low <= v_ep - _u * be_trig)`);
     lines.push(`                float v_be_sl = v_ep + v_dir * _u * be_offset`);
     lines.push(`                v_sl := v_dir == 1 ? math.max(v_sl, v_be_sl) : math.min(v_sl, v_be_sl)`);
