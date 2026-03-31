@@ -27475,6 +27475,19 @@ function _renderOOSSummary() {
     (newInfo ? ` | Новые данные: ${newInfo}` : '');
 }
 
+// Вспомогательная функция: maxDrawdown из массива equity
+// (используется для чистых метрик нового периода в OOS)
+function _calcDDFromEq(eq) {
+  if (!eq || eq.length === 0) return 0;
+  let peak = eq[0], dd = 0;
+  for (const v of eq) {
+    if (v > peak) peak = v;
+    const cur = peak - v;
+    if (cur > dd) dd = cur;
+  }
+  return dd;
+}
+
 // Запуск OOS-сравнения на выбранной выборке
 async function runOOSOnNewData() {
   if (!NEW_DATA || NEW_DATA.length < 10) { alert('Сначала загрузите новые данные'); return; }
@@ -27496,6 +27509,22 @@ async function runOOSOnNewData() {
 
   if (!srcList || srcList.length === 0) { alert('Нет результатов для сравнения'); return; }
 
+  // Вычисляем overlapIdx один раз: первый бар NEW_DATA строго после конца DATA.
+  // Бары до overlapIdx — пересечение с историей, их исключаем из метрик нового периода.
+  // Если пересечения нет (NEW_DATA начинается после DATA) — overlapIdx = 0, поведение не меняется.
+  let _overlapIdx = 0;
+  if (DATA.length > 0 && NEW_DATA.length > 0) {
+    const _lastOldT = DATA[DATA.length - 1].t;
+    if (_lastOldT) {
+      for (let _k = 0; _k < NEW_DATA.length; _k++) {
+        if (NEW_DATA[_k].t && NEW_DATA[_k].t > _lastOldT) {
+          _overlapIdx = _k;
+          break;
+        }
+      }
+    }
+  }
+
   const progressEl = document.getElementById('oos-new-progress');
   const btnEl = document.getElementById('btn-oos-new');
   if (btnEl) btnEl.disabled = true;
@@ -27508,7 +27537,7 @@ async function runOOSOnNewData() {
     if (i % 5 === 0) await yieldToUI();
 
     const origDATA = DATA;
-    let rOld = null, rNew = null;
+    let rOld = null, rNew = null, _newTradeLog = [];
 
     // Пересчитываем ПОЛНЫЙ результат на исходных 100% данных (не IS часть)
     try {
@@ -27516,12 +27545,38 @@ async function runOOSOnNewData() {
       rOld = _hcRunBacktest(r.cfg);
     } catch(e) { }
 
-    // Для new результата пересчитываем на новых данных
+    // Для new результата: прямой запуск с tradeLog на полном NEW_DATA.
+    // Полный датасет нужен для прогрева индикаторов (MA, ATR, Pivot).
+    // Чистые метрики без пересечения вычисляются ниже через _overlapIdx.
     try {
       DATA = NEW_DATA;
-      rNew = _hcRunBacktest(r.cfg);
+      const _ind    = _calcIndicators(r.cfg);
+      const _btCfg  = buildBtCfg(r.cfg, _ind);
+      _btCfg.tradeLog = [];
+      rNew = backtest(_ind.pvLo, _ind.pvHi, _ind.atrArr, _btCfg);
+      _newTradeLog = _btCfg.tradeLog || [];
     } catch(e) { }
     DATA = origDATA;
+
+    // Чистые метрики нового периода: только бары/сделки после overlapIdx
+    let new_pnl = null, new_wr = null, new_n = null;
+    let new_dd = null, new_pdd = null, new_kRatio = null;
+    if (rNew && rNew.eq && rNew.eq.length > 0) {
+      const _eq  = rNew.eq;
+      const _oi  = Math.min(_overlapIdx, _eq.length - 1);
+      const _eqS = _eq.slice(_oi);                         // equity только нового периода
+
+      const _cleanT = _newTradeLog.filter(
+        t => t.entryBar != null && t.entryBar >= _oi && t.exitBar != null
+      );
+
+      new_pnl    = _eq[_eq.length - 1] - (_eq[_oi] || 0);
+      new_dd     = _calcDDFromEq(_eqS);
+      new_pdd    = new_dd > 0 ? new_pnl / new_dd : null;
+      new_n      = _cleanT.length;
+      new_wr     = new_n > 0 ? _cleanT.filter(t => t.pnl > 0).length / new_n * 100 : null;
+      new_kRatio = _calcKRatio(_eqS);
+    }
 
     _oosTableResults.push({
       name:      r.name,
@@ -27536,28 +27591,31 @@ async function runOOSOnNewData() {
       dwr:       rOld ? rOld.dwr : null,
       p1:        rOld ? rOld.p1  : 0,
       p2:        rOld ? rOld.p2  : 0,
-      // OOS-специфичные поля
-      old_pnl:   rOld ? rOld.pnl : null,
-      old_wr:    rOld ? rOld.wr  : null,
-      old_n:     rOld ? rOld.n   : null,
-      old_dd:    rOld ? rOld.dd  : null,
-      old_pdd:   rOld && rOld.dd > 0 ? rOld.pnl / rOld.dd : null,
+      // OOS-специфичные поля — история
+      old_pnl:    rOld ? rOld.pnl : null,
+      old_wr:     rOld ? rOld.wr  : null,
+      old_n:      rOld ? rOld.n   : null,
+      old_dd:     rOld ? rOld.dd  : null,
+      old_pdd:    rOld && rOld.dd > 0 ? rOld.pnl / rOld.dd : null,
       old_kRatio: rOld && rOld.eq ? _calcKRatio(rOld.eq) : null,
-      new_pnl:   rNew ? rNew.pnl : null,
-      new_wr:    rNew ? rNew.wr  : null,
-      new_n:     rNew ? rNew.n   : null,
-      new_dd:    rNew ? rNew.dd  : null,
-      new_pdd:   rNew && rNew.dd > 0 ? rNew.pnl / rNew.dd : null,
-      new_kRatio: rNew && rNew.eq ? _calcKRatio(rNew.eq) : null,
-      delta_pnl: (rOld && rNew) ? rNew.pnl - rOld.pnl : null,
-      delta_wr:  (rOld && rNew) ? rNew.wr  - rOld.wr  : null,
-      delta_dd:  (rOld && rNew) ? rNew.dd - rOld.dd : null,
-      delta_pdd: (rOld && rOld.dd > 0 && rNew && rNew.dd > 0) ? (rNew.pnl / rNew.dd) - (rOld.pnl / rOld.dd) : null,
-      delta_kRatio: (rOld && rOld.eq && rNew && rNew.eq) ? (_calcKRatio(rNew.eq) ?? 0) - (_calcKRatio(rOld.eq) ?? 0) : null,
+      // OOS-специфичные поля — новый период (чистые, без пересечения)
+      new_pnl,
+      new_wr,
+      new_n,
+      new_dd,
+      new_pdd,
+      new_kRatio,
+      // Дельты из чистых значений
+      delta_pnl:    (rOld && new_pnl != null) ? new_pnl    - rOld.pnl : null,
+      delta_wr:     (rOld && new_wr  != null) ? new_wr     - rOld.wr  : null,
+      delta_dd:     (rOld && new_dd  != null) ? new_dd     - rOld.dd  : null,
+      delta_pdd:    (rOld && rOld.dd > 0 && new_pdd != null) ? new_pdd - (rOld.pnl / rOld.dd) : null,
+      delta_kRatio: (rOld && rOld.eq && new_kRatio != null) ? new_kRatio - (_calcKRatio(rOld.eq) ?? 0) : null,
       old_bars:  DATA ? DATA.length : null,
       new_bars:  NEW_DATA ? NEW_DATA.length : null,
-      old_eq:    rOld ? rOld.eq  : null,   // equity curve на истории
-      new_eq:    rNew ? rNew.eq  : null,   // equity curve на новых данных
+      _overlapBars: _overlapIdx,               // для отладки: сколько баров пересечения
+      old_eq:    rOld ? rOld.eq  : null,       // equity curve на истории
+      new_eq:    rNew ? rNew.eq  : null,       // equity curve на новых данных (полная, график обрезает сам)
     });
   }
 
@@ -30424,7 +30482,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774972621385;
+window._BUILD_TS = 1774976703652;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
