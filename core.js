@@ -263,7 +263,7 @@ function calcHTFADX(data, htfRatio, period) {
     const htfADX = _rmaFromFirstNonZero(Array.from(dx), period);
     const aligned = new Float64Array(N);
     for (let i = 0; i < N; i++) {
-      const last = Math.floor((i+1)/htfRatio)-1;
+      const last = Math.floor(i/htfRatio)-1;
       aligned[i] = last >= 0 ? htfADX[last] : 0;
     }
     const shifted = new Float64Array(N);
