@@ -1,0 +1,334 @@
+//@version=6
+// ============================================================
+// USE Strategy Engine — экспорт из оптимизатора
+// Конфиг: Free ATR17 SL9% TP3% [Struct65(L5R5)|ConfSMA150×9tf|VolDir5|MACDf]
+// PnL: 103.6%  WR: 85.6%  Сделок: 97  DD: 19.2%
+// ============================================================
+indicator("USE [Free ATR17 SL9% TP3% [Struct65(L5R5)|ConfSMA150×9tf|VolDir5|MACDf]]", shorttitle="USE_EXP", overlay=true, max_lines_count=500, max_labels_count=500, max_boxes_count=500)
+
+// ==========================================
+// 1. ВХОДНЫЕ ДАННЫЕ
+// ==========================================
+grp_entry = "🎯 ПАТТЕРНЫ ВХОДА"
+use_pivot    = input.bool(false,   "Pivot Points",       group=grp_entry)
+pivot_left   = input.int(5,  "Pivot — баров слева",  minval=1, maxval=20,  group=grp_entry, active=use_pivot)
+pivot_right  = input.int(2,  "Pivot — баров справа", minval=1, maxval=10,  group=grp_entry, active=use_pivot)
+use_engulf   = input.bool(false, "Engulfing",          group=grp_entry)
+use_pinbar   = input.bool(false, "Pin Bar",            group=grp_entry)
+pin_ratio    = input.float(2.0, "Pin Bar тень/тело",  step=0.5, group=grp_entry, active=use_pinbar)
+use_boll     = input.bool(false,   "Пробой Боллинджера", group=grp_entry)
+boll_len     = input.int(5, "Боллинджер период",  minval=5, maxval=200, group=grp_entry, active=use_boll)
+boll_mult    = input.float(1.5, "Боллинджер σ",       step=0.1, group=grp_entry, active=use_boll)
+use_donch    = input.bool(false,  "Пробой Дончиана",    group=grp_entry)
+donch_len    = input.int(5, "Дончиан период",     minval=5, maxval=200, group=grp_entry, active=use_donch)
+use_atr_bo   = input.bool(false,  "Пробой ATR-канала",  group=grp_entry)
+atr_bo_len   = input.int(5, "ATR-канал EMA",      minval=5, maxval=200, group=grp_entry, active=use_atr_bo)
+atr_bo_mult  = input.float(2.0, "ATR-канал множитель", step=0.1, group=grp_entry, active=use_atr_bo)
+use_ma_touch  = input.bool(false, "Касание MA", group=grp_entry)
+mat_type      = input.string("WMA", "  Тип MA касания", options=["SMA","EMA","WMA","HMA","DEMA","TEMA","Kalman"], group=grp_entry, active=use_ma_touch)
+mat_len       = input.int(20, "  Период MA касания", minval=1, maxval=500, group=grp_entry, active=use_ma_touch)
+mat_zone_pct  = input.float(0.2, "  Зона %", step=0.05, minval=0, group=grp_entry, active=use_ma_touch)
+use_squeeze   = input.bool(false, "Squeeze (BB+Keltner)", group=grp_entry)
+sqz_bb_len    = input.int(20, "  Squeeze BB период", minval=5, maxval=200, group=grp_entry, active=use_squeeze)
+sqz_kc_mult   = input.float(1.5, "  KC множитель", step=0.1, group=grp_entry, active=use_squeeze)
+sqz_min_bars  = input.int(1, "  Мин баров в сжатии", minval=1, maxval=20, group=grp_entry, active=use_squeeze)
+use_tl_touch = input.bool(false, "Касание TL (линия)", group=grp_entry)
+use_tl_break = input.bool(false, "Пробой TL (линия)",  group=grp_entry)
+use_flag     = input.bool(false,    "Флаг",               group=grp_entry)
+use_tri      = input.bool(false,     "Треугольник",        group=grp_entry)
+tl_pv_l      = input.int(5,  "TL Pivot Left",  minval=2, maxval=20, group=grp_entry)
+tl_pv_r      = input.int(3,  "TL Pivot Right", minval=1, maxval=10, group=grp_entry)
+tl_zone_pct  = input.float(0.3, "TL Зона ±%",      step=0.1,  group=grp_entry)
+flag_imp_atr = input.float(2.0, "Флаг Импульс ×ATR", step=0.5, group=grp_entry)
+flag_max_b   = input.int(20, "Флаг Макс баров",   minval=5, maxval=50, group=grp_entry)
+flag_ret     = input.float(0.618, "Флаг Откат",  step=0.01, group=grp_entry)
+use_rsi_exit  = input.bool(false, "RSI выход из зоны", group=grp_entry)
+rsi_exit_per  = input.int(14, "  RSI период", minval=2, maxval=50, group=grp_entry)
+rsi_exit_os   = input.int(30, "  RSI OS уровень", minval=5, maxval=49, group=grp_entry)
+rsi_exit_ob   = input.int(70, "  RSI OB уровень", minval=51, maxval=95, group=grp_entry)
+use_ma_cross  = input.bool(false, "МА кросс-овер", group=grp_entry)
+ma_cross_type = input.string("EMA", "  МА тип", options=["EMA","SMA","WMA"], group=grp_entry)
+ma_cross_p    = input.int(20, "  МА период", minval=2, maxval=500, group=grp_entry)
+use_supertrend = input.bool(false, "Supertrend смена тренда", group=grp_entry)
+st_atr_p       = input.int(10, "  ST ATR период", minval=1, maxval=200, group=grp_entry)
+st_mult        = input.float(3, "  ST множитель", minval=0.1, maxval=20, step=0.1, group=grp_entry)
+use_kalman_cross = input.bool(false, "Kalman кросс", group=grp_entry)
+kalman_cross_len = input.int(20, "  Kalman период", minval=5, maxval=500, group=grp_entry, active=use_kalman_cross)
+use_free_entry = input.bool(true, "Свободный вход", group=grp_entry)
+use_macd      = input.bool(false, "MACD кросс", group=grp_entry)
+macd_fast     = input.int(12, "  MACD быстрый", minval=2, maxval=100, group=grp_entry)
+macd_slow     = input.int(26, "  MACD медленный", minval=3, maxval=200, group=grp_entry)
+macd_signal   = input.int(9, "  MACD сигнал", minval=2, maxval=50, group=grp_entry)
+use_stoch_exit = input.bool(false, "Stochastic выход из зоны", group=grp_entry)
+stoch_k_per   = input.int(14, "  Stoch K период", minval=2, maxval=100, group=grp_entry)
+stoch_d_per   = input.int(3,  "  Stoch D период", minval=2, maxval=20, group=grp_entry)
+stoch_os      = input.int(20, "  Stoch OS уровень", minval=5, maxval=49, group=grp_entry)
+stoch_ob      = input.int(80, "  Stoch OB уровень", minval=51, maxval=95, group=grp_entry)
+use_vol_move  = input.bool(false, "Объём + движение", group=grp_entry)
+vol_move_mult = input.float(1.5, "  Объём ×avg", step=0.1, group=grp_entry)
+use_inside_bar = input.bool(false, "Inside Bar пробой", group=grp_entry)
+use_eis     = input.bool(false, "Elder Impulse System", group=grp_entry)
+eis_ema_p   = input.int(13, "  EIS EMA период", minval=2, maxval=200, group=grp_entry)
+use_soldiers = input.bool(false, "3 White Soldiers / 3 Black Crows", group=grp_entry)
+use_n_reversal = input.bool(false, "Разворот после N свечей", group=grp_entry)
+n_reversal_n  = input.int(3, "  Мин свечей серии", minval=2, maxval=20, group=grp_entry)
+use_pchg     = input.bool(false, "% Price Change Entry", group=grp_entry)
+pchg_pct_a   = input.float(1, "  А: мин.% изм. (+вверх/-вниз)", step=0.1, group=grp_entry)
+pchg_per_a   = input.int(10, "  А: период (свечей)", minval=1, group=grp_entry)
+pchg_htf_a   = input.int(1, "  А: HTF множитель", minval=1, group=grp_entry)
+use_pchg_b   = input.bool(false, "  Условие B (AND)", group=grp_entry)
+pchg_pct_b   = input.float(1, "  B: мин.% изм. (+вверх/-вниз)", step=0.1, group=grp_entry)
+pchg_per_b   = input.int(20, "  B: период (свечей)", minval=1, group=grp_entry)
+pchg_htf_b   = input.int(1, "  B: HTF множитель", minval=1, group=grp_entry)
+
+grp_ma   = "📈 MA ФИЛЬТР"
+use_int_ma = input.bool(false, "Включить MA фильтр", group=grp_ma)
+ma_type      = input.string("EMA", "Тип", options=["SMA","EMA","WMA","HMA","VWMA","DEMA","TEMA","Kalman"], group=grp_ma)
+ma_len       = input.int(200, "Период", group=grp_ma)
+ma_htf_ratio = input.int(1, "HTF ratio (1=текущий ТФ)", minval=1, maxval=1000, group=grp_ma)
+
+grp_conf     = "🔍 CONFIRM MA"
+use_conf_ma  = input.bool(true, "Включить Confirm MA", group=grp_conf)
+conf_ma_type = input.string("SMA", "Тип", options=["SMA","EMA","WMA","HMA","DEMA","TEMA","Kalman"], group=grp_conf)
+conf_ma_len  = input.int(150, "Период", group=grp_conf)
+conf_ma_htf  = input.int(9, "HTF ratio (1=текущий ТФ)", minval=1, maxval=1000, group=grp_conf)
+
+grp_wtrend = "📊 ПРОСТОЙ ТРЕНД"
+use_simple_trend = input.bool(false, "Свечи выше/ниже MA", group=grp_wtrend)
+st_depth   = input.int(3, "Период (баров)", minval=3, maxval=50, group=grp_wtrend)
+
+grp_ma_dist = "📏 ДИСТАНЦИЯ ОТ MA"
+use_ma_dist = input.bool(false, "Фильтр расстояния", group=grp_ma_dist)
+ma_dist_max = input.float(3.0, "Макс дистанция ×ATR", step=0.5, group=grp_ma_dist)
+
+grp_adx  = "📊 ADX"
+use_adx       = input.bool(false, "ADX фильтр", group=grp_adx)
+adx_len       = input.int(10, "Период", group=grp_adx, active=use_adx)
+adx_thresh    = input.float(20.0, "Мин ADX", step=1.0, group=grp_adx, active=use_adx)
+adx_htf_ratio = input.int(1, "HTF ratio (1=текущий ТФ)", minval=1, maxval=1000, group=grp_adx)
+adx_slope     = input.bool(false, "ADX растёт (slope)", group=grp_adx)
+adx_slope_bars= input.int(3, "Slope: баров назад", minval=1, maxval=20, group=grp_adx)
+
+grp_vsa  = "🐳 ОБЪЁМ"
+use_vsa    = input.bool(false,  "Подтверждение объёмом", group=grp_vsa)
+vol_len    = input.int(20, "Период среднего", group=grp_vsa)
+vol_mult   = input.float(1.8, "Множитель", step=0.1, group=grp_vsa)
+use_liq_f  = input.bool(false,  "Фильтр ликвидности", group=grp_vsa)
+liq_min_mult = input.float(0.5, "Мин объём / средний", step=0.1, group=grp_vsa)
+use_vol_dir = input.bool(true, "Направление объёма", group=grp_vsa)
+vol_dir_len = input.int(5, "Период направления", minval=3, maxval=50, group=grp_vsa)
+
+grp_candle = "📏 ФИЛЬТР СВЕЧИ"
+use_candle_f = input.bool(false, "Фильтр размера свечи", group=grp_candle)
+candle_min   = input.float(0.3, "Мин размер ×ATR (0=выкл)", step=0.1, group=grp_candle)
+candle_max   = input.float(3.0, "Макс размер ×ATR (0=выкл)", step=0.1, group=grp_candle)
+
+grp_volf = "🌊 ВОЛАТИЛЬНОСТЬ"
+use_vol_f   = input.bool(false,  "Фильтр волатильности", group=grp_volf)
+vol_f_mult  = input.float(2.0, "Макс ATR/средний", step=0.1, group=grp_volf)
+vol_f_len   = input.int(50, "Период", group=grp_volf)
+use_atr_exp  = input.bool(false, "ATR расширяется (антифлет)", group=grp_volf)
+atr_exp_mult = input.float(1.0, "Мин ATR/средний (антифлет)", step=0.1, group=grp_volf)
+
+grp_struct = "🏗️ СТРУКТУРА"
+use_struct   = input.bool(true, "Структура рынка HH/HL", group=grp_struct)
+struct_pv_l  = input.int(5, "Pivot left",  minval=2, maxval=100, group=grp_struct, active=use_struct)
+struct_pv_r  = input.int(5, "Pivot right", minval=1, maxval=10,   group=grp_struct, active=use_struct)
+struct_len_v = input.int(65, "Окно (баров)", minval=10, maxval=2000, group=grp_struct, active=use_struct)
+
+grp_rsi_f = "📊 RSI ФИЛЬТР"
+use_rsi_f  = input.bool(false, "RSI зоны (вход при экстремумах)", group=grp_rsi_f)
+rsi_f_len  = input.int(14, "  Период RSI",         minval=2, maxval=50,  group=grp_rsi_f, active=use_rsi_f)
+rsi_f_os   = input.int(30, "  Перепроданность ≤ (Long)", minval=5, maxval=49,  group=grp_rsi_f, active=use_rsi_f)
+rsi_f_ob   = input.int(70, "  Перекупленность ≥ (Short)", minval=51, maxval=95, group=grp_rsi_f, active=use_rsi_f)
+
+grp_consec_f = "🔢 ПОДРЯД ИДУЩИЕ СВЕЧИ"
+use_consec_f = input.bool(false, "Блок подряд идущих свечей", tooltip="Блокирует вход если N или более свечей подряд идут в сторону сигнала — перекупленность", group=grp_consec_f)
+consec_max_v = input.int(5, "  Макс подряд", minval=2, maxval=10, group=grp_consec_f, active=use_consec_f)
+
+grp_fresh_f = "🌱 СВЕЖЕСТЬ ТРЕНДА"
+use_fresh_f = input.bool(false, "Тренд слишком 'старый'", tooltip="Блокирует вход если N+ баров подряд цена выше/ниже MA — тренд устарел, вход рискован", group=grp_fresh_f)
+fresh_max_v = input.int(20, "  Макс баров тренда", minval=3, maxval=100, group=grp_fresh_f, active=use_fresh_f)
+
+grp_fat_f = "💀 ИСТОЩЕНИЕ ОБЪЁМА"
+use_fat_f    = input.bool(false, "Fat: истощение (объём+серия)", tooltip="Блокирует вход если серия свечей в тренде при падающем объёме — признак истощения", group=grp_fat_f)
+fat_consec_v = input.int(6, "  Подряд свечей тренда", minval=2, maxval=10, group=grp_fat_f, active=use_fat_f)
+fat_vol_drop = input.float(0.70, "  Объём упал до × среднего", step=0.05, minval=0.1, maxval=1.5, group=grp_fat_f, active=use_fat_f)
+
+grp_er_f = "⚡ EFFICIENCY RATIO (ER)"
+use_er_f    = input.bool(false, "ER Kaufman (качество тренда)", tooltip="ER=1 = чистый тренд, ER=0 = хаос. Блокирует вход если ER ниже порога.", group=grp_er_f)
+er_period_v = input.int(10, "  Период ER", minval=2, maxval=50, group=grp_er_f, active=use_er_f)
+er_thresh_v = input.float(0.30, "  Порог ER (0–1)", step=0.01, minval=0, maxval=1, group=grp_er_f, active=use_er_f)
+
+grp_kalman_f = "🌊 KALMAN MA ФИЛЬТР"
+use_kalman_f = input.bool(false, "Kalman MA направление (фильтр)", tooltip="Адаптивная MA — фильтр тренда. Быстрее при высокой волатильности.", group=grp_kalman_f)
+kalman_f_len = input.int(20, "  Период Kalman", minval=5, maxval=500, group=grp_kalman_f, active=use_kalman_f)
+
+grp_sqzmod_f = "🔲 МОДИФИКАТОР СЖАТИЯ"
+use_sqz_mod  = input.bool(false, "Вход только из Squeeze", tooltip="Блокирует вход если предыдущий бар НЕ был в сжатии (BB < KC). Требует включённого Squeeze входа.", group=grp_sqzmod_f)
+
+grp_macd_f = "📉 MACD ФИЛЬТР"
+use_macd_f = input.bool(true, "MACD направление (фильтр)", tooltip="Long только если MACD line > signal. Short только если MACD line < signal. Использует те же параметры что MACD-вход.", group=grp_macd_f)
+
+// ===== СТОП-ЛОССЫ =====
+grp_sl = "🛑 STOP LOSS"
+sl_logic   = input.string("ИЛИ (первый сработавший)", "Логика SL", options=["ИЛИ (первый сработавший)","И (оба нарушены)"], group=grp_sl)
+use_sl_atr = input.bool(false, "✅ SL по ATR",    group=grp_sl)
+sl_atr_val = input.float(1.5, "  ATR множитель", step=0.1, group=grp_sl)
+use_sl_pct = input.bool(true, "✅ SL по %",      group=grp_sl)
+sl_pct_val = input.float(9.0, "  Процент %",    step=0.1, group=grp_sl)
+use_sl_piv = input.bool(false, "✅ SL pivot (динам)", group=grp_sl)
+sl_piv_off  = input.float(0.2, "  Отступ ×ATR",  step=0.1, group=grp_sl)
+sl_piv_max  = input.float(3.0, "  Макс ×ATR",    step=0.1, group=grp_sl)
+sl_piv_trail= input.bool(false, "  Подтягивать", group=grp_sl)
+sl_piv_look = input.int(3, "  Баров слева", minval=1, maxval=10, group=grp_sl)
+sl_piv_right_v = input.int(1, "  Баров справа", minval=1, maxval=5, group=grp_sl)
+
+// ===== ТЕЙК-ПРОФИТЫ =====
+grp_tp = "🎯 TAKE PROFIT"
+tp_logic   = input.string("ИЛИ (первый сработавший)", "Логика TP", options=["ИЛИ (первый сработавший)","И (оба достигнуты)"], group=grp_tp)
+use_tp_atr = input.bool(false, "✅ TP по ATR",       group=grp_tp)
+tp_atr_val = input.float(3.0, "  ATR множитель", step=0.1, group=grp_tp)
+use_tp_pct = input.bool(true, "✅ TP по %",         group=grp_tp)
+tp_pct_val = input.float(3.0, "  Процент %",     step=0.1, group=grp_tp)
+use_tp_rr  = input.bool(false,  "✅ TP по R:R от SL", group=grp_tp)
+tp_rr_val  = input.float(2.0, "  R:R множитель", step=0.1, group=grp_tp)
+
+grp_be = "🔒 БЕЗУБЫТОК"
+use_be    = input.bool(false, "Безубыток", group=grp_be)
+be_trig   = input.float(0.5, "Триггер (×ATR)", step=0.1, group=grp_be, active=use_be)
+be_offset = input.float(0.0, "Оффсет (×ATR)",  step=0.1, group=grp_be)
+
+grp_trail = "⛓️ TRAILING"
+use_trail  = input.bool(false, "Trailing stop", group=grp_trail)
+trail_trig = input.float(0.5, "Активация (×ATR)", step=0.1, group=grp_trail, active=use_trail)
+trail_dist = input.float(0.5, "Дистанция (×ATR)", step=0.1, group=grp_trail, active=use_trail)
+
+grp_wick = "🪝 WICK TRAILING SL"
+use_wick_trail = input.bool(false, "Wick Trailing SL", group=grp_wick)
+wick_off_type  = input.string("atr", "Тип отступа", options=["atr","pct","pts"], group=grp_wick, active=use_wick_trail)
+wick_mult      = input.float(0.5, "Множитель отступа", step=0.1, group=grp_wick, active=use_wick_trail)
+
+grp_exit = "🚪 ВЫХОД"
+use_sig_ex      = input.bool(false, "Обратный сигнал", group=grp_exit)
+sig_ex_skip     = input.int(0, "Пропустить обратных", minval=0, maxval=50, group=grp_exit)
+sig_ex_cooldown = input.int(0, "Кулдаун баров", minval=0, maxval=50, group=grp_exit)
+sig_ex_min_bars = input.int(2, "Мин баров в сделке", minval=1, maxval=50, group=grp_exit)
+sig_ex_mode     = input.string("plus", "Режим выхода (any/plus/minus)", options=["any","plus","minus"], group=grp_exit)
+use_time_ex = input.bool(false, "Выход по времени", group=grp_exit)
+max_bars_in = input.int(50, "Макс баров в сделке", minval=2, maxval=500, group=grp_exit)
+use_climax  = input.bool(false, "Climax выход (только в плюс)", group=grp_exit)
+use_clx_any = input.bool(false, "Climax± (любой)", group=grp_exit)
+use_st_exit = input.bool(false, "Supertrend-выход (смена тренда против позиции)", group=grp_exit)
+
+grp_wait = "⏳ ОТЛОЖЕННЫЙ ВХОД"
+use_wait    = input.bool(false, "Ждать отката", group=grp_wait)
+wait_bars   = input.int(0, "Баров ожидания (Bars)", minval=0, maxval=20, group=grp_wait)
+wait_ret    = input.bool(false, "Требовать откат цены (Retrace)", group=grp_wait)
+wait_max_b  = input.int(10, "Отменить после N баров", minval=0, maxval=100, group=grp_wait)
+wait_catr   = input.float(0, "Отменить при уходе ×ATR", minval=0, step=0.1, group=grp_wait)
+
+grp_strat = "⚙️ КАПИТАЛ"
+start_cap  = input.float(1000.0, "Депозит $", group=grp_strat)
+comm_rate  = input.float(0.100, "Комиссия %", step=0.01, group=grp_strat)
+use_spread = input.bool(false, "Учитывать спред", group=grp_strat)
+spread_pct = input.float(0.000, "Спред %", step=0.05, group=grp_strat)
+atr_len    = input.int(17, "Период ATR", group=grp_strat)
+atr_step   = input.int(2, "Шаг вариаций ATR", group=grp_strat)
+max_bars   = input.int(8648, "Глубина теста", minval=100, maxval=500000, group=grp_strat)
+
+grp_vis = "🎨 ВИЗУАЛИЗАЦИЯ"
+show_tr   = input.bool(true, "Разметка сделок", group=grp_vis)
+show_eq   = input.bool(true, "Equity", group=grp_vis)
+eq_color  = input.color(color.new(color.yellow,20), "Цвет Equity", group=grp_vis)
+eq_width  = input.int(2, "Толщина Equity", minval=1, maxval=4, group=grp_vis)
+lbl_off_m = input.float(0.4, "Отступ ярлыков", step=0.1, group=grp_vis)
+lbl_size  = input.string(size.small, "Размер текста", options=[size.tiny,size.small,size.normal,size.large], group=grp_vis)
+c_win     = input.color(color.new(color.green,85), "Win", group=grp_vis)
+c_loss    = input.color(color.new(color.red,85), "Loss", group=grp_vis)
+c_neu     = input.color(color.new(color.gray,90), "Active", group=grp_vis)
+c_tp_line = input.color(color.lime, "TP линия", group=grp_vis)
+c_sl_line = input.color(color.red,  "SL линия", group=grp_vis)
+
+grp_tab = "📊 ТАБЛИЦА"
+pos_main  = input.string(position.top_right, "Позиция", group=grp_tab)
+table_sz  = input.string(size.small, "Размер", options=[size.tiny,size.small,size.normal], group=grp_tab)
+c_bg      = input.color(color.new(color.black,40), "Фон", group=grp_tab)
+
+grp_bot = "🤖 БОТ-АЛЕРТЫ"
+bot_fmt = input.string("text", "Формат сообщений", options=["text", "json"], tooltip="text — читаемый формат. json — для ботов (3Commas, Alertatron, Cornix и др.)", group=grp_bot)
+bot_ticker_ov = input.string("", "Тикер (оставь пустым = авто)", tooltip="Если пусто — используется syminfo.ticker. Задай явно если бот требует конкретный символ, напр. BTCUSDT.", group=grp_bot)
+
+// ==========================================
+// 2. ИНДИКАТОРЫ И ФИЛЬТРЫ
+// ==========================================
+float atr_v  = ta.atr(atr_len)
+float atr_m1 = ta.atr(math.max(1, atr_len - atr_step))
+float atr_p1 = ta.atr(atr_len + atr_step)
+float total_cost = comm_rate * 2 + (use_spread ? spread_pct : 0)
+float entry_price = close
+
+// Helper: convert seconds to TF string
+f_tf_str(int secs) =>
+	secs < 60 ? str.tostring(secs) + "S" : secs < 86400 ? str.tostring(math.round(secs / 60)) : str.tostring(math.round(secs / 86400)) + "D"
+
+// ADX (Wilder's)
+dirmov(len) =>
+	up = ta.change(high)
+	dn = -ta.change(low)
+	pDM = na(up) ? na : (up > dn and up > 0 ? up : 0)
+	mDM = na(dn) ? na : (dn > up and dn > 0 ? dn : 0)
+	tr2 = ta.rma(ta.tr, len)
+	[100 * ta.rma(pDM, len) / tr2, 100 * ta.rma(mDM, len) / tr2]
+
+adx_calc(len) =>
+	[pd, md] = dirmov(len)
+	s = pd + md
+	100 * ta.rma(math.abs(pd - md) / (s == 0 ? 1 : s), len)
+
+string _adx_tf_str = adx_htf_ratio <= 1 ? timeframe.period : f_tf_str(timeframe.in_seconds() * adx_htf_ratio)
+float adx_val = request.security(syminfo.tickerid, _adx_tf_str, adx_calc(adx_len), barmerge.gaps_off, barmerge.lookahead_on)
+float adx_val_prev = request.security(syminfo.tickerid, _adx_tf_str, adx_calc(adx_len), barmerge.gaps_off, barmerge.lookahead_on)[adx_slope_bars]
+bool adx_thresh_ok = use_adx ? (not na(adx_val) and adx_val >= adx_thresh) : true
+bool adx_slope_ok  = not use_adx or not adx_slope or (not na(adx_val) and not na(adx_val_prev) and adx_val > adx_val_prev)
+bool adx_ok        = adx_thresh_ok and adx_slope_ok
+
+// Volatility filter
+float atr_avg = ta.sma(atr_v, vol_f_len)
+bool vol_f_ok   = use_vol_f   ? (atr_v[1] <= atr_avg[1] * vol_f_mult)  : true
+bool atr_exp_ok = use_atr_exp ? (atr_v[1] >= atr_avg[1] * atr_exp_mult) : true
+
+// Candle size filter
+float candle_size_1 = high[1] - low[1]
+bool candle_f_ok = not use_candle_f or (candle_size_1 >= candle_min * atr_v[1] and (candle_max <= 0 or candle_size_1 <= candle_max * atr_v[1]))
+
+// Market structure
+struct_pv_hi_v = ta.pivothigh(high, struct_pv_l, struct_pv_r)
+struct_pv_lo_v = ta.pivotlow(low,  struct_pv_l, struct_pv_r)
+var float struct_hi1 = na
+var float struct_hi2 = na
+var float struct_lo1 = na
+var float struct_lo2 = na
+var int struct_hi1_bar = na
+var int struct_hi2_bar = na
+var int struct_lo1_bar = na
+var int struct_lo2_bar = na
+if not na(struct_pv_hi_v)
+	struct_hi2 := struct_hi1
+	struct_hi2_bar := struct_hi1_bar
+	struct_hi1 := high[struct_pv_r]
+	struct_hi1_bar := bar_index - struct_pv_r
+if not na(struct_pv_lo_v)
+	struct_lo2 := struct_lo1
+	struct_lo2_bar := struct_lo1_bar
+	struct_lo1 := low[struct_pv_r]
+	struct_lo1_bar := bar_index - struct_pv_r
+bool struct_has_2hi = not na(struct_hi2) and not na(struct_hi2_bar) and (bar_index - struct_hi2_bar) <= struct_len_v
+bool struct_has_2lo = not na(struct_lo2) and not na(struct_lo2_bar) and (bar_index - struct_lo2_bar) <= struct_len_v
+bool struct_bull = struct_has_2hi and struct_has_2lo and struct_hi1 > struct_hi2 and struct_lo1 > struct_lo2
+bool struct_bear = struct_has_2hi and struct_has_2lo and struct_hi1 < struct_hi2 and struct_lo1 < struct_lo2
+bool struct_ok_l = not use_struct or struct_bull
+bool struct_ok_s = not use_struct or struct_bear
+
+// Данный файл — только конфиг. Остальной код (фильтры, сигналы, бэктест)
+// скопируй из оригинального файла начиная с раздела "// MA helpers"
