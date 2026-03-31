@@ -5281,6 +5281,7 @@ const _OOS_COL_DEFS = [
   { id: 'oos-col-wr',      label: 'WR%',               default: true },
   { id: 'oos-col-kr',      label: 'K-Ratio',           default: true },
   { id: 'oos-col-n',       label: '# сделок',          default: true },
+  { id: 'oos-col-rate',    label: 'Rate%',             default: true },
   { id: 'oos-col-score',   label: 'Оценка',            default: true },
 ];
 
@@ -7304,6 +7305,7 @@ function applyOOSFilters() {
   const fon    = parseFloat(document.getElementById('oof_on')?.value);
   const fnn    = parseFloat(document.getElementById('oof_nn')?.value);
   const fscore = document.getElementById('oof_score')?.value || '';
+  const frate  = parseFloat(document.getElementById('oof_rate')?.value);
 
   const src = _oosTableResults.filter(r => {
     if (fname && !r.name.toLowerCase().includes(fname)) return false;
@@ -7327,6 +7329,7 @@ function applyOOSFilters() {
       if (!isNaN(fdapt)) { const da = (ao!=null&&an!=null)?an-ao:null; if(da==null||da<fdapt) return false; }
       if (!isNaN(fdwr) && (r.delta_wr ?? -Infinity) < fdwr) return false;
     }
+    if (!isNaN(frate) && (r.rate == null || r.rate < frate)) return false;
     if (fscore) {
       const badge = _oosGetBadge(r);
       if (badge !== fscore) return false;
@@ -7394,6 +7397,7 @@ function applyOOSFilters() {
       `<td class="oos-col-kr ${pCls(r.delta_kRatio)}">${r.delta_kRatio != null ? (r.delta_kRatio >= 0 ? '+' : '') + r.delta_kRatio.toFixed(2) : '—'}</td>` +
       `<td class="oos-col-n muted" style="text-align:center">${r.old_n??'—'}</td>` +
       `<td class="oos-col-n muted" style="text-align:center">${r.new_n??'—'}</td>` +
+      `<td class="oos-col-rate ${r.rate==null?'':r.rate>=70?'pos':r.rate>=30?'warn':'neg'}" style="text-align:center" title="Скорость роста нов/ист × 100%. 100% = равная скорость">${r.rate!=null?Math.round(r.rate)+'%':'—'}</td>` +
       `<td class="oos-col-score" style="text-align:center"><span class="oos-badge ${badge} ${oosCls}">${oosScore}</span></td>` +
       `</tr>`;
   }
@@ -7849,6 +7853,7 @@ function _getOOSSortVal(r, key) {
     const an = (NEW_DATA && r.new_pnl !== null) ? r.new_pnl / NEW_DATA.length * 1000 : null;
     return (ao !== null && an !== null) ? an - ao : null;
   }
+  if (key === 'rate') return r.rate ?? null;
   if (key === 'score') {
     if (r.new_pnl > 0) {
       const ao = (r.old_n > 0) ? r.old_pnl / r.old_n : 0;
@@ -8023,6 +8028,14 @@ async function runOOSOnNewData() {
       old_bars:  DATA ? DATA.length : null,
       new_bars:  NEW_DATA ? NEW_DATA.length : null,
       _overlapBars: _overlapIdx,               // для отладки: сколько баров пересечения
+      rate: (() => {
+        const _ob = DATA ? DATA.length : 0;
+        const _nb = NEW_DATA ? (NEW_DATA.length - _overlapIdx) : 0;
+        if (_ob > 0 && _nb > 0 && rOld && rOld.pnl > 0 && new_pnl != null) {
+          return (new_pnl / _nb) / (rOld.pnl / _ob) * 100;
+        }
+        return null;
+      })(),
       old_eq:    rOld ? rOld.eq  : null,       // equity curve на истории
       new_eq:    rNew ? rNew.eq  : null,       // equity curve на новых данных (полная, график обрезает сам)
     });
