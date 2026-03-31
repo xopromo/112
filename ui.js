@@ -2074,16 +2074,44 @@ function openTplModal() {
 function closeTplModal() { $('tpl-overlay').classList.remove('open'); }
 
 // ── Pine Script генератор ──────────────────────────────────────────────────
+let _pineMode = 'indicator'; // текущий режим: 'indicator' | 'strategy'
+
 function openPineModal() {
   if (!_robustResult) { alert('Сначала откройте детали результата'); return; }
+  _pineMode = 'indicator';
+  _renderPineModal();
+  $('pine-overlay').classList.add('open');
+}
+
+function switchPineTab(mode) {
+  _pineMode = mode;
+  _renderPineModal();
+}
+
+function _renderPineModal() {
   const r = _robustResult;
+  if (!r) return;
   if (typeof generatePineScript !== 'function') {
     alert('Генератор Pine Script не загружен (pine_export.js)'); return;
   }
-  const code = generatePineScript(r);
+  const isStrategy = _pineMode === 'strategy';
+  const code = isStrategy ? generatePineStrategy(r) : generatePineScript(r);
   $('pine-code').value = code;
-  $('pine-desc').textContent = `Конфиг: ${r.name}  ·  PnL ${r.pnl.toFixed(1)}%  WR ${r.wr.toFixed(1)}%  Сделок ${r.n}  DD ${r.dd.toFixed(1)}%`;
-  $('pine-overlay').classList.add('open');
+  $('pine-desc').textContent = isStrategy
+    ? `Стратегия: ${r.name}  ·  Использует strategy.exit(stop, limit) — точное исполнение SL/TP`
+    : `Индикатор: ${r.name}  ·  PnL ${r.pnl.toFixed(1)}%  WR ${r.wr.toFixed(1)}%  Сделок ${r.n}  DD ${r.dd.toFixed(1)}%`;
+  const tabInd = $('pine-tab-indicator');
+  const tabStr = $('pine-tab-strategy');
+  if (tabInd) {
+    tabInd.style.background = isStrategy ? 'var(--bg2)' : '#c792ea';
+    tabInd.style.color = isStrategy ? 'var(--text2)' : '#000';
+    tabInd.style.borderColor = isStrategy ? 'var(--border)' : '#c792ea';
+  }
+  if (tabStr) {
+    tabStr.style.background = isStrategy ? '#c792ea' : 'var(--bg2)';
+    tabStr.style.color = isStrategy ? '#000' : 'var(--text2)';
+    tabStr.style.borderColor = isStrategy ? '#c792ea' : 'var(--border)';
+  }
 }
 function closePineModal() { $('pine-overlay').classList.remove('open'); }
 function copyPineCode() {

@@ -17,7 +17,7 @@
 // ─────────────────────────────────────────────────────────────
 // ============================================================
 
-function generatePineScript(r) {
+function generatePineScript(r, mode = 'indicator') {
   if (!r || !r.cfg) return '// Нет конфига';
   const c = r.cfg;
 
@@ -58,7 +58,11 @@ function generatePineScript(r) {
   lines.push(`// Конфиг: ${r.name}`);
   lines.push(`// PnL: ${r.pnl.toFixed(1)}%  WR: ${r.wr.toFixed(1)}%  Сделок: ${r.n}  DD: ${r.dd.toFixed(1)}%`);
   lines.push(`// ============================================================`);
-  lines.push(`indicator("USE [${r.name}]", shorttitle="USE_EXP", overlay=true, max_lines_count=500, max_labels_count=500, max_boxes_count=500)`);
+  if (mode === 'strategy') {
+    lines.push(`strategy("USE [${r.name}]", shorttitle="USE_STR", overlay=true, commission_type=strategy.commission.percent, commission_value=${comm.toFixed(4)}, initial_capital=10000, default_qty_type=strategy.percent_of_equity, default_qty_value=100, pyramiding=0, max_lines_count=500, max_labels_count=500, max_boxes_count=500)`);
+  } else {
+    lines.push(`indicator("USE [${r.name}]", shorttitle="USE_EXP", overlay=true, max_lines_count=500, max_labels_count=500, max_boxes_count=500)`);
+  }
   lines.push(``);
 
   // ── INPUTS ───────────────────────────────────────────────
@@ -893,6 +897,7 @@ function generatePineScript(r) {
   lines.push(``);
 
   // ── BACKTEST / EQUITY ENGINE ─────────────────────────────
+  if (mode === 'indicator') {
   lines.push(`// ==========================================`);
   lines.push(`// 4. БЭКТЕСТ (вариации ATR / SL / TP)`);
   lines.push(`// ==========================================`);
@@ -1151,6 +1156,7 @@ function generatePineScript(r) {
   lines.push(`plot(show_eq ? eq_m : na, "Equity %", color=eq_m >= 0 ? eq_color : color.new(color.red,30), linewidth=eq_width, display=display.pane)`);
   lines.push(`plot(0, "Zero", color=color.new(color.gray,70), style=plot.style_circles, display=display.pane)`);
   lines.push(``);
+  } // end if (mode === 'indicator') — solve_core + equity
 
   // ── VISUAL ENGINE ────────────────────────────────────────
   lines.push(`// ==========================================`);
@@ -1458,7 +1464,167 @@ function generatePineScript(r) {
   lines.push(`                b_trade := box.new(bar_index, v_ep, bar_index, v_ep, bgcolor=c_neu, border_width=0)`);
   lines.push(``);
 
+  // ── STRATEGY EXECUTION ───────────────────────────────────
+  if (mode === 'strategy') {
+    lines.push(`// ==========================================`);
+    lines.push(`// 5. STRATEGY EXECUTION`);
+    lines.push(`// ==========================================`);
+    lines.push(`var float s_sl = na`);
+    lines.push(`var float s_tp = na`);
+    lines.push(`var int s_dir = 0`);
+    lines.push(`var int s_ep_bar = -1`);
+    lines.push(`var int s_xb = -1`);
+    lines.push(`var int s_pd = 0`);
+    lines.push(`var int s_pb = -1`);
+    lines.push(`var float s_psc = 0.0`);
+    lines.push(`var float s_ep = 0.0`);
+    lines.push(`var bool s_tra = false`);
+    lines.push(`var bool s_bea = false`);
+    lines.push(`var int s_sig_skip = 0`);
+    lines.push(`var int s_cd_bar = -1`);
+    lines.push(`var float s_wsl = float(na)`);
+    lines.push(``);
+    lines.push(`// Detect intrabar SL/TP close by TV strategy engine`);
+    lines.push(`if strategy.position_size[1] != 0 and strategy.position_size == 0`);
+    lines.push(`    s_xb := bar_index`);
+    lines.push(`    s_tra := false`);
+    lines.push(`    s_bea := false`);
+    lines.push(`    s_wsl := float(na)`);
+    lines.push(`    s_sig_skip := 0`);
+    lines.push(`    s_cd_bar := -1`);
+    lines.push(``);
+    lines.push(`if strategy.position_size == 0 and bar_index > s_xb`);
+    lines.push(`    bool s_do_enter = false`);
+    lines.push(`    int  s_do_dir   = 0`);
+    lines.push(`    // A. Pending entry`);
+    lines.push(`    if use_wait and s_pd != 0`);
+    lines.push(`        int _bw = bar_index - s_pb`);
+    lines.push(`        bool _cncl = (wait_max_b > 0 and _bw > wait_max_b) or (wait_catr > 0 and s_pd * (close - s_psc) > wait_catr * atr_v[1])`);
+    lines.push(`        if _cncl`);
+    lines.push(`            s_pd := 0`);
+    lines.push(`        else`);
+    lines.push(`            bool _bk = _bw >= wait_bars`);
+    lines.push(`            bool _rk = not wait_ret or (s_pd == 1 and close < s_psc) or (s_pd == -1 and close > s_psc)`);
+    lines.push(`            if _bk and _rk`);
+    lines.push(`                s_do_enter := true`);
+    lines.push(`                s_do_dir   := s_pd`);
+    lines.push(`                s_pd       := 0`);
+    lines.push(`    // B. New signal`);
+    lines.push(`    if not s_do_enter and s_pd == 0`);
+    lines.push(`        if sig_l or sig_s`);
+    lines.push(`            bool _use_delay = use_wait and (wait_bars > 0 or wait_ret)`);
+    lines.push(`            if _use_delay`);
+    lines.push(`                s_pd  := sig_l ? 1 : -1`);
+    lines.push(`                s_pb  := bar_index`);
+    lines.push(`                s_psc := close`);
+    lines.push(`            else`);
+    lines.push(`                s_do_enter := true`);
+    lines.push(`                s_do_dir   := sig_l ? 1 : -1`);
+    lines.push(`    // C. Execute entry`);
+    lines.push(`    if s_do_enter`);
+    lines.push(`        float _u = atr_v[1]`);
+    lines.push(`        s_ep      := entry_price`);
+    lines.push(`        s_dir     := s_do_dir`);
+    lines.push(`        s_sl      := calc_sl_level(s_dir, s_ep, _u)`);
+    lines.push(`        float _sl_d = math.abs(s_ep - s_sl)`);
+    lines.push(`        s_tp      := calc_tp_level(s_dir, s_ep, _u, _sl_d)`);
+    lines.push(`        s_ep_bar  := bar_index`);
+    lines.push(`        s_tra     := false`);
+    lines.push(`        s_bea     := false`);
+    lines.push(`        s_wsl     := float(na)`);
+    lines.push(`        s_sig_skip := 0`);
+    lines.push(`        s_cd_bar  := -1`);
+    lines.push(`        if s_dir == 1`);
+    lines.push(`            strategy.entry("L", strategy.long)`);
+    lines.push(`            strategy.exit("LX", "L", stop=s_sl, limit=s_tp)`);
+    lines.push(`        else`);
+    lines.push(`            strategy.entry("S", strategy.short)`);
+    lines.push(`            strategy.exit("SX", "S", stop=s_sl, limit=s_tp)`);
+    lines.push(``);
+    lines.push(`if strategy.position_size != 0 and bar_index > s_ep_bar`);
+    lines.push(`    float _u = atr_v[1]`);
+    lines.push(`    bool _sl_upd = false`);
+    lines.push(`    // BE stop update`);
+    lines.push(`    if use_be and not s_bea`);
+    lines.push(`        if (s_dir == 1 and high >= s_ep + _u * be_trig) or (s_dir == -1 and low <= s_ep - _u * be_trig)`);
+    lines.push(`            float _be_sl = s_ep + s_dir * _u * be_offset`);
+    lines.push(`            float _new_sl = s_dir == 1 ? math.max(s_sl, _be_sl) : math.min(s_sl, _be_sl)`);
+    lines.push(`            if _new_sl != s_sl`);
+    lines.push(`                s_sl    := _new_sl`);
+    lines.push(`                s_bea   := true`);
+    lines.push(`                _sl_upd := true`);
+    lines.push(`    // Trailing stop update`);
+    lines.push(`    if use_trail`);
+    lines.push(`        if s_dir == 1`);
+    lines.push(`            if high >= s_ep + _u * trail_trig`);
+    lines.push(`                s_tra := true`);
+    lines.push(`            if s_tra`);
+    lines.push(`                float ns = high - _u * trail_dist`);
+    lines.push(`                if ns > s_sl`);
+    lines.push(`                    s_sl    := ns`);
+    lines.push(`                    _sl_upd := true`);
+    lines.push(`        else`);
+    lines.push(`            if low <= s_ep - _u * trail_trig`);
+    lines.push(`                s_tra := true`);
+    lines.push(`            if s_tra`);
+    lines.push(`                float ns = low + _u * trail_dist`);
+    lines.push(`                if ns < s_sl`);
+    lines.push(`                    s_sl    := ns`);
+    lines.push(`                    _sl_upd := true`);
+    lines.push(`    // Re-register exit order when stop updated`);
+    lines.push(`    if _sl_upd`);
+    lines.push(`        if s_dir == 1`);
+    lines.push(`            strategy.exit("LX", "L", stop=s_sl, limit=s_tp)`);
+    lines.push(`        else`);
+    lines.push(`            strategy.exit("SX", "S", stop=s_sl, limit=s_tp)`);
+    lines.push(`    // Signal exit`);
+    lines.push(`    float s_cpnl = s_dir == 1 ? (close - s_ep) / s_ep * 100 : (s_ep - close) / s_ep * 100`);
+    lines.push(`    bool s_frc = false`);
+    lines.push(`    bool s_rev_sig = use_sig_ex and ((s_dir == 1 and pat_s) or (s_dir == -1 and pat_l))`);
+    lines.push(`    bool s_rev_ok = (bar_index - s_ep_bar) >= sig_ex_min_bars`);
+    lines.push(`    bool s_rev_mode = sig_ex_mode == "any" or (sig_ex_mode == "plus" and s_cpnl > 0) or (sig_ex_mode == "minus" and s_cpnl < 0)`);
+    lines.push(`    if use_sig_ex and s_rev_sig and s_rev_ok`);
+    lines.push(`        if sig_ex_cooldown > 0`);
+    lines.push(`            if s_cd_bar < 0`);
+    lines.push(`                s_cd_bar := bar_index`);
+    lines.push(`            if (bar_index - s_cd_bar) >= sig_ex_cooldown`);
+    lines.push(`                if s_rev_mode`);
+    lines.push(`                    if s_sig_skip >= sig_ex_skip`);
+    lines.push(`                        s_frc := true`);
+    lines.push(`                    else`);
+    lines.push(`                        s_sig_skip += 1`);
+    lines.push(`                s_cd_bar := -1`);
+    lines.push(`        else`);
+    lines.push(`            if s_rev_mode`);
+    lines.push(`                if s_sig_skip >= sig_ex_skip`);
+    lines.push(`                    s_frc := true`);
+    lines.push(`                else`);
+    lines.push(`                    s_sig_skip += 1`);
+    lines.push(`    if not s_rev_sig`);
+    lines.push(`        s_cd_bar := -1`);
+    lines.push(`    if use_climax and is_climax_v and not s_frc`);
+    lines.push(`        if (s_dir == 1 and close[1] > s_ep) or (s_dir == -1 and close[1] < s_ep)`);
+    lines.push(`            s_frc := true`);
+    lines.push(`    if use_clx_any and is_climax_v and not s_frc`);
+    lines.push(`        s_frc := true`);
+    lines.push(`    if use_st_exit and not s_frc`);
+    lines.push(`        if (s_dir == 1 and st_flip_bear) or (s_dir == -1 and st_flip_bull)`);
+    lines.push(`            s_frc := true`);
+    lines.push(`    if use_time_ex and (bar_index - s_ep_bar) >= max_bars_in and not s_frc`);
+    lines.push(`        s_frc := true`);
+    lines.push(`    if s_frc`);
+    lines.push(`        if s_dir == 1`);
+    lines.push(`            strategy.close("L")`);
+    lines.push(`        else`);
+    lines.push(`            strategy.close("S")`);
+    lines.push(`        s_xb       := bar_index`);
+    lines.push(`        s_sig_skip := 0`);
+    lines.push(`        s_cd_bar   := -1`);
+    lines.push(``);
+  } // end if (mode === 'strategy') — strategy execution
+
   // ── TABLE ────────────────────────────────────────────────
+  if (mode === 'indicator') {
   lines.push(`// ==========================================`);
   lines.push(`// 7. ТАБЛИЦА СТАТИСТИКИ`);
   lines.push(`// ==========================================`);
@@ -1524,6 +1690,7 @@ function generatePineScript(r) {
   lines.push(`        table.cell(t, 0, 17, "⚠️ Данные охвачены не полностью: пропущено " + str.tostring(_missing) + " баров. Увеличь Глубину теста до " + str.tostring(last_bar_index + 1), bgcolor=color.new(color.orange,40), text_color=color.white, text_size=size.tiny)`);
   lines.push(`        table.merge_cells(t, 0, 17, 5, 17)`);
   lines.push(``);
+  } // end if (mode === 'indicator') — stats table
 
   // ── ALERTS ───────────────────────────────────────────────
   lines.push(`// ==========================================`);
@@ -1553,6 +1720,12 @@ function generatePineScript(r) {
   const fixed = (typeof fixPineScript === 'function') ? fixPineScript(rawCode) : rawCode;
   // Фаза 2 (Hyp 4): добавляем active= к зависимым инпутам (Pine v6)
   return _addActivePinev6(fixed);
+}
+
+// Обёртка: генерирует Pine Strategy вместо индикатора.
+// Использует strategy.exit(stop, limit) для точного исполнения SL/TP.
+function generatePineStrategy(r) {
+  return generatePineScript(r, 'strategy');
 }
 
 // ============================================================
