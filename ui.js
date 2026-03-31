@@ -4312,9 +4312,20 @@ function selectRow(idx) {
     // Найдём индекс в _oosTableResults (глобальный индекс для drawOOSChart)
     const globalIdx = _oosTableResults.indexOf(r);
     if (globalIdx >= 0) {
-      // Обновляем выделение в OOS таблице вручную (drawOOSChart сделает это, но нужно передать rowEl)
       const rowEl = document.querySelector(`#oos-rtbl tr[data-i="${globalIdx}"]`);
       drawOOSChart(globalIdx, rowEl);
+      // Прокручиваем строку в видимую область OOS таблицы
+      if (rowEl) {
+        const oosTblWrap = document.getElementById('oos-tbl-wrap');
+        if (oosTblWrap) {
+          const trTop    = rowEl.offsetTop;
+          const trBottom = trTop + rowEl.offsetHeight;
+          const visTop   = oosTblWrap.scrollTop;
+          const visBot   = visTop + oosTblWrap.clientHeight;
+          if (trTop < visTop + 40)         oosTblWrap.scrollTop = trTop - 40;
+          else if (trBottom > visBot - 10) oosTblWrap.scrollTop = trBottom - oosTblWrap.clientHeight + 10;
+        }
+      }
     }
     return;
   }
@@ -7537,6 +7548,9 @@ function drawOOSChart(idx, rowEl) {
   const eqWrap = document.getElementById('eq-wrap');
   if (!canvas || !wrap) return;
   const r = _oosTableResults[idx];
+  // Синхронизируем _selectedIdx чтобы клавиатурная навигация шла с этой строки
+  const visIdx = _visibleResults.indexOf(r);
+  if (visIdx >= 0) _selectedIdx = visIdx;
   if (!r || !r.old_eq || !r.old_eq.length || !r.new_eq || !r.new_eq.length) {
     wrap.style.display = 'none'; return;
   }
