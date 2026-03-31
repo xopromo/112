@@ -11643,7 +11643,7 @@ function generatePineScript(r, mode = 'indicator') {
   lines.push(`    if use_kelly or use_adaptive_tp or use_adaptive_sl`);
   lines.push(`        kelly_txt = use_kelly ? ("Kelly: " + str.tostring(kelly_pct, "#.#") + "%") : "Kelly: OFF"`);
   lines.push(`        adapt_txt = (use_adaptive_tp or use_adaptive_sl) ? (" | Adapt: " + str.tostring(atr_tp_ratio, "#.##") + " / " + str.tostring(atr_sl_ratio, "#.##")) : ""`);
-  lines.push(`        table.cell(t, 0, 16, kelly_txt + adapt_txt, bgcolor=color.new(color.cyan,40), text_color=color.white, text_size=table_sz)`);
+  lines.push(`        table.cell(t, 0, 16, kelly_txt + adapt_txt, bgcolor=color.new(color.aqua,40), text_color=color.white, text_size=table_sz)`);
   lines.push(`        table.merge_cells(t, 0, 16, 5, 16)`);
   lines.push(``);
   lines.push(`    float sl_ref = use_sl_atr ? sl_atr_val : use_sl_pct ? sl_pct_val : 1.5`);
@@ -30693,7 +30693,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774990274882;
+window._BUILD_TS = 1774990393877;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
