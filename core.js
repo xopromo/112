@@ -915,6 +915,18 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
         } else if (slCandidates.length===1) { sl1=slCandidates[0]; hasSL2=false; }
         else { sl1 = NaN; hasSL2=false; } // noSL: no exit, matches Pine na
 
+        // Dynamic SL by structure break: if structure broken, tighten SL
+        if (cfg.useDynSLStruct && !isNaN(sl1) && cfg.structBull && cfg.structBear) {
+          const structOk = cfg.structBull[i] || cfg.structBear[i];
+          if (!structOk) {
+            // Structure broken: move SL closer to entry by multiplier
+            const slDist = Math.abs(entry - sl1);
+            const newSlDist = slDist * cfg.dynSLStructMult;
+            sl1 = dir === 1 ? entry - newSlDist : entry + newSlDist;
+            if (hasSL2) sl2 = sl1; // sync sl2
+          }
+        }
+
         // Compute TP levels — через _calcTP из sl_tp_registry.js
         const slDist = !isNaN(sl1) ? Math.abs(entry-sl1) : ac; // fallback to 1×ATR for R:R TP when no fixed SL
         let tpA = NaN, tpB = NaN;

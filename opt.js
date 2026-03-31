@@ -862,6 +862,7 @@ function calcTotal() {
   const useTrail=$c('x_tr'),useBE=$c('x_be'),useTime=$c('x_time');
   const useVSA=HAS_VOLUME&&$c('f_vsa'),useWT=HAS_VOLUME&&$c('f_wt');
   const useAtrBo=$c('e_atrbo');
+  const useDynSLStruct=$c('x_dynsl');  // Dynamic SL by structure break
   const pvLs=usePv?parseRange('e_pvl'):[5];
   const pvRs=usePv?parseRange('e_pvr'):[2];
   const atrPs=parseRange('c_atr');
@@ -885,6 +886,7 @@ function calcTotal() {
   const wickOffType=document.getElementById('x_wt_type')?.value||'ATR';
   const wickMults=useWickTrail?parseRange('x_wt_mult'):[0.5];
   const timeBarsA=useTime?parseRange('x_timeb'):[0];  // Default 0 when TimeExit disabled
+  const dynSLStructMults=useDynSLStruct?parseRange('x_dynsl_m'):[0.3];  // Multiplier for Dynamic SL
   const revBarsA=($c('x_rev')&&$v('x_revb'))?parseRange('x_revb'):[2];
   const revSkipA=$c('x_rev')?parseRange('x_revskip'):[0];
   const revCooldownA=$c('x_rev')?parseRange('x_revcd'):[0];
@@ -1618,6 +1620,7 @@ async function runOpt() {
     (_adxLArr.length||1)*(_sTrendArr.length||1)*
     (tlPvLs.length||1)*(tlPvRs.length||1)*
     (stAtrPArr.length||1)*(stMultArr.length||1)*
+    (dynSLStructMults.length||1)*
     (waitBarsArr.length||1)*(waitRetraceArr.length||1);
 
   // Monte Carlo: shuffle and limit
@@ -1637,6 +1640,7 @@ async function runOpt() {
       (timeBarsArr.length||1)*(freshMaxs.length||1)*(wtThreshs.length||1)*
       (vsaMs.length||1)*(atrBoMults.length||1)*(confNArr.length||1)*(confTypeArr.length||1)*
       (confHtfArr.length||1)*(maCrossTypeArr.length||1)*(revBarsArr.length||1)*
+      (dynSLStructMults.length||1)*
     (revSkipArr.length||1)*(revCooldownArr.length||1)*
     (_adxLArr.length||1)*(_sTrendArr.length||1)*
     (tlPvLs.length||1)*(tlPvRs.length||1)*
@@ -3846,6 +3850,8 @@ function buildBtCfg(cfg, ind) {
     useBE:    cfg.useBE    || false,
     beTrig:   cfg.beTrig   || 1,
     beOff:    cfg.beOff    || 0,
+    useDynSLStruct: cfg.useDynSLStruct || false,
+    dynSLStructMult: cfg.dynSLStructMult || 0.3,
     useTrail: cfg.useTrail || false,
     trTrig:   cfg.trTrig   || 1,
     trDist:   cfg.trDist   || 0.5,
