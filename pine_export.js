@@ -275,6 +275,11 @@ function generatePineScript(r, mode = 'indicator') {
   lines.push(`kelly_max_cap = input.float(25.0, "Максимум % на сделку", minval=5, maxval=50, step=1, group=grp_kelly, active=use_kelly)`);
   lines.push(``);
 
+  lines.push(`grp_dynsl = "🏗️ ДИНАМИЧЕСКИЙ SL (по структуре)"`);
+  lines.push(`use_dynsl_struct = input.bool(false, "Сжимать SL при нарушении структуры", group=grp_dynsl)`);
+  lines.push(`dynsl_struct_mult = input.float(0.3, "Коэффициент сжатия SL", minval=0.1, maxval=0.9, step=0.1, group=grp_dynsl, active=use_dynsl_struct, tooltip="0.3 = SL × 0.3 при нарушении структуры")`);
+  lines.push(``);
+
   // Delayed entry
   lines.push(`grp_wait = "⏳ ОТЛОЖЕННЫЙ ВХОД"`);
   lines.push(`use_wait    = input.bool(${b(c.waitBars > 0 || c.waitRetrace)}, "Ждать отката", group=grp_wait)`);
@@ -868,10 +873,11 @@ function generatePineScript(r, mode = 'indicator') {
   lines.push(`bool sl_is_or = sl_logic == "ИЛИ (первый сработавший)"`);
   lines.push(`bool tp_is_or = tp_logic == "ИЛИ (первый сработавший)"`);
   lines.push(``);
-  lines.push(`calc_sl_level(int dir, float ep, float ac) =>`);
+  lines.push(`calc_sl_level(int dir, float ep, float ac, bool struct_ok) =>`);
     lines.push(`    float sl_atr_lvl = na`);
     lines.push(`    float sl_pct_lvl = na`);
     lines.push(`    float sl_piv_lvl = na`);
+  lines.push(`    float dyn_mult = (use_dynsl_struct and not struct_ok) ? dynsl_struct_mult : 1.0`);
   lines.push(`    int cnt = 0`);
   lines.push(`    if use_sl_atr`);
   lines.push(`        cnt += 1`);
@@ -905,6 +911,11 @@ function generatePineScript(r, mode = 'indicator') {
   lines.push(`                if na(farthest) or d > math.abs(ep - farthest)`);
   lines.push(`                    farthest := lv`);
   lines.push(`        result := sl_is_or ? closest : farthest`);
+  lines.push(`    // Apply Dynamic SL multiplier if structure broken`);
+  lines.push(`    if use_dynsl_struct and not struct_ok and not na(result)`);
+  lines.push(`        float sl_dist = math.abs(ep - result)`);
+  lines.push(`        float new_sl_dist = sl_dist * dyn_mult`);
+  lines.push(`        result := dir == 1 ? ep - new_sl_dist : ep + new_sl_dist`);
   lines.push(`    result`);
   lines.push(``);
   lines.push(`calc_tp_level(int dir, float ep, float ac, float sl_dist) =>`);
@@ -1163,7 +1174,7 @@ function generatePineScript(r, mode = 'indicator') {
     lines.push(`                    _wsl := float(na)`);
     lines.push(`                    _sig_skip := 0`);
     lines.push(`                    _cd_bar := -1`);
-  lines.push(`                    _dsl := _sl_over > 0 ? (entry_price - _ac * _sl_ov) : calc_sl_level(1, entry_price, _ac)`);
+  lines.push(`                    _dsl := _sl_over > 0 ? (entry_price - _ac * _sl_ov) : calc_sl_level(1, entry_price, _ac, struct_bull)`);
   lines.push(`                    float sl_d = math.abs(entry_price - _dsl)`);
   lines.push(`                    _dtp := _tp_over > 0 ? (entry_price + _ac * _tp_ov) : calc_tp_level(1, entry_price, _ac, sl_d)`);
   lines.push(`                    _eb := bar_index`);
@@ -1176,7 +1187,7 @@ function generatePineScript(r, mode = 'indicator') {
     lines.push(`                    _wsl := float(na)`);
     lines.push(`                    _sig_skip := 0`);
     lines.push(`                    _cd_bar := -1`);
-  lines.push(`                    _dsl := _sl_over > 0 ? (entry_price + _ac * _sl_ov) : calc_sl_level(-1, entry_price, _ac)`);
+  lines.push(`                    _dsl := _sl_over > 0 ? (entry_price + _ac * _sl_ov) : calc_sl_level(-1, entry_price, _ac, struct_bear)`);
   lines.push(`                    float sl_d = math.abs(entry_price - _dsl)`);
   lines.push(`                    _dtp := _tp_over > 0 ? (entry_price - _ac * _tp_ov) : calc_tp_level(-1, entry_price, _ac, sl_d)`);
   lines.push(`                    _eb := bar_index`);
@@ -1477,7 +1488,8 @@ function generatePineScript(r, mode = 'indicator') {
   lines.push(`            v_sig_skip := 0`);
   lines.push(`            v_cd_bar := -1`);
   lines.push(`            float _u = atr_v[1]`);
-  lines.push(`            v_sl := calc_sl_level(v_dir, entry_price, _u)`);
+  lines.push(`            bool struct_ok = v_dir == 1 ? struct_bull : struct_bear`);
+  lines.push(`            v_sl := calc_sl_level(v_dir, entry_price, _u, struct_ok)`);
   lines.push(`            float sl_d = math.abs(entry_price - v_sl)`);
   lines.push(`            v_tp := calc_tp_level(v_dir, entry_price, _u, sl_d)`);
   lines.push(`            v_eb := bar_index`);
@@ -1569,7 +1581,8 @@ function generatePineScript(r, mode = 'indicator') {
     lines.push(`        float _u = atr_v[1]`);
     lines.push(`        s_ep      := entry_price`);
     lines.push(`        s_dir     := s_do_dir`);
-    lines.push(`        s_sl      := calc_sl_level(s_dir, s_ep, _u)`);
+    lines.push(`        bool s_struct_ok = s_dir == 1 ? struct_bull : struct_bear`);
+    lines.push(`        s_sl      := calc_sl_level(s_dir, s_ep, _u, s_struct_ok)`);
     lines.push(`        float _sl_d = math.abs(s_ep - s_sl)`);
     lines.push(`        s_tp      := calc_tp_level(s_dir, s_ep, _u, _sl_d)`);
     lines.push(`        s_ep_bar  := bar_index`);
