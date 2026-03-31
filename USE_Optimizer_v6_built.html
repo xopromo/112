@@ -10785,10 +10785,10 @@ function generatePineScript(r, mode = 'indicator') {
   lines.push(`    int cnt = 0`);
   lines.push(`    if use_sl_atr`);
   lines.push(`        cnt += 1`);
-  lines.push(`        sl_atr_lvl := dir == 1 ? ep - ac * sl_atr_val : ep + ac * sl_atr_val`);
+  lines.push(`        sl_atr_lvl := dir == 1 ? ep - ac * sl_atr_val * sl_adaptive_mult : ep + ac * sl_atr_val * sl_adaptive_mult`);
   lines.push(`    if use_sl_pct`);
   lines.push(`        cnt += 1`);
-  lines.push(`        sl_pct_lvl := dir == 1 ? ep * (1 - sl_pct_val/100) : ep * (1 + sl_pct_val/100)`);
+  lines.push(`        sl_pct_lvl := dir == 1 ? ep * (1 - sl_pct_val * sl_adaptive_mult/100) : ep * (1 + sl_pct_val * sl_adaptive_mult/100)`);
   lines.push(`    if use_sl_piv`);
   lines.push(`        cnt += 1`);
   lines.push(`        float raw = dir == 1 ? dyn_sl_long_raw : dyn_sl_short_raw`);
@@ -10824,10 +10824,10 @@ function generatePineScript(r, mode = 'indicator') {
   lines.push(`    int cnt = 0`);
   lines.push(`    if use_tp_atr`);
   lines.push(`        cnt += 1`);
-  lines.push(`        tp_atr_lvl := dir == 1 ? ep + ac * tp_atr_val : ep - ac * tp_atr_val`);
+  lines.push(`        tp_atr_lvl := dir == 1 ? ep + ac * tp_atr_val * tp_adaptive_mult : ep - ac * tp_atr_val * tp_adaptive_mult`);
   lines.push(`    if use_tp_pct`);
   lines.push(`        cnt += 1`);
-  lines.push(`        tp_pct_lvl := dir == 1 ? ep * (1 + tp_pct_val/100) : ep * (1 - tp_pct_val/100)`);
+  lines.push(`        tp_pct_lvl := dir == 1 ? ep * (1 + tp_pct_val * tp_adaptive_mult/100) : ep * (1 - tp_pct_val * tp_adaptive_mult/100)`);
   lines.push(`    if use_tp_rr`);
   lines.push(`        cnt += 1`);
   lines.push(`        tp_rr_lvl := dir == 1 ? ep + sl_dist * tp_rr_val : ep - sl_dist * tp_rr_val`);
@@ -11623,6 +11623,13 @@ function generatePineScript(r, mode = 'indicator') {
   lines.push(`    d(13, "SL",  base_sl + 0.2, p_l2, w_l2, c_l2, dd_l2, p_l2 == best)`);
     lines.push(`    table.cell(t, 0, 14, "─────", bgcolor=c_bg, text_color=color.gray, text_size=table_sz)`);
     lines.push(`    table.merge_cells(t, 0, 14, 5, 14)`);
+  lines.push(`    // Kelly & Adaptive metrics`);
+  lines.push(`    if use_kelly or use_adaptive_tp or use_adaptive_sl`);
+  lines.push(`        kelly_txt = use_kelly ? ("Kelly: " + str.tostring(kelly_pct, "#.#") + "%") : "Kelly: OFF"`);
+  lines.push(`        adapt_txt = (use_adaptive_tp or use_adaptive_sl) ? (" | Adapt: " + str.tostring(atr_tp_ratio, "#.##") + " / " + str.tostring(atr_sl_ratio, "#.##")) : ""`);
+  lines.push(`        table.cell(t, 0, 16, kelly_txt + adapt_txt, bgcolor=color.new(color.cyan,40), text_color=color.white, text_size=table_sz)`);
+  lines.push(`        table.merge_cells(t, 0, 16, 5, 16)`);
+  lines.push(``);
   lines.push(`    float sl_ref = use_sl_atr ? sl_atr_val : use_sl_pct ? sl_pct_val : 1.5`);
   lines.push(`    float tp_ref = use_tp_atr ? tp_atr_val : use_tp_rr ? tp_rr_val : 3.0`);
   lines.push(`    float ev   = w_m/100 * tp_ref - (1-w_m/100) * sl_ref`);
@@ -30542,7 +30549,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774982124761;
+window._BUILD_TS = 1774982139525;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
