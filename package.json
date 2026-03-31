@@ -1,0 +1,17 @@
+{
+  "name": "use-optimizer",
+  "version": "6.0.0",
+  "description": "USE Optimizer — trading strategy optimizer for TradingView",
+  "private": true,
+  "scripts": {
+    "test": "node --test tests/unit/*.test.cjs",
+    "test:indicators": "node --test tests/unit/indicators.test.cjs",
+    "test:backtest":   "node --test tests/unit/backtest.test.cjs",
+    "test:metrics":    "node --test tests/unit/metrics.test.cjs",
+    "test:filters":    "node --test tests/unit/filters.test.cjs",
+    "test:pine":       "node --test tests/unit/pine_export.test.cjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
