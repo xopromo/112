@@ -1234,6 +1234,9 @@ async function runOpt() {
 
   // Exit flags
   const useBE=$c('x_be'),useTrail=$c('x_tr'),useRev=$c('x_rev');
+  const useDynSLStruct=$c('x_dynsl');  // Dynamic SL by structure break
+  const useAdaptiveTP=$c('x_adaptive_tp');
+  const useAdaptiveSL=$c('x_adaptive_sl');
   const revSrc=document.querySelector('.xmode-btn.active[id^="revsrc_"]')?.id?.replace('revsrc_','')||'same';
   const revSkipArr=useRev?parseRange('x_revskip'):[0];
   const revCooldownArr=useRev?parseRange('x_revcd'):[0];
@@ -1607,10 +1610,8 @@ async function runOpt() {
   // Count combos for progress
   const vsaMs=useVSA?parseRange('f_vsam'):[0];
   const dynSLStructMults=useDynSLStruct?parseRange('x_dynsl_m'):[0.3];  // Dynamic SL multipliers
-  const useAdaptiveTP=$c('x_adaptive_tp');
   const tpAtrLens=useAdaptiveTP?parseRange('x_tp_atr_len'):[20];
   const tpAtrMults=useAdaptiveTP?parseRange('x_tp_atr_mult'):[1.0];
-  const useAdaptiveSL=$c('x_adaptive_sl');
   const slAtrLens=useAdaptiveSL?parseRange('x_sl_atr_len'):[20];
   const slAtrMults=useAdaptiveSL?parseRange('x_sl_atr_mult'):[0.5];
   // Точное количество валидных BE комбинаций (beOff < beTrig)
