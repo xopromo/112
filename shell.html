@@ -1839,6 +1839,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
         <col style="width:60px"> <!-- ΔK-Ratio -->
         <col style="width:46px"> <!-- # ист -->
         <col style="width:46px"> <!-- # нов -->
+        <col style="width:62px"> <!-- Rate% -->
         <col style="width:104px"><!-- Оценка -->
       </colgroup>
       <thead>
@@ -1865,6 +1866,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
           <th onclick="doOOSSort('delta_kRatio')" class="oos-col-kr oos-th-delta" style="resize:horizontal">ΔK-Ratio ↕</th>
           <th class="oos-col-n oos-th-hist"># ист</th>
           <th class="oos-col-n oos-th-new" ># нов</th>
+          <th onclick="doOOSSort('rate')" class="oos-col-rate" style="resize:horizontal;background:var(--bg3);color:var(--accent);padding:5px 4px;border-bottom:1px solid var(--border2);cursor:pointer" title="Rate% = (PnL нов / баров нов) / (PnL ист / баров ист) × 100. 100% = одинаковый темп, &gt;100% = ускорение, &lt;100% = замедление">Rate% ↕</th>
           <th onclick="doOOSSort('score')" class="oos-col-score" style="overflow:hidden;background:var(--bg3);color:var(--accent);padding:5px 7px;border-bottom:1px solid var(--border2);cursor:pointer;resize:horizontal">Оценка ↕</th>
           <th id="oos-col-settings-btn" title="Настройки столбиков" style="cursor:pointer;width:20px;padding:2px 4px;background:var(--bg3);border-bottom:1px solid var(--border2)">⚙</th>
         </tr>
@@ -1887,6 +1889,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
           <td></td><td></td><td></td>
           <td style="padding:1px 2px"><input id="oof_on" type="number" placeholder="≥" oninput="applyOOSFilters()" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border2);border-radius:3px;color:var(--text);font-size:.65em;padding:1px 3px"></td>
           <td style="padding:1px 2px"><input id="oof_nn" type="number" placeholder="≥" oninput="applyOOSFilters()" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border2);border-radius:3px;color:var(--text);font-size:.65em;padding:1px 3px"></td>
+          <td style="padding:1px 2px"><input id="oof_rate" type="number" placeholder="≥" oninput="applyOOSFilters()" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border2);border-radius:3px;color:var(--text);font-size:.65em;padding:1px 3px"></td>
           <td style="padding:1px 2px">
             <select id="oof_score" onchange="applyOOSFilters()" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border2);border-radius:3px;color:var(--text);font-size:.62em;padding:1px 1px">
               <option value="">все</option>
@@ -1947,16 +1950,16 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
       <h3 style="margin:0;color:#c792ea" id="pine-modal-title">🌲 Pine Script v6 — генератор</h3>
       <button class="dp-close" onclick="closePineModal()" style="position:static">✕</button>
     </div>
-    <div style="flex-shrink:0;display:flex;gap:6px;margin-bottom:8px">
-      <button id="pine-tab-indicator" onclick="switchPineTab('indicator')" style="flex:1;padding:5px 8px;font-size:.72em;border-radius:4px;border:1px solid #c792ea;background:#c792ea;color:#000;cursor:pointer">📊 Индикатор</button>
-      <button id="pine-tab-strategy" onclick="switchPineTab('strategy')" style="flex:1;padding:5px 8px;font-size:.72em;border-radius:4px;border:1px solid var(--border);background:var(--bg2);color:var(--text2);cursor:pointer">⚡ Стратегия (strategy.exit)</button>
-    </div>
     <div style="flex-shrink:0;font-size:.65em;color:var(--text2);margin-bottom:8px" id="pine-desc">Готовый индикатор USE для TradingView</div>
     <textarea id="pine-code" readonly spellcheck="false"
       style="flex:1;min-height:420px;font-family:monospace;font-size:.7em;background:#0d1117;color:#a9b1d6;
              border:1px solid var(--border);border-radius:6px;padding:10px;resize:vertical;
              white-space:pre;overflow:auto;tab-size:4"></textarea>
-    <div style="flex-shrink:0;display:flex;gap:8px;margin-top:10px">
+    <div style="flex-shrink:0;display:flex;gap:6px;margin-top:10px">
+      <button id="pine-tab-indicator" onclick="switchPineTab('indicator')" style="flex:1;padding:5px 8px;font-size:.72em;border-radius:4px;border:1px solid #c792ea;background:#c792ea;color:#000;cursor:pointer">📊 Индикатор</button>
+      <button id="pine-tab-strategy" onclick="switchPineTab('strategy')" style="flex:1;padding:5px 8px;font-size:.72em;border-radius:4px;border:1px solid var(--border);background:var(--bg2);color:var(--text2);cursor:pointer">⚡ Стратегия (strategy.exit)</button>
+    </div>
+    <div style="flex-shrink:0;display:flex;gap:8px;margin-top:6px">
       <button class="tpl-btn2" onclick="copyPineCode()" style="flex:1;padding:8px">📋 Скопировать код</button>
       <button class="tpl-btn2" onclick="downloadPineCode()" style="flex:1;padding:8px;border-color:var(--green);color:var(--green)">⬇ Скачать .pine</button>
     </div>

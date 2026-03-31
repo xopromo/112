@@ -1839,6 +1839,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
         <col style="width:60px"> <!-- ΔK-Ratio -->
         <col style="width:46px"> <!-- # ист -->
         <col style="width:46px"> <!-- # нов -->
+        <col style="width:62px"> <!-- Rate% -->
         <col style="width:104px"><!-- Оценка -->
       </colgroup>
       <thead>
@@ -1865,6 +1866,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
           <th onclick="doOOSSort('delta_kRatio')" class="oos-col-kr oos-th-delta" style="resize:horizontal">ΔK-Ratio ↕</th>
           <th class="oos-col-n oos-th-hist"># ист</th>
           <th class="oos-col-n oos-th-new" ># нов</th>
+          <th onclick="doOOSSort('rate')" class="oos-col-rate" style="resize:horizontal;background:var(--bg3);color:var(--accent);padding:5px 4px;border-bottom:1px solid var(--border2);cursor:pointer" title="Rate% = (PnL нов / баров нов) / (PnL ист / баров ист) × 100. 100% = одинаковый темп, &gt;100% = ускорение, &lt;100% = замедление">Rate% ↕</th>
           <th onclick="doOOSSort('score')" class="oos-col-score" style="overflow:hidden;background:var(--bg3);color:var(--accent);padding:5px 7px;border-bottom:1px solid var(--border2);cursor:pointer;resize:horizontal">Оценка ↕</th>
           <th id="oos-col-settings-btn" title="Настройки столбиков" style="cursor:pointer;width:20px;padding:2px 4px;background:var(--bg3);border-bottom:1px solid var(--border2)">⚙</th>
         </tr>
@@ -1887,6 +1889,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
           <td></td><td></td><td></td>
           <td style="padding:1px 2px"><input id="oof_on" type="number" placeholder="≥" oninput="applyOOSFilters()" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border2);border-radius:3px;color:var(--text);font-size:.65em;padding:1px 3px"></td>
           <td style="padding:1px 2px"><input id="oof_nn" type="number" placeholder="≥" oninput="applyOOSFilters()" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border2);border-radius:3px;color:var(--text);font-size:.65em;padding:1px 3px"></td>
+          <td style="padding:1px 2px"><input id="oof_rate" type="number" placeholder="≥" oninput="applyOOSFilters()" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border2);border-radius:3px;color:var(--text);font-size:.65em;padding:1px 3px"></td>
           <td style="padding:1px 2px">
             <select id="oof_score" onchange="applyOOSFilters()" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border2);border-radius:3px;color:var(--text);font-size:.62em;padding:1px 1px">
               <option value="">все</option>
@@ -1947,16 +1950,16 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
       <h3 style="margin:0;color:#c792ea" id="pine-modal-title">🌲 Pine Script v6 — генератор</h3>
       <button class="dp-close" onclick="closePineModal()" style="position:static">✕</button>
     </div>
-    <div style="flex-shrink:0;display:flex;gap:6px;margin-bottom:8px">
-      <button id="pine-tab-indicator" onclick="switchPineTab('indicator')" style="flex:1;padding:5px 8px;font-size:.72em;border-radius:4px;border:1px solid #c792ea;background:#c792ea;color:#000;cursor:pointer">📊 Индикатор</button>
-      <button id="pine-tab-strategy" onclick="switchPineTab('strategy')" style="flex:1;padding:5px 8px;font-size:.72em;border-radius:4px;border:1px solid var(--border);background:var(--bg2);color:var(--text2);cursor:pointer">⚡ Стратегия (strategy.exit)</button>
-    </div>
     <div style="flex-shrink:0;font-size:.65em;color:var(--text2);margin-bottom:8px" id="pine-desc">Готовый индикатор USE для TradingView</div>
     <textarea id="pine-code" readonly spellcheck="false"
       style="flex:1;min-height:420px;font-family:monospace;font-size:.7em;background:#0d1117;color:#a9b1d6;
              border:1px solid var(--border);border-radius:6px;padding:10px;resize:vertical;
              white-space:pre;overflow:auto;tab-size:4"></textarea>
-    <div style="flex-shrink:0;display:flex;gap:8px;margin-top:10px">
+    <div style="flex-shrink:0;display:flex;gap:6px;margin-top:10px">
+      <button id="pine-tab-indicator" onclick="switchPineTab('indicator')" style="flex:1;padding:5px 8px;font-size:.72em;border-radius:4px;border:1px solid #c792ea;background:#c792ea;color:#000;cursor:pointer">📊 Индикатор</button>
+      <button id="pine-tab-strategy" onclick="switchPineTab('strategy')" style="flex:1;padding:5px 8px;font-size:.72em;border-radius:4px;border:1px solid var(--border);background:var(--bg2);color:var(--text2);cursor:pointer">⚡ Стратегия (strategy.exit)</button>
+    </div>
+    <div style="flex-shrink:0;display:flex;gap:8px;margin-top:6px">
       <button class="tpl-btn2" onclick="copyPineCode()" style="flex:1;padding:8px">📋 Скопировать код</button>
       <button class="tpl-btn2" onclick="downloadPineCode()" style="flex:1;padding:8px;border-color:var(--green);color:var(--green)">⬇ Скачать .pine</button>
     </div>
@@ -10784,10 +10787,10 @@ function generatePineScript(r, mode = 'indicator') {
   lines.push(`    int cnt = 0`);
   lines.push(`    if use_sl_atr`);
   lines.push(`        cnt += 1`);
-  lines.push(`        sl_atr_lvl := dir == 1 ? ep - ac * sl_atr_val : ep + ac * sl_atr_val`);
+  lines.push(`        sl_atr_lvl := dir == 1 ? ep - ac * sl_atr_val * sl_adaptive_mult : ep + ac * sl_atr_val * sl_adaptive_mult`);
   lines.push(`    if use_sl_pct`);
   lines.push(`        cnt += 1`);
-  lines.push(`        sl_pct_lvl := dir == 1 ? ep * (1 - sl_pct_val/100) : ep * (1 + sl_pct_val/100)`);
+  lines.push(`        sl_pct_lvl := dir == 1 ? ep * (1 - sl_pct_val * sl_adaptive_mult/100) : ep * (1 + sl_pct_val * sl_adaptive_mult/100)`);
   lines.push(`    if use_sl_piv`);
   lines.push(`        cnt += 1`);
   lines.push(`        float raw = dir == 1 ? dyn_sl_long_raw : dyn_sl_short_raw`);
@@ -10823,10 +10826,10 @@ function generatePineScript(r, mode = 'indicator') {
   lines.push(`    int cnt = 0`);
   lines.push(`    if use_tp_atr`);
   lines.push(`        cnt += 1`);
-  lines.push(`        tp_atr_lvl := dir == 1 ? ep + ac * tp_atr_val : ep - ac * tp_atr_val`);
+  lines.push(`        tp_atr_lvl := dir == 1 ? ep + ac * tp_atr_val * tp_adaptive_mult : ep - ac * tp_atr_val * tp_adaptive_mult`);
   lines.push(`    if use_tp_pct`);
   lines.push(`        cnt += 1`);
-  lines.push(`        tp_pct_lvl := dir == 1 ? ep * (1 + tp_pct_val/100) : ep * (1 - tp_pct_val/100)`);
+  lines.push(`        tp_pct_lvl := dir == 1 ? ep * (1 + tp_pct_val * tp_adaptive_mult/100) : ep * (1 - tp_pct_val * tp_adaptive_mult/100)`);
   lines.push(`    if use_tp_rr`);
   lines.push(`        cnt += 1`);
   lines.push(`        tp_rr_lvl := dir == 1 ? ep + sl_dist * tp_rr_val : ep - sl_dist * tp_rr_val`);
@@ -11622,6 +11625,13 @@ function generatePineScript(r, mode = 'indicator') {
   lines.push(`    d(13, "SL",  base_sl + 0.2, p_l2, w_l2, c_l2, dd_l2, p_l2 == best)`);
     lines.push(`    table.cell(t, 0, 14, "─────", bgcolor=c_bg, text_color=color.gray, text_size=table_sz)`);
     lines.push(`    table.merge_cells(t, 0, 14, 5, 14)`);
+  lines.push(`    // Kelly & Adaptive metrics`);
+  lines.push(`    if use_kelly or use_adaptive_tp or use_adaptive_sl`);
+  lines.push(`        kelly_txt = use_kelly ? ("Kelly: " + str.tostring(kelly_pct, "#.#") + "%") : "Kelly: OFF"`);
+  lines.push(`        adapt_txt = (use_adaptive_tp or use_adaptive_sl) ? (" | Adapt: " + str.tostring(atr_tp_ratio, "#.##") + " / " + str.tostring(atr_sl_ratio, "#.##")) : ""`);
+  lines.push(`        table.cell(t, 0, 16, kelly_txt + adapt_txt, bgcolor=color.new(color.cyan,40), text_color=color.white, text_size=table_sz)`);
+  lines.push(`        table.merge_cells(t, 0, 16, 5, 16)`);
+  lines.push(``);
   lines.push(`    float sl_ref = use_sl_atr ? sl_atr_val : use_sl_pct ? sl_pct_val : 1.5`);
   lines.push(`    float tp_ref = use_tp_atr ? tp_atr_val : use_tp_rr ? tp_rr_val : 3.0`);
   lines.push(`    float ev   = w_m/100 * tp_ref - (1-w_m/100) * sl_ref`);
@@ -24921,6 +24931,7 @@ const _OOS_COL_DEFS = [
   { id: 'oos-col-wr',      label: 'WR%',               default: true },
   { id: 'oos-col-kr',      label: 'K-Ratio',           default: true },
   { id: 'oos-col-n',       label: '# сделок',          default: true },
+  { id: 'oos-col-rate',    label: 'Rate%',             default: true },
   { id: 'oos-col-score',   label: 'Оценка',            default: true },
 ];
 
@@ -26944,6 +26955,7 @@ function applyOOSFilters() {
   const fon    = parseFloat(document.getElementById('oof_on')?.value);
   const fnn    = parseFloat(document.getElementById('oof_nn')?.value);
   const fscore = document.getElementById('oof_score')?.value || '';
+  const frate  = parseFloat(document.getElementById('oof_rate')?.value);
 
   const src = _oosTableResults.filter(r => {
     if (fname && !r.name.toLowerCase().includes(fname)) return false;
@@ -26967,6 +26979,7 @@ function applyOOSFilters() {
       if (!isNaN(fdapt)) { const da = (ao!=null&&an!=null)?an-ao:null; if(da==null||da<fdapt) return false; }
       if (!isNaN(fdwr) && (r.delta_wr ?? -Infinity) < fdwr) return false;
     }
+    if (!isNaN(frate) && (r.rate == null || r.rate < frate)) return false;
     if (fscore) {
       const badge = _oosGetBadge(r);
       if (badge !== fscore) return false;
@@ -27034,6 +27047,7 @@ function applyOOSFilters() {
       `<td class="oos-col-kr ${pCls(r.delta_kRatio)}">${r.delta_kRatio != null ? (r.delta_kRatio >= 0 ? '+' : '') + r.delta_kRatio.toFixed(2) : '—'}</td>` +
       `<td class="oos-col-n muted" style="text-align:center">${r.old_n??'—'}</td>` +
       `<td class="oos-col-n muted" style="text-align:center">${r.new_n??'—'}</td>` +
+      `<td class="oos-col-rate ${r.rate==null?'':r.rate>=70?'pos':r.rate>=30?'warn':'neg'}" style="text-align:center" title="Скорость роста нов/ист × 100%. 100% = равная скорость">${r.rate!=null?Math.round(r.rate)+'%':'—'}</td>` +
       `<td class="oos-col-score" style="text-align:center"><span class="oos-badge ${badge} ${oosCls}">${oosScore}</span></td>` +
       `</tr>`;
   }
@@ -27490,6 +27504,7 @@ function _getOOSSortVal(r, key) {
     const an = (NEW_DATA && r.new_pnl !== null) ? r.new_pnl / NEW_DATA.length * 1000 : null;
     return (ao !== null && an !== null) ? an - ao : null;
   }
+  if (key === 'rate') return r.rate ?? null;
   if (key === 'score') {
     if (r.new_pnl > 0) {
       const ao = (r.old_n > 0) ? r.old_pnl / r.old_n : 0;
@@ -27664,6 +27679,14 @@ async function runOOSOnNewData() {
       old_bars:  DATA ? DATA.length : null,
       new_bars:  NEW_DATA ? NEW_DATA.length : null,
       _overlapBars: _overlapIdx,               // для отладки: сколько баров пересечения
+      rate: (() => {
+        const _ob = DATA ? DATA.length : 0;
+        const _nb = NEW_DATA ? (NEW_DATA.length - _overlapIdx) : 0;
+        if (_ob > 0 && _nb > 0 && rOld && rOld.pnl > 0 && new_pnl != null) {
+          return (new_pnl / _nb) / (rOld.pnl / _ob) * 100;
+        }
+        return null;
+      })(),
       old_eq:    rOld ? rOld.eq  : null,       // equity curve на истории
       new_eq:    rNew ? rNew.eq  : null,       // equity curve на новых данных (полная, график обрезает сам)
     });
@@ -30533,7 +30556,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774982922853;
+window._BUILD_TS = 1774984227069;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
