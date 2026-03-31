@@ -963,8 +963,8 @@ function renderVisibleResults() {
     const stable = r.dwr < 10 ? '✅' : r.dwr < 20 ? '⚠️' : '❌';
     const lsSc = r.dwrLS===null||r.dwrLS===undefined ? 'na' : r.dwrLS<10?'ok':r.dwrLS<25?'warn':'bad';
     const lsIcon = r.dwrLS===null||r.dwrLS===undefined ? '—' : r.dwrLS<10?'✅':r.dwrLS<25?'⚠️':'❌';
-    const pnlCls = r.pnl >= 0 ? 'pos' : 'neg';
-    const pddCls = r.pdd >= 10 ? 'pos' : r.pdd >= 5 ? 'warn' : 'neg';
+    const pnlCls = (r.pnl ?? 0) >= 0 ? 'pos' : 'neg';
+    const pddCls = (r.pdd ?? 0) >= 10 ? 'pos' : (r.pdd ?? 0) >= 5 ? 'warn' : 'neg';
     let robCell = '—';
     if (r.robScore !== undefined && r.robMax > 0) {
       // Нормализуем к шкале 0-5 для пиктограммы
@@ -997,11 +997,11 @@ function renderVisibleResults() {
       `<tr data-i="${rii}" style="cursor:pointer">` +
       `<td class="accent" style="font-size:.66em;max-width:380px;overflow:hidden;text-overflow:ellipsis;user-select:text;cursor:text" title="${r.name}">${r.name}${delBtn}</td>` +
       `<td class="col-fav" style="font-size:.85em" data-fav="${rii}" data-level="${favLvl}">${fav}</td>` +
-      `<td class="col-pnl ${pnlCls}">${r.pnl.toFixed(1)}</td>` +
-      `<td class="col-wr">${r.wr.toFixed(1)}</td>` +
-      `<td class="col-n muted">${r.n}</td>` +
-      `<td class="col-dd neg">${r.dd.toFixed(1)}</td>` +
-      `<td class="col-pdd ${pddCls}">${r.pdd.toFixed(1)}</td>` +
+      `<td class="col-pnl ${pnlCls}">${r.pnl != null ? r.pnl.toFixed(1) : '—'}</td>` +
+      `<td class="col-wr">${r.wr != null ? r.wr.toFixed(1) : '—'}</td>` +
+      `<td class="col-n muted">${r.n ?? '—'}</td>` +
+      `<td class="col-dd neg">${r.dd != null ? r.dd.toFixed(1) : '—'}</td>` +
+      `<td class="col-pdd ${pddCls}">${r.pdd != null ? r.pdd.toFixed(1) : '—'}</td>` +
       (()=>{ const s=r.sig??0; const sc=s>=90?'pos':s>=70?'':'neg'; return `<td class="col-sig ${sc}" title="Статистическая значимость WR (z-тест)\n≥90% = значима ✅\n70–90% = под вопросом\n&lt;70% = вероятно случайно">${s}%</td>`; })() +
       (()=>{ const g=r.gt??-2; const gc=g>=5?'pos':g>=2?'':'neg'; return `<td class="col-gt ${gc}" title="GT-Score = (P/DD) × sig_mult × consistency_mult\nАнтиовефиттинг метрика: штрафует за мало сделок и нестабильный WR">${g.toFixed(2)}</td>`; })() +
       (()=>{ const v=r.cvr??null; if(v===null) return '<td class="col-cvr muted">—</td>'; const vc=v>=80?'pos':v>=50?'':'neg'; return `<td class="col-cvr ${vc}" title="CVR% — Temporal Cross-Validation Robustness\nПроцент из 6 временных окон, где стратегия прибыльна.\n≥80% = устойчива ✅ | 50–80% = умеренно | &lt;50% = нестабильна">${v}%</td>`; })() +
@@ -2384,6 +2384,8 @@ function toggleOOSFav(idx, event) {
   if (event) event.stopPropagation();
   const r = _oosTableResults[idx];
   if (!r) return;
+  // Не сохраняем если бэктест на исходных данных упал — pnl/wr/dd будут null
+  if (r.pnl == null || r.wr == null || r.dd == null) return;
   toggleFav(r, event, 2); // startLevel=2: из OOS = проверено на новых данных
 }
 
@@ -7702,7 +7704,7 @@ function drawOOSChart(idx, rowEl) {
   ctx.fillText(nameShort, pad, H - 4);
 
   // Сохраняем параметры графика для mouse tracking
-  window._oosChartParams = { combined, mn, range, pad, W, H, splitFrac, splitIdx };
+  window._oosChartParams = { combined, mn, range, pad, W, H, splitFrac, splitIdx, dpr };
 
   // Добавляем mouse tracking к OOS crosshair canvas (уже отрисован в overlayе)
   const oosCharts = document.getElementById('oos-crosshair');
@@ -7724,17 +7726,14 @@ function _drawOOSCrosshair(e) {
   const ch = e.target; // сам crosshair canvas
   if (!ch) return;
 
-  const canvas = document.getElementById('oos-eqc');
-  if (!canvas) return;
+  const { combined, mn, range, pad, W, H, dpr: _dpr } = p;
+  const dpr = _dpr || window.devicePixelRatio || 1;
 
   const rect = ch.getBoundingClientRect();
-  const scaleX = canvas.width / rect.width;
-  const scaleY = canvas.height / rect.height;
 
-  const cx = (e.clientX - rect.left) * scaleX / 2;
-  const cy = (e.clientY - rect.top) * scaleY / 2;
-
-  const { combined, mn, range, pad, W, H } = p;
+  // cx/cy в CSS-пикселях = координатное пространство графика (W=offsetWidth, H=offsetHeight)
+  const cx = (e.clientX - rect.left) * (W / rect.width);
+  const cy = (e.clientY - rect.top)  * (H / rect.height);
 
   if (cx < pad || cx > W - pad || cy < pad || cy > H - pad) {
     ch.getContext('2d').clearRect(0, 0, ch.width, ch.height);
@@ -7752,7 +7751,7 @@ function _drawOOSCrosshair(e) {
   const ctx = ch.getContext('2d');
   ctx.clearRect(0, 0, ch.width, ch.height);
   ctx.save();
-  ctx.scale(2, 2);
+  ctx.scale(dpr, dpr);
 
   // Вертикальная линия
   ctx.strokeStyle = 'rgba(255,255,255,0.35)';
