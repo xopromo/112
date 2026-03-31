@@ -461,6 +461,7 @@ function switchTableMode(mode) {
     if (stdScroll)   stdScroll.style.display   = 'none';
     if (oosTbl)      oosTbl.style.display       = '';
     if (eqWrap)      eqWrap.style.display       = 'none'; // стандартный график скрыть
+    document.body.classList.remove('chart-active');
     // OOS график покажет drawOOSChart при клике по строке
     // Инициализация настроек столбиков OOS
     _initOOSColSettings();
@@ -473,6 +474,7 @@ function switchTableMode(mode) {
     if (stdScroll)   stdScroll.style.display   = '';
     if (oosTbl)      oosTbl.style.display       = 'none';
     if (oosChrtWrap) oosChrtWrap.style.display  = 'none'; // OOS график скрыть
+    document.body.classList.remove('chart-active');
     // eq-wrap управляет собственной видимостью через drawEquityData
   }
   // Панель новых данных — во всех режимах
@@ -3347,6 +3349,7 @@ function drawEquityData(eq, label, splitPct) {
   const _scrollT = _scrollEl.scrollTop;
   if (wrap) wrap.style.display = 'block';
   canvas.style.display='block';
+  document.body.classList.add('chart-active');
   // Восстанавливаем позицию немедленно
   window.scrollTo({top: _scrollY, behavior: 'instant'});
   _scrollEl.scrollTop = _scrollT;
@@ -7588,6 +7591,7 @@ function drawOOSChart(idx, rowEl) {
   // Скрываем основной график и показываем OOS
   if (eqWrap) eqWrap.style.display = 'none';
   wrap.style.display = 'block';
+  document.body.classList.add('chart-active');
 
   const eq_old = r.old_eq;
   const eq_new = r.new_eq;
@@ -8355,6 +8359,7 @@ async function setProject(id) {
   results = []; equities = {};
   if ($('tb')) $('tb').innerHTML = '';
   if ($('eqc')) $('eqc').style.display = 'none';
+  document.body.classList.remove('chart-active');
   if ($('rbtn')) $('rbtn').disabled = true;
 
   // Update UI
