@@ -9991,7 +9991,7 @@ function generatePineScript(r, mode = 'indicator') {
   lines.push(`// PnL: ${r.pnl.toFixed(1)}%  WR: ${r.wr.toFixed(1)}%  Сделок: ${r.n}  DD: ${r.dd.toFixed(1)}%`);
   lines.push(`// ============================================================`);
   if (mode === 'strategy') {
-    lines.push(`strategy("USE [${r.name}]", shorttitle="USE_STR", overlay=true, commission_type=strategy.commission.percent, commission_value=${comm.toFixed(4)}, initial_capital=10000, default_qty_type=strategy.percent_of_equity, default_qty_value=100, pyramiding=0, max_lines_count=500, max_labels_count=500, max_boxes_count=500)`);
+    lines.push(`strategy("USE [${r.name}]", shorttitle="USE_STR", overlay=true, commission_type=strategy.commission.percent, commission_value=${comm.toFixed(4)}, initial_capital=10000, default_qty_type=strategy.percent_of_equity, default_qty_value=100, pyramiding=0, process_orders_on_close=true, max_lines_count=500, max_labels_count=500, max_boxes_count=500)`);
   } else {
     lines.push(`indicator("USE [${r.name}]", shorttitle="USE_EXP", overlay=true, max_lines_count=500, max_labels_count=500, max_boxes_count=500)`);
   }
@@ -15736,7 +15736,17 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
           const retraceOk = !cfg.waitRetrace ||
             (pendingDir === 1  && bar.c < pendingSigClose) ||
             (pendingDir === -1 && bar.c > pendingSigClose);
-          if (barsOk && retraceOk) { doDir = pendingDir; pendingDir = 0; }
+          if (barsOk && retraceOk) {
+            // Пересчитываем фильтры на баре входа (как в TradingView)
+            let _pendingFilterOk = true;
+            for (let _fi = 0; _fi < activeFilters.length && _pendingFilterOk; _fi++) {
+              const _f = activeFilters[_fi];
+              if (pendingDir === 1  && _f.blocksL(cfg, i, ac)) _pendingFilterOk = false;
+              if (pendingDir === -1 && _f.blocksS(cfg, i, ac)) _pendingFilterOk = false;
+            }
+            if (_pendingFilterOk) { doDir = pendingDir; }
+            pendingDir = 0;
+          }
         }
       }
 
@@ -30856,7 +30866,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774996458445;
+window._BUILD_TS = 1775000068228;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;

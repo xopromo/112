@@ -877,7 +877,17 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
           const retraceOk = !cfg.waitRetrace ||
             (pendingDir === 1  && bar.c < pendingSigClose) ||
             (pendingDir === -1 && bar.c > pendingSigClose);
-          if (barsOk && retraceOk) { doDir = pendingDir; pendingDir = 0; }
+          if (barsOk && retraceOk) {
+            // Пересчитываем фильтры на баре входа (как в TradingView)
+            let _pendingFilterOk = true;
+            for (let _fi = 0; _fi < activeFilters.length && _pendingFilterOk; _fi++) {
+              const _f = activeFilters[_fi];
+              if (pendingDir === 1  && _f.blocksL(cfg, i, ac)) _pendingFilterOk = false;
+              if (pendingDir === -1 && _f.blocksS(cfg, i, ac)) _pendingFilterOk = false;
+            }
+            if (_pendingFilterOk) { doDir = pendingDir; }
+            pendingDir = 0;
+          }
         }
       }
 
