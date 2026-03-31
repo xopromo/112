@@ -113,6 +113,24 @@ else
 fi
 
 # ======================================================================
+# 🔴 Критично 7: Unit-тесты (136 тестов — индикаторы, backtest, метрики, фильтры, pine)
+# ======================================================================
+echo "  Запуск unit-тестов..."
+if command -v node &>/dev/null && [ -f "tests/unit/indicators.test.cjs" ]; then
+  if node --test tests/unit/*.test.cjs 2>&1 | grep -q "^# fail [^0]"; then
+    FAIL_COUNT=$(node --test tests/unit/*.test.cjs 2>&1 | grep "^# fail" | awk '{print $3}')
+    echo "  ❌ ОШИБКА: Unit-тесты провалились ($FAIL_COUNT тестов)"
+    node --test tests/unit/*.test.cjs 2>&1 | grep "not ok" | head -5
+    ERRORS=$((ERRORS + 1))
+  else
+    PASS_COUNT=$(node --test tests/unit/*.test.cjs 2>&1 | grep "^# pass" | awk '{print $3}')
+    echo "  ✓ Unit-тесты: $PASS_COUNT пройдено"
+  fi
+else
+  echo "  ⚠️  WARNING: node или тесты не найдены — пропускаем"
+fi
+
+# ======================================================================
 # Результаты
 # ======================================================================
 echo ""
