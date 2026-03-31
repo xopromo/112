@@ -3017,6 +3017,11 @@ async function runOpt() {
                                     const matPeriod   = _ip.matPeriod   ?? window._ipDef.matPeriod;
                                     const matZone     = _ip.matZone     ?? window._ipDef.matZone;
                                     const tlZonePct   = _ip.tlZonePct   ?? window._ipDef.tlZonePct;
+                                    const tpAtrLen    = _ip.tpAtrLen    ?? window._ipDef.tpAtrLen ?? 20;
+                                    const tpAtrMult   = _ip.tpAtrMult   ?? window._ipDef.tpAtrMult ?? 1.0;
+                                    const slAtrLen    = _ip.slAtrLen    ?? window._ipDef.slAtrLen ?? 20;
+                                    const slAtrMult   = _ip.slAtrMult   ?? window._ipDef.slAtrMult ?? 0.5;
+                                    const dynSLStructMult = _ip.dynSLStructMult ?? window._ipDef.dynSLStructMult ?? 0.3;
                                     const rsiExitArr = useRsiExit   ? (rsiExitCache[rsiExitPer]||(rsiExitCache[rsiExitPer]=calcRSI(rsiExitPer))) : null;
                                     const kalmanCrossArr = useKalmanCross ? (()=>{const k=kalmanCrossLen;return kalmanCrossCache[k]||(kalmanCrossCache[k]=_buildKalmanVelocity(closes,k));})() : null; // ##KALMAN_CROSS##
                                     const kalmanArr = useKalmanMA ? (()=>{return kalmanMACache[kalmanLen]||(kalmanMACache[kalmanLen]=_buildKalmanVelocity(closes,kalmanLen));})() : null; // ##KALMAN_MA##
