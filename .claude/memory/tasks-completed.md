@@ -144,35 +144,54 @@
 
 ---
 
-## Текущие задачи для внедрения
+## 2026-03-31: OOS trade comparison diagnostic
 
-### 🔴 Приоритет 1: HC IS/OOS split
+**Задача**: Сравнить сделки JS оптимизатора с TV (List of Trades CSV)
+**Файлы**: ui.js (`showOOSTradeDiag`, `_parseListOfTrades`, `_parseIndicatorExport`)
+**Статус**: ✅ Готово (PR #173-175)
 
-**Файл**: ui.js (HC таблица и detail)
-**Необходимо**: Создать `_hcBuildOOS(cfg)` который пересчитает IS/OOS для соседей
-**Время**: ~2ч
-**Выигрыш**: HC результаты будут иметь TV-колонки
+**Что реализовано**:
+- Парсинг TV "List of Trades" CSV (стратегия) и индикаторного EL/ES/XL/XS CSV
+- Классификация расхождений: EXIT_PRICE / MISSING_TV / MISSING_OPT / FULL_MATCH
+- UI таблица с детализацией по каждой сделке
 
-### 🔴 Приоритет 1: Sortino Ratio экспорт
+---
 
-**Файлы**: opt.js (добавить в results.push), ui.js (колонка)
-**Необходимо**: Раскомментировать формулу, добавить в UI
-**Время**: ~30м
-**Выигрыш**: Более надёжная оценка
+## 2026-03-31: ADX slope units + calcHTFADX fallback fix
 
-### 🟡 Приоритет 2: WASM оптимизация
+**Задача**: Устранить расхождение JS vs Pine в ADX slope фильтре и HTF расчёте
+**Файлы**: filter_registry.js, core.js
+**Статус**: ✅ Готово (PR #176)
 
-**Файл**: Новый (rust + wasm)
-**Необходимо**: Перевести backtest цикл на Rust
-**Время**: ~1-2 недели
-**Выигрыш**: 15x ускорение
+**Баги**:
+- `adxSlopeBars` в JS был в базовых барах, Pine — в HTF барах → теперь `× htfRatio`
+- `Math.floor((i+1)/htfRatio)-1` lookahead → исправлено на `Math.floor(i/htfRatio)-1`
 
-### 🟢 Приоритет 3: Дизайн-аудит хук
+---
 
-**Файлы**: scripts/dumb-checks.sh
-**Необходимо**: Pre-push hook для проверки стиля
-**Время**: ~1ч
-**Выигрыш**: Блокирует глупые ошибки
+## 2026-03-31: Pine Strategy export (strategy.exit с точными ценами)
+
+**Задача**: Выход из сделок по точной цене SL/TP (не на закрытии свечи)
+**Файлы**: pine_export.js, shell.html, ui.js
+**Статус**: ✅ Готово (PR #176)
+
+**Решение**: `generatePineStrategy(r)` генерирует `strategy()` с `strategy.exit(stop=sl, limit=tp)`.
+TV исполняет SL/TP интрабарно. Для OOS сравнения — экспортировать "List of Trades" из стратегии.
+UI: вкладки Индикатор / Стратегия в Pine Script модале.
+
+---
+
+## 2026-03-31: Починена инфраструктура (sync + hooks + dumb-checks)
+
+**Задача**: sync_claude_md.sh не работал (устаревший regex), хуки не установлены
+**Файлы**: agent/sync_claude_md.sh, .claude/scripts/dumb-checks.sh, .git/hooks/
+**Статус**: ✅ Готово
+
+**Что сделано**:
+- Новый regex для bullet-формата `` `name` (NUM) `` вместо старого `| name | NUM |`
+- Добавлены новые функции в FUNCS: generatePineStrategy, openOOSDiagnostic, showOOSTradeDiag, calcHTFADX
+- Хуки установлены: pre-push (dumb-checks) + post-commit (sync номеров строк)
+- dumb-checks: console.* в ядре (opt.js/core.js) → ERROR; warmup отсутствие → ERROR; sync CLAUDE.md → ERROR
 
 ---
 

@@ -285,6 +285,8 @@ header .sub {
 }
 table { width: 100%; border-collapse: collapse; }
 thead { position: sticky; top: 0; z-index: 10; }
+/* Когда чарт прилип сверху — заголовки уезжают вместе с таблицей */
+body.chart-active thead { position: relative; top: auto; }
 th {
   background: var(--bg3);
   color: var(--accent);
