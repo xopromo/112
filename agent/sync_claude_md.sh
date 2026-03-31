@@ -12,40 +12,43 @@ CHECK_ONLY=false
 [[ "${1:-}" == "--check" ]] && CHECK_ONLY=true
 
 python3 - "$REPO_DIR" "$CLAUDE_MD" "$CHECK_ONLY" <<'PYEOF'
-import sys, re, subprocess
+import sys, re
 
 repo, claude_md, check_only = sys.argv[1], sys.argv[2], sys.argv[3] == "true"
 
 # Список: (файл, grep-паттерн, имя-в-карте)
 # Паттерн должен однозначно матчить ОДНУ строку с определением функции/константы
 FUNCS = [
-    ("opt.js",        r"^function parseRange\(",           "parseRange"),
-    ("opt.js",        r"^function _calcStatSig\(",         "_calcStatSig"),
-    ("opt.js",        r"^function _calcGTScore\(",         "_calcGTScore"),
-    ("opt.js",        r"^function buildName\(",            "buildName"),
-    ("opt.js",        r"^async function runOpt\(",         "runOpt"),
-    ("opt.js",        r"^  function _runOOS\(",            "_runOOS"),
-    ("opt.js",        r"^  function _attachOOS\(",         "_attachOOS"),
-    ("opt.js",        r"^function _calcIndicators\(",      "_calcIndicators"),
-    ("opt.js",        r"^function buildBtCfg\(",           "buildBtCfg"),
-    ("opt.js",        r"^async function runMassRobust\(",  "runMassRobust"),
-    ("opt.js",        r"^async function runRobustScoreFor\(",  "runRobustScoreFor"),
-    ("opt.js",        r"^async function runRobustScoreForDetailed\(",  "runRobustScoreForDetailed"),
-    ("opt.js",        r"^const HC_NUMERIC_PARAMS\s*=",    "HC_NUMERIC_PARAMS"),
-    ("ui.js",         r"^function switchTableMode\(",      "switchTableMode"),
-    ("ui.js",         r"^function resetAllFilters\(",      "resetAllFilters"),
-    ("ui.js",         r"^function applyFilters\(",         "applyFilters"),
-    ("ui.js",         r"^async function runOOSScan\(",     "runOOSScan"),
-    ("ui.js",         r"^function openHCModal\(",          "openHCModal"),
-    ("ui.js",         r"^async function _hcRobScore\(",    "_hcRobScore"),
-    ("ui.js",         r"^function _hcRunBacktest\(",       "_hcRunBacktest"),
-    ("ui.js",         r"^function _hcNeighbours\(",        "_hcNeighbours"),
-    ("ui.js",         r"^async function runHillClimbing\(","runHillClimbing"),
-    ("ui.js",         r"^function _hcOpenDetail\(",        "_hcOpenDetail"),
-    ("pine_export.js",r"^function generatePineScript\(",  "generatePineScript"),
-    ("pine_export.js",r"^function fixPineScript\(",        "fixPineScript"),
-    ("pine_export.js",r"^function _addActivePinev6\(",    "_addActivePinev6"),
-    ("core.js",       r"^function backtest\(",             "backtest"),
+    ("opt.js",        r"^function parseRange\(",              "parseRange"),
+    ("opt.js",        r"^function _calcStatSig\(",            "_calcStatSig"),
+    ("opt.js",        r"^function _calcGTScore\(",            "_calcGTScore"),
+    ("opt.js",        r"^async function runOpt\(",            "runOpt"),
+    ("opt.js",        r"^  function _runOOS\(",               "_runOOS"),
+    ("opt.js",        r"^  function _attachOOS\(",            "_attachOOS"),
+    ("opt.js",        r"^function _calcIndicators\(",         "_calcIndicators"),
+    ("opt.js",        r"^function buildBtCfg\(",              "buildBtCfg"),
+    ("opt.js",        r"^async function runMassRobust\(",     "runMassRobust"),
+    ("opt.js",        r"^async function runRobustScoreFor\(", "runRobustScoreFor"),
+    ("opt.js",        r"^const HC_NUMERIC_PARAMS\s*=",        "HC_NUMERIC_PARAMS"),
+    ("ui.js",         r"^function showDetail\(",              "showDetail"),
+    ("ui.js",         r"^function switchTableMode\(",         "switchTableMode"),
+    ("ui.js",         r"^function resetAllFilters\(",         "resetAllFilters"),
+    ("ui.js",         r"^function applyFilters\(",            "applyFilters"),
+    ("ui.js",         r"^async function runOOSScan\(",        "runOOSScan"),
+    ("ui.js",         r"^function openHCModal\(",             "openHCModal"),
+    ("ui.js",         r"^async function _hcRobScore\(",       "_hcRobScore"),
+    ("ui.js",         r"^function _hcRunBacktest\(",          "_hcRunBacktest"),
+    ("ui.js",         r"^function _hcNeighbours\(",           "_hcNeighbours"),
+    ("ui.js",         r"^async function runHillClimbing\(",   "runHillClimbing"),
+    ("ui.js",         r"^function _hcOpenDetail\(",           "_hcOpenDetail"),
+    ("ui.js",         r"^function openOOSDiagnostic\(",       "openOOSDiagnostic"),
+    ("ui.js",         r"^function showOOSTradeDiag\(",        "showOOSTradeDiag"),
+    ("pine_export.js",r"^function generatePineScript\(",      "generatePineScript"),
+    ("pine_export.js",r"^function generatePineStrategy\(",    "generatePineStrategy"),
+    ("pine_export.js",r"^function fixPineScript\(",           "fixPineScript"),
+    ("pine_export.js",r"^function _addActivePinev6\(",        "_addActivePinev6"),
+    ("core.js",       r"^function backtest\(",                "backtest"),
+    ("core.js",       r"^function calcHTFADX\(",              "calcHTFADX"),
 ]
 
 with open(claude_md, "r") as f:
@@ -63,7 +66,7 @@ for (fname, pattern, name) in FUNCS:
         print(f"WARN: файл не найден: {fname}", file=sys.stderr)
         continue
 
-    # Находим строку
+    # Находим строку с определением функции
     lineno = None
     rx = re.compile(pattern)
     for i, line in enumerate(lines, 1):
@@ -75,17 +78,18 @@ for (fname, pattern, name) in FUNCS:
         not_found.append(f"{name} ({fname})")
         continue
 
-    # Ищем текущий номер в CLAUDE.md: | `name` | NUM |
-    table_rx = re.compile(r'(\| `' + re.escape(name) + r'` \| )(\d+)( \|)')
-    m = table_rx.search(content)
+    # Формат в CLAUDE.md: `name` (NUM) или `name(args)` (NUM)
+    # Regex: backtick + name + любые символы кроме backtick + backtick + пробел + ( + digits + )
+    bullet_rx = re.compile(r'(`' + re.escape(name) + r'[^`]*` \()(\d+)(\))')
+    m = bullet_rx.search(content)
     if not m:
-        continue  # функция не в карте — пропускаем
+        continue  # функция не в карте CLAUDE.md — пропускаем
 
     old_num = int(m.group(2))
     if old_num == lineno:
         continue
 
-    changes.append((name, old_num, lineno, fname, m.start(), m.end(), m.group(1), m.group(3)))
+    changes.append((name, old_num, lineno, fname, bullet_rx))
 
 if not_found:
     print(f"WARN: не найдено в исходниках: {', '.join(not_found)}", file=sys.stderr)
@@ -94,17 +98,16 @@ if not changes:
     print("sync_claude_md: все номера строк актуальны")
     sys.exit(0)
 
-for (name, old, new, fname, *_) in changes:
+for (name, old, new, fname, _) in changes:
     print(f"  {name}: {old} → {new} ({fname})")
 
 if check_only:
     print(f"sync_claude_md: найдено {len(changes)} расхождений (запусти без --check чтобы исправить)")
     sys.exit(1)
 
-# Применяем замены (справа налево чтобы не сбивать offset)
-for (name, old, new, fname, start, end, pre, post) in sorted(changes, key=lambda x: -x[4]):
-    table_rx = re.compile(r'(\| `' + re.escape(name) + r'` \| )(\d+)( \|)')
-    content = table_rx.sub(r'\g<1>' + str(new) + r'\g<3>', content, count=1)
+# Применяем замены
+for (name, old, new, fname, bullet_rx) in changes:
+    content = bullet_rx.sub(r'\g<1>' + str(new) + r'\g<3>', content, count=1)
 
 with open(claude_md, "w") as f:
     f.write(content)

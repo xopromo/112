@@ -71,24 +71,43 @@ git push -u origin claude/ваша-ветка
 
 ## 🔍 Ключевые функции (компактная карта)
 
+> Номера строк обновляются автоматически хуком post-commit (`agent/sync_claude_md.sh`)
+
 **opt.js**:
 - `parseRange` (23) — парсер диапазона
-- `_calcStatSig` (43) — z-тест WR > 50%
-- `_calcGTScore` (58) — anti-overfitting метрика
-- `_calcIndicators` (3023) — пересчёт MA, ATR и др.
-- `backtest` → через core.js:378
-- `runOpt` (875) — главный цикл (MC/TPE/Ex)
-- `_attachOOS` (941) — IS/OOS split
-- `_hcRunBacktest` — HC с кэшем
+- `_calcStatSig` (67) — z-тест WR > 50%
+- `_calcGTScore` (82) — anti-overfitting метрика
+- `_calcIndicators` (3358) — пересчёт MA, ATR и др.
+- `runOpt` (934) — главный цикл (MC/TPE/Ex)
+- `_runOOS` (989) — OOS прогон
+- `_attachOOS` (1004) — IS/OOS split
+- `buildBtCfg` (3732) — сборка cfg для бэктеста
+- `runMassRobust` (3978) — массовый тест устойчивости
+- `HC_NUMERIC_PARAMS` (4298) — список параметров HC
 
 **ui.js**:
-- `showDetail` (761) — standard detail панель
-- `switchTableMode` (435) — HC/Fav/Results
-- `openOOSDiagnostic` (7404) — диагностика OOS
-- `runHillClimbing` (4210) — поиск соседей
+- `showDetail` (1158) — standard detail панель
+- `switchTableMode` (447) — HC/Fav/Results
+- `applyFilters` (739) — применение фильтров таблицы
+- `resetAllFilters` (723) — сброс фильтров
+- `runOOSScan` (5180) — OOS сканирование
+- `openHCModal` (5496) — открыть HC окно
+- `_hcRunBacktest` (5799) — HC бэктест с кэшем
+- `_hcNeighbours` (5986) — поиск соседей HC
+- `runHillClimbing` (6117) — главный HC цикл
+- `_hcOpenDetail` (6884) — HC detail панель
+- `openOOSDiagnostic` (7450) — запуск OOS диагностики
+- `showOOSTradeDiag` (9968) — UI диагностики расхождений
 
 **core.js**:
-- `backtest(cfg, data)` (378) — основной бэктест
+- `backtest` (521) — основной бэктест (принимает pvLo,pvHi,atrArr,cfg)
+- `calcHTFADX` (231) — ADX на HTF через группировку баров
+
+**pine_export.js**:
+- `generatePineScript` (20) — экспорт Pine индикатора
+- `generatePineStrategy` (1727) — экспорт Pine стратегии (strategy.exit)
+- `fixPineScript` (1736) — автоисправление Pine v5→v6
+- `_addActivePinev6` (1852) — toggle-группы Pine v6
 
 ---
 

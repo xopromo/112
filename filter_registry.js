@@ -71,7 +71,7 @@ const FILTER_REGISTRY = [
   {
     id:       'rsi',
     flag:     'useRSI',
-    blocksL:  (cfg, i) => cfg.rsiArr && cfg.rsiArr[i-1] >= cfg.rsiOS,
+    blocksL:  (cfg, i) => cfg.rsiArr && (cfg.rsiArr[i-1] <= 0 || cfg.rsiArr[i-1] >= cfg.rsiOS),
     blocksS:  (cfg, i) => cfg.rsiArr && cfg.rsiArr[i-1] <= cfg.rsiOB,
     nameLabel: (cfg) => `RSI(${cfg.rsiOS}-${cfg.rsiOB})`,
   },
