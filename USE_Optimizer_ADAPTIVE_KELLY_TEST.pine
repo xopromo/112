@@ -296,8 +296,8 @@ if barstate.islast
 	table.cell(t, 0, 9, "B (W/L)", text_color=color.gray, text_size=size.small)
 	table.cell(t, 1, 9, str.tostring(kelly_avg_win / kelly_avg_loss, "#.##"), text_color=color.white, text_size=size.small)
 
-	table.cell(t, 0, 10, "Kelly %", text_color=color.new(color.cyan,70), text_size=size.small)
-	table.cell(t, 1, 10, str.tostring(kelly_pct, "#.#") + "%", text_color=color.cyan, text_size=size.small)
+	table.cell(t, 0, 10, "Kelly %", text_color=color.new(color.aqua,70), text_size=size.small)
+	table.cell(t, 1, 10, str.tostring(kelly_pct, "#.#") + "%", text_color=color.aqua, text_size=size.small)
 
 	table.cell(t, 0, 12, "Статус", text_color=color.gray, text_size=size.small)
 	status_txt = v_in ? (v_dir == 1 ? "LONG" : "SHORT") : "ЖДЕТ"
