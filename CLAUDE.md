@@ -106,9 +106,9 @@ git push -u origin claude/ваша-ветка
 
 **pine_export.js**:
 - `generatePineScript` (20) — экспорт Pine индикатора
-- `generatePineStrategy` (1791) — экспорт Pine стратегии (strategy.exit)
-- `fixPineScript` (1800) — автоисправление Pine v5→v6
-- `_addActivePinev6` (1916) — toggle-группы Pine v6
+- `generatePineStrategy` (1807) — экспорт Pine стратегии (strategy.exit)
+- `fixPineScript` (1816) — автоисправление Pine v5→v6
+- `_addActivePinev6` (1932) — toggle-группы Pine v6
 
 ---
 
