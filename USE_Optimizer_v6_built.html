@@ -17449,6 +17449,13 @@ async function runOpt() {
 
   // Count combos for progress
   const vsaMs=useVSA?parseRange('f_vsam'):[0];
+  const dynSLStructMults=useDynSLStruct?parseRange('x_dynsl_m'):[0.3];  // Dynamic SL multipliers
+  const useAdaptiveTP=$c('x_adaptive_tp');
+  const tpAtrLens=useAdaptiveTP?parseRange('x_tp_atr_len'):[20];
+  const tpAtrMults=useAdaptiveTP?parseRange('x_tp_atr_mult'):[1.0];
+  const useAdaptiveSL=$c('x_adaptive_sl');
+  const slAtrLens=useAdaptiveSL?parseRange('x_sl_atr_len'):[20];
+  const slAtrMults=useAdaptiveSL?parseRange('x_sl_atr_mult'):[0.5];
   // Точное количество валидных BE комбинаций (beOff < beTrig)
   let beValidCount=1;
   if(useBE){let v=0;beTrigs.forEach(t=>{beOffs.forEach(o=>{if(o<t)v++;});});beValidCount=v||1;}
@@ -17463,7 +17470,8 @@ async function runOpt() {
     (_adxLArr.length||1)*(_sTrendArr.length||1)*
     (tlPvLs.length||1)*(tlPvRs.length||1)*
     (stAtrPArr.length||1)*(stMultArr.length||1)*
-    (dynSLStructMults.length||1)*
+    (dynSLStructMults.length||1)*(tpAtrLens.length||1)*(tpAtrMults.length||1)*
+    (slAtrLens.length||1)*(slAtrMults.length||1)*
     (waitBarsArr.length||1)*(waitRetraceArr.length||1);
 
   // Monte Carlo: shuffle and limit
@@ -17483,7 +17491,8 @@ async function runOpt() {
       (timeBarsArr.length||1)*(freshMaxs.length||1)*(wtThreshs.length||1)*
       (vsaMs.length||1)*(atrBoMults.length||1)*(confNArr.length||1)*(confTypeArr.length||1)*
       (confHtfArr.length||1)*(maCrossTypeArr.length||1)*(revBarsArr.length||1)*
-      (dynSLStructMults.length||1)*
+      (dynSLStructMults.length||1)*(tpAtrLens.length||1)*(tpAtrMults.length||1)*
+      (slAtrLens.length||1)*(slAtrMults.length||1)*
     (revSkipArr.length||1)*(revCooldownArr.length||1)*
     (_adxLArr.length||1)*(_sTrendArr.length||1)*
     (tlPvLs.length||1)*(tlPvRs.length||1)*
@@ -30826,7 +30835,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1774994496142;
+window._BUILD_TS = 1774994836049;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
