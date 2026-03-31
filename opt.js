@@ -2308,6 +2308,11 @@ async function runOpt() {
       const _confType= _dims[_d][dimIndices[_d++]];
       const _confHtf = _dims[_d][dimIndices[_d++]];
       const _mCrossType= _dims[_d][dimIndices[_d++]];
+      const dynSLStructMult = _dims[_d][dimIndices[_d++]];
+      const tpAtrLen = _dims[_d][dimIndices[_d++]];
+      const tpAtrMult = _dims[_d][dimIndices[_d++]];
+      const slAtrLen = _dims[_d][dimIndices[_d++]];
+      const slAtrMult = _dims[_d][dimIndices[_d++]];
       const _fCombo  = _dims[_d][dimIndices[_d++]]; // powerset: объект с bool-флагами фильтров
       // Эффективные флаги фильтров (TPE)
       const _effUseMa      = _fCombo.useMa      ?? useMa;
