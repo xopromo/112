@@ -852,7 +852,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
 #notepad-fab.active { color: var(--accent) !important; border-color: var(--accent) !important; background: rgba(0,212,255,.08) !important; }
 
 /* TABLE FILTER TEMPLATE popover */
-#tbl-tpl-popover {
+#tbl-tpl-popover, #oos-tpl-popover {
   position: fixed; z-index: 5000;
   background: var(--bg2); border: 1px solid var(--border2); border-radius: 8px;
   padding: 10px; min-width: 260px; max-height: 400px; overflow-y: auto;
@@ -1655,6 +1655,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
     <button class="tpl-btn2" style="padding:3px 10px;font-size:.85em" onclick="document.getElementById('fi-new').click()">📂 Загрузить CSV</button>
     <button class="tpl-btn2 ok" id="btn-oos-new" style="padding:3px 10px;font-size:.85em;display:none" onclick="runOOSOnNewData()">📊 Сравнить с новыми</button>
     <button class="tpl-btn2" id="btn-oos-export" style="padding:3px 10px;font-size:.85em;display:none" onclick="exportOOSTableCSV()">💾 CSV</button>
+    <div style="position:relative"><button class="tpl-btn2" id="btn-oos-tpl" style="padding:3px 10px;font-size:.85em;display:none;border-color:var(--accent2);color:var(--accent)" onclick="openOOSTplPopover()">💾 Шаблоны OOS ▾</button></div>
     <span style="margin-left:auto;display:flex;gap:6px;align-items:center">
     <label style="display:flex;align-items:center;gap:4px;color:var(--text2);font-size:.85em" title="Стратегия считается стабильной если средняя прибыль за сделку (APT) на новых данных >= X% от исторической">
       Порог стабильности: <input type="number" id="oos-stable-thresh" value="50" min="10" max="100" step="5"
@@ -1889,7 +1890,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
           <td></td><td></td><td></td>
           <td style="padding:1px 2px"><input id="oof_on" type="number" placeholder="≥" oninput="applyOOSFilters()" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border2);border-radius:3px;color:var(--text);font-size:.65em;padding:1px 3px"></td>
           <td style="padding:1px 2px"><input id="oof_nn" type="number" placeholder="≥" oninput="applyOOSFilters()" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border2);border-radius:3px;color:var(--text);font-size:.65em;padding:1px 3px"></td>
-          <td style="padding:1px 2px"><input id="oof_rate" type="number" placeholder="≥" oninput="applyOOSFilters()" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border2);border-radius:3px;color:var(--text);font-size:.65em;padding:1px 3px"></td>
+          <td style="padding:1px 2px"><div style="display:flex;gap:2px"><input id="oof_rate_min" type="number" placeholder="≥" oninput="applyOOSFilters()" style="width:50%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border2);border-radius:3px;color:var(--text);font-size:.65em;padding:1px 2px" title="Rate% от"><input id="oof_rate_max" type="number" placeholder="≤" oninput="applyOOSFilters()" style="width:50%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border2);border-radius:3px;color:var(--text);font-size:.65em;padding:1px 2px" title="Rate% до"></div></td>
           <td style="padding:1px 2px">
             <select id="oof_score" onchange="applyOOSFilters()" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border2);border-radius:3px;color:var(--text);font-size:.62em;padding:1px 1px">
               <option value="">все</option>

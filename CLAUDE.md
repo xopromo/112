@@ -86,18 +86,18 @@ git push -u origin claude/ваша-ветка
 - `HC_NUMERIC_PARAMS` (4298) — список параметров HC
 
 **ui.js**:
-- `showDetail` (1160) — standard detail панель
+- `showDetail` (1263) — standard detail панель
 - `switchTableMode` (447) — HC/Fav/Results
-- `applyFilters` (741) — применение фильтров таблицы
-- `resetAllFilters` (725) — сброс фильтров
-- `runOOSScan` (5183) — OOS сканирование
-- `openHCModal` (5499) — открыть HC окно
-- `_hcRunBacktest` (5802) — HC бэктест с кэшем
-- `_hcNeighbours` (5989) — поиск соседей HC
-- `runHillClimbing` (6120) — главный HC цикл
-- `_hcOpenDetail` (6887) — HC detail панель
-- `openOOSDiagnostic` (7453) — запуск OOS диагностики
-- `showOOSTradeDiag` (10031) — UI диагностики расхождений
+- `applyFilters` (844) — применение фильтров таблицы
+- `resetAllFilters` (828) — сброс фильтров
+- `runOOSScan` (5286) — OOS сканирование
+- `openHCModal` (5603) — открыть HC окно
+- `_hcRunBacktest` (5906) — HC бэктест с кэшем
+- `_hcNeighbours` (6093) — поиск соседей HC
+- `runHillClimbing` (6224) — главный HC цикл
+- `_hcOpenDetail` (6991) — HC detail панель
+- `openOOSDiagnostic` (7562) — запуск OOS диагностики
+- `showOOSTradeDiag` (10149) — UI диагностики расхождений
 
 **core.js**:
 - `backtest` (521) — основной бэктест (принимает pvLo,pvHi,atrArr,cfg)
@@ -105,9 +105,9 @@ git push -u origin claude/ваша-ветка
 
 **pine_export.js**:
 - `generatePineScript` (20) — экспорт Pine индикатора
-- `generatePineStrategy` (1771) — экспорт Pine стратегии (strategy.exit)
-- `fixPineScript` (1780) — автоисправление Pine v5→v6
-- `_addActivePinev6` (1896) — toggle-группы Pine v6
+- `generatePineStrategy` (1778) — экспорт Pine стратегии (strategy.exit)
+- `fixPineScript` (1787) — автоисправление Pine v5→v6
+- `_addActivePinev6` (1903) — toggle-группы Pine v6
 
 ---
 

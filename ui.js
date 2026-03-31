@@ -483,6 +483,9 @@ function switchTableMode(mode) {
   // Кнопка экспорта только в OOS режиме
   const exportBtn = document.getElementById('btn-oos-export');
   if (exportBtn) exportBtn.style.display = (mode === 'oos' && _oosTableResults.length > 0) ? '' : 'none';
+  // Кнопка шаблонов OOS только в OOS режиме
+  const oosTplBtn = document.getElementById('btn-oos-tpl');
+  if (oosTplBtn) oosTplBtn.style.display = (mode === 'oos') ? '' : 'none';
   // Кнопка сравнения
   const oosBtn = document.getElementById('btn-oos-new');
   if (oosBtn) oosBtn.style.display = NEW_DATA ? '' : 'none';
@@ -695,6 +698,106 @@ async function togglePinTpl(i) {
   await storeSave(_TBL_TPL_KEY, tpls);
   _renderQuickFilterBtns(tpls);
   openTableTplPopover(true);
+}
+
+// ══════════════════════════════════════════════════════════════
+// OOS TABLE FILTER TEMPLATES — мини-шаблоны фильтров OOS таблицы
+// ══════════════════════════════════════════════════════════════
+const _OOS_TPL_KEY = 'use_oos_tbl_tpl';
+
+const _OOS_TF_NUM_IDS = ['oof_opnl','oof_npnl','oof_dpnl','oof_oddd','oof_nddd','oof_opdd','oof_npdd','oof_dapt','oof_dwr','oof_on','oof_nn','oof_rate_min','oof_rate_max'];
+const _OOS_TF_SEL_IDS = ['oof_fav','oof_score'];
+const _OOS_TF_TXT_IDS = ['oof_name'];
+
+function _gatherOOSFilters() {
+  const f = {};
+  [..._OOS_TF_NUM_IDS, ..._OOS_TF_SEL_IDS, ..._OOS_TF_TXT_IDS].forEach(id => {
+    f[id] = document.getElementById(id)?.value ?? '';
+  });
+  f._oosSortKey = _oosSortKey;
+  f._oosSortDir = _oosSortDir;
+  return f;
+}
+
+function _applyOOSFiltersFromTpl(f) {
+  [..._OOS_TF_NUM_IDS, ..._OOS_TF_SEL_IDS, ..._OOS_TF_TXT_IDS].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = f[id] ?? '';
+  });
+  if (f._oosSortKey !== undefined) _oosSortKey = f._oosSortKey;
+  if (f._oosSortDir !== undefined) _oosSortDir = f._oosSortDir;
+  applyOOSFilters();
+}
+
+async function openOOSTplPopover(forceReopen) {
+  const existing = document.getElementById('oos-tpl-popover');
+  if (existing && !forceReopen) { existing.remove(); return; }
+  if (existing) existing.remove();
+
+  const tpls = (await storeLoad(_OOS_TPL_KEY)) || [];
+  const btn  = document.getElementById('btn-oos-tpl');
+
+  const pop = document.createElement('div');
+  pop.id = 'oos-tpl-popover';
+
+  const saveRow = `<div style="display:flex;gap:5px;margin-bottom:8px">
+    <button class="tpl-ibtn" style="flex:1;font-size:.68em;padding:4px" onclick="saveOOSTableTpl()">💾 Сохранить текущий</button>
+  </div>`;
+
+  const items = tpls.length
+    ? tpls.map((t, i) => `
+      <div class="tbl-tpl-item">
+        <div style="flex:1;min-width:0">
+          <div class="tbl-tpl-name">${t.name}</div>
+          <div class="tbl-tpl-date">${new Date(t.ts).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</div>
+        </div>
+        <button class="tpl-ibtn" style="font-size:.62em;padding:2px 6px" onclick="applyOOSTableTpl(${i})" title="Применить">▶</button>
+        <button class="tpl-ibtn del" style="font-size:.62em;padding:2px 5px" onclick="deleteOOSTableTpl(${i})" title="Удалить">✕</button>
+      </div>`).join('')
+    : '<div style="font-size:.65em;color:var(--text3);padding:4px 0">Нет сохранённых шаблонов</div>';
+
+  pop.innerHTML = saveRow + items;
+
+  document.body.appendChild(pop);
+  const rect = btn.getBoundingClientRect();
+  pop.style.position = 'fixed';
+  pop.style.top  = (rect.bottom + 3) + 'px';
+  pop.style.right = (window.innerWidth - rect.right) + 'px';
+  pop.style.left  = 'auto';
+
+  setTimeout(() => {
+    document.addEventListener('mousedown', function _close(e) {
+      if (!pop.contains(e.target) && e.target !== btn) {
+        pop.remove();
+        document.removeEventListener('mousedown', _close);
+      }
+    });
+  }, 0);
+}
+
+async function saveOOSTableTpl() {
+  const tpls = (await storeLoad(_OOS_TPL_KEY)) || [];
+  const name = prompt('Название шаблона OOS-фильтров:',
+    `OOS-фильтр ${new Date().toLocaleString('ru-RU',{hour:'2-digit',minute:'2-digit'})}`);
+  if (!name?.trim()) return;
+  tpls.push({ name: name.trim(), filters: _gatherOOSFilters(), ts: Date.now() });
+  await storeSave(_OOS_TPL_KEY, tpls);
+  openOOSTplPopover(true);
+}
+
+async function applyOOSTableTpl(i) {
+  const tpls = (await storeLoad(_OOS_TPL_KEY)) || [];
+  if (!tpls[i]) return;
+  _applyOOSFiltersFromTpl(tpls[i].filters);
+  const pop = document.getElementById('oos-tpl-popover');
+  if (pop) pop.remove();
+}
+
+async function deleteOOSTableTpl(i) {
+  const tpls = (await storeLoad(_OOS_TPL_KEY)) || [];
+  tpls.splice(i, 1);
+  await storeSave(_OOS_TPL_KEY, tpls);
+  openOOSTplPopover(true);
 }
 
 // Move results from table to hidden archive (keeps them for future TPE use)
@@ -7308,7 +7411,8 @@ function applyOOSFilters() {
   const fon    = parseFloat(document.getElementById('oof_on')?.value);
   const fnn    = parseFloat(document.getElementById('oof_nn')?.value);
   const fscore = document.getElementById('oof_score')?.value || '';
-  const frate  = parseFloat(document.getElementById('oof_rate')?.value);
+  const frate_min = parseFloat(document.getElementById('oof_rate_min')?.value);
+  const frate_max = parseFloat(document.getElementById('oof_rate_max')?.value);
 
   const src = _oosTableResults.filter(r => {
     if (fname && !r.name.toLowerCase().includes(fname)) return false;
@@ -7332,7 +7436,8 @@ function applyOOSFilters() {
       if (!isNaN(fdapt)) { const da = (ao!=null&&an!=null)?an-ao:null; if(da==null||da<fdapt) return false; }
       if (!isNaN(fdwr) && (r.delta_wr ?? -Infinity) < fdwr) return false;
     }
-    if (!isNaN(frate) && (r.rate == null || r.rate < frate)) return false;
+    if (!isNaN(frate_min) && (r.rate == null || r.rate < frate_min)) return false;
+    if (!isNaN(frate_max) && (r.rate == null || r.rate > frate_max)) return false;
     if (fscore) {
       const badge = _oosGetBadge(r);
       if (badge !== fscore) return false;
