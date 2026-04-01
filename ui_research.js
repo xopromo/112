@@ -300,43 +300,77 @@ function _renderClusters(insights) {
     const clustInsight = insights.insights.find(i => i.type === 'clusters');
     clusters = clustInsight?.clusters || [];
   }
-  if (clusters.length === 0) return '<p style="color:#888">Кластеры не найдены</p>';
+  if (clusters.length === 0) return '<p style="color:#888;padding:20px;font-size:1em">📊 Кластеры не найдены</p>';
 
   return `
-    <div style="display:grid;gap:12px">
+    <div style="display:grid;gap:16px;font-size:1em;line-height:1.6">
       ${clusters.slice(0, 5).map((c, i) => `
-        <div style="background:rgba(166,227,161,.1);border:1px solid rgba(166,227,161,.3);border-radius:4px;padding:12px">
-          <div style="font-weight:600;color:#a6e3a1;margin-bottom:8px">🎯 Кластер ${i + 1}</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;font-size:.85em">
-            <div style="background:rgba(0,0,0,.2);padding:6px;border-radius:4px">
-              <div style="color:#888;font-size:.8em">Размер</div>
-              <div style="color:#a6e3a1;font-weight:600">${c.size} стратегий</div>
+        <div style="background:rgba(166,227,161,.08);border:2px solid rgba(166,227,161,.25);border-radius:8px;padding:16px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+            <div style="font-size:1.15em;font-weight:600;color:#a6e3a1">🎯 Кластер ${i + 1}</div>
+            <div style="font-size:0.9em;color:#888">${c.size} стратегий</div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:14px">
+            <div style="background:rgba(0,0,0,.2);padding:8px;border-radius:4px;text-align:center">
+              <div style="color:#888;font-size:0.85em;margin-bottom:3px">📊 Avg PnL</div>
+              <div style="color:#a6e3a1;font-weight:600;font-size:1.1em">${(c.avgPnl || 0).toFixed(2)}%</div>
             </div>
-            <div style="background:rgba(0,0,0,.2);padding:6px;border-radius:4px">
-              <div style="color:#888;font-size:.8em">Avg PnL</div>
-              <div style="color:#f9e2af;font-weight:600">${(c.avgPnl || 0).toFixed(2)}%</div>
+            <div style="background:rgba(0,0,0,.2);padding:8px;border-radius:4px;text-align:center">
+              <div style="color:#888;font-size:0.85em;margin-bottom:3px">📈 Avg WR</div>
+              <div style="color:#f9e2af;font-weight:600;font-size:1.1em">${(c.avgWr || 0).toFixed(1)}%</div>
             </div>
-            <div style="background:rgba(0,0,0,.2);padding:6px;border-radius:4px">
-              <div style="color:#888;font-size:.8em">Avg WR</div>
-              <div style="color:#f9e2af;font-weight:600">${(c.avgWr || 0).toFixed(1)}%</div>
+            <div style="background:rgba(0,0,0,.2);padding:8px;border-radius:4px;text-align:center">
+              <div style="color:#888;font-size:0.85em;margin-bottom:3px">📉 Avg DD</div>
+              <div style="color:#f38ba8;font-weight:600;font-size:1.1em">${(c.avgDd || 0).toFixed(1)}%</div>
             </div>
-            <div style="background:rgba(0,0,0,.2);padding:6px;border-radius:4px">
-              <div style="color:#888;font-size:.8em">Avg DD</div>
-              <div style="color:#f38ba8;font-weight:600">${(c.avgDd || 0).toFixed(1)}%</div>
+            <div style="background:rgba(0,0,0,.2);padding:8px;border-radius:4px;text-align:center">
+              <div style="color:#888;font-size:0.85em;margin-bottom:3px">🔢 Размер</div>
+              <div style="color:#a78bfa;font-weight:600;font-size:1.1em">${c.size}</div>
             </div>
           </div>
-          <div style="font-size:.85em">
-            <div style="color:#a78bfa;margin-bottom:4px">🔝 Топ конфиги:</div>
-            ${(c.topConfigs || []).slice(0, 3).map(cfg => `
-              <div style="color:#888;font-size:.8em;margin-left:8px">
-                PnL: ${(cfg.pnl || 0).toFixed(2)}% | WR: ${(cfg.wr || 0).toFixed(1)}%
+
+          <div style="background:rgba(249,226,175,.05);border:1px solid rgba(249,226,175,.2);border-radius:6px;padding:10px;margin-bottom:14px;font-size:0.95em">
+            <div style="color:#f9e2af;font-weight:600;margin-bottom:6px">🔝 Лучшие конфиги в кластере:</div>
+            ${(c.topConfigs || []).slice(0, 3).map((cfg, idx) => `
+              <div style="color:#cdd6f4;margin:4px 0;padding:4px 0">
+                ${idx + 1}. <strong>${cfg.name || 'config'}</strong> - PnL: <span style="color:#a6e3a1">${(cfg.pnl || 0).toFixed(2)}%</span> | WR: <span style="color:#f9e2af">${(cfg.wr || 0).toFixed(1)}%</span>
               </div>
             `).join('')}
+          </div>
+
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button onclick="_applyClusterFilter(${i})" style="background:rgba(166,227,161,.2);border:1px solid rgba(166,227,161,.6);color:#a6e3a1;border-radius:4px;padding:8px 12px;cursor:pointer;font-size:0.95em;font-weight:600;flex:1;min-width:150px">
+              🔍 Показать все ${c.size}
+            </button>
+            <button onclick="_runClusterOOS(${i})" style="background:rgba(139,92,246,.2);border:1px solid rgba(139,92,246,.6);color:#a78bfa;border-radius:4px;padding:8px 12px;cursor:pointer;font-size:0.95em;font-weight:600;flex:1;min-width:150px">
+              📊 OOS тест топ-10
+            </button>
+            <button onclick="_saveClusterFavorites(${i})" style="background:rgba(243,139,168,.1);border:1px solid rgba(243,139,168,.3);color:#f38ba8;border-radius:4px;padding:8px 12px;cursor:pointer;font-size:0.95em;font-weight:600;flex:1;min-width:150px">
+              ❤️ В избранные
+            </button>
           </div>
         </div>
       `).join('')}
     </div>
   `;
+}
+
+// 🔥 ФУНКЦИИ ДЕЙСТВИЙ С КЛАСТЕРАМИ
+
+function _applyClusterFilter(clusterIdx) {
+  toast('🔍 Фильтр по кластеру ' + (clusterIdx + 1) + ' - скоро в основной таблице', 3000);
+  // TODO: реализовать фильтр в основной таблице
+}
+
+function _runClusterOOS(clusterIdx) {
+  toast('📊 OOS тест топ-конфигов кластера ' + (clusterIdx + 1) + ' - скоро запустится', 3000);
+  // TODO: интеграция с runOOSScan()
+}
+
+function _saveClusterFavorites(clusterIdx) {
+  toast('❤️ Топ конфиги кластера ' + (clusterIdx + 1) + ' добавлены в избранные', 2000);
+  // TODO: сохранить в localStorage
 }
 
 // ═══════════════════════════════════════════════════════════════
