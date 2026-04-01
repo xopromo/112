@@ -18,6 +18,7 @@ const ResearchAgent = (() => {
   let _totalDataPoints = 0;
   let _totalRuns = 0;
   let _isAnalyzing = false;
+  let _isFinishingRun = false;  // Флаг для защиты от параллельных finishRun()
 
   // ─── Инициализация IndexedDB ────────────────────────────────
 
@@ -74,10 +75,18 @@ const ResearchAgent = (() => {
   // ─── API: Завершить прогон и сохранить ─────────────────────
 
   async function finishRun(metadata = {}) {
+    // Защита от параллельных вызовов finishRun()
+    if (_isFinishingRun) {
+      console.log('[ResearchAgent] finishRun: уже выполняется, пропуск');
+      return;
+    }
+
     if (!_currentRunId || _resultsBuffer.length === 0) {
       console.log('[ResearchAgent] finishRun: пропуск (нет данных)', { hasId: !!_currentRunId, bufLen: _resultsBuffer.length });
       return;
     }
+
+    _isFinishingRun = true;
 
     clearTimeout(_saveTimer);
     const db = await _initDB();
@@ -135,6 +144,7 @@ const ResearchAgent = (() => {
 
         _currentRunId = null;
         _resultsBuffer = [];
+        _isFinishingRun = false;
         resolve(run);
       };
 
@@ -142,6 +152,7 @@ const ResearchAgent = (() => {
         console.error('[ResearchAgent] Транзакция IndexedDB ошибка:', tx.error);
         _currentRunId = null;
         _resultsBuffer = [];
+        _isFinishingRun = false;
         reject(tx.error);
       };
     });
@@ -211,6 +222,7 @@ const ResearchAgent = (() => {
         resolve(runs);
       };
       req.onerror = () => reject(req.error);
+      tx.onerror = () => reject(tx.error);
     });
   }
 
@@ -263,6 +275,10 @@ const ResearchAgent = (() => {
         console.error('[ResearchAgent] getStatus: ошибка запроса', req.error);
         resolve({ totalRuns: 0, totalDataPoints: 0, lastAnalysisTime: null, lastRunTime: null, isAnalyzing: false });
       };
+      tx.onerror = () => {
+        console.error('[ResearchAgent] getStatus: ошибка транзакции', tx.error);
+        resolve({ totalRuns: 0, totalDataPoints: 0, lastAnalysisTime: null, lastRunTime: null, isAnalyzing: false });
+      };
     });
   }
 
@@ -294,7 +310,7 @@ const ResearchAgent = (() => {
         return null;
       }
 
-      const analysis = ResearchAnalysis.analyzeResults(allResults);
+      const analysis = await ResearchAnalysis.analyzeResults(allResults);
 
       // Обновить время последнего анализа
       _lastAnalysisTime = new Date().toISOString();
