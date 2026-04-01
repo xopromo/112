@@ -227,9 +227,16 @@ const ResearchAgent = (() => {
 
       const req = index.getAll(projectId);
       req.onsuccess = () => {
-        const runs = req.result
+        const allRuns = req.result || [];
+        if (!Array.isArray(allRuns)) {
+          console.error('[ResearchAgent] loadHistory: req.result не массив', typeof allRuns);
+          resolve([]);
+          return;
+        }
+        const runs = allRuns
           .sort((a, b) => b.timestamp - a.timestamp)
           .slice(0, limit);
+        console.log('[ResearchAgent] loadHistory: найдено', allRuns.length, 'runs, возвращаю', runs.length);
         resolve(runs);
       };
       req.onerror = () => reject(req.error);
@@ -241,17 +248,29 @@ const ResearchAgent = (() => {
 
   async function getAllResultsFromHistory(projectId, timeWindow = null) {
     const runs = await loadHistory(projectId, 1000);
+    console.log('[ResearchAgent] getAllResultsFromHistory: получено', runs.length, 'runs');
+
     const results = [];
     const cutoff = timeWindow ? Date.now() - timeWindow : 0;
 
     for (const run of runs) {
-      if (!run || !run.timestamp) continue;  // Защита от null/undefined
-      if (run.timestamp < cutoff) break;
+      if (!run || !run.timestamp) {
+        console.log('[ResearchAgent] getAllResultsFromHistory: пропуск null run');
+        continue;
+      }
+      if (run.timestamp < cutoff) {
+        console.log('[ResearchAgent] getAllResultsFromHistory: timestamp < cutoff, break');
+        break;
+      }
       if (run.results && Array.isArray(run.results)) {
+        console.log('[ResearchAgent] getAllResultsFromHistory: добавляю', run.results.length, 'результатов из run');
         results.push(...run.results);
+      } else {
+        console.log('[ResearchAgent] getAllResultsFromHistory: run.results не массив или не существует', { hasResults: !!run.results, isArray: Array.isArray(run.results) });
       }
     }
 
+    console.log('[ResearchAgent] getAllResultsFromHistory: итого', results.length, 'результатов');
     return results;
   }
 
@@ -306,10 +325,12 @@ const ResearchAgent = (() => {
 
     _isAnalyzing = true;
     const projectId = ProjectManager?.getCurrentId() || localStorage.getItem('_currentProjectId') || 'default';
+    console.log('[ResearchAgent] runAnalysisManually: projectId=' + projectId);
 
     try {
       // Получить все накопленные результаты
       const allResults = await getAllResultsFromHistory(projectId);
+      console.log('[ResearchAgent] runAnalysisManually: получено', allResults.length, 'результатов');
 
       if (allResults.length === 0) {
         console.warn('[ResearchAgent] Нет результатов для анализа');
