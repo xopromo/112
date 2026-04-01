@@ -30,8 +30,9 @@ ui_heatmap  = open(os.path.join(base, 'ui_heatmap.js'),  encoding='utf-8').read(
 ui_projects = open(os.path.join(base, 'ui_projects.js'), encoding='utf-8').read()
 ui_oos       = open(os.path.join(base, 'ui_oos.js'),       encoding='utf-8').read()
 ui_comparator= open(os.path.join(base, 'ui_comparator.js'),encoding='utf-8').read()
-ui_queue    = open(os.path.join(base, 'ui_queue.js'),    encoding='utf-8').read()
-pine        = open(os.path.join(base, 'pine_export.js'), encoding='utf-8').read()
+ui_queue      = open(os.path.join(base, 'ui_queue.js'),    encoding='utf-8').read()
+ui_tvcompare  = open(os.path.join(base, 'ui_tvcompare.js'),encoding='utf-8').read()
+pine          = open(os.path.join(base, 'pine_export.js'), encoding='utf-8').read()
 
 # ── ML: model + inference + in-browser training ────────────────────────────
 _ml_model_path  = os.path.join(base, 'ml', 'model_generated.js')
@@ -97,6 +98,7 @@ for ph, content in [
     ('/* ##OPT_B## */', opt_B),
     ('/* ##OPT_C## */', opt_C),
     ('/* ##OPT_D## */', opt_D),
+    ('/* ##TVCOMPARE## */', ui_tvcompare),
     ('/* ##QUEUE## */',    ui_queue),
     ('/* ##HC## */',       ui_hc),
     ('/* ##ML_UI## */',    ui_ml),
