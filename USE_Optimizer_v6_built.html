@@ -25183,325 +25183,6 @@ function updatePreRunCount() {
 }
 try { window.updatePreRunCount = updatePreRunCount; } catch(e) {}
 
-// ── ИДЕЯ 3: Массовый OOS-скан всех видимых результатов
-let _oosScanRunning = false;
-async function runOOSScan() {
-  if (_oosScanRunning) { _oosScanRunning = false; return; }
-  if (!DATA || !_visibleResults.length) return;
-  _oosScanRunning = true;
-  _hcRobRunning = true; // разрешаем runRobustScoreFor работать (иначе _stopCheck()=true сразу)
-  const btn = document.getElementById('btn-oos-scan');
-  const status = document.getElementById('oos-scan-status');
-  if (btn) btn.textContent = '⏹ Стоп';
-  const toScan = _getPreRunFiltered();
-  const N = DATA.length, cut = Math.floor(N * 0.8);
-  let done = 0, passed = 0;
-  for (const r of toScan) {
-    if (!_oosScanRunning) break;
-    const origData = DATA;
-    DATA = origData.slice(cut);
-    const rOOS = _hcRunBacktest(r.cfg);
-    DATA = origData;
-    const oosOk = rOOS && rOOS.n >= 3 && rOOS.pnl > 0;
-    if (oosOk) {
-      const { score, details } = await runRobustScoreForDetailed(r, ['oos','walk','param','noise','mc'], true);
-      r.robScore = score; r.robMax = 5; r.robDetails = details;
-      const ri = results.findIndex(x => x.name === r.name);
-      if (ri >= 0) { results[ri].robScore = score; results[ri].robMax = 5; results[ri].robDetails = details; }
-      if (score >= 1) passed++;
-    } else {
-      if (r.robScore === undefined) r.robScore = 0;
-    }
-    done++;
-    if (status) status.textContent = `${done}/${toScan.length} | ≥1🛡: ${passed}`;
-    if (done % 3 === 0) { await yieldToUI(); _updateHCSrcCounts(); }
-  }
-  _oosScanRunning = false;
-  _hcRobRunning = false;
-  if (btn) btn.textContent = '🔎 OOS-скан';
-  if (status) status.textContent = `✅ ${done} проверено | ≥1🛡: ${passed} | Кэш: ${_robCache.size}`;
-  _updateHCSrcCounts();
-  applyFilters(true);
-}
-
-function _updateHCSrcCounts() {
-  const visCnt = document.getElementById('hc_src_vis_cnt');
-  const favCnt = document.getElementById('hc_src_fav_cnt');
-  const robCnt = document.getElementById('hc_src_rob_cnt');
-  if (visCnt) visCnt.textContent = _visibleResults.length;
-  if (favCnt) favCnt.textContent = favourites.length;
-  if (robCnt) {
-    const minR = parseInt(document.getElementById('hc_src_rob_min')?.value) || 3;
-    const cnt = results.filter(r => r.robScore !== undefined && r.robScore >= minR).length;
-    robCnt.textContent = cnt;
-  }
-}
-
-
-// ─────────────────────────────────────────────────────────────────
-// НАСТРАИВАЕМЫЕ КОЛОНКИ ТАБЛИЦЫ
-// ─────────────────────────────────────────────────────────────────
-const _COL_DEFS = [
-  { id: 'col-fav',        label: '⭐ Избранное',        default: true },
-  { id: 'col-pnl',        label: 'PnL%',                default: true },
-  { id: 'col-wr',         label: 'WR%',                 default: true },
-  { id: 'col-n',          label: '# сделок',            default: true },
-  { id: 'col-dd',         label: 'DD%',                 default: true },
-  { id: 'col-pdd',        label: 'P/DD',                default: true },
-  { id: 'col-sig',        label: 'Sig%',                default: true },
-  { id: 'col-gt',         label: 'GT-Score',            default: true },
-  { id: 'col-cvr',        label: 'CVR%',                default: true },
-  { id: 'col-sor',        label: 'Sortino',             default: true },  // ##SOR
-  { id: 'col-kr',         label: 'K-Ratio',             default: true },  // ##KR
-  { id: 'col-sqn',        label: 'SQN',                 default: true },  // ##SQN
-  { id: 'col-omg',        label: 'Omega',               default: true },  // ##OMG
-  { id: 'col-pain',       label: 'Pain',                default: true },  // ##PAIN
-  { id: 'col-burke',      label: 'Burke',               default: true },  // ##BURKE
-  { id: 'col-srnty',      label: 'Serenity',            default: true },  // ##SRNTY
-  { id: 'col-ir',         label: 'IR',                  default: true },  // ##IR
-  { id: 'col-ml',         label: 'ML-фильтр',           default: true },  // ##ML_FILTER
-  { id: 'col-cpcv',       label: 'CPCV%',               default: false }, // ##CPCV lazy
-  { id: 'col-avg',        label: 'Avg%',                default: true },
-  { id: 'col-p1',         label: '1п PnL',              default: true },
-  { id: 'col-p2',         label: '2п PnL',              default: false },
-  { id: 'col-dwr',        label: 'ΔWR',                 default: true },
-  { id: 'col-split',      label: 'Split',               default: true },
-  { id: 'col-ls',          label: 'L/S Split',           default: true },
-  { id: 'col-tv-score',   label: 'TV рейтинг',          default: true },
-  { id: 'col-tv-dpnl',    label: 'ΔPnL TV',             default: true },
-  { id: 'col-tv-ddd',     label: 'ΔDD TV',              default: true },
-  { id: 'col-tv-dpdd',    label: 'ΔP/DD TV',            default: true },
-  { id: 'col-rob',        label: 'Rob (итого)',         default: true },
-  { id: 'col-rob-oos',    label: '🔬 OOS',              default: true },
-  { id: 'col-rob-walk',   label: '🔬 Walk-Forward',    default: true },
-  { id: 'col-rob-param',  label: '🔬 Param',            default: true },
-  { id: 'col-rob-noise',  label: '🔬 Noise',            default: true },
-  { id: 'col-rob-mc',     label: '🔬 MC',               default: true },
-];
-
-// OOS таблица столбики (аналогично _COL_DEFS)
-const _OOS_COL_DEFS = [
-  { id: 'oos-col-fav',     label: '⭐ Избранное',      default: true },
-  { id: 'oos-col-pnl',     label: 'PnL%',              default: true },
-  { id: 'oos-col-dd',      label: 'DD%',               default: true },
-  { id: 'oos-col-pdd',     label: 'P/DD',              default: true },
-  { id: 'oos-col-apt',     label: 'Avg/tr',            default: true },
-  { id: 'oos-col-wr',      label: 'WR%',               default: true },
-  { id: 'oos-col-kr',      label: 'K-Ratio',           default: true },
-  { id: 'oos-col-n',       label: '# сделок',          default: true },
-  { id: 'oos-col-rate',    label: 'Rate%',             default: true },
-  { id: 'oos-col-score',   label: 'Оценка',            default: true },
-];
-
-let _colSettings = null; // null = не загружен
-let _oosColSettings = null; // null = не загружен
-
-function _loadColSettings() {
-  try {
-    const saved = localStorage.getItem('use_col_settings');
-    if (saved) return JSON.parse(saved);
-  } catch(e) {}
-  // Дефолт
-  const def = {};
-  _COL_DEFS.forEach(c => def[c.id] = c.default);
-  return def;
-}
-
-function _saveColSettings(settings) {
-  try { localStorage.setItem('use_col_settings', JSON.stringify(settings)); } catch(e) {}
-}
-
-function _applyColSettings(settings) {
-  // ОПТИМИЗАЦИЯ: если все колонки видимы — пропускаем querySelectorAll (дефолт после рендера)
-  const hiddenCols = _COL_DEFS.filter(col => settings[col.id] === false);
-  if (hiddenCols.length === 0) return;
-  // Применяем показ/скрытие через CSS класс col-hidden только для изменённых колонок
-  _COL_DEFS.forEach(col => {
-    const visible = settings[col.id] !== false;
-    document.querySelectorAll('.' + col.id).forEach(el => {
-      el.classList.toggle('col-hidden', !visible);
-    });
-  });
-}
-
-function getColSettings() {
-  if (!_colSettings) _colSettings = _loadColSettings();
-  return _colSettings;
-}
-
-function setColVisible(colId, visible) {
-  const s = getColSettings();
-  s[colId] = visible;
-  _colSettings = s;
-  _saveColSettings(s);
-  _applyColSettings(s);
-}
-
-let _colPanelOpen = false;
-function toggleColSettings() {
-  const btn = document.getElementById('col-settings-btn');
-  if (!btn) return;
-  // Убираем старую панель
-  const oldPanel = document.getElementById('col-settings-panel');
-  if (oldPanel) { oldPanel.remove(); _colPanelOpen = false; return; }
-  _colPanelOpen = true;
-  const settings = getColSettings();
-  const panel = document.createElement('div');
-  panel.id = 'col-settings-panel';
-  panel.innerHTML = '<div style="font-weight:600;margin-bottom:6px;color:var(--text3);font-size:.9em">Столбики таблицы</div>' +
-    _COL_DEFS.map(col => {
-      const checked = settings[col.id] !== false ? 'checked' : '';
-      return `<label><input type="checkbox" ${checked} onchange="setColVisible('${col.id}',this.checked)"> ${col.label}</label>`;
-    }).join('') +
-    '<div style="margin-top:8px;display:flex;gap:6px">' +
-    '<button class="tpl-btn2" style="font-size:.8em;padding:2px 6px" onclick="_colShowAll()">Все</button>' +
-    '<button class="tpl-btn2" style="font-size:.8em;padding:2px 6px" onclick="_colHideRob()">Скрыть тесты</button>' +
-    '</div>';
-  // Позиционируем относительно кнопки
-  const rect = btn.getBoundingClientRect();
-  const tbl = btn.closest('table');
-  if (tbl) {
-    const tblRect = tbl.getBoundingClientRect();
-    panel.style.position = 'fixed';
-    panel.style.top = (rect.bottom + 4) + 'px';
-    // Проверяем место вправо, если не влазит - позиционируем влево
-    const panelWidth = 280; // примерная ширина панели
-    const rightSpace = window.innerWidth - rect.right;
-    if (rightSpace < panelWidth) {
-      // Позиционируем от левого края кнопки
-      panel.style.left = (rect.left - panelWidth + rect.width) + 'px';
-      panel.style.right = 'auto';
-    } else {
-      // Позиционируем от правого края
-      panel.style.right = (window.innerWidth - rect.right) + 'px';
-      panel.style.left = 'auto';
-    }
-  }
-  document.body.appendChild(panel);
-  // Закрыть при клике вне
-  setTimeout(() => {
-    document.addEventListener('click', function _closePanel(e) {
-      if (!panel.contains(e.target) && e.target.id !== 'col-settings-btn') {
-        panel.remove(); _colPanelOpen = false;
-        document.removeEventListener('click', _closePanel);
-      }
-    });
-  }, 50);
-}
-
-function _colShowAll() {
-  _COL_DEFS.forEach(c => setColVisible(c.id, true));
-  // Обновляем чекбоксы в панели
-  document.querySelectorAll('#col-settings-panel input[type=checkbox]').forEach((cb,i) => cb.checked = true);
-}
-function _colHideRob() {
-  ['col-rob-oos','col-rob-walk','col-rob-param','col-rob-noise','col-rob-mc'].forEach(c => setColVisible(c, false));
-  document.querySelectorAll('#col-settings-panel input[type=checkbox]').forEach(cb => {
-    const col = _COL_DEFS.find(c => c.label === cb.parentElement.textContent.trim());
-  });
-  toggleColSettings(); toggleColSettings(); // перерисовываем панель
-}
-
-// Инициализация при загрузке
-function _initColSettings() {
-  const s = getColSettings();
-  _applyColSettings(s);
-}
-
-// ─────────────────────────────────────────────────────────────────
-// OOS таблица — настраиваемые колонки
-// ─────────────────────────────────────────────────────────────────
-
-function _loadOOSColSettings() {
-  try {
-    const saved = localStorage.getItem('use_oos_col_settings');
-    if (saved) return JSON.parse(saved);
-  } catch(e) {}
-  const def = {};
-  _OOS_COL_DEFS.forEach(c => def[c.id] = c.default);
-  return def;
-}
-
-function _saveOOSColSettings(settings) {
-  try { localStorage.setItem('use_oos_col_settings', JSON.stringify(settings)); } catch(e) {}
-}
-
-function _applyOOSColSettings(settings) {
-  const hiddenCols = _OOS_COL_DEFS.filter(col => settings[col.id] === false);
-  if (hiddenCols.length === 0) return;
-  _OOS_COL_DEFS.forEach(col => {
-    const visible = settings[col.id] !== false;
-    document.querySelectorAll('.' + col.id).forEach(el => {
-      el.classList.toggle('col-hidden', !visible);
-    });
-  });
-}
-
-function getOOSColSettings() {
-  if (!_oosColSettings) _oosColSettings = _loadOOSColSettings();
-  return _oosColSettings;
-}
-
-function setOOSColVisible(colId, visible) {
-  const s = getOOSColSettings();
-  s[colId] = visible;
-  _oosColSettings = s;
-  _saveOOSColSettings(s);
-  _applyOOSColSettings(s);
-}
-
-let _oosColPanelOpen = false;
-function toggleOOSColSettings() {
-  const btn = document.getElementById('oos-col-settings-btn');
-  if (!btn) return;
-  const oldPanel = document.getElementById('oos-col-settings-panel');
-  if (oldPanel) { oldPanel.remove(); _oosColPanelOpen = false; return; }
-  _oosColPanelOpen = true;
-  const settings = getOOSColSettings();
-  const panel = document.createElement('div');
-  panel.id = 'oos-col-settings-panel';
-  panel.innerHTML = '<div style="font-weight:600;margin-bottom:6px;color:var(--text3);font-size:.9em">Столбики OOS</div>' +
-    _OOS_COL_DEFS.map(col => {
-      const checked = settings[col.id] !== false ? 'checked' : '';
-      return `<label><input type="checkbox" ${checked} onchange="setOOSColVisible('${col.id}',this.checked)"> ${col.label}</label>`;
-    }).join('') +
-    '<div style="margin-top:8px;display:flex;gap:6px">' +
-    '<button class="tpl-btn2" style="font-size:.8em;padding:2px 6px" onclick="_oosColShowAll()">Все</button>' +
-    '</div>';
-  const rect = btn.getBoundingClientRect();
-  panel.style.position = 'fixed';
-  panel.style.top = (rect.bottom + 4) + 'px';
-  const panelWidth = 240;
-  const rightSpace = window.innerWidth - rect.right;
-  if (rightSpace < panelWidth) {
-    panel.style.left = (rect.left - panelWidth + rect.width) + 'px';
-    panel.style.right = 'auto';
-  } else {
-    panel.style.right = (window.innerWidth - rect.right) + 'px';
-    panel.style.left = 'auto';
-  }
-  document.body.appendChild(panel);
-  setTimeout(() => {
-    document.addEventListener('click', function _closePanelOOS(e) {
-      if (!panel.contains(e.target) && e.target.id !== 'oos-col-settings-btn') {
-        panel.remove(); _oosColPanelOpen = false;
-        document.removeEventListener('click', _closePanelOOS);
-      }
-    });
-  }, 50);
-}
-
-function _oosColShowAll() {
-  _OOS_COL_DEFS.forEach(c => setOOSColVisible(c.id, true));
-  document.querySelectorAll('#oos-col-settings-panel input[type=checkbox]').forEach((cb,i) => cb.checked = true);
-}
-
-function _initOOSColSettings() {
-  const s = getOOSColSettings();
-  _applyOOSColSettings(s);
-}
-
-
 
 function openHCModal(mode) {
   if (!DATA) { alert('Нет данных'); return; }
@@ -27063,9 +26744,323 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 
+// ── ИДЕЯ 3: Массовый OOS-скан всех видимых результатов
+let _oosScanRunning = false;
+async function runOOSScan() {
+  if (_oosScanRunning) { _oosScanRunning = false; return; }
+  if (!DATA || !_visibleResults.length) return;
+  _oosScanRunning = true;
+  _hcRobRunning = true; // разрешаем runRobustScoreFor работать (иначе _stopCheck()=true сразу)
+  const btn = document.getElementById('btn-oos-scan');
+  const status = document.getElementById('oos-scan-status');
+  if (btn) btn.textContent = '⏹ Стоп';
+  const toScan = _getPreRunFiltered();
+  const N = DATA.length, cut = Math.floor(N * 0.8);
+  let done = 0, passed = 0;
+  for (const r of toScan) {
+    if (!_oosScanRunning) break;
+    const origData = DATA;
+    DATA = origData.slice(cut);
+    const rOOS = _hcRunBacktest(r.cfg);
+    DATA = origData;
+    const oosOk = rOOS && rOOS.n >= 3 && rOOS.pnl > 0;
+    if (oosOk) {
+      const { score, details } = await runRobustScoreForDetailed(r, ['oos','walk','param','noise','mc'], true);
+      r.robScore = score; r.robMax = 5; r.robDetails = details;
+      const ri = results.findIndex(x => x.name === r.name);
+      if (ri >= 0) { results[ri].robScore = score; results[ri].robMax = 5; results[ri].robDetails = details; }
+      if (score >= 1) passed++;
+    } else {
+      if (r.robScore === undefined) r.robScore = 0;
+    }
+    done++;
+    if (status) status.textContent = `${done}/${toScan.length} | ≥1🛡: ${passed}`;
+    if (done % 3 === 0) { await yieldToUI(); _updateHCSrcCounts(); }
+  }
+  _oosScanRunning = false;
+  _hcRobRunning = false;
+  if (btn) btn.textContent = '🔎 OOS-скан';
+  if (status) status.textContent = `✅ ${done} проверено | ≥1🛡: ${passed} | Кэш: ${_robCache.size}`;
+  _updateHCSrcCounts();
+  applyFilters(true);
+}
+
+function _updateHCSrcCounts() {
+  const visCnt = document.getElementById('hc_src_vis_cnt');
+  const favCnt = document.getElementById('hc_src_fav_cnt');
+  const robCnt = document.getElementById('hc_src_rob_cnt');
+  if (visCnt) visCnt.textContent = _visibleResults.length;
+  if (favCnt) favCnt.textContent = favourites.length;
+  if (robCnt) {
+    const minR = parseInt(document.getElementById('hc_src_rob_min')?.value) || 3;
+    const cnt = results.filter(r => r.robScore !== undefined && r.robScore >= minR).length;
+    robCnt.textContent = cnt;
+  }
+}
 
 
+// ─────────────────────────────────────────────────────────────────
+// НАСТРАИВАЕМЫЕ КОЛОНКИ ТАБЛИЦЫ
+// ─────────────────────────────────────────────────────────────────
+const _COL_DEFS = [
+  { id: 'col-fav',        label: '⭐ Избранное',        default: true },
+  { id: 'col-pnl',        label: 'PnL%',                default: true },
+  { id: 'col-wr',         label: 'WR%',                 default: true },
+  { id: 'col-n',          label: '# сделок',            default: true },
+  { id: 'col-dd',         label: 'DD%',                 default: true },
+  { id: 'col-pdd',        label: 'P/DD',                default: true },
+  { id: 'col-sig',        label: 'Sig%',                default: true },
+  { id: 'col-gt',         label: 'GT-Score',            default: true },
+  { id: 'col-cvr',        label: 'CVR%',                default: true },
+  { id: 'col-sor',        label: 'Sortino',             default: true },  // ##SOR
+  { id: 'col-kr',         label: 'K-Ratio',             default: true },  // ##KR
+  { id: 'col-sqn',        label: 'SQN',                 default: true },  // ##SQN
+  { id: 'col-omg',        label: 'Omega',               default: true },  // ##OMG
+  { id: 'col-pain',       label: 'Pain',                default: true },  // ##PAIN
+  { id: 'col-burke',      label: 'Burke',               default: true },  // ##BURKE
+  { id: 'col-srnty',      label: 'Serenity',            default: true },  // ##SRNTY
+  { id: 'col-ir',         label: 'IR',                  default: true },  // ##IR
+  { id: 'col-ml',         label: 'ML-фильтр',           default: true },  // ##ML_FILTER
+  { id: 'col-cpcv',       label: 'CPCV%',               default: false }, // ##CPCV lazy
+  { id: 'col-avg',        label: 'Avg%',                default: true },
+  { id: 'col-p1',         label: '1п PnL',              default: true },
+  { id: 'col-p2',         label: '2п PnL',              default: false },
+  { id: 'col-dwr',        label: 'ΔWR',                 default: true },
+  { id: 'col-split',      label: 'Split',               default: true },
+  { id: 'col-ls',          label: 'L/S Split',           default: true },
+  { id: 'col-tv-score',   label: 'TV рейтинг',          default: true },
+  { id: 'col-tv-dpnl',    label: 'ΔPnL TV',             default: true },
+  { id: 'col-tv-ddd',     label: 'ΔDD TV',              default: true },
+  { id: 'col-tv-dpdd',    label: 'ΔP/DD TV',            default: true },
+  { id: 'col-rob',        label: 'Rob (итого)',         default: true },
+  { id: 'col-rob-oos',    label: '🔬 OOS',              default: true },
+  { id: 'col-rob-walk',   label: '🔬 Walk-Forward',    default: true },
+  { id: 'col-rob-param',  label: '🔬 Param',            default: true },
+  { id: 'col-rob-noise',  label: '🔬 Noise',            default: true },
+  { id: 'col-rob-mc',     label: '🔬 MC',               default: true },
+];
 
+// OOS таблица столбики (аналогично _COL_DEFS)
+const _OOS_COL_DEFS = [
+  { id: 'oos-col-fav',     label: '⭐ Избранное',      default: true },
+  { id: 'oos-col-pnl',     label: 'PnL%',              default: true },
+  { id: 'oos-col-dd',      label: 'DD%',               default: true },
+  { id: 'oos-col-pdd',     label: 'P/DD',              default: true },
+  { id: 'oos-col-apt',     label: 'Avg/tr',            default: true },
+  { id: 'oos-col-wr',      label: 'WR%',               default: true },
+  { id: 'oos-col-kr',      label: 'K-Ratio',           default: true },
+  { id: 'oos-col-n',       label: '# сделок',          default: true },
+  { id: 'oos-col-rate',    label: 'Rate%',             default: true },
+  { id: 'oos-col-score',   label: 'Оценка',            default: true },
+];
+
+let _colSettings = null; // null = не загружен
+let _oosColSettings = null; // null = не загружен
+
+function _loadColSettings() {
+  try {
+    const saved = localStorage.getItem('use_col_settings');
+    if (saved) return JSON.parse(saved);
+  } catch(e) {}
+  // Дефолт
+  const def = {};
+  _COL_DEFS.forEach(c => def[c.id] = c.default);
+  return def;
+}
+
+function _saveColSettings(settings) {
+  try { localStorage.setItem('use_col_settings', JSON.stringify(settings)); } catch(e) {}
+}
+
+function _applyColSettings(settings) {
+  // ОПТИМИЗАЦИЯ: если все колонки видимы — пропускаем querySelectorAll (дефолт после рендера)
+  const hiddenCols = _COL_DEFS.filter(col => settings[col.id] === false);
+  if (hiddenCols.length === 0) return;
+  // Применяем показ/скрытие через CSS класс col-hidden только для изменённых колонок
+  _COL_DEFS.forEach(col => {
+    const visible = settings[col.id] !== false;
+    document.querySelectorAll('.' + col.id).forEach(el => {
+      el.classList.toggle('col-hidden', !visible);
+    });
+  });
+}
+
+function getColSettings() {
+  if (!_colSettings) _colSettings = _loadColSettings();
+  return _colSettings;
+}
+
+function setColVisible(colId, visible) {
+  const s = getColSettings();
+  s[colId] = visible;
+  _colSettings = s;
+  _saveColSettings(s);
+  _applyColSettings(s);
+}
+
+let _colPanelOpen = false;
+function toggleColSettings() {
+  const btn = document.getElementById('col-settings-btn');
+  if (!btn) return;
+  // Убираем старую панель
+  const oldPanel = document.getElementById('col-settings-panel');
+  if (oldPanel) { oldPanel.remove(); _colPanelOpen = false; return; }
+  _colPanelOpen = true;
+  const settings = getColSettings();
+  const panel = document.createElement('div');
+  panel.id = 'col-settings-panel';
+  panel.innerHTML = '<div style="font-weight:600;margin-bottom:6px;color:var(--text3);font-size:.9em">Столбики таблицы</div>' +
+    _COL_DEFS.map(col => {
+      const checked = settings[col.id] !== false ? 'checked' : '';
+      return `<label><input type="checkbox" ${checked} onchange="setColVisible('${col.id}',this.checked)"> ${col.label}</label>`;
+    }).join('') +
+    '<div style="margin-top:8px;display:flex;gap:6px">' +
+    '<button class="tpl-btn2" style="font-size:.8em;padding:2px 6px" onclick="_colShowAll()">Все</button>' +
+    '<button class="tpl-btn2" style="font-size:.8em;padding:2px 6px" onclick="_colHideRob()">Скрыть тесты</button>' +
+    '</div>';
+  // Позиционируем относительно кнопки
+  const rect = btn.getBoundingClientRect();
+  const tbl = btn.closest('table');
+  if (tbl) {
+    const tblRect = tbl.getBoundingClientRect();
+    panel.style.position = 'fixed';
+    panel.style.top = (rect.bottom + 4) + 'px';
+    // Проверяем место вправо, если не влазит - позиционируем влево
+    const panelWidth = 280; // примерная ширина панели
+    const rightSpace = window.innerWidth - rect.right;
+    if (rightSpace < panelWidth) {
+      // Позиционируем от левого края кнопки
+      panel.style.left = (rect.left - panelWidth + rect.width) + 'px';
+      panel.style.right = 'auto';
+    } else {
+      // Позиционируем от правого края
+      panel.style.right = (window.innerWidth - rect.right) + 'px';
+      panel.style.left = 'auto';
+    }
+  }
+  document.body.appendChild(panel);
+  // Закрыть при клике вне
+  setTimeout(() => {
+    document.addEventListener('click', function _closePanel(e) {
+      if (!panel.contains(e.target) && e.target.id !== 'col-settings-btn') {
+        panel.remove(); _colPanelOpen = false;
+        document.removeEventListener('click', _closePanel);
+      }
+    });
+  }, 50);
+}
+
+function _colShowAll() {
+  _COL_DEFS.forEach(c => setColVisible(c.id, true));
+  // Обновляем чекбоксы в панели
+  document.querySelectorAll('#col-settings-panel input[type=checkbox]').forEach((cb,i) => cb.checked = true);
+}
+function _colHideRob() {
+  ['col-rob-oos','col-rob-walk','col-rob-param','col-rob-noise','col-rob-mc'].forEach(c => setColVisible(c, false));
+  document.querySelectorAll('#col-settings-panel input[type=checkbox]').forEach(cb => {
+    const col = _COL_DEFS.find(c => c.label === cb.parentElement.textContent.trim());
+  });
+  toggleColSettings(); toggleColSettings(); // перерисовываем панель
+}
+
+// Инициализация при загрузке
+function _initColSettings() {
+  const s = getColSettings();
+  _applyColSettings(s);
+}
+
+// ─────────────────────────────────────────────────────────────────
+// OOS таблица — настраиваемые колонки
+// ─────────────────────────────────────────────────────────────────
+
+function _loadOOSColSettings() {
+  try {
+    const saved = localStorage.getItem('use_oos_col_settings');
+    if (saved) return JSON.parse(saved);
+  } catch(e) {}
+  const def = {};
+  _OOS_COL_DEFS.forEach(c => def[c.id] = c.default);
+  return def;
+}
+
+function _saveOOSColSettings(settings) {
+  try { localStorage.setItem('use_oos_col_settings', JSON.stringify(settings)); } catch(e) {}
+}
+
+function _applyOOSColSettings(settings) {
+  const hiddenCols = _OOS_COL_DEFS.filter(col => settings[col.id] === false);
+  if (hiddenCols.length === 0) return;
+  _OOS_COL_DEFS.forEach(col => {
+    const visible = settings[col.id] !== false;
+    document.querySelectorAll('.' + col.id).forEach(el => {
+      el.classList.toggle('col-hidden', !visible);
+    });
+  });
+}
+
+function getOOSColSettings() {
+  if (!_oosColSettings) _oosColSettings = _loadOOSColSettings();
+  return _oosColSettings;
+}
+
+function setOOSColVisible(colId, visible) {
+  const s = getOOSColSettings();
+  s[colId] = visible;
+  _oosColSettings = s;
+  _saveOOSColSettings(s);
+  _applyOOSColSettings(s);
+}
+
+let _oosColPanelOpen = false;
+function toggleOOSColSettings() {
+  const btn = document.getElementById('oos-col-settings-btn');
+  if (!btn) return;
+  const oldPanel = document.getElementById('oos-col-settings-panel');
+  if (oldPanel) { oldPanel.remove(); _oosColPanelOpen = false; return; }
+  _oosColPanelOpen = true;
+  const settings = getOOSColSettings();
+  const panel = document.createElement('div');
+  panel.id = 'oos-col-settings-panel';
+  panel.innerHTML = '<div style="font-weight:600;margin-bottom:6px;color:var(--text3);font-size:.9em">Столбики OOS</div>' +
+    _OOS_COL_DEFS.map(col => {
+      const checked = settings[col.id] !== false ? 'checked' : '';
+      return `<label><input type="checkbox" ${checked} onchange="setOOSColVisible('${col.id}',this.checked)"> ${col.label}</label>`;
+    }).join('') +
+    '<div style="margin-top:8px;display:flex;gap:6px">' +
+    '<button class="tpl-btn2" style="font-size:.8em;padding:2px 6px" onclick="_oosColShowAll()">Все</button>' +
+    '</div>';
+  const rect = btn.getBoundingClientRect();
+  panel.style.position = 'fixed';
+  panel.style.top = (rect.bottom + 4) + 'px';
+  const panelWidth = 240;
+  const rightSpace = window.innerWidth - rect.right;
+  if (rightSpace < panelWidth) {
+    panel.style.left = (rect.left - panelWidth + rect.width) + 'px';
+    panel.style.right = 'auto';
+  } else {
+    panel.style.right = (window.innerWidth - rect.right) + 'px';
+    panel.style.left = 'auto';
+  }
+  document.body.appendChild(panel);
+  setTimeout(() => {
+    document.addEventListener('click', function _closePanelOOS(e) {
+      if (!panel.contains(e.target) && e.target.id !== 'oos-col-settings-btn') {
+        panel.remove(); _oosColPanelOpen = false;
+        document.removeEventListener('click', _closePanelOOS);
+      }
+    });
+  }, 50);
+}
+
+function _oosColShowAll() {
+  _OOS_COL_DEFS.forEach(c => setOOSColVisible(c.id, true));
+  document.querySelectorAll('#oos-col-settings-panel input[type=checkbox]').forEach((cb,i) => cb.checked = true);
+}
+
+function _initOOSColSettings() {
+  const s = getOOSColSettings();
+  _applyOOSColSettings(s);
+}
 
 // ============================================================
 // OOS COMPARE — сравнение избранных стратегий на новых данных
@@ -28086,6 +28081,8 @@ function exportOOSTableCSV() {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob); a.download = 'oos_compare.csv'; a.click();
 }
+
+
 
 
 
@@ -29585,6 +29582,7 @@ try{window.runMLFeatureScreening=runMLFeatureScreening;}catch(e){}
 
 
 
+
 // ─── Market Structure Comparator config reader ───────────────────────────────
 
 function _checkMSCConfig() {
@@ -30163,6 +30161,7 @@ function runOOSTradeDiag(oosIdx, event) {
   };
   reader.readAsText(file);
 }
+
 
 </script>
 </script>
@@ -30931,7 +30930,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1775034713144;
+window._BUILD_TS = 1775039431890;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
