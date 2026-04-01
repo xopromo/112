@@ -92,11 +92,11 @@ git push -u origin claude/ваша-ветка
 - `HC_NUMERIC_PARAMS` (4401) — список параметров HC
 
 **ui.js**:
-- `showDetail` (1263) — standard detail панель
-- `switchTableMode` (447) — HC/Fav/Results
-- `applyFilters` (844) — применение фильтров таблицы
-- `resetAllFilters` (828) — сброс фильтров
-- `runOOSScan` (5309) — OOS сканирование (→ ui_oos.js:3)
+- `showDetail` (20) — standard detail панель
+- `switchTableMode` (15) — HC/Fav/Results
+- `applyFilters` (412) — применение фильтров таблицы
+- `resetAllFilters` (396) — сброс фильтров
+- `runOOSScan` (3) — OOS сканирование (→ ui_oos.js:3)
 
 **ui_hc.js**:
 - `openHCModal` (1) — открыть HC окно
