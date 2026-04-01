@@ -3320,6 +3320,12 @@ async function runOpt() {
   try { await _batchCPCV(results, 200); } catch(_cpcvErr) { console.error('[Exhaustive _batchCPCV]', _cpcvErr); }
   if (typeof setMcPhase === 'function') setMcPhase(null);
   _curPage = 0;
+
+  // 🤖 Research Agent: добавить результаты в буфер
+  if (typeof ResearchAgent !== 'undefined' && window._queueMode && results.length > 0) {
+    ResearchAgent.addResults(results);
+  }
+
   renderResults();
   if(results.length>0) showBestStats();
   updateETA(done, total, results.length);
