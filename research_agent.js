@@ -92,6 +92,9 @@ const ResearchAgent = (() => {
     const db = await _initDB();
     const projectId = ProjectManager?.getCurrentId() || 'default';
 
+    // Синхронизировать projectId в localStorage для консистентности
+    localStorage.setItem('_currentProjectId', projectId);
+
     console.log('[ResearchAgent] 💾 finishRun: сохраняю', _resultsBuffer.length, 'результатов, projectId=' + projectId);
 
     const run = {
@@ -255,7 +258,7 @@ const ResearchAgent = (() => {
 
   async function getStatus() {
     const db = await _initDB();
-    const projectId = localStorage.getItem('_currentProjectId') || 'default';
+    const projectId = ProjectManager?.getCurrentId() || localStorage.getItem('_currentProjectId') || 'default';
 
     console.log('[ResearchAgent] getStatus: ищу данные для projectId=' + projectId);
 
@@ -301,7 +304,7 @@ const ResearchAgent = (() => {
     }
 
     _isAnalyzing = true;
-    const projectId = localStorage.getItem('_currentProjectId') || 'default';
+    const projectId = ProjectManager?.getCurrentId() || localStorage.getItem('_currentProjectId') || 'default';
 
     try {
       // Получить все накопленные результаты
