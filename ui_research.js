@@ -16,39 +16,74 @@ async function openResearchModal() {
   box.style.cssText = 'background:var(--bg2,#1e1e2e);border:1px solid rgba(139,92,246,.45);border-radius:8px;padding:20px;width:min(900px,95vw);max-height:90vh;overflow-y:auto;color:var(--fg,#cdd6f4)';
   overlay.appendChild(box);
 
-  // Загружаем историю из ResearchAgent
+  // Загружаем историю и статус из ResearchAgent
   let insights = null;
   let history = null;
+  let status = null;
 
   if (typeof ResearchAgent !== 'undefined') {
     const currentProjectId = localStorage.getItem('_currentProjectId') || 'default';
     history = await ResearchAgent.loadHistory(currentProjectId, 50);
+    status = await ResearchAgent.getStatus();
+
     if (history && history.length > 0) {
       const latestRun = history[0];
       insights = latestRun.analysis;
     }
   }
 
-  const tabBtn = (id, label, icon) =>
-    `<button onclick="openResearchModal('${id}')" style="background:${id==='overview'?'rgba(139,92,246,.2)':'none'};border:1px solid ${id==='overview'?'rgba(139,92,246,.6)':'#444'};color:var(--fg,#cdd6f4);border-radius:4px;padding:4px 12px;cursor:pointer;font-size:.82em;display:flex;align-items:center;gap:4px">
-          <span>${icon}</span> ${label}
-        </button>`;
-
   const headerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-      <span style="font-weight:600">📊 Анализ результатов</span>
+      <span style="font-weight:600">📊 Research Agent</span>
       <button onclick="document.getElementById('research-modal').remove()" style="background:none;border:none;color:var(--fg,#cdd6f4);cursor:pointer;font-size:1.2em">✕</button>
     </div>`;
 
-  if (!insights) {
+  // Статус панель
+  const statusHTML = status ? `
+    <div style="background:rgba(139,92,246,.08);border:1px solid rgba(139,92,246,.2);border-radius:6px;padding:12px;margin-bottom:12px;font-size:.85em">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;margin-bottom:10px">
+        <div>
+          <div style="color:#888;font-size:.75em;margin-bottom:2px">📊 Накоплено данных</div>
+          <div style="color:#a6e3a1;font-weight:600">${status.totalDataPoints} результатов</div>
+        </div>
+        <div>
+          <div style="color:#888;font-size:.75em;margin-bottom:2px">🔄 Прогонов</div>
+          <div style="color:#f9e2af;font-weight:600">${status.totalRuns}</div>
+        </div>
+        <div>
+          <div style="color:#888;font-size:.75em;margin-bottom:2px">⏱️ Последний прогон</div>
+          <div style="color:#cdd6f4;font-weight:600;font-size:.8em">${status.lastRunTime ? new Date(status.lastRunTime).toLocaleString('ru-RU').split(' ')[1] : '—'}</div>
+        </div>
+        <div>
+          <div style="color:#888;font-size:.75em;margin-bottom:2px">✅ Последний анализ</div>
+          <div style="color:${status.lastAnalysisTime ? '#a6e3a1' : '#888'};font-weight:600;font-size:.8em">${status.lastAnalysisTime ? new Date(status.lastAnalysisTime).toLocaleString('ru-RU').split(' ')[1] : 'не проводился'}</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button onclick="_runResearchAnalysisManually()" style="background:rgba(166,227,161,.2);border:1px solid rgba(166,227,161,.6);color:#a6e3a1;border-radius:4px;padding:6px 12px;cursor:pointer;font-size:.8em;font-weight:600" ${status.isAnalyzing ? 'disabled style="opacity:.5;cursor:not-allowed"' : ''}>
+          ${status.isAnalyzing ? '⏳ Анализирует...' : '▶️ Запустить анализ'}
+        </button>
+        <button onclick="openResearchModal()" style="background:rgba(139,92,246,.1);border:1px solid rgba(139,92,246,.4);color:#a78bfa;border-radius:4px;padding:6px 12px;cursor:pointer;font-size:.8em" title="Обновить статус">🔄 Обновить</button>
+      </div>
+    </div>` : '';
+
+  if (!insights && !status) {
     box.innerHTML = headerHTML + `
       <div style="color:#888;font-size:.9em;padding:20px;text-align:center">
-        ℹ️ Нет накопленных результатов. Запустите оптимизацию или очередь задач.
+        ℹ️ Research Agent не инициализирован. Запустите оптимизацию или очередь задач.
       </div>`;
     return;
   }
 
-  box.innerHTML = headerHTML + `
+  if (!insights) {
+    box.innerHTML = headerHTML + statusHTML + `
+      <div style="color:#888;font-size:.9em;padding:20px;text-align:center">
+        ℹ️ Нет накопленных результатов для анализа. Запустите оптимизацию или очередь задач.
+      </div>`;
+    return;
+  }
+
+  box.innerHTML = headerHTML + statusHTML + `
     <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;border-bottom:1px solid #444;padding-bottom:10px">
       <button onclick="document.querySelector('[data-tab=overview]')?.click()" style="background:rgba(139,92,246,.2);border:1px solid rgba(139,92,246,.6);color:var(--fg,#cdd6f4);border-radius:4px;padding:4px 12px;cursor:pointer;font-size:.82em">📊 Обзор</button>
       <button onclick="document.querySelector('[data-tab=correlations]')?.click()" style="background:none;border:1px solid #444;color:var(--fg,#cdd6f4);border-radius:4px;padding:4px 12px;cursor:pointer;font-size:.82em">🔗 Корреляции</button>
@@ -340,4 +375,39 @@ async function _renderHistory(history) {
       `).join('')}
     </div>
   `;
+}
+
+// ─── Вспомогательная функция: запустить анализ вручную ────────
+
+async function _runResearchAnalysisManually() {
+  if (typeof ResearchAgent === 'undefined') {
+    toast('❌ Research Agent не загружен', 2000);
+    return;
+  }
+
+  const btn = event.target;
+  const originalText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '⏳ Анализирует...';
+
+  try {
+    const analysis = await ResearchAgent.runAnalysisManually();
+
+    if (analysis) {
+      toast('✅ Анализ завершён успешно', 2000);
+      // Переоткрыть modal с обновленными данными
+      setTimeout(() => {
+        openResearchModal();
+      }, 500);
+    } else {
+      toast('⚠️ Нет результатов для анализа', 2000);
+      btn.disabled = false;
+      btn.textContent = originalText;
+    }
+  } catch (e) {
+    console.error('Ошибка анализа:', e);
+    toast('❌ Ошибка при анализе', 2000);
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
 }
