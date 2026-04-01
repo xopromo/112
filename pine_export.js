@@ -1486,7 +1486,8 @@ function generatePineScript(r, mode = 'indicator') {
   lines.push(`        v_ib_hit := false`);
   lines.push(`        v_sig_skip := 0`);
   lines.push(`        v_cd_bar := -1`);
-  lines.push(`    if v_in and not htr and use_be and not v_bea and be_offset < be_trig`);
+  lines.push(`    float _u = atr_v[1]`);
+  lines.push(`    if v_in and use_be and not v_bea and be_offset < be_trig`);
   lines.push(`        if (v_dir == 1 and high >= v_ep + _u * be_trig) or (v_dir == -1 and low <= v_ep - _u * be_trig)`);
   lines.push(`            float v_be_sl = v_ep + v_dir * _u * be_offset`);
   lines.push(`            v_sl := v_dir == 1 ? math.max(v_sl, v_be_sl) : math.min(v_sl, v_be_sl)`);
