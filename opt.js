@@ -2230,6 +2230,12 @@ async function runOpt() {
     results.sort((a,b)=>b.pdd-a.pdd);
     try { await _batchCPCV(results, 200); } catch(_cpcvErr) { console.error('[MC _batchCPCV]', _cpcvErr); }
     if (typeof setMcPhase === 'function') setMcPhase(null);
+
+    // 🤖 Research Agent: добавить результаты из MC режима
+    if (typeof ResearchAgent !== 'undefined' && window._queueMode && results.length > 0) {
+      ResearchAgent.addResults(results);
+    }
+
     renderResults(); showBestStats(); updateETA(done, mcTotal, results.length);
     $('prog').textContent = '✅ ' + fmtNum(results.length) + ' / ' + fmtNum(done) + ' прошли фильтр';
     $('pbtn').style.display='none'; $('sbtn').style.display='none';
@@ -2798,6 +2804,12 @@ async function runOpt() {
     results.sort((a,b)=>b.pdd-a.pdd);
     try { await _batchCPCV(results, 200); } catch(_cpcvErr) { console.error('[TPE _batchCPCV]', _cpcvErr); }
     if (typeof setMcPhase==='function') setMcPhase(null);
+
+    // 🤖 Research Agent: добавить результаты из TPE/Synthesis режима
+    if (typeof ResearchAgent !== 'undefined' && window._queueMode && results.length > 0) {
+      ResearchAgent.addResults(results);
+    }
+
     renderResults(); showBestStats(); updateETA(done, _tpeMaxIter, results.length);
     const _tpeStopReason = results.length >= _tpeTarget ? `✅ цель ${_tpeTarget} достигнута` : `✅ бюджет ${_tpeMaxIter} итераций исчерпан`;
     $('prog').textContent=`${_tpeStopReason} | ${fmtNum(results.length)} / ${fmtNum(done)} прошли фильтр`;
@@ -2906,6 +2918,12 @@ async function runOpt() {
         if (oi % 50 === 0) { await yieldToUI(); }
       }
     }
+
+    // 🤖 Research Agent: добавить результаты из BO режима
+    if (typeof ResearchAgent !== 'undefined' && window._queueMode && results.length > 0) {
+      ResearchAgent.addResults(results);
+    }
+
     renderResults(); showBestStats();
     updateETA(boN, boN, results.length);
     $('prog').textContent = `✅ BO завершён ${boN} итераций | ${fmtNum(results.length)} прошли фильтр`;
