@@ -18,6 +18,7 @@ const ResearchAgent = (() => {
   let _totalDataPoints = 0;
   let _totalRuns = 0;
   let _isAnalyzing = false;
+  let _isFinishingRun = false;  // Флаг для защиты от параллельных finishRun()
 
   // ─── Инициализация IndexedDB ────────────────────────────────
 
@@ -60,6 +61,10 @@ const ResearchAgent = (() => {
       console.log('[ResearchAgent] ⚠️  addResults: невалидные данные', { isArray: Array.isArray(newResults), len: newResults?.length });
       return;
     }
+    if (!_currentRunId) {
+      console.log('[ResearchAgent] ⚠️  addResults: нет активного прогона (_currentRunId не установлен)');
+      return;
+    }
     console.log('[ResearchAgent] 📥 addResults:', newResults.length, 'результатов, всего в буфере:', _resultsBuffer.length + newResults.length);
     _resultsBuffer.push(...newResults);
 
@@ -70,10 +75,18 @@ const ResearchAgent = (() => {
   // ─── API: Завершить прогон и сохранить ─────────────────────
 
   async function finishRun(metadata = {}) {
+    // Защита от параллельных вызовов finishRun()
+    if (_isFinishingRun) {
+      console.log('[ResearchAgent] finishRun: уже выполняется, пропуск');
+      return;
+    }
+
     if (!_currentRunId || _resultsBuffer.length === 0) {
       console.log('[ResearchAgent] finishRun: пропуск (нет данных)', { hasId: !!_currentRunId, bufLen: _resultsBuffer.length });
       return;
     }
+
+    _isFinishingRun = true;
 
     clearTimeout(_saveTimer);
     const db = await _initDB();
@@ -112,10 +125,14 @@ const ResearchAgent = (() => {
     }
 
     // Сохранить в IndexedDB
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const tx = db.transaction([STORE_RUNS], 'readwrite');
       const store = tx.objectStore(STORE_RUNS);
-      store.add(run);
+      const addReq = store.add(run);
+
+      addReq.onerror = () => {
+        console.warn('[ResearchAgent] Ошибка добавления в IndexedDB:', addReq.error);
+      };
 
       tx.oncomplete = async () => {
         console.log(`[ResearchAgent] 💾 Сохранено: ${run.resultCount} результатов (${_currentRunId})`);
@@ -127,7 +144,16 @@ const ResearchAgent = (() => {
 
         _currentRunId = null;
         _resultsBuffer = [];
+        _isFinishingRun = false;
         resolve(run);
+      };
+
+      tx.onerror = () => {
+        console.error('[ResearchAgent] Транзакция IndexedDB ошибка:', tx.error);
+        _currentRunId = null;
+        _resultsBuffer = [];
+        _isFinishingRun = false;
+        reject(tx.error);
       };
     });
   }
@@ -196,6 +222,7 @@ const ResearchAgent = (() => {
         resolve(runs);
       };
       req.onerror = () => reject(req.error);
+      tx.onerror = () => reject(tx.error);
     });
   }
 
@@ -248,6 +275,10 @@ const ResearchAgent = (() => {
         console.error('[ResearchAgent] getStatus: ошибка запроса', req.error);
         resolve({ totalRuns: 0, totalDataPoints: 0, lastAnalysisTime: null, lastRunTime: null, isAnalyzing: false });
       };
+      tx.onerror = () => {
+        console.error('[ResearchAgent] getStatus: ошибка транзакции', tx.error);
+        resolve({ totalRuns: 0, totalDataPoints: 0, lastAnalysisTime: null, lastRunTime: null, isAnalyzing: false });
+      };
     });
   }
 
@@ -279,7 +310,7 @@ const ResearchAgent = (() => {
         return null;
       }
 
-      const analysis = ResearchAnalysis.analyzeResults(allResults);
+      const analysis = await ResearchAnalysis.analyzeResults(allResults);
 
       // Обновить время последнего анализа
       _lastAnalysisTime = new Date().toISOString();
@@ -296,6 +327,18 @@ const ResearchAgent = (() => {
     }
   }
 
+  // ─── Диагностика (для отладки) ──────────────────────────────
+
+  function getDebugInfo() {
+    return {
+      currentRunId: _currentRunId,
+      bufferSize: _resultsBuffer.length,
+      isAnalyzing: _isAnalyzing,
+      dbInitialized: _db !== null,
+      lastAnalysisTime: _lastAnalysisTime
+    };
+  }
+
   // ─── Public API ─────────────────────────────────────────────
 
   return {
@@ -305,7 +348,8 @@ const ResearchAgent = (() => {
     loadHistory,
     getAllResultsFromHistory,
     getStatus,
-    runAnalysisManually
+    runAnalysisManually,
+    getDebugInfo
   };
 })();
 

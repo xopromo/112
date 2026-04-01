@@ -942,8 +942,12 @@ async function runOpt() {
   stopped=false; paused=false;
   if (!window._queueMode) { results=[]; equities={}; }
   // 🤖 Research Agent: начать новый прогон (если доступен)
-  if (typeof ResearchAgent !== 'undefined' && window._queueMode) {
-    await ResearchAgent.startRun({ mode: optMode, dataLength: DATA?.length || 0 });
+  if (typeof ResearchAgent !== 'undefined') {
+    try {
+      await ResearchAgent.startRun({ mode: optMode, dataLength: DATA?.length || 0 });
+    } catch (e) {
+      console.warn('[runOpt] ResearchAgent.startRun ошибка:', e);
+    }
   }
   try { // ── глобальный try/catch: любая ошибка отображается в UI ──────────────
   resultCache.clear();
