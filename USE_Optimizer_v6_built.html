@@ -1058,7 +1058,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
     <div class="field"><label>Пивот Left (диапазон)</label><input id="e_tl_pvl" value="3-6" data-tip="Баров слева для поиска пивотов (строит трендовую линию). Формат: min-max, например 3-6 для перебора от 3 до 6 баров"></div>
     <div class="field"><label>Пивот Right (диапазон)</label><input id="e_tl_pvr" value="1-2" data-tip="Баров справа для подтверждения пивотов (повышает стабильность). Формат: min-max, например 1-2 для перебора"></div>
   </div>
-  <div class="field"><label>Зона касания ± % (диапазон)</label><input id="e_tl_zone" value="-0.1-0.5" data-tip="Допустимое отклонение цены от линии (%). Отрицательное = противоположное направление. Примеры: -0.1-0.5 (от -0.1% до 0.5%), или -0.5:0.5:0.1 (от -0.5 до 0.5 с шагом 0.1)"></div>
+  <div class="field"><label>Зона касания ± % (диапазон)</label><input id="e_tl_zone" value="-0.1-0.5" data-tip="Допустимое отклонение цены от линии (%). Отрицательное = противоположное направление. Примеры: -0.1-0.5 (шаг 0.1), -0.5:0.5:0.05 (явный шаг 0.05), или -0.1,0.1,0.3,0.5 (конкретные значения)"></div>
 
   <div class="sep"></div>
   <div class="cb"><input type="checkbox" id="e_tl_break"><label data-tip="Сигнал при пробое трендовой линии закрытием выше/ниже. Использует те же параметры пивота и зону что выше">Пробой трендовой линии (с параметрами выше)</label></div>
@@ -1392,7 +1392,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
 
   <div class="sep"></div>
   <div class="cb" id="liq-cb"><input type="checkbox" id="f_liq"><label data-tip="Минимальная ликвидность: блокирует входы когда объём аномально низкий (ночные сессии, праздники)">Ликвидность (мин объём)</label></div>
-  <div class="field"><label>Мин объём / средний ×</label><input id="f_liqm" value="0.5" data-tip="Минимальный объём как доля среднего. 0.5 = объём должен быть хотя бы 50% от среднего"></div>
+  <div class="field"><label>Мин объём / средний × (диапазон)</label><input id="f_liqm" value="0.3-0.9" data-tip="Минимальный объём как доля среднего. Примеры: 0.3-0.9 (перебор от 0.3 до 0.9 с шагом 0.1), или 0.3:0.9:0.05 (шаг 0.05), или 0.2,0.5,0.8 (конкретные значения)"></div>
 
   <div class="sep"></div>
   <div class="cb" id="vdir-cb"><input type="checkbox" id="f_vdir"><label data-tip="Направленный объём: считает преобладание бычьего или медвежьего объёма за N баров. Лонг — если бычий объём доминирует">Направление объёма</label></div>
@@ -18188,7 +18188,8 @@ async function runOpt() {
   }
   const vsaMult=$n('f_vsam')||1.5;
   const vsaP=$n('f_vsap')||20;
-  const liqMin=$n('f_liqm')||0.5;
+  // liqMin больше НЕ читается как константа — перебирается через liqMinArr
+  // const liqMin=$n('f_liqm')||0.5;
   const volDirPArr = useVolDir ? parseRange('f_vdirp') : [$n('f_vdirp')||10];
   const clxVolMult=$n('f_clxm')||3.0;
   const clxBodyMult=$n('f_clxb')||1.5;
@@ -18445,6 +18446,8 @@ async function runOpt() {
   const tpAtrMults=useAdaptiveTP?parseRange('x_tp_atr_mult'):[1.0];
   const slAtrLens=useAdaptiveSL?parseRange('x_sl_atr_len'):[20];
   const slAtrMults=useAdaptiveSL?parseRange('x_sl_atr_mult'):[0.5];
+  // TrendLine Zone с защитой от пустого массива
+  const tlZonePctArr=useTrendFigures ? (()=>{const a=parseRange('e_tl_zone'); return (Array.isArray(a)&&a.length>0)?a:[0.3];})() : [0.3];
   // Точное количество валидных BE комбинаций (beOff < beTrig)
   let beValidCount=1;
   if(useBE){let v=0;beTrigs.forEach(t=>{beOffs.forEach(o=>{if(o<t)v++;});});beValidCount=v||1;}
@@ -18453,7 +18456,7 @@ async function runOpt() {
     (adxTs.length||1)*(adxHtfArr.length||1)*(rsiPairs.length||1)*(vfMs.length||1)*(atrExpMs.length||1)*(mdMaxs.length||1)*
     slPairs.length*tpPairs.length*beValidCount*(trTrigs.length||1)*(trDists.length||1)*
     (timeBarsArr.length||1)*(freshMaxs.length||1)*(wtThreshs.length||1)*
-    (vsaMs.length||1)*(atrBoMults.length||1)*(confNArr.length||1)*(confTypeArr.length||1)*
+    (vsaMs.length||1)*(liqMinArr.length||1)*(atrBoMults.length||1)*(confNArr.length||1)*(confTypeArr.length||1)*
     (confHtfArr.length||1)*(maCrossTypeArr.length||1)*(revBarsArr.length||1)*
     (revSkipArr.length||1)*(revCooldownArr.length||1)*
     (_adxLArr.length||1)*(_sTrendArr.length||1)*
@@ -18597,7 +18600,7 @@ async function runOpt() {
       ['pinRatio',       (Array.isArray(pinRatioArr) && pinRatioArr.length > 0) ? pinRatioArr : [2]],
       ['matPeriod',      (Array.isArray(matPArr) && matPArr.length > 0) ? matPArr : [20]],
       ['matZone',        (Array.isArray(matZoneArr) && matZoneArr.length > 0) ? matZoneArr : [0.2]],
-      ['tlZonePct',      useTrendFigures ? parseRange('e_tl_zone') : [0.3]],
+      ['tlZonePct',      (Array.isArray(tlZonePctArr) && tlZonePctArr.length > 0) ? tlZonePctArr : [0.3]],
     ];
     // Defaults for all params (first element of each array)
     window._ipDef = Object.fromEntries(_allIp.map(([n,a])=>[n,a[0]]));
@@ -32559,7 +32562,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1775063008823;
+window._BUILD_TS = 1775064328283;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
