@@ -23,6 +23,8 @@
 function parseRange(id) {
   const v = $v(id);
   if (!v) return [];
+
+  // 🔥 Формат с шагом: min:max:step (например 1:10:0.5 или -0.5:0.5:0.1)
   if (v.includes(':')) {
     const parts = v.split(':').map(Number);
     if (parts.length >= 3 && parts[2] > 0) {
@@ -38,6 +40,30 @@ function parseRange(id) {
     }
     return parts.filter(x => !isNaN(x));
   }
+
+  // 🔥 Формат диапазона: min-max (поддерживает отрицательные: -0.5-0.5)
+  // Регулярное выражение для парсинга: -?число-?число
+  const rangeMatch = v.match(/^(-?\d+\.?\d*)-(-?\d+\.?\d*)$/);
+  if (rangeMatch) {
+    const min = parseFloat(rangeMatch[1]);
+    const max = parseFloat(rangeMatch[2]);
+    if (!isNaN(min) && !isNaN(max)) {
+      // Генерируем диапазон с шагом 0.1 (или меньше для малых диапазонов)
+      const diff = Math.abs(max - min);
+      const step = diff <= 1 ? 0.1 : diff <= 10 ? 1 : 5;
+      const arr = [];
+      if (min <= max) {
+        for (let x = min; x <= max + step * 0.0001; x += step)
+          arr.push(Math.round(x * 10000) / 10000);
+      } else {
+        for (let x = min; x >= max - step * 0.0001; x -= step)
+          arr.push(Math.round(x * 10000) / 10000);
+      }
+      return arr;
+    }
+  }
+
+  // 🔥 Список через запятую: 1,2,3 или -0.1,0.2,0.5
   return v.split(',').map(x => parseFloat(x.trim())).filter(x => !isNaN(x));
 }
 
