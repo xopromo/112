@@ -56,7 +56,11 @@ const ResearchAgent = (() => {
   // ─── API: Добавить результаты в буфер (вызывается из runOpt) ──
 
   function addResults(newResults) {
-    if (!Array.isArray(newResults) || newResults.length === 0) return;
+    if (!Array.isArray(newResults) || newResults.length === 0) {
+      console.log('[ResearchAgent] ⚠️  addResults: невалидные данные', { isArray: Array.isArray(newResults), len: newResults?.length });
+      return;
+    }
+    console.log('[ResearchAgent] 📥 addResults:', newResults.length, 'результатов, всего в буфере:', _resultsBuffer.length + newResults.length);
     _resultsBuffer.push(...newResults);
 
     // Автосохранение каждые 100 результатов или через 30 сек
@@ -66,15 +70,21 @@ const ResearchAgent = (() => {
   // ─── API: Завершить прогон и сохранить ─────────────────────
 
   async function finishRun(metadata = {}) {
-    if (!_currentRunId || _resultsBuffer.length === 0) return;
+    if (!_currentRunId || _resultsBuffer.length === 0) {
+      console.log('[ResearchAgent] finishRun: пропуск (нет данных)', { hasId: !!_currentRunId, bufLen: _resultsBuffer.length });
+      return;
+    }
 
     clearTimeout(_saveTimer);
     const db = await _initDB();
+    const projectId = ProjectManager?.getCurrentId() || 'default';
+
+    console.log('[ResearchAgent] 💾 finishRun: сохраняю', _resultsBuffer.length, 'результатов, projectId=' + projectId);
 
     const run = {
       id: _currentRunId,
       timestamp: Date.now(),
-      projectId: ProjectManager?.getCurrentId() || 'default',
+      projectId: projectId,
       metadata,
       resultCount: _resultsBuffer.length,
       results: _resultsBuffer.map(r => ({
@@ -210,6 +220,8 @@ const ResearchAgent = (() => {
     const db = await _initDB();
     const projectId = localStorage.getItem('_currentProjectId') || 'default';
 
+    console.log('[ResearchAgent] getStatus: ищу данные для projectId=' + projectId);
+
     return new Promise((resolve) => {
       const tx = db.transaction([STORE_RUNS], 'readonly');
       const store = tx.objectStore(STORE_RUNS);
@@ -221,6 +233,8 @@ const ResearchAgent = (() => {
         const totalData = runs.reduce((sum, r) => sum + (r.resultCount || 0), 0);
         const lastRun = runs.length > 0 ? runs[runs.length - 1] : null;
 
+        console.log('[ResearchAgent] getStatus результат:', { runs: runs.length, totalData, projectId });
+
         resolve({
           totalRuns: runs.length,
           totalDataPoints: totalData,
@@ -229,6 +243,10 @@ const ResearchAgent = (() => {
           isAnalyzing: _isAnalyzing,
           lastAnalysisRunId: runs[0]?.id || null
         });
+      };
+      req.onerror = () => {
+        console.error('[ResearchAgent] getStatus: ошибка запроса', req.error);
+        resolve({ totalRuns: 0, totalDataPoints: 0, lastAnalysisTime: null, lastRunTime: null, isAnalyzing: false });
       };
     });
   }
