@@ -2232,7 +2232,7 @@ async function runOpt() {
     if (typeof setMcPhase === 'function') setMcPhase(null);
 
     // 🤖 Research Agent: добавить результаты из MC режима
-    if (typeof ResearchAgent !== 'undefined' && window._queueMode && results.length > 0) {
+    if (typeof ResearchAgent !== 'undefined' && results.length > 0) {
       ResearchAgent.addResults(results);
     }
 
@@ -2806,7 +2806,7 @@ async function runOpt() {
     if (typeof setMcPhase==='function') setMcPhase(null);
 
     // 🤖 Research Agent: добавить результаты из TPE/Synthesis режима
-    if (typeof ResearchAgent !== 'undefined' && window._queueMode && results.length > 0) {
+    if (typeof ResearchAgent !== 'undefined' && results.length > 0) {
       ResearchAgent.addResults(results);
     }
 
@@ -2920,7 +2920,7 @@ async function runOpt() {
     }
 
     // 🤖 Research Agent: добавить результаты из BO режима
-    if (typeof ResearchAgent !== 'undefined' && window._queueMode && results.length > 0) {
+    if (typeof ResearchAgent !== 'undefined' && results.length > 0) {
       ResearchAgent.addResults(results);
     }
 
@@ -3339,8 +3339,8 @@ async function runOpt() {
   if (typeof setMcPhase === 'function') setMcPhase(null);
   _curPage = 0;
 
-  // 🤖 Research Agent: добавить результаты в буфер
-  if (typeof ResearchAgent !== 'undefined' && window._queueMode && results.length > 0) {
+  // 🤖 Research Agent: добавить результаты в буфер (Grid/Exhaustive режим)
+  if (typeof ResearchAgent !== 'undefined' && results.length > 0) {
     ResearchAgent.addResults(results);
   }
 
