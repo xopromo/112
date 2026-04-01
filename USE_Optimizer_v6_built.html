@@ -13344,6 +13344,7 @@ const ResearchAgent = (() => {
   let _dbPromise = null;  // Кэш для защиты от параллельной инициализации
   let _currentRunId = null;
   let _resultsBuffer = [];
+  let _pendingResultsQueues = [];  // ОЧЕРЕДЬ для защиты от race condition
   let _lastAnalysisTime = localStorage.getItem('_raLastAnalysisTime') || null;
   let _totalDataPoints = 0;
   let _totalRuns = 0;
@@ -13409,6 +13410,14 @@ const ResearchAgent = (() => {
       console.log('[ResearchAgent] ⚠️  addResults: нет активного прогона (_currentRunId не установлен)');
       return;
     }
+
+    // Защита от race condition: если finishRun выполняется, добавляем в очередь
+    if (_isFinishingRun) {
+      console.log('[ResearchAgent] ⚠️  addResults: finishRun выполняется, добавляю в очередь');
+      _pendingResultsQueues.push(newResults);
+      return;
+    }
+
     console.log('[ResearchAgent] 📥 addResults:', newResults.length, 'результатов, всего в буфере:', _resultsBuffer.length + newResults.length);
     _resultsBuffer.push(...newResults);
   }
@@ -13489,16 +13498,36 @@ const ResearchAgent = (() => {
           console.warn('[ResearchAgent] Ошибка экспорта (некритичная):', e);
         }
 
+        // Перенести очереди результатов обратно в буфер если есть новые результаты
+        if (_pendingResultsQueues.length > 0) {
+          console.log('[ResearchAgent] ℹ️  Обработка', _pendingResultsQueues.length, 'очередей результатов');
+          const allQueued = [];
+          for (const queue of _pendingResultsQueues) {
+            allQueued.push(...queue);
+          }
+          _resultsBuffer = allQueued;
+          _pendingResultsQueues = [];
+        } else {
+          _resultsBuffer = [];
+        }
+
         _currentRunId = null;
-        _resultsBuffer = [];
         _isFinishingRun = false;
         resolve(run);
       };
 
       tx.onerror = () => {
         console.error('[ResearchAgent] Транзакция IndexedDB ошибка:', tx.error);
+        // Перенести очередь обратно в буфер для переПопытки
+        if (_pendingResultsQueues.length > 0) {
+          const allQueued = [];
+          for (const queue of _pendingResultsQueues) {
+            allQueued.push(...queue);
+          }
+          _resultsBuffer = allQueued;
+          _pendingResultsQueues = [];
+        }
         _currentRunId = null;
-        _resultsBuffer = [];
         _isFinishingRun = false;
         reject(tx.error);
       };
@@ -14017,7 +14046,10 @@ const ResearchAnalysis = (() => {
       // Difference of means
       const diff = Math.abs(mean(sucVals) - mean(unsucVals));
       const stdDiff = Math.sqrt(Math.pow(stdev(sucVals), 2) + Math.pow(stdev(unsucVals), 2)) || 1;
-      const tScore = diff / stdDiff;
+      const tScore = (diff === 0 && stdDiff === 0) ? 0 : (diff / stdDiff);
+
+      // Защита от NaN
+      if (!isFinite(tScore)) continue;
 
       importance[param] = {
         successMean: mean(sucVals),
@@ -32175,7 +32207,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1775048412259;
+window._BUILD_TS = 1775048517261;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
