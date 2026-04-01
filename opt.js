@@ -36,6 +36,8 @@ function parseRange(id) {
         for (let x = parts[0]; x >= parts[1] - parts[2] * 0.0001; x -= parts[2])
           arr.push(Math.round(x * 10000) / 10000);
       }
+      // Диагностика для большинство параметров только не мешают
+      // if (arr.length > 10) console.warn(`[parseRange] ${id}: "${v}" → ${arr.length} значений [${arr.slice(0,3).join(', ')}...${arr.slice(-3).join(', ')}]`);
       return arr;
     }
     return parts.filter(x => !isNaN(x));
@@ -1395,8 +1397,9 @@ async function runOpt() {
   }
   const vsaMult=$n('f_vsam')||1.5;
   const vsaP=$n('f_vsap')||20;
-  // liqMin больше НЕ читается как константа — перебирается через liqMinArr
+  // liqMin и tlZone больше НЕ читаются как константы — перебираются через liqMinArr и tlZonePctArr
   // const liqMin=$n('f_liqm')||0.5;
+  // const _tlZone (используется как дефолт, заменяется на tlZonePct из _dims)
   const volDirPArr = useVolDir ? parseRange('f_vdirp') : [$n('f_vdirp')||10];
   const clxVolMult=$n('f_clxm')||3.0;
   const clxBodyMult=$n('f_clxb')||1.5;
@@ -1648,6 +1651,7 @@ async function runOpt() {
   // Count combos for progress
   const vsaMs=useVSA?parseRange('f_vsam'):[0];
   const liqMinArr=useLiq?parseRange('f_liqm'):[0.5];
+  const tlZonePctArr=useTrendFigures ? (()=>{const a=parseRange('e_tl_zone'); return (Array.isArray(a)&&a.length>0)?a:[0.3];})() : [0.3];
   const dynSLStructMults=useDynSLStruct?parseRange('x_dynsl_m'):[0.3];  // Dynamic SL multipliers
   const tpAtrLens=useAdaptiveTP?parseRange('x_tp_atr_len'):[20];
   const tpAtrMults=useAdaptiveTP?parseRange('x_tp_atr_mult'):[1.0];
@@ -1667,7 +1671,7 @@ async function runOpt() {
     (confHtfArr.length||1)*(maCrossTypeArr.length||1)*(revBarsArr.length||1)*
     (revSkipArr.length||1)*(revCooldownArr.length||1)*
     (_adxLArr.length||1)*(_sTrendArr.length||1)*
-    (tlPvLs.length||1)*(tlPvRs.length||1)*
+    (tlPvLs.length||1)*(tlPvRs.length||1)*(tlZonePctArr.length||1)*
     (stAtrPArr.length||1)*(stMultArr.length||1)*
     (dynSLStructMults.length||1)*(tpAtrLens.length||1)*(tpAtrMults.length||1)*
     (slAtrLens.length||1)*(slAtrMults.length||1)*
@@ -1688,13 +1692,13 @@ async function runOpt() {
       (adxTs.length||1)*(adxHtfArr.length||1)*(rsiPairs.length||1)*(vfMs.length||1)*(atrExpMs.length||1)*(mdMaxs.length||1)*
       slPairs.length*tpPairs.length*beValidCount*(trTrigs.length||1)*(trDists.length||1)*
       (timeBarsArr.length||1)*(freshMaxs.length||1)*(wtThreshs.length||1)*
-      (vsaMs.length||1)*(atrBoMults.length||1)*(confNArr.length||1)*(confTypeArr.length||1)*
+      (vsaMs.length||1)*(liqMinArr.length||1)*(atrBoMults.length||1)*(confNArr.length||1)*(confTypeArr.length||1)*
       (confHtfArr.length||1)*(maCrossTypeArr.length||1)*(revBarsArr.length||1)*
       (dynSLStructMults.length||1)*(tpAtrLens.length||1)*(tpAtrMults.length||1)*
       (slAtrLens.length||1)*(slAtrMults.length||1)*
     (revSkipArr.length||1)*(revCooldownArr.length||1)*
     (_adxLArr.length||1)*(_sTrendArr.length||1)*
-    (tlPvLs.length||1)*(tlPvRs.length||1)*
+    (tlPvLs.length||1)*(tlPvRs.length||1)*(tlZonePctArr.length||1)*
     (stAtrPArr.length||1)*(stMultArr.length||1)*
     (waitBarsArr.length||1)*(waitRetraceArr.length||1);
     // ── ИДЕЯ 7: Latin Hypercube Sampling — равномерное покрытие пространства
@@ -1877,7 +1881,7 @@ async function runOpt() {
     (atrBoMults.length?atrBoMults:[2.0]), slPairs, tpPairs,
     beOffs, beTrigs, trTrigs, trDists, wickMults, (timeBarsArr.length?timeBarsArr:[50]),
     window._ipCombos,
-    (tlPvLs.length?tlPvLs:[5]), (tlPvRs.length?tlPvRs:[3]),
+    (tlPvLs.length?tlPvLs:[5]), (tlPvRs.length?tlPvRs:[3]), (tlZonePctArr.length?tlZonePctArr:[0.3]),
     (confTypeArr.length?confTypeArr:['EMA']), (confHtfArr.length?confHtfArr:[1]),
     (maCrossTypeArr.length?maCrossTypeArr:['EMA']),
     (dynSLStructMults.length?dynSLStructMults:[0.3]),
@@ -1980,6 +1984,7 @@ async function runOpt() {
       const _ip      = _dims[_d][_di[_d++]];
       const tlPvL    = _dims[_d][_di[_d++]];
       const tlPvR    = _dims[_d][_di[_d++]];
+      const tlZonePct= _dims[_d][_di[_d++]];
       const _confType= _dims[_d][_di[_d++]];
       const _confHtf = _dims[_d][_di[_d++]];
       const _mCrossType= _dims[_d][_di[_d++]];
@@ -2362,6 +2367,7 @@ async function runOpt() {
       const _ip      = _dims[_d][dimIndices[_d++]];
       const tlPvL    = _dims[_d][dimIndices[_d++]];
       const tlPvR    = _dims[_d][dimIndices[_d++]];
+      const tlZonePct= _dims[_d][dimIndices[_d++]];
       const _confType= _dims[_d][dimIndices[_d++]];
       const _confHtf = _dims[_d][dimIndices[_d++]];
       const _mCrossType= _dims[_d][dimIndices[_d++]];
