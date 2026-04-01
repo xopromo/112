@@ -30,6 +30,8 @@ function baseContext(data) {
     JSON, Error, TypeError, RangeError,
     setTimeout: (fn) => fn(),  // синхронные заглушки
     clearTimeout: () => {},
+    setInterval: () => 0,
+    clearInterval: () => {},
     performance: { now: () => Date.now() },
 
     // Приложение-глобалы
@@ -53,7 +55,7 @@ function baseContext(data) {
     indexedDB: null,
 
     // Вспомогательные функции которые иногда вызываются при инициализации
-    requestAnimationFrame: (fn) => fn(0),
+    requestAnimationFrame: () => 0,  // НЕ вызываем fn — иначе RAF-цикл → stack overflow
     cancelAnimationFrame: () => {},
   };
 }
@@ -138,4 +140,107 @@ function createPineCtx(data) {
   return ctx;
 }
 
-module.exports = { createCoreCtx, createOptCtx, createPineCtx };
+/**
+ * createUICtx(data?)
+ * Загружает полный ui.js (с подстановкой ##-маркеров как в build.py).
+ * Доступны все функции ui.js: parseTextToSettings, _hcMetric, _hcCluster,
+ * _calcDDFromEq, _mlscrPearson, _parseCSVtoArray, _parseListOfTrades, и др.
+ *
+ * DOMContentLoaded/load-хендлеры регистрируются но НЕ запускаются —
+ * document.addEventListener является заглушкой () => {}.
+ */
+function createUICtx(data) {
+  const noop = () => {};
+  const domEl = () => ({
+    value: '', checked: false, textContent: '', innerHTML: '',
+    style: {}, classList: { add: noop, remove: noop, toggle: noop, contains: () => false },
+    addEventListener: noop, removeEventListener: noop,
+    appendChild: noop, remove: noop,
+  });
+
+  const base = baseContext(data);
+  // Расширяем document и window чтобы принимали addEventListener без краша
+  base.document = {
+    getElementById:     () => null,
+    querySelector:      () => null,
+    querySelectorAll:   () => [],
+    createElement:      () => domEl(),
+    createElementNS:    () => domEl(),
+    addEventListener:   noop,
+    removeEventListener: noop,
+    head:  { appendChild: noop },
+    body:  { appendChild: noop, style: {} },
+  };
+  base.window = {
+    addEventListener:   noop,
+    removeEventListener: noop,
+    location: { href: '' },
+    onerror: null,
+  };
+  // Дополнительные браузерные API, которые ui.js может использовать на верхнем уровне
+  base.AudioContext = function() { return { createOscillator: () => ({ connect: noop, start: noop, stop: noop, frequency: { setValueAtTime: noop }, type: '' }), createGain: () => ({ connect: noop, gain: { setValueAtTime: noop, exponentialRampToValueAtTime: noop } }), currentTime: 0, destination: {} }; };
+  base.Worker        = function() { return { postMessage: noop, terminate: noop, addEventListener: noop }; };
+  base.URL           = { createObjectURL: () => '', revokeObjectURL: noop };
+  base.Blob          = function() { return {}; };
+  base.MessageChannel = function() { return { port1: { onmessage: null, postMessage: noop }, port2: { onmessage: null, postMessage: noop } }; };
+  base.crypto        = { getRandomValues: (arr) => { for (let i = 0; i < arr.length; i++) arr[i] = Math.floor(Math.random() * 256); return arr; } };
+
+  const ctx = vm.createContext(base);
+
+  // ── Подставляем ##-маркеры как build.py ──────────────────────────────────
+  const REGISTRY_FILES = [
+    'entry_registry.js', 'filter_registry.js',
+    'exit_registry.js',  'sl_tp_registry.js',
+  ];
+  const registries = REGISTRY_FILES.map(f => readSrc(f)).join('\n');
+
+  const optFull = readSrc('opt.js');
+  const SEC = ['// ##SECTION_A##\n', '// ##SECTION_B##\n', '// ##SECTION_C##\n', '// ##SECTION_D##\n'];
+  const iA = optFull.indexOf(SEC[0]) + SEC[0].length;
+  const iB = optFull.indexOf(SEC[1]);
+  const iC = optFull.indexOf(SEC[2]);
+  const iD = optFull.indexOf(SEC[3]);
+  const optA = optFull.slice(iA, iB).trimEnd();
+  const optB = optFull.slice(iB + SEC[1].length, iC).trimEnd();
+  const optC = optFull.slice(iC + SEC[2].length, iD).trimEnd();
+  const optD = optFull.slice(iD + SEC[3].length).trimEnd();
+
+  const HDR_END = '// ============================================================\n\n';
+  const coreFull = readSrc('core.js');
+  const coreCode = coreFull.slice(coreFull.lastIndexOf(HDR_END) + HDR_END.length).trimEnd();
+
+  let uiCode = readSrc('ui.js');
+  uiCode = uiCode.replace('/* ##REGISTRIES## */', registries);
+  uiCode = uiCode.replace('/* ##OPT_A## */', optA);
+  uiCode = uiCode.replace('/* ##CORE## */',  coreCode);
+  uiCode = uiCode.replace('/* ##OPT_B## */', optB);
+  uiCode = uiCode.replace('/* ##OPT_C## */', optC);
+  uiCode = uiCode.replace('/* ##OPT_D## */', optD);
+
+  try {
+    vm.runInContext(uiCode, ctx, { filename: 'ui.js' });
+  } catch (e) {
+    throw new Error(`Harness createUICtx: ошибка загрузки ui.js: ${e.message}\n  at line ~${e.stack}`);
+  }
+
+  // Экспортируем let/const верхнего уровня ui.js на globalThis контекста
+  vm.runInContext(`
+    (function _exposeUI() {
+      var names = [
+        'CFG_HTML_MAP','_TF_NUM_IDS','_TF_SEL_IDS','_COL_DEFS','_OOS_COL_DEFS',
+        'fmtSec','_calcDDFromEq','_parseCSVtoArray','_parseListOfTrades',
+        '_hcMetric','_hcCluster','_gaCrossover','_gaMutate',
+        '_mlscrPearson','_mlscrVariance','_mlscrLinFit','_mlscrGreedyR2',
+        'parseTextToSettings','_oosGetBadge','_getOOSSortVal',
+        '_normTime','parseCSV','_mergeMultiResults',
+      ];
+      names.forEach(function(n) {
+        try { if (typeof eval(n) !== 'undefined') globalThis[n] = eval(n); } catch(e) {}
+      });
+    })();
+  `, ctx);
+
+  return ctx;
+}
+
+module.exports = { createCoreCtx, createOptCtx, createPineCtx, createUICtx };
