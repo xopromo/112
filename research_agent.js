@@ -311,6 +311,18 @@ const ResearchAgent = (() => {
     }
   }
 
+  // ─── Диагностика (для отладки) ──────────────────────────────
+
+  function getDebugInfo() {
+    return {
+      currentRunId: _currentRunId,
+      bufferSize: _resultsBuffer.length,
+      isAnalyzing: _isAnalyzing,
+      dbInitialized: _db !== null,
+      lastAnalysisTime: _lastAnalysisTime
+    };
+  }
+
   // ─── Public API ─────────────────────────────────────────────
 
   return {
@@ -320,7 +332,8 @@ const ResearchAgent = (() => {
     loadHistory,
     getAllResultsFromHistory,
     getStatus,
-    runAnalysisManually
+    runAnalysisManually,
+    getDebugInfo
   };
 })();
 
