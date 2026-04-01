@@ -34,6 +34,7 @@ ui_queue      = open(os.path.join(base, 'ui_queue.js'),    encoding='utf-8').rea
 ui_tvcompare  = open(os.path.join(base, 'ui_tvcompare.js'),encoding='utf-8').read()
 ui_detail     = open(os.path.join(base, 'ui_detail.js'),   encoding='utf-8').read()
 ui_table      = open(os.path.join(base, 'ui_table.js'),    encoding='utf-8').read()
+ui_equity     = open(os.path.join(base, 'ui_equity.js'),   encoding='utf-8').read()
 ui_robust     = open(os.path.join(base, 'ui_robust.js'),   encoding='utf-8').read()
 ui_parse      = open(os.path.join(base, 'ui_parse.js'),    encoding='utf-8').read()
 pine          = open(os.path.join(base, 'pine_export.js'), encoding='utf-8').read()
@@ -106,6 +107,7 @@ for ph, content in [
     ('/* ##DETAIL## */',   ui_detail),
     ('/* ##ROBUST## */',   ui_robust),
     ('/* ##PARSE## */',    ui_parse),
+    ('/* ##EQUITY## */',   ui_equity),
     ('/* ##TVCOMPARE## */', ui_tvcompare),
     ('/* ##QUEUE## */',    ui_queue),
     ('/* ##HC## */',       ui_hc),

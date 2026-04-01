@@ -220,6 +220,7 @@ function createUICtx(data) {
   uiCode = uiCode.replace('/* ##DETAIL## */',    readSrc('ui_detail.js'));
   uiCode = uiCode.replace('/* ##ROBUST## */',    readSrc('ui_robust.js'));
   uiCode = uiCode.replace('/* ##PARSE## */',     readSrc('ui_parse.js'));
+  uiCode = uiCode.replace('/* ##EQUITY## */',    readSrc('ui_equity.js'));
   uiCode = uiCode.replace('/* ##TVCOMPARE## */', readSrc('ui_tvcompare.js'));
   uiCode = uiCode.replace('/* ##QUEUE## */', readSrc('ui_queue.js'));
   uiCode = uiCode.replace('/* ##HC## */',   readSrc('ui_hc.js'));
