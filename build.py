@@ -38,6 +38,7 @@ ui_equity     = open(os.path.join(base, 'ui_equity.js'),   encoding='utf-8').rea
 ui_favs       = open(os.path.join(base, 'ui_favs.js'),     encoding='utf-8').read()
 ui_robust     = open(os.path.join(base, 'ui_robust.js'),   encoding='utf-8').read()
 ui_parse      = open(os.path.join(base, 'ui_parse.js'),    encoding='utf-8').read()
+ui_research  = open(os.path.join(base, 'ui_research.js'),  encoding='utf-8').read()
 pine          = open(os.path.join(base, 'pine_export.js'), encoding='utf-8').read()
 
 # ── ML: model + inference + in-browser training ────────────────────────────
@@ -118,6 +119,7 @@ for ph, content in [
     ('/* ##PROJECTS## */',  ui_projects),
     ('/* ##OOS## */',       ui_oos),
     ('/* ##COMPARATOR## */',ui_comparator),
+    ('/* ##RESEARCH_UI## */',ui_research),
 ]:
     assert ph in ui_built, f"Placeholder not found in ui.js: {ph!r}"
     ui_built = ui_built.replace(ph, content, 1)
