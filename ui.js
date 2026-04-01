@@ -5141,6 +5141,20 @@ async function runQueue() {
       progEl.style.color = '#ff5555';
     }
   } finally {
+    // 🤖 Research Agent: завершить прогон и сохранить результаты
+    if (typeof ResearchAgent !== 'undefined') {
+      try {
+        await ResearchAgent.finishRun({
+          taskCount: tasks.length,
+          totalRepeats: totalRepeats,
+          stopped: _queueStopFlag,
+          resultCount: (window.results || []).length
+        });
+      } catch (e) {
+        console.warn('[ResearchAgent] Ошибка при завершении:', e);
+      }
+    }
+
     _queueRunning = false;
     window._queueMode = false;
     if (runBtn)  runBtn.style.display  = 'inline-block';
