@@ -22467,19 +22467,21 @@ async function checkPause() {
 }
 
 // ── yieldToUI: уступает управление UI без заморозки в фоновых вкладках ──
-// MessageChannel — настоящий macrotask, браузеры НЕ throttle-ят его до
-// 1000ms в фоновых вкладках (в отличие от setTimeout). Это позволяет TPE,
-// поиску соседей и тестам устойчивости работать в неактивной вкладке.
+// Web Worker работает в отдельном OS-потоке и доставляет сообщения через IPC
+// браузера — этот канал НЕ подпадает под "intensive throttling" Chrome 86+,
+// который тормозит MessageChannel/setTimeout в скрытых вкладках до 1 сек/1 мин.
+// Это позволяет TPE, очереди задач и тестам устойчивости работать в фоне.
 //
 // ВАЖНО: onmessage — один слот. Если два корутина одновременно вызовут
 // yieldToUI(), второй перезапишет первый callback → первый зависнет навсегда.
-// Пример: rob-тест + _batchOOS таймер запускаются параллельно.
 // Решение: очередь резолверов. Каждый postMessage обслуживает одного ожидающего.
-const _yieldCh = new MessageChannel();
 const _yieldQueue = [];
-_yieldCh.port1.onmessage = () => { const cb = _yieldQueue.shift(); if (cb) cb(); };
+const _yieldWorker = new Worker(URL.createObjectURL(
+  new Blob(['self.onmessage=()=>self.postMessage(0)'], {type:'application/javascript'})
+));
+_yieldWorker.onmessage = () => { const cb = _yieldQueue.shift(); if (cb) cb(); };
 function yieldToUI() {
-  return new Promise(res => { _yieldQueue.push(res); _yieldCh.port2.postMessage(0); });
+  return new Promise(res => { _yieldQueue.push(res); _yieldWorker.postMessage(0); });
 }
 
 // --- Stop ---
@@ -32254,7 +32256,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1775051260646;
+window._BUILD_TS = 1775051395046;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
