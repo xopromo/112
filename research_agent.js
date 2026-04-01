@@ -11,9 +11,9 @@ const ResearchAgent = (() => {
   const STORE_INSIGHTS = 'insights';   // Кэшированные инсайты
 
   let _db = null;
+  let _dbPromise = null;  // Кэш для защиты от параллельной инициализации
   let _currentRunId = null;
   let _resultsBuffer = [];
-  let _saveTimer = null;
   let _lastAnalysisTime = localStorage.getItem('_raLastAnalysisTime') || null;
   let _totalDataPoints = 0;
   let _totalRuns = 0;
@@ -23,8 +23,13 @@ const ResearchAgent = (() => {
   // ─── Инициализация IndexedDB ────────────────────────────────
 
   async function _initDB() {
+    // Если уже инициализирована, вернуть существующее подключение
     if (_db) return _db;
-    return new Promise((resolve, reject) => {
+
+    // Если инициализация уже в процессе, вернуть обещание о завершении
+    if (_dbPromise) return _dbPromise;
+
+    _dbPromise = new Promise((resolve, reject) => {
       const req = indexedDB.open(IDB_NAME, IDB_VERSION);
       req.onupgradeneeded = (e) => {
         const db = e.target.result;
@@ -39,9 +44,18 @@ const ResearchAgent = (() => {
           db.createObjectStore(STORE_INSIGHTS, { keyPath: 'id' });
         }
       };
-      req.onsuccess = (e) => { _db = e.target.result; resolve(_db); };
-      req.onerror = () => reject(req.error);
+      req.onsuccess = (e) => {
+        _db = e.target.result;
+        _dbPromise = null;  // Очистить кэш промиса после успеха
+        resolve(_db);
+      };
+      req.onerror = () => {
+        _dbPromise = null;  // Очистить кэш промиса при ошибке
+        reject(req.error);
+      };
     });
+
+    return _dbPromise;
   }
 
   // ─── API: Начать новый прогон ──────────────────────────────
@@ -67,9 +81,6 @@ const ResearchAgent = (() => {
     }
     console.log('[ResearchAgent] 📥 addResults:', newResults.length, 'результатов, всего в буфере:', _resultsBuffer.length + newResults.length);
     _resultsBuffer.push(...newResults);
-
-    // Автосохранение каждые 100 результатов или через 30 сек
-    _debounceSave();
   }
 
   // ─── API: Завершить прогон и сохранить ─────────────────────
@@ -88,7 +99,6 @@ const ResearchAgent = (() => {
 
     _isFinishingRun = true;
 
-    clearTimeout(_saveTimer);
     const db = await _initDB();
     const projectId = ProjectManager?.getCurrentId() || 'default';
 
@@ -165,18 +175,6 @@ const ResearchAgent = (() => {
     });
   }
 
-  // ─── Автосохранение (debounced) ────────────────────────────
-
-  function _debounceSave() {
-    clearTimeout(_saveTimer);
-    _saveTimer = setTimeout(async () => {
-      if (_resultsBuffer.length >= 100) {
-        console.log(`[ResearchAgent] 📊 Промежуточное сохранение: ${_resultsBuffer.length} результатов`);
-        // Можно добавить промежуточное сохранение если нужно
-      }
-    }, 30000);
-  }
-
   // ─── Экспорт в папку проекта (.research/YYYY-MM-DD.json) ───
 
   async function _exportToProjectFolder(run) {
@@ -247,8 +245,11 @@ const ResearchAgent = (() => {
     const cutoff = timeWindow ? Date.now() - timeWindow : 0;
 
     for (const run of runs) {
+      if (!run || !run.timestamp) continue;  // Защита от null/undefined
       if (run.timestamp < cutoff) break;
-      results.push(...(run.results || []));
+      if (run.results && Array.isArray(run.results)) {
+        results.push(...run.results);
+      }
     }
 
     return results;

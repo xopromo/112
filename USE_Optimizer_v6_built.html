@@ -13341,9 +13341,9 @@ const ResearchAgent = (() => {
   const STORE_INSIGHTS = 'insights';   // Кэшированные инсайты
 
   let _db = null;
+  let _dbPromise = null;  // Кэш для защиты от параллельной инициализации
   let _currentRunId = null;
   let _resultsBuffer = [];
-  let _saveTimer = null;
   let _lastAnalysisTime = localStorage.getItem('_raLastAnalysisTime') || null;
   let _totalDataPoints = 0;
   let _totalRuns = 0;
@@ -13353,8 +13353,13 @@ const ResearchAgent = (() => {
   // ─── Инициализация IndexedDB ────────────────────────────────
 
   async function _initDB() {
+    // Если уже инициализирована, вернуть существующее подключение
     if (_db) return _db;
-    return new Promise((resolve, reject) => {
+
+    // Если инициализация уже в процессе, вернуть обещание о завершении
+    if (_dbPromise) return _dbPromise;
+
+    _dbPromise = new Promise((resolve, reject) => {
       const req = indexedDB.open(IDB_NAME, IDB_VERSION);
       req.onupgradeneeded = (e) => {
         const db = e.target.result;
@@ -13369,9 +13374,18 @@ const ResearchAgent = (() => {
           db.createObjectStore(STORE_INSIGHTS, { keyPath: 'id' });
         }
       };
-      req.onsuccess = (e) => { _db = e.target.result; resolve(_db); };
-      req.onerror = () => reject(req.error);
+      req.onsuccess = (e) => {
+        _db = e.target.result;
+        _dbPromise = null;  // Очистить кэш промиса после успеха
+        resolve(_db);
+      };
+      req.onerror = () => {
+        _dbPromise = null;  // Очистить кэш промиса при ошибке
+        reject(req.error);
+      };
     });
+
+    return _dbPromise;
   }
 
   // ─── API: Начать новый прогон ──────────────────────────────
@@ -13397,9 +13411,6 @@ const ResearchAgent = (() => {
     }
     console.log('[ResearchAgent] 📥 addResults:', newResults.length, 'результатов, всего в буфере:', _resultsBuffer.length + newResults.length);
     _resultsBuffer.push(...newResults);
-
-    // Автосохранение каждые 100 результатов или через 30 сек
-    _debounceSave();
   }
 
   // ─── API: Завершить прогон и сохранить ─────────────────────
@@ -13418,7 +13429,6 @@ const ResearchAgent = (() => {
 
     _isFinishingRun = true;
 
-    clearTimeout(_saveTimer);
     const db = await _initDB();
     const projectId = ProjectManager?.getCurrentId() || 'default';
 
@@ -13495,18 +13505,6 @@ const ResearchAgent = (() => {
     });
   }
 
-  // ─── Автосохранение (debounced) ────────────────────────────
-
-  function _debounceSave() {
-    clearTimeout(_saveTimer);
-    _saveTimer = setTimeout(async () => {
-      if (_resultsBuffer.length >= 100) {
-        console.log(`[ResearchAgent] 📊 Промежуточное сохранение: ${_resultsBuffer.length} результатов`);
-        // Можно добавить промежуточное сохранение если нужно
-      }
-    }, 30000);
-  }
-
   // ─── Экспорт в папку проекта (.research/YYYY-MM-DD.json) ───
 
   async function _exportToProjectFolder(run) {
@@ -13577,8 +13575,11 @@ const ResearchAgent = (() => {
     const cutoff = timeWindow ? Date.now() - timeWindow : 0;
 
     for (const run of runs) {
+      if (!run || !run.timestamp) continue;  // Защита от null/undefined
       if (run.timestamp < cutoff) break;
-      results.push(...(run.results || []));
+      if (run.results && Array.isArray(run.results)) {
+        results.push(...run.results);
+      }
     }
 
     return results;
@@ -13905,13 +13906,18 @@ const ResearchAnalysis = (() => {
   }
 
   function _normalize(arr) {
+    if (!arr || arr.length === 0) return [];
     const min = Math.min(...arr);
     const max = Math.max(...arr);
-    const range = max - min || 1;
+    const range = (max - min) || 1;
+    if (!isFinite(min) || !isFinite(max)) return arr.map(() => 0);  // NaN защита
     return arr.map(x => (x - min) / range);
   }
 
   function _kmeansCluster(features, k, maxIter) {
+    if (!features || features.length === 0) return [];
+    if (k > features.length) k = features.length;  // Не больше k чем элементов
+
     const n = features.length;
     const clusters = Array.from({length: k}, () => []);
     let centers = features.slice(0, k).map(f => [...f]);
@@ -13959,6 +13965,9 @@ const ResearchAnalysis = (() => {
   }
 
   function _euclidean(a, b) {
+    if (!a || !b || !Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) {
+      return Infinity;  // Неверные входные данные - максимальное расстояние
+    }
     return Math.sqrt(a.reduce((s, x, i) => s + (x - b[i]) ** 2, 0));
   }
 
@@ -32145,7 +32154,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1775047807674;
+window._BUILD_TS = 1775047955357;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;

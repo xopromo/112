@@ -198,13 +198,18 @@ const ResearchAnalysis = (() => {
   }
 
   function _normalize(arr) {
+    if (!arr || arr.length === 0) return [];
     const min = Math.min(...arr);
     const max = Math.max(...arr);
-    const range = max - min || 1;
+    const range = (max - min) || 1;
+    if (!isFinite(min) || !isFinite(max)) return arr.map(() => 0);  // NaN защита
     return arr.map(x => (x - min) / range);
   }
 
   function _kmeansCluster(features, k, maxIter) {
+    if (!features || features.length === 0) return [];
+    if (k > features.length) k = features.length;  // Не больше k чем элементов
+
     const n = features.length;
     const clusters = Array.from({length: k}, () => []);
     let centers = features.slice(0, k).map(f => [...f]);
@@ -252,6 +257,9 @@ const ResearchAnalysis = (() => {
   }
 
   function _euclidean(a, b) {
+    if (!a || !b || !Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) {
+      return Infinity;  // Неверные входные данные - максимальное расстояние
+    }
     return Math.sqrt(a.reduce((s, x, i) => s + (x - b[i]) ** 2, 0));
   }
 
