@@ -132,9 +132,21 @@ function _renderResearchOverview(insights, history) {
   if (!insights) return '<p style="color:#888">No insights available</p>';
 
   const summary = insights.summary || {};
-  const correlations = insights.correlations || [];
-  const anomalies = insights.anomalies || [];
-  const clusters = insights.clusters || [];
+
+  // 🔥 ПРАВИЛЬНО: инсайты это МАССИВ объектов с type: 'correlations', 'anomalies' и т.д.
+  const insightsArray = insights.insights || [];
+
+  let correlations = [];
+  let anomalies = [];
+  let clusters = [];
+  let features = [];
+
+  for (const insight of insightsArray) {
+    if (insight.type === 'correlations') correlations = insight.topCorrelations || [];
+    if (insight.type === 'anomalies') anomalies = insight.topAnomalies || [];
+    if (insight.type === 'clusters') clusters = insight.clusters || [];
+    if (insight.type === 'feature_importance') features = insight.topFeatures || [];
+  }
 
   const topCorr = correlations
     .filter(c => Math.abs(c.r) > 0.3)
@@ -219,7 +231,11 @@ function _renderResearchOverview(insights, history) {
 }
 
 function _renderCorrelations(insights) {
-  const corr = insights?.correlations || [];
+  let corr = [];
+  if (insights?.insights) {
+    const corrInsight = insights.insights.find(i => i.type === 'correlations');
+    corr = corrInsight?.topCorrelations || [];
+  }
   if (corr.length === 0) return '<p style="color:#888">Корреляции не найдены</p>';
 
   // Группируем по метрикам
@@ -249,6 +265,11 @@ function _renderCorrelations(insights) {
 }
 
 function _renderAnomalies(insights) {
+  let anom = [];
+  if (insights?.insights) {
+    const anomInsight = insights.insights.find(i => i.type === 'anomalies');
+    anom = anomInsight?.topAnomalies || [];
+  }
   const anom = insights?.anomalies || [];
   if (anom.length === 0) return '<p style="color:#888">Аномалии не обнаружены</p>';
 
@@ -275,7 +296,11 @@ function _renderAnomalies(insights) {
 }
 
 function _renderClusters(insights) {
-  const clusters = insights?.clusters || [];
+  let clusters = [];
+  if (insights?.insights) {
+    const clustInsight = insights.insights.find(i => i.type === 'clusters');
+    clusters = clustInsight?.clusters || [];
+  }
   if (clusters.length === 0) return '<p style="color:#888">Кластеры не найдены</p>';
 
   return `
@@ -316,7 +341,11 @@ function _renderClusters(insights) {
 }
 
 function _renderFeatures(insights) {
-  const features = insights?.featureImportance || [];
+  let features = [];
+  if (insights?.insights) {
+    const featInsight = insights.insights.find(i => i.type === 'feature_importance');
+    features = featInsight?.topFeatures || [];
+  }
   if (features.length === 0) return '<p style="color:#888">Анализ факторов не доступен</p>';
 
   return `
