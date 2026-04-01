@@ -270,7 +270,6 @@ function _renderAnomalies(insights) {
     const anomInsight = insights.insights.find(i => i.type === 'anomalies');
     anom = anomInsight?.topAnomalies || [];
   }
-  const anom = insights?.anomalies || [];
   if (anom.length === 0) return '<p style="color:#888">Аномалии не обнаружены</p>';
 
   return `
