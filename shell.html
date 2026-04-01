@@ -1055,14 +1055,14 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
 
   <div class="cb"><input type="checkbox" id="e_tl_touch"><label data-tip="Сигнал при касании построенной трендовой линии (через последовательные пивоты). Для продолжения тренда">Касание трендовой линии</label></div>
   <div class="g2">
-    <div class="field"><label>Пивот Left</label><input id="e_tl_pvl" value="5" data-tip="Баров слева для пивотов, по которым строится трендовая линия"></div>
-    <div class="field"><label>Пивот Right</label><input id="e_tl_pvr" value="3" data-tip="Баров справа для подтверждения пивотов трендовой линии"></div>
+    <div class="field"><label>Пивот Left (диапазон)</label><input id="e_tl_pvl" value="3-6" data-tip="Баров слева для поиска пивотов (строит трендовую линию). Формат: min-max, например 3-6 для перебора от 3 до 6 баров"></div>
+    <div class="field"><label>Пивот Right (диапазон)</label><input id="e_tl_pvr" value="1-2" data-tip="Баров справа для подтверждения пивотов (повышает стабильность). Формат: min-max, например 1-2 для перебора"></div>
   </div>
-  <div class="field"><label>Зона касания %</label><input id="e_tl_zone" value="0.3" data-tip="Допустимое отклонение цены закрытия от трендовой линии (%). 0.3% = цена в пределах 0.3% от линии"></div>
+  <div class="field"><label>Зона касания ± % (диапазон)</label><input id="e_tl_zone" value="0.2-0.5" data-tip="Допустимое отклонение цены от трендовой линии (%). Для перебора используй диапазон: 0.2-0.5 (50% успешных стратегий будут в этом диапазоне)"></div>
 
   <div class="sep"></div>
-  <div class="cb"><input type="checkbox" id="e_tl_break"><label data-tip="Сигнал при пробое трендовой линии закрытием выше/ниже. Использует те же пивот-параметры">Пробой трендовой линии</label></div>
-  <div class="hint">Использует те же параметры пивота и зону выше</div>
+  <div class="cb"><input type="checkbox" id="e_tl_break"><label data-tip="Сигнал при пробое трендовой линии закрытием выше/ниже. Использует те же параметры пивота и зону что выше">Пробой трендовой линии (с параметрами выше)</label></div>
+  <div class="hint">⚙️ Использует те же параметры: Пивот Left/Right и Зона касания. Оптимизируй один раз для обоих сигналов!</div>
 
   <div class="sep"></div>
   <div class="cb"><input type="checkbox" id="e_flag"><label data-tip="Паттерн Флаг: импульс (сильное движение) + откат в узком канале + пробой вверх/вниз">Флаг (Flag)</label></div>
