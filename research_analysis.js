@@ -320,19 +320,19 @@ const ResearchAnalysis = (() => {
 
     // 1. Корреляции
     const corr = analyzeCorrelations(results);
-    if (!corr.error) insights.push(corr);
+    if (corr && !corr.error) insights.push(corr);
 
     // 2. Аномалии
     const anom = findAnomalies(results, 'pnl', 2.0);
-    if (anom.anomalies.length > 0) insights.push(anom);
+    if (anom && anom.anomalies && anom.anomalies.length > 0) insights.push(anom);
 
     // 3. Кластеры
     const clust = clusterSuccessful(results, 3);
-    if (!clust.error) insights.push(clust);
+    if (clust && !clust.error) insights.push(clust);
 
     // 4. Feature Importance
     const feat = analyzeFeatureImportance(results);
-    if (!feat.error) insights.push(feat);
+    if (feat && !feat.error) insights.push(feat);
 
     return {
       timestamp: Date.now(),
