@@ -137,9 +137,13 @@ const ResearchAgent = (() => {
       tx.oncomplete = async () => {
         console.log(`[ResearchAgent] 💾 Сохранено: ${run.resultCount} результатов (${_currentRunId})`);
 
-        // Экспортировать в папку проекта
-        if (ProjectManager?.getCurrentId()) {
-          await _exportToProjectFolder(run);
+        // Экспортировать в папку проекта (ошибки экспорта не должны блокировать finishRun)
+        try {
+          if (ProjectManager?.getCurrentId()) {
+            await _exportToProjectFolder(run);
+          }
+        } catch (e) {
+          console.warn('[ResearchAgent] Ошибка экспорта (некритичная):', e);
         }
 
         _currentRunId = null;
@@ -176,6 +180,12 @@ const ResearchAgent = (() => {
     try {
       const projId = ProjectManager?.getCurrentId();
       if (!projId) return;
+
+      // Проверяем наличие API File System Access
+      if (typeof ProjectManager.getDirectoryHandle !== 'function') {
+        console.warn('[ResearchAgent] ProjectManager.getDirectoryHandle не доступен (нет File System Access API)');
+        return;
+      }
 
       const dirHandle = await ProjectManager.getDirectoryHandle(projId);
       if (!dirHandle) return;

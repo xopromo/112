@@ -13467,9 +13467,13 @@ const ResearchAgent = (() => {
       tx.oncomplete = async () => {
         console.log(`[ResearchAgent] 💾 Сохранено: ${run.resultCount} результатов (${_currentRunId})`);
 
-        // Экспортировать в папку проекта
-        if (ProjectManager?.getCurrentId()) {
-          await _exportToProjectFolder(run);
+        // Экспортировать в папку проекта (ошибки экспорта не должны блокировать finishRun)
+        try {
+          if (ProjectManager?.getCurrentId()) {
+            await _exportToProjectFolder(run);
+          }
+        } catch (e) {
+          console.warn('[ResearchAgent] Ошибка экспорта (некритичная):', e);
         }
 
         _currentRunId = null;
@@ -13506,6 +13510,12 @@ const ResearchAgent = (() => {
     try {
       const projId = ProjectManager?.getCurrentId();
       if (!projId) return;
+
+      // Проверяем наличие API File System Access
+      if (typeof ProjectManager.getDirectoryHandle !== 'function') {
+        console.warn('[ResearchAgent] ProjectManager.getDirectoryHandle не доступен (нет File System Access API)');
+        return;
+      }
 
       const dirHandle = await ProjectManager.getDirectoryHandle(projId);
       if (!dirHandle) return;
@@ -13843,6 +13853,10 @@ const ResearchAnalysis = (() => {
 
     // Извлекаем числовые параметры (нормализованные)
     const paramNames = _getNumericParams(successful);
+    if (paramNames.length === 0) {
+      return { error: 'Не найдено числовых параметров для кластеризации' };
+    }
+
     const features = successful.map(r => {
       const v = paramNames.map(p => r.cfg[p] || 0);
       return _normalize(v);
@@ -13956,6 +13970,9 @@ const ResearchAnalysis = (() => {
     }
 
     const paramNames = _getNumericParams(results);
+    if (paramNames.length === 0) {
+      return { error: 'Не найдено числовых параметров для анализа' };
+    }
     const importance = {};
 
     for (const param of paramNames) {
@@ -32125,7 +32142,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1775047271846;
+window._BUILD_TS = 1775047567542;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
