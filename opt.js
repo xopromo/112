@@ -942,7 +942,7 @@ async function runOpt() {
   stopped=false; paused=false;
   if (!window._queueMode) { results=[]; equities={}; }
   // 🤖 Research Agent: начать новый прогон (если доступен)
-  if (typeof ResearchAgent !== 'undefined' && window._queueMode) {
+  if (typeof ResearchAgent !== 'undefined') {
     await ResearchAgent.startRun({ mode: optMode, dataLength: DATA?.length || 0 });
   }
   try { // ── глобальный try/catch: любая ошибка отображается в UI ──────────────
