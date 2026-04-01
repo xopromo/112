@@ -161,18 +161,28 @@ const ResearchAnalysis = (() => {
     // K-means итерации
     const clusters = _kmeansCluster(features, k, 20);
 
-    // Анализ кластеров
+    // Анализ кластеров с ПОЛНОЙ информацией
     const analysis = clusters.map((cluster, idx) => {
       const configs = cluster.map(i => successful[i]);
+      const avgParams = {};
+      paramNames.forEach(pname => {
+        avgParams[pname] = mean(configs.map(c => c.cfg[pname] || 0));
+      });
+
       return {
         clusterId: idx,
         size: configs.length,
         avgPnl: mean(configs.map(c => c.pnl)),
         avgWr: mean(configs.map(c => c.wr)),
         avgDd: mean(configs.map(c => c.dd)),
+        // 🔥 НОВОЕ: сохраняем все результаты в кластере + параметры
+        allResults: configs.map(c => ({ name: c.name, pnl: c.pnl, wr: c.wr, dd: c.dd })),
+        resultIndices: cluster,  // индексы в массиве results
         topConfigs: configs
           .sort((a, b) => b.pnl - a.pnl)
-          .slice(0, 3)
+          .slice(0, 3),
+        avgParameters: avgParams,  // средние значения параметров для кластера
+        paramNames: paramNames
       };
     });
 
@@ -180,7 +190,14 @@ const ResearchAnalysis = (() => {
       type: 'clusters',
       k,
       totalSuccessful: successful.length,
-      clusters: analysis.sort((a, b) => b.avgPnl - a.avgPnl)
+      clusters: analysis.sort((a, b) => b.avgPnl - a.avgPnl),
+      paramNames: paramNames,
+      // 🔥 НОВОЕ: маппинг результата → кластер для фильтрации в UI
+      resultClusterMap: Object.fromEntries(
+        clusters.flatMap((cluster, clusterIdx) =>
+          cluster.map(resIdx => [resIdx, clusterIdx])
+        )
+      )
     };
   }
 
