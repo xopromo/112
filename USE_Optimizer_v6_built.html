@@ -31467,35 +31467,149 @@ function _renderClusters(insights) {
   `;
 }
 
+// ═══════════════════════════════════════════════════════════════
+// СЛОВАРЬ ПАРАМЕТРОВ С РУССКИМИ НАЗВАНИЯМИ И ОПИСАНИЯМИ
+// ═══════════════════════════════════════════════════════════════
+
+const PARAM_DICTIONARY = {
+  // MA параметры
+  'pvL': { ru: '📈 Нижний пивот (PvL)', desc: 'Минимум для поиска поддержки' },
+  'pvR': { ru: '📉 Верхний пивот (PvR)', desc: 'Максимум для поиска сопротивления' },
+  'maP': { ru: '📊 Период MA', desc: 'Период скользящей средней (больше = медленнее)' },
+  'mType': { ru: '🔄 Тип MA', desc: 'EMA/SMA - тип скользящей средней' },
+
+  // ATR параметры
+  'atrP': { ru: '🎯 Период ATR', desc: 'Период Average True Range для размера стопа' },
+  'atrBoM': { ru: '⚖️ Множитель ATR', desc: 'Размер стопа = ATR × этот множитель' },
+
+  // SL/TP параметры
+  'slPair': { ru: '🛑 Стоп-лосс %', desc: 'Размер стопа в % от цены' },
+  'tpPair': { ru: '✅ Тейк-профит %', desc: 'Размер профита в % от цены' },
+  'dynSLStructMult': { ru: '⚡ Динамический SL', desc: 'Адаптивный размер стопа' },
+  'tpAtrMult': { ru: '📊 Профит/ATR', desc: 'Отношение профита к волатильности' },
+  'slAtrMult': { ru: '📊 Стоп/ATR', desc: 'Отношение стопа к волатильности' },
+
+  // Фильтры
+  'useMa': { ru: '🎓 Фильтр MA', desc: 'Включить фильтр по скользящей средней' },
+  'useAdx': { ru: '💪 Фильтр ADX', desc: 'Включить фильтр по силе тренда' },
+  'useRsi': { ru: '⚙️ Фильтр RSI', desc: 'Включить фильтр по перекупленности/перепроданности' },
+  'useVolF': { ru: '📢 Фильтр объёма', desc: 'Включить фильтр по объёму торговли' },
+  'useStruct': { ru: '🏗️ Структурный фильтр', desc: 'Проверка структуры High/Low' },
+  'useMaDist': { ru: '📏 Дистанция MA', desc: 'Минимальное расстояние до MA' },
+  'useCandleF': { ru: '🕯️ Паттерны свечей', desc: 'Фильтр по паттернам свечей' },
+  'useConsec': { ru: '📈 Консекутивный', desc: 'Проверка консекутивных баров' },
+  'useSTrend': { ru: '🌊 Структурный тренд', desc: 'Тренд на основе структуры' },
+  'useFresh': { ru: '🆕 Свежесть сигнала', desc: 'Максимум баров с момента сигнала' },
+  'useAtrExp': { ru: '💨 ATR expansion', desc: 'Расширение волатильности' },
+  'useConfirm': { ru: '✔️ Подтверждение', desc: 'Дополнительное подтверждение сигнала' },
+  'useVSA': { ru: '🔍 VSA анализ', desc: 'Volume Spread Analysis' },
+  'useLiq': { ru: '💧 Ликвидность', desc: 'Проверка ликвидности' },
+  'useVolDir': { ru: '🎯 Направление объёма', desc: 'Объём совпадает с направлением' },
+  'useWT': { ru: '🌀 Wave Trend', desc: 'Wave Trend осциллятор' },
+  'useFat': { ru: '📦 FAT фильтр', desc: 'Volume Accumulation анализ' },
+
+  // RSI параметры
+  'rsiPair': { ru: '⚙️ Пороги RSI', desc: 'Уровни перекупленности/перепроданности (обычно 30/70)' },
+
+  // ADX параметры
+  'adxT': { ru: '💪 Порог ADX', desc: 'Минимальное значение ADX для сильного тренда' },
+  'adxL': { ru: '📊 Период ADX', desc: 'Период расчёта ADX' },
+  'adxHtfRatio': { ru: '📈 ADX на старшем TF', desc: 'Проверка ADX на более крупном таймфрейме' },
+
+  // HTF параметры
+  'htfRatio': { ru: '📊 Старший TF', desc: 'Раз по какому делим текущий TF для HTF анализа' },
+
+  // Другие
+  'mdMax': { ru: '⏱️ Market Direction Max', desc: 'Максимум баров для анализа направления' },
+  'freshMax': { ru: '🆕 Свежесть Max', desc: 'Максимум баров для свежести сигнала' },
+  'wtT': { ru: '🌀 Wave Trend Threshold', desc: 'Порог Wave Trend' },
+  'vsaM': { ru: '🔍 VSA множитель', desc: 'Множитель для VSA анализа' },
+  'liqMin': { ru: '💧 Минимум ликвидности', desc: 'Минимальный объём для торговли' },
+  'wickMult': { ru: '🕯️ Фитиль множитель', desc: 'Размер фитиля свечи' },
+  'timeBars': { ru: '⏰ Временные бары', desc: 'Бары для временного фильтра' },
+  'vfM': { ru: '📢 Volume Filter множитель', desc: 'Множитель для фильтра объёма' },
+  'atrExpM': { ru: '💨 ATR Expansion множитель', desc: 'Множитель для расширения ATR' },
+  'beOff': { ru: '🎯 Break Even Offset', desc: 'Смещение для переноса стопа в безубыток' },
+  'beTrig': { ru: '✔️ Break Even Trigger', desc: 'Прибыль для переноса стопа' },
+  'trTrig': { ru: '📈 Trailing Stop Trigger', desc: 'Активация трейлинга' },
+  'trDist': { ru: '📏 Trailing Stop Distance', desc: 'Расстояние трейлинга' },
+  '_ip': { ru: '⚙️ Inner Parameters', desc: 'Специальные внутренние параметры' },
+  'tlPvL': { ru: '🔗 Trendline Pivot L', desc: 'Левая точка для линии тренда' },
+  'tlPvR': { ru: '🔗 Trendline Pivot R', desc: 'Правая точка для линии тренда' },
+  '_confType': { ru: '✔️ Тип подтверждения', desc: 'Способ подтверждения сигнала' },
+  '_confHtf': { ru: '📈 Подтверждение на HTF', desc: 'Подтверждение на старшем TF' },
+  '_mCrossType': { ru: '📊 Тип пересечения MA', desc: 'Fast/Slow или другое пересечение' },
+  'mlHighThreshold': { ru: '🤖 ML Высокий порог', desc: 'Порог ML модели для сильного сигнала' },
+  'mlThreshold': { ru: '🤖 ML Базовый порог', desc: 'Базовый порог ML модели' },
+  'erThresh': { ru: '📉 Чувствительность', desc: 'Порог чувствительности к шуму' },
+  'tizomePct': { ru: '⏱️ Времени %', desc: 'Процент времени дня для торговли' },
+  'tagNetPct': { ru: '💰 Чистый %', desc: 'Процент чистой прибыли' },
+  'bagCount': { ru: '📊 Кол-во сделок', desc: 'Количество сделок в фильтре' },
+  'mAlphaE': { ru: '📈 Alpha', desc: 'Alpha параметр модели' },
+  'retrace': { ru: '↩️ Retrace %', desc: 'Процент отката для входа' }
+};
+
+function getParamInfo(paramName) {
+  return PARAM_DICTIONARY[paramName] || { ru: paramName, desc: 'Описание недоступно' };
+}
+
 function _renderFeatures(insights) {
   let features = [];
   if (insights?.insights) {
     const featInsight = insights.insights.find(i => i.type === 'feature_importance');
     features = featInsight?.topFeatures || [];
   }
-  if (features.length === 0) return '<p style="color:#888">Анализ факторов не доступен</p>';
+  if (features.length === 0) return '<div style="font-size:1.1em;color:#888;padding:20px;text-align:center">📊 Анализ факторов не доступен</div>';
+
+  const topFeatures = features.slice(0, 10);
 
   return `
-    <div>
-      <div style="font-size:.9em;color:#888;margin-bottom:12px">
-        ℹ️ Параметры отранжированы по дискриминативной силе (т-score).
-        Высокие значения означают, что параметр сильнее различает успешные и неудачные стратегии.
+    <div style="font-size:1em;line-height:1.6">
+      <div style="background:rgba(166,227,161,.1);border:1px solid rgba(166,227,161,.3);border-radius:8px;padding:16px;margin-bottom:20px">
+        <div style="font-size:1.1em;font-weight:600;color:#a6e3a1;margin-bottom:8px">💡 Как использовать эти факторы?</div>
+        <div style="color:#cdd6f4;font-size:0.95em;line-height:1.5">
+          Эти параметры <strong>НАИБОЛЕЕ ВАЖНЫ</strong> для успеха вашей стратегии. Чем выше значение, тем сильнее параметр влияет на результат.
+          <br><br>
+          <strong>👉 Рекомендация:</strong> Сосредоточьте оптимизацию на этих параметрах - они дают максимум эффекта!
+        </div>
       </div>
-      <div style="display:grid;gap:6px">
-        ${features.slice(0, 15).map((f, i) => {
-          const barWidth = Math.min(100, Math.abs(f.tScore || 0) * 10);
+
+      <div style="display:grid;gap:14px">
+        ${topFeatures.map((f, i) => {
+          const info = getParamInfo(f.param);
+          const score = f.tScore || 0;
+          const impact = score > 2 ? '🔥 Критически важен' : score > 1 ? '⚡ Высокое влияние' : '📊 Среднее влияние';
+          const barWidth = Math.min(100, Math.abs(score) * 15);
+
           return `
-            <div style="font-size:.85em">
-              <div style="display:flex;justify-content:space-between;margin-bottom:4px">
-                <strong>${f.param || 'unknown'}</strong>
-                <span style="color:#a78bfa">${(f.tScore || 0).toFixed(3)}</span>
+            <div style="background:rgba(139,92,246,.08);border:1px solid rgba(139,92,246,.2);border-radius:6px;padding:12px;transition:all .2s">
+              <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:8px">
+                <div>
+                  <div style="font-size:1.05em;font-weight:600;color:#cdd6f4;margin-bottom:4px">
+                    ${i + 1}. ${info.ru}
+                  </div>
+                  <div style="font-size:0.9em;color:#888;margin-bottom:6px">
+                    ${info.desc}
+                  </div>
+                </div>
+                <div style="text-align:right;white-space:nowrap;margin-left:12px">
+                  <div style="font-size:0.9em;color:#a78bfa;font-weight:600">${(score).toFixed(2)}</div>
+                  <div style="font-size:0.8em;color:#888">${impact}</div>
+                </div>
               </div>
-              <div style="background:rgba(0,0,0,.3);border-radius:2px;height:6px;overflow:hidden">
-                <div style="background:linear-gradient(90deg, #a6e3a1, #f9e2af);height:100%;width:${barWidth}%" />
+              <div style="background:rgba(0,0,0,.3);border-radius:3px;height:8px;overflow:hidden">
+                <div style="background:linear-gradient(90deg, #a6e3a1, #f9e2af);height:100%;width:${barWidth}%;transition:width .3s" />
               </div>
             </div>
           `;
         }).join('')}
+      </div>
+
+      <div style="background:rgba(249,226,175,.05);border:1px solid rgba(249,226,175,.2);border-radius:8px;padding:16px;margin-top:20px">
+        <div style="font-size:0.95em;color:#f9e2af;line-height:1.5">
+          <strong>📝 Совет:</strong> Если параметр здесь на первом месте, значит его диапазон оптимизации нужно
+          <strong>сузить</strong> или <strong>зафиксировать</strong> на лучшее значение. Остальные параметры можно оставить на авто.
+        </div>
       </div>
     </div>
   `;
@@ -32330,7 +32444,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1775053942686;
+window._BUILD_TS = 1775054294619;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
