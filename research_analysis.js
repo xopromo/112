@@ -310,11 +310,26 @@ const ResearchAnalysis = (() => {
       // Защита от NaN
       if (!isFinite(tScore)) continue;
 
+      // 🔥 НОВОЕ: рекомендуемые значения
+      const sucMean = mean(sucVals);
+      const sucStd = stdev(sucVals);
+      const sucMin = Math.min(...sucVals);
+      const sucMax = Math.max(...sucVals);
+      const p25 = percentile(sucVals, 0.25);
+      const p75 = percentile(sucVals, 0.75);
+
       importance[param] = {
-        successMean: mean(sucVals),
+        successMean: sucMean,
         unsuccessMean: mean(unsucVals),
         difference: diff,
-        tScore: tScore
+        tScore: tScore,
+        // 🔥 РЕКОМЕНДАЦИИ:
+        recommendedValue: sucMean,  // среднее успешных
+        recommendedRange: `${p25.toFixed(2)}-${p75.toFixed(2)}`,  // межквартильный диапазон
+        successMin: sucMin,
+        successMax: sucMax,
+        successStdev: sucStd,
+        successCount: sucVals.length
       };
     }
 
