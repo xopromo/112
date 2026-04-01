@@ -23,6 +23,8 @@
 function parseRange(id) {
   const v = $v(id);
   if (!v) return [];
+
+  // 🔥 Формат с шагом: min:max:step (например 1:10:0.5 или -0.5:0.5:0.1)
   if (v.includes(':')) {
     const parts = v.split(':').map(Number);
     if (parts.length >= 3 && parts[2] > 0) {
@@ -38,6 +40,30 @@ function parseRange(id) {
     }
     return parts.filter(x => !isNaN(x));
   }
+
+  // 🔥 Формат диапазона: min-max (поддерживает отрицательные: -0.5-0.5)
+  // Регулярное выражение для парсинга: -?число-?число
+  const rangeMatch = v.match(/^(-?\d+\.?\d*)-(-?\d+\.?\d*)$/);
+  if (rangeMatch) {
+    const min = parseFloat(rangeMatch[1]);
+    const max = parseFloat(rangeMatch[2]);
+    if (!isNaN(min) && !isNaN(max)) {
+      // Генерируем диапазон с шагом 0.1 (или меньше для малых диапазонов)
+      const diff = Math.abs(max - min);
+      const step = diff <= 1 ? 0.1 : diff <= 10 ? 1 : 5;
+      const arr = [];
+      if (min <= max) {
+        for (let x = min; x <= max + step * 0.0001; x += step)
+          arr.push(Math.round(x * 10000) / 10000);
+      } else {
+        for (let x = min; x >= max - step * 0.0001; x -= step)
+          arr.push(Math.round(x * 10000) / 10000);
+      }
+      return arr;
+    }
+  }
+
+  // 🔥 Список через запятую: 1,2,3 или -0.1,0.2,0.5
   return v.split(',').map(x => parseFloat(x.trim())).filter(x => !isNaN(x));
 }
 
@@ -805,8 +831,10 @@ function buildName(cfg, pvL, pvR, slDesc, tpDesc, filters, extras) {
   if (entries.length === 0) entries.push('NoEntry');
   parts.push(entries.join('+'));
   // TL pivot params — include in name so variants with different pivots are unique
-  if ((cfg.useTLTouch||cfg.useTLBreak||cfg.useFlag||cfg.useTri) && cfg.tlPvL != null)
-    parts.push(`pv${cfg.tlPvL}/${cfg.tlPvR}`);
+  if ((cfg.useTLTouch||cfg.useTLBreak||cfg.useFlag||cfg.useTri) && cfg.tlPvL != null) {
+    const tlZoneStr = (cfg.tlZonePct || 0.3).toFixed(2);
+    parts.push(`pv${cfg.tlPvL}/${cfg.tlPvR}z${tlZoneStr}`);
+  }
 
   // ATR period — always include so variants with different atrP are unique
   if (ex.atrP != null) parts.push(`ATR${ex.atrP}`);
@@ -915,8 +943,8 @@ function calcTotal() {
   const _ctStw=$c('f_strend')?parseRange('f_stw'):[$n('f_stw')||10];
   const _ctConf=$c('f_confirm')?parseRange('f_confn'):[100];
   const _useTF=$c('e_tl_touch')||$c('e_tl_break')||$c('e_flag')||$c('e_tri');
-  const _ctTlPvL=_useTF?parseRange('e_tl_pvl'):[5];
-  const _ctTlPvR=_useTF?parseRange('e_tl_pvr'):[3];
+  const _ctTlPvL=_useTF?parseRange('e_tl_pvl'):[3,4,5,6];  // default диапазон 3-6
+  const _ctTlPvR=_useTF?parseRange('e_tl_pvr'):[1,2];      // default диапазон 1-2
   const _tfMulCount = (()=>{ const m=parseRange('c_tf_range').filter(x=>x>=1); return m.length>0?m.length:1; })();
   return (pvLs.length*pvRs.length*atrPs.length*(maPs.length||1)*
     (adxTs.length||1)*(_ctAdxL.length||1)*(_ctAdxHtf.length||1)*rsiCount*(vfMs.length||1)*(_ctAtrExpMs.length||1)*(mdMaxs.length||1)*
@@ -1537,8 +1565,8 @@ async function runOpt() {
   // tfSigL[i] / tfSigS[i] — бит-флаг: какие именно фигуры дали сигнал
   // бит 0 = TL-touch, бит 1 = TL-break, бит 2 = flag, бит 3 = triangle
   // tlPvLs/tlPvRs — диапазоны пивотов для TL, добавляются в _mcDims как измерения
-  const tlPvLs = useTrendFigures ? parseRange('e_tl_pvl') : [5];
-  const tlPvRs = useTrendFigures ? parseRange('e_tl_pvr') : [3];
+  const tlPvLs = useTrendFigures ? parseRange('e_tl_pvl') : [3,4,5,6];  // диапазон 3-6
+  const tlPvRs = useTrendFigures ? parseRange('e_tl_pvr') : [1,2];      // диапазон 1-2
   const TF_TOUCH=1, TF_BREAK=2, TF_FLAG=4, TF_TRI=8;
   // Параметры TL, не зависящие от tlPvL/tlPvR — вычисляются один раз
   const _tlZone        = useTrendFigures ? ($n('e_tl_zone')||0.3)/100 : 0;

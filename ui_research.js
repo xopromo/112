@@ -474,9 +474,12 @@ function _renderFeatures(insights) {
       <div style="background:rgba(166,227,161,.1);border:1px solid rgba(166,227,161,.3);border-radius:8px;padding:16px;margin-bottom:20px">
         <div style="font-size:1.1em;font-weight:600;color:#a6e3a1;margin-bottom:8px">💡 Как использовать эти факторы?</div>
         <div style="color:#cdd6f4;font-size:0.95em;line-height:1.5">
-          Эти параметры <strong>НАИБОЛЕЕ ВАЖНЫ</strong> для успеха вашей стратегии. Чем выше значение, тем сильнее параметр влияет на результат.
+          Вот <strong>ТОЧНЫЕ ЗНАЧЕНИЯ</strong> параметров которые работают лучше всего.
           <br><br>
-          <strong>👉 Рекомендация:</strong> Сосредоточьте оптимизацию на этих параметрах - они дают максимум эффекта!
+          <strong>👉 Как применить:</strong>
+          <br>1️⃣ <strong>Рекомендуемое значение</strong> — используй это в параметре (часто дает лучшие результаты)
+          <br>2️⃣ <strong>Диапазон</strong> — ограничь оптимизацию этим диапазоном вместо full range
+          <br>3️⃣ <strong>Или зафиксируй</strong> рекомендуемое значение и оптимизируй остальные параметры
         </div>
       </div>
 
@@ -486,15 +489,17 @@ function _renderFeatures(insights) {
           const score = f.tScore || 0;
           const impact = score > 2 ? '🔥 Критически важен' : score > 1 ? '⚡ Высокое влияние' : '📊 Среднее влияние';
           const barWidth = Math.min(100, Math.abs(score) * 15);
+          const recommended = (f.recommendedValue || 0).toFixed(2);
+          const range = f.recommendedRange || '—';
 
           return `
-            <div style="background:rgba(139,92,246,.08);border:1px solid rgba(139,92,246,.2);border-radius:6px;padding:12px;transition:all .2s">
-              <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:8px">
+            <div style="background:rgba(139,92,246,.08);border:1px solid rgba(139,92,246,.2);border-radius:6px;padding:14px;transition:all .2s">
+              <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:10px">
                 <div>
                   <div style="font-size:1.05em;font-weight:600;color:#cdd6f4;margin-bottom:4px">
                     ${i + 1}. ${info.ru}
                   </div>
-                  <div style="font-size:0.9em;color:#888;margin-bottom:6px">
+                  <div style="font-size:0.9em;color:#888;margin-bottom:8px">
                     ${info.desc}
                   </div>
                 </div>
@@ -503,6 +508,21 @@ function _renderFeatures(insights) {
                   <div style="font-size:0.8em;color:#888">${impact}</div>
                 </div>
               </div>
+
+              <!-- 🔥 РЕКОМЕНДАЦИИ -->
+              <div style="background:rgba(166,227,161,.15);border-left:3px solid #a6e3a1;border-radius:4px;padding:8px;margin-bottom:8px;font-size:0.9em">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                  <div>
+                    <div style="color:#888;font-size:0.8em;margin-bottom:2px">✅ Рекомендуемое</div>
+                    <div style="color:#a6e3a1;font-weight:600;font-size:1em">${recommended}</div>
+                  </div>
+                  <div>
+                    <div style="color:#888;font-size:0.8em;margin-bottom:2px">📊 Диапазон (50% успешных)</div>
+                    <div style="color:#f9e2af;font-weight:600;font-size:1em">${range}</div>
+                  </div>
+                </div>
+              </div>
+
               <div style="background:rgba(0,0,0,.3);border-radius:3px;height:8px;overflow:hidden">
                 <div style="background:linear-gradient(90deg, #a6e3a1, #f9e2af);height:100%;width:${barWidth}%;transition:width .3s" />
               </div>
@@ -513,8 +533,9 @@ function _renderFeatures(insights) {
 
       <div style="background:rgba(249,226,175,.05);border:1px solid rgba(249,226,175,.2);border-radius:8px;padding:16px;margin-top:20px">
         <div style="font-size:0.95em;color:#f9e2af;line-height:1.5">
-          <strong>📝 Совет:</strong> Если параметр здесь на первом месте, значит его диапазон оптимизации нужно
-          <strong>сузить</strong> или <strong>зафиксировать</strong> на лучшее значение. Остальные параметры можно оставить на авто.
+          <strong>🎯 Быстрый способ:</strong> Скопируй рекомендуемое значение в параметр, сузь диапазон до указанного, остальные оставь на авто.
+          <br><br>
+          <strong>📈 Продвинутый способ:</strong> Зафиксируй топ-3 параметра на рекомендуемые значения, остальные оптимизируй полностью.
         </div>
       </div>
     </div>
