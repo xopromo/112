@@ -2238,9 +2238,13 @@ async function runOpt() {
     // 🤖 Research Agent: добавить результаты из MC режима
     if (typeof ResearchAgent !== 'undefined' && results.length > 0) {
       ResearchAgent.addResults(results);
-      // Завершить и сохранить прогон (асинхронно, но не блокируем)
+      // Завершить и сохранить прогон (ждём чтобы избежать race condition в Grid режиме)
       if (typeof ResearchAgent.finishRun === 'function') {
-        ResearchAgent.finishRun({ mode: 'mc', resultCount: results.length }).catch(e => console.warn('[MC finishRun]', e));
+        try {
+          await ResearchAgent.finishRun({ mode: 'mc', resultCount: results.length });
+        } catch (e) {
+          console.warn('[MC finishRun]', e);
+        }
       }
     }
 
@@ -2816,9 +2820,13 @@ async function runOpt() {
     // 🤖 Research Agent: добавить результаты из TPE/Synthesis режима
     if (typeof ResearchAgent !== 'undefined' && results.length > 0) {
       ResearchAgent.addResults(results);
-      // Завершить и сохранить прогон (асинхронно, но не блокируем)
+      // Завершить и сохранить прогон (ждём чтобы избежать race condition в Grid режиме)
       if (typeof ResearchAgent.finishRun === 'function') {
-        ResearchAgent.finishRun({ mode: _isSynthMode ? 'synthesis' : 'tpe', resultCount: results.length }).catch(e => console.warn('[TPE finishRun]', e));
+        try {
+          await ResearchAgent.finishRun({ mode: _isSynthMode ? 'synthesis' : 'tpe', resultCount: results.length });
+        } catch (e) {
+          console.warn('[TPE finishRun]', e);
+        }
       }
     }
 
@@ -2934,9 +2942,13 @@ async function runOpt() {
     // 🤖 Research Agent: добавить результаты из BO режима
     if (typeof ResearchAgent !== 'undefined' && results.length > 0) {
       ResearchAgent.addResults(results);
-      // Завершить и сохранить прогон (асинхронно, но не блокируем)
+      // Завершить и сохранить прогон (ждём чтобы избежать race condition в Grid режиме)
       if (typeof ResearchAgent.finishRun === 'function') {
-        ResearchAgent.finishRun({ mode: 'bo', resultCount: results.length }).catch(e => console.warn('[BO finishRun]', e));
+        try {
+          await ResearchAgent.finishRun({ mode: 'bo', resultCount: results.length });
+        } catch (e) {
+          console.warn('[BO finishRun]', e);
+        }
       }
     }
 
@@ -3358,9 +3370,13 @@ async function runOpt() {
   // 🤖 Research Agent: добавить результаты в буфер (Grid/Exhaustive режим)
   if (typeof ResearchAgent !== 'undefined' && results.length > 0) {
     ResearchAgent.addResults(results);
-    // Завершить и сохранить прогон (асинхронно, но не блокируем)
+    // Завершить и сохранить прогон (ждём чтобы избежать race condition в Grid режиме)
     if (typeof ResearchAgent.finishRun === 'function') {
-      ResearchAgent.finishRun({ mode: 'grid', resultCount: results.length }).catch(e => console.warn('[Grid finishRun]', e));
+      try {
+        await ResearchAgent.finishRun({ mode: 'grid', resultCount: results.length });
+      } catch (e) {
+        console.warn('[Grid finishRun]', e);
+      }
     }
   }
 

@@ -13372,7 +13372,9 @@ const ResearchAgent = (() => {
         }
         // Хранилище: insights — кэш анализа
         if (!db.objectStoreNames.contains(STORE_INSIGHTS)) {
-          db.createObjectStore(STORE_INSIGHTS, { keyPath: 'id' });
+          const insightStore = db.createObjectStore(STORE_INSIGHTS, { keyPath: 'id' });
+          insightStore.createIndex('projectId', 'projectId', { unique: false });
+          insightStore.createIndex('timestamp', 'timestamp', { unique: false });
         }
       };
       req.onsuccess = (e) => {
@@ -13425,6 +13427,8 @@ const ResearchAgent = (() => {
   // ─── API: Завершить прогон и сохранить ─────────────────────
 
   async function finishRun(metadata = {}) {
+    console.log('[ResearchAgent] finishRun: вызов', { metadata, hasId: !!_currentRunId, bufLen: _resultsBuffer.length, isFinishing: _isFinishingRun });
+
     // Защита от параллельных вызовов finishRun()
     if (_isFinishingRun) {
       console.log('[ResearchAgent] finishRun: уже выполняется, пропуск');
@@ -13437,6 +13441,7 @@ const ResearchAgent = (() => {
     }
 
     _isFinishingRun = true;
+    console.log('[ResearchAgent] finishRun: начало сохранения', { runId: _currentRunId, bufLen: _resultsBuffer.length });
 
     const db = await _initDB();
     const projectId = ProjectManager?.getCurrentId() || 'default';
@@ -13488,6 +13493,31 @@ const ResearchAgent = (() => {
 
       tx.oncomplete = async () => {
         console.log(`[ResearchAgent] 💾 Сохранено: ${run.resultCount} результатов (${_currentRunId})`);
+
+        // Сохранить анализ в отдельное хранилище STORE_INSIGHTS если вычислен
+        if (run.analysis && run.analysis.insights && run.analysis.insights.length > 0) {
+          try {
+            const insightRecord = {
+              id: `insight_${_currentRunId}_${Date.now()}`,
+              runId: _currentRunId,
+              projectId: run.projectId,
+              timestamp: run.timestamp,
+              analysis: run.analysis,
+              resultCount: run.resultCount
+            };
+            const insightTx = db.transaction([STORE_INSIGHTS], 'readwrite');
+            const insightStore = insightTx.objectStore(STORE_INSIGHTS);
+            insightStore.add(insightRecord);
+            insightTx.oncomplete = () => {
+              console.log(`[ResearchAgent] 📊 Инсайты сохранены в STORE_INSIGHTS: ${run.analysis.insights.length} инсайтов`);
+            };
+            insightTx.onerror = () => {
+              console.warn('[ResearchAgent] Ошибка сохранения инсайтов:', insightTx.error);
+            };
+          } catch (e) {
+            console.warn('[ResearchAgent] Ошибка при сохранении анализа в STORE_INSIGHTS:', e);
+          }
+        }
 
         // Экспортировать в папку проекта (ошибки экспорта не должны блокировать finishRun)
         try {
@@ -18969,9 +18999,13 @@ async function runOpt() {
     // 🤖 Research Agent: добавить результаты из MC режима
     if (typeof ResearchAgent !== 'undefined' && results.length > 0) {
       ResearchAgent.addResults(results);
-      // Завершить и сохранить прогон (асинхронно, но не блокируем)
+      // Завершить и сохранить прогон (ждём чтобы избежать race condition в Grid режиме)
       if (typeof ResearchAgent.finishRun === 'function') {
-        ResearchAgent.finishRun({ mode: 'mc', resultCount: results.length }).catch(e => console.warn('[MC finishRun]', e));
+        try {
+          await ResearchAgent.finishRun({ mode: 'mc', resultCount: results.length });
+        } catch (e) {
+          console.warn('[MC finishRun]', e);
+        }
       }
     }
 
@@ -19547,9 +19581,13 @@ async function runOpt() {
     // 🤖 Research Agent: добавить результаты из TPE/Synthesis режима
     if (typeof ResearchAgent !== 'undefined' && results.length > 0) {
       ResearchAgent.addResults(results);
-      // Завершить и сохранить прогон (асинхронно, но не блокируем)
+      // Завершить и сохранить прогон (ждём чтобы избежать race condition в Grid режиме)
       if (typeof ResearchAgent.finishRun === 'function') {
-        ResearchAgent.finishRun({ mode: _isSynthMode ? 'synthesis' : 'tpe', resultCount: results.length }).catch(e => console.warn('[TPE finishRun]', e));
+        try {
+          await ResearchAgent.finishRun({ mode: _isSynthMode ? 'synthesis' : 'tpe', resultCount: results.length });
+        } catch (e) {
+          console.warn('[TPE finishRun]', e);
+        }
       }
     }
 
@@ -19665,9 +19703,13 @@ async function runOpt() {
     // 🤖 Research Agent: добавить результаты из BO режима
     if (typeof ResearchAgent !== 'undefined' && results.length > 0) {
       ResearchAgent.addResults(results);
-      // Завершить и сохранить прогон (асинхронно, но не блокируем)
+      // Завершить и сохранить прогон (ждём чтобы избежать race condition в Grid режиме)
       if (typeof ResearchAgent.finishRun === 'function') {
-        ResearchAgent.finishRun({ mode: 'bo', resultCount: results.length }).catch(e => console.warn('[BO finishRun]', e));
+        try {
+          await ResearchAgent.finishRun({ mode: 'bo', resultCount: results.length });
+        } catch (e) {
+          console.warn('[BO finishRun]', e);
+        }
       }
     }
 
@@ -20089,9 +20131,13 @@ async function runOpt() {
   // 🤖 Research Agent: добавить результаты в буфер (Grid/Exhaustive режим)
   if (typeof ResearchAgent !== 'undefined' && results.length > 0) {
     ResearchAgent.addResults(results);
-    // Завершить и сохранить прогон (асинхронно, но не блокируем)
+    // Завершить и сохранить прогон (ждём чтобы избежать race condition в Grid режиме)
     if (typeof ResearchAgent.finishRun === 'function') {
-      ResearchAgent.finishRun({ mode: 'grid', resultCount: results.length }).catch(e => console.warn('[Grid finishRun]', e));
+      try {
+        await ResearchAgent.finishRun({ mode: 'grid', resultCount: results.length });
+      } catch (e) {
+        console.warn('[Grid finishRun]', e);
+      }
     }
   }
 
@@ -31214,9 +31260,21 @@ function _renderResearchOverview(insights, history) {
   if (!insights) return '<p style="color:#888">No insights available</p>';
 
   const summary = insights.summary || {};
-  const correlations = insights.correlations || [];
-  const anomalies = insights.anomalies || [];
-  const clusters = insights.clusters || [];
+
+  // 🔥 ПРАВИЛЬНО: инсайты это МАССИВ объектов с type: 'correlations', 'anomalies' и т.д.
+  const insightsArray = insights.insights || [];
+
+  let correlations = [];
+  let anomalies = [];
+  let clusters = [];
+  let features = [];
+
+  for (const insight of insightsArray) {
+    if (insight.type === 'correlations') correlations = insight.topCorrelations || [];
+    if (insight.type === 'anomalies') anomalies = insight.topAnomalies || [];
+    if (insight.type === 'clusters') clusters = insight.clusters || [];
+    if (insight.type === 'feature_importance') features = insight.topFeatures || [];
+  }
 
   const topCorr = correlations
     .filter(c => Math.abs(c.r) > 0.3)
@@ -31301,7 +31359,11 @@ function _renderResearchOverview(insights, history) {
 }
 
 function _renderCorrelations(insights) {
-  const corr = insights?.correlations || [];
+  let corr = [];
+  if (insights?.insights) {
+    const corrInsight = insights.insights.find(i => i.type === 'correlations');
+    corr = corrInsight?.topCorrelations || [];
+  }
   if (corr.length === 0) return '<p style="color:#888">Корреляции не найдены</p>';
 
   // Группируем по метрикам
@@ -31331,6 +31393,11 @@ function _renderCorrelations(insights) {
 }
 
 function _renderAnomalies(insights) {
+  let anom = [];
+  if (insights?.insights) {
+    const anomInsight = insights.insights.find(i => i.type === 'anomalies');
+    anom = anomInsight?.topAnomalies || [];
+  }
   const anom = insights?.anomalies || [];
   if (anom.length === 0) return '<p style="color:#888">Аномалии не обнаружены</p>';
 
@@ -31357,7 +31424,11 @@ function _renderAnomalies(insights) {
 }
 
 function _renderClusters(insights) {
-  const clusters = insights?.clusters || [];
+  let clusters = [];
+  if (insights?.insights) {
+    const clustInsight = insights.insights.find(i => i.type === 'clusters');
+    clusters = clustInsight?.clusters || [];
+  }
   if (clusters.length === 0) return '<p style="color:#888">Кластеры не найдены</p>';
 
   return `
@@ -31398,7 +31469,11 @@ function _renderClusters(insights) {
 }
 
 function _renderFeatures(insights) {
-  const features = insights?.featureImportance || [];
+  let features = [];
+  if (insights?.insights) {
+    const featInsight = insights.insights.find(i => i.type === 'feature_importance');
+    features = featInsight?.topFeatures || [];
+  }
   if (features.length === 0) return '<p style="color:#888">Анализ факторов не доступен</p>';
 
   return `
@@ -32256,7 +32331,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1775051434013;
+window._BUILD_TS = 1775051909669;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;

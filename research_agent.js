@@ -42,7 +42,9 @@ const ResearchAgent = (() => {
         }
         // Хранилище: insights — кэш анализа
         if (!db.objectStoreNames.contains(STORE_INSIGHTS)) {
-          db.createObjectStore(STORE_INSIGHTS, { keyPath: 'id' });
+          const insightStore = db.createObjectStore(STORE_INSIGHTS, { keyPath: 'id' });
+          insightStore.createIndex('projectId', 'projectId', { unique: false });
+          insightStore.createIndex('timestamp', 'timestamp', { unique: false });
         }
       };
       req.onsuccess = (e) => {
@@ -95,6 +97,8 @@ const ResearchAgent = (() => {
   // ─── API: Завершить прогон и сохранить ─────────────────────
 
   async function finishRun(metadata = {}) {
+    console.log('[ResearchAgent] finishRun: вызов', { metadata, hasId: !!_currentRunId, bufLen: _resultsBuffer.length, isFinishing: _isFinishingRun });
+
     // Защита от параллельных вызовов finishRun()
     if (_isFinishingRun) {
       console.log('[ResearchAgent] finishRun: уже выполняется, пропуск');
@@ -107,6 +111,7 @@ const ResearchAgent = (() => {
     }
 
     _isFinishingRun = true;
+    console.log('[ResearchAgent] finishRun: начало сохранения', { runId: _currentRunId, bufLen: _resultsBuffer.length });
 
     const db = await _initDB();
     const projectId = ProjectManager?.getCurrentId() || 'default';
@@ -158,6 +163,31 @@ const ResearchAgent = (() => {
 
       tx.oncomplete = async () => {
         console.log(`[ResearchAgent] 💾 Сохранено: ${run.resultCount} результатов (${_currentRunId})`);
+
+        // Сохранить анализ в отдельное хранилище STORE_INSIGHTS если вычислен
+        if (run.analysis && run.analysis.insights && run.analysis.insights.length > 0) {
+          try {
+            const insightRecord = {
+              id: `insight_${_currentRunId}_${Date.now()}`,
+              runId: _currentRunId,
+              projectId: run.projectId,
+              timestamp: run.timestamp,
+              analysis: run.analysis,
+              resultCount: run.resultCount
+            };
+            const insightTx = db.transaction([STORE_INSIGHTS], 'readwrite');
+            const insightStore = insightTx.objectStore(STORE_INSIGHTS);
+            insightStore.add(insightRecord);
+            insightTx.oncomplete = () => {
+              console.log(`[ResearchAgent] 📊 Инсайты сохранены в STORE_INSIGHTS: ${run.analysis.insights.length} инсайтов`);
+            };
+            insightTx.onerror = () => {
+              console.warn('[ResearchAgent] Ошибка сохранения инсайтов:', insightTx.error);
+            };
+          } catch (e) {
+            console.warn('[ResearchAgent] Ошибка при сохранении анализа в STORE_INSIGHTS:', e);
+          }
+        }
 
         // Экспортировать в папку проекта (ошибки экспорта не должны блокировать finishRun)
         try {
