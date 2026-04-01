@@ -149,6 +149,10 @@ const ResearchAnalysis = (() => {
 
     // Извлекаем числовые параметры (нормализованные)
     const paramNames = _getNumericParams(successful);
+    if (paramNames.length === 0) {
+      return { error: 'Не найдено числовых параметров для кластеризации' };
+    }
+
     const features = successful.map(r => {
       const v = paramNames.map(p => r.cfg[p] || 0);
       return _normalize(v);
@@ -262,6 +266,9 @@ const ResearchAnalysis = (() => {
     }
 
     const paramNames = _getNumericParams(results);
+    if (paramNames.length === 0) {
+      return { error: 'Не найдено числовых параметров для анализа' };
+    }
     const importance = {};
 
     for (const param of paramNames) {
