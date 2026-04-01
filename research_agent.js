@@ -87,6 +87,16 @@ const ResearchAgent = (() => {
       equities: window.equities || {}
     };
 
+    // 🤖 Анализ результатов (если доступен ResearchAnalysis)
+    if (typeof ResearchAnalysis !== 'undefined' && run.results.length >= 10) {
+      try {
+        run.analysis = await ResearchAnalysis.analyzeResults(run.results);
+        console.log(`[ResearchAgent] 📊 Анализ завершён: ${run.analysis.insights.length} инсайтов`);
+      } catch (e) {
+        console.warn('[ResearchAgent] Ошибка анализа:', e);
+      }
+    }
+
     // Сохранить в IndexedDB
     return new Promise((resolve) => {
       const tx = db.transaction([STORE_RUNS], 'readwrite');

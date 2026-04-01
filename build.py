@@ -48,6 +48,7 @@ if os.path.exists(_ml_train_path):
 ml_code = '\n'.join(ml_parts)
 projects = open(os.path.join(base, 'projects.js'),   encoding='utf-8').read()
 research_agent = open(os.path.join(base, 'research_agent.js'), encoding='utf-8').read()
+research_analysis = open(os.path.join(base, 'research_analysis.js'), encoding='utf-8').read()
 synthesis = open(os.path.join(base, 'synthesis.js'),   encoding='utf-8').read()
 synthesis_worker = open(os.path.join(base, 'synthesis_worker.js'), encoding='utf-8').read()
 pareto   = open(os.path.join(base, 'pareto_front.js'), encoding='utf-8').read()
@@ -127,6 +128,9 @@ shell = shell.replace('/* ##SYNTHESIS_UI## */', synthesis_ui, 1)
 
 assert '/* ##RESEARCH_AGENT## */' in shell, "Placeholder ##RESEARCH_AGENT## not found in shell.html"
 shell = shell.replace('/* ##RESEARCH_AGENT## */', research_agent, 1)
+
+assert '/* ##RESEARCH_ANALYSIS## */' in shell, "Placeholder ##RESEARCH_ANALYSIS## not found in shell.html"
+shell = shell.replace('/* ##RESEARCH_ANALYSIS## */', research_analysis, 1)
 
 assert '/* ##PROJECTS## */' in shell, "Placeholder ##PROJECTS## not found in shell.html"
 shell = shell.replace('/* ##PROJECTS## */', projects, 1)
