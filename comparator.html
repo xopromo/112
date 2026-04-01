@@ -1133,10 +1133,17 @@ let _lastCfg = null;
 function _saveAndOpenOptimizer() {
   if (!_lastCfg) return;
   localStorage.setItem('msc_config', JSON.stringify(_lastCfg));
-  // Try to open optimizer relative to current location
   const base = location.href.replace(/comparator\.html.*$/, '');
   const url = base + 'USE_Optimizer_v6_built.html';
-  window.open(url, '_blank');
+  const w = window.open(url, '_blank');
+  if (!w) {
+    // Popup blocked — show inline link instead
+    const st = document.getElementById('cfg-copy-status');
+    if (st) {
+      st.innerHTML = '⚠️ Попап заблокирован. <a href="' + url + '" target="_blank" style="color:var(--purple)">Открыть вручную →</a>';
+      setTimeout(() => { if(st) st.textContent = ''; }, 10000);
+    }
+  }
 }
 
 function _copyConfigJSON() {

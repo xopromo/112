@@ -2940,6 +2940,20 @@ function openParseModal() {
 function closeParseModal() { $('parse-overlay').classList.remove('open'); }
 
 function parseTextToSettings(text) {
+  // ── РЕЖИМ -1: Comparator JSON формат ({apply:{...}, hints:[...], meta:{...}}) ──
+  try {
+    const _cmpJson = JSON.parse(text.trim());
+    if (_cmpJson && _cmpJson.apply && typeof _cmpJson.apply === 'object') {
+      const ch = [];
+      Object.entries(_cmpJson.apply).forEach(([id, val]) => {
+        const type  = typeof val === 'boolean' ? 'chk' : 'val';
+        const value = typeof val === 'boolean' ? val : String(val);
+        ch.push({ id, value, type, label: `${id}=${val}` });
+      });
+      if (ch.length) return ch;
+    }
+  } catch(e) { /* not comparator JSON, fall through */ }
+
   // ── РЕЖИМ 0: JSON блок (buildCopyText формат с CFG JSON) ────────────────
   // Если текст содержит --- CFG JSON --- блок — используем точное восстановление
   const _jsonBlockMatch = text.match(/---\s*CFG JSON\s*---\s*\n([\s\S]*?)\n---\s*\/CFG JSON\s*---/);
@@ -9770,7 +9784,7 @@ function _checkMSCConfig() {
       <button id="msc-apply-btn" style="
         background:var(--accent,#89dceb);color:#1e1e2e;border:none;border-radius:6px;
         padding:7px 18px;font-size:13px;font-weight:700;cursor:pointer
-      ">✅ Загрузить шаблон</button>
+      ">✅ Применено · Закрыть</button>
       ${hintsHtml ? `<button onclick="
         const h=document.getElementById('msc-hints');
         if(h){h.style.display=h.style.display==='none'?'flex':'none';
@@ -9782,10 +9796,12 @@ function _checkMSCConfig() {
   `;
   document.body.appendChild(banner);
 
+  // Auto-apply immediately — button "Открыть оптимизатор и применить" обещает применить
+  applySettings(settings);
+  _updateActiveTplBadge();
+  showTplToast(`📊 Шаблон "${tplName}" загружен`);
+
   document.getElementById('msc-apply-btn').addEventListener('click', function() {
-    applySettings(settings);
-    _updateActiveTplBadge();
-    showTplToast(`📊 Шаблон "${tplName}" загружен`);
     const b = document.getElementById('msc-banner');
     if (b) b.remove();
   });
