@@ -892,6 +892,7 @@ function calcTotal() {
   const revCooldownA=$c('x_rev')?parseRange('x_revcd'):[0];
   const wtTs=useWT?parseRange('f_wtt'):[0];
   const vsaMs=useVSA?parseRange('f_vsam'):[0];
+  const liqMinArr=(HAS_VOLUME&&$c('f_liq'))?parseRange('f_liqm'):[0.5];
   const atrBoMs=useAtrBo?parseRange('e_atbm'):[2.0];
   let slCfgs=[];
   if($c('s_atr')) parseRange('s_atrv').forEach(v=>slCfgs.push({type:'atr',m:v}));
@@ -921,7 +922,7 @@ function calcTotal() {
     (adxTs.length||1)*(_ctAdxL.length||1)*(_ctAdxHtf.length||1)*rsiCount*(vfMs.length||1)*(_ctAtrExpMs.length||1)*(mdMaxs.length||1)*
     slCount*tpCount*beCount*(trTrigs.length||1)*(trDists.length||1)*
     (timeBarsA.length||1)*(freshMaxs.length||1)*(wtTs.length||1)*
-    (vsaMs.length||1)*(atrBoMs.length||1)*(revBarsA.length||1)*
+    (vsaMs.length||1)*(liqMinArr.length||1)*(atrBoMs.length||1)*(revBarsA.length||1)*
     (revSkipA.length||1)*(revCooldownA.length||1)*
     (_ctConf.length||1)*(_ctStw.length||1)*
     (_ctTlPvL.length||1)*(_ctTlPvR.length||1)) * _tfMulCount;
@@ -1609,6 +1610,7 @@ async function runOpt() {
 
   // Count combos for progress
   const vsaMs=useVSA?parseRange('f_vsam'):[0];
+  const liqMinArr=useLiq?parseRange('f_liqm'):[0.5];
   const dynSLStructMults=useDynSLStruct?parseRange('x_dynsl_m'):[0.3];  // Dynamic SL multipliers
   const tpAtrLens=useAdaptiveTP?parseRange('x_tp_atr_len'):[20];
   const tpAtrMults=useAdaptiveTP?parseRange('x_tp_atr_mult'):[1.0];
@@ -1832,7 +1834,7 @@ async function runOpt() {
     (maTypeArr.length?maTypeArr:['EMA']), (htfRatioArr.length?htfRatioArr:[1]),
     (adxTs.length?adxTs:[0]), (adxHtfArr.length?adxHtfArr:[1]), rsiPairs, (vfMs.length?vfMs:[0]), (atrExpMs.length?atrExpMs:[0]),
     (mdMaxs.length?mdMaxs:[0]), (freshMaxs.length?freshMaxs:[20]),
-    (wtThreshs.length?wtThreshs:[0]), (vsaMs.length?vsaMs:[0]),
+    (wtThreshs.length?wtThreshs:[0]), (vsaMs.length?vsaMs:[0]), (liqMinArr.length?liqMinArr:[0.5]),
     (atrBoMults.length?atrBoMults:[2.0]), slPairs, tpPairs,
     beOffs, beTrigs, trTrigs, trDists, wickMults, (timeBarsArr.length?timeBarsArr:[50]),
     window._ipCombos,
@@ -1926,6 +1928,7 @@ async function runOpt() {
       const freshMax = _dims[_d][_di[_d++]];
       const wtT      = _dims[_d][_di[_d++]];
       const vsaM     = _dims[_d][_di[_d++]];
+      const liqMin   = _dims[_d][_di[_d++]];
       const atrBoM   = _dims[_d][_di[_d++]];
       const slPair   = _dims[_d][_di[_d++]];
       const tpPair   = _dims[_d][_di[_d++]];
@@ -2293,6 +2296,7 @@ async function runOpt() {
       const freshMax = _dims[_d][dimIndices[_d++]];
       const wtT      = _dims[_d][dimIndices[_d++]];
       const vsaM     = _dims[_d][dimIndices[_d++]];
+      const liqMin   = _dims[_d][dimIndices[_d++]];
       const atrBoM   = _dims[_d][dimIndices[_d++]];
       const slPair   = _dims[_d][dimIndices[_d++]];
       const tpPair   = _dims[_d][dimIndices[_d++]];
@@ -2960,6 +2964,8 @@ async function runOpt() {
                     }
                     for(const vsaM of (vsaMs.length?vsaMs:[0])) {
                       if(_mcDone) break;
+                      for(const liqMin of (liqMinArr.length?liqMinArr:[0.5])) {
+                      if(_mcDone) break;
                       for(const atrBoM of (atrBoMults.length?atrBoMults:[2.0])) {
                         if(_mcDone) break;
                         for(const slPair of slPairs) {
@@ -3262,6 +3268,7 @@ async function runOpt() {
                           } // tpPair
                         } // slPair
                       } // atrBoM
+                      } // liqMin
                     } // vsaM
                   } // wtT
                 } // freshMax
