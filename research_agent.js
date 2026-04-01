@@ -376,6 +376,29 @@ const ResearchAgent = (() => {
 
       const analysis = await ResearchAnalysis.analyzeResults(allResults);
 
+      // 🔥 СОХРАНИТЬ ИНСАЙТЫ В INDEXEDDB
+      const db = await _initDB();
+      const insightRecord = {
+        id: `insight_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+        timestamp: Date.now(),
+        projectId: projectId,
+        analysis: analysis,
+        resultCount: allResults.length
+      };
+
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction([STORE_INSIGHTS], 'readwrite');
+        const store = tx.objectStore(STORE_INSIGHTS);
+        const req = store.add(insightRecord);
+
+        req.onerror = () => reject(req.error);
+        tx.oncomplete = () => {
+          console.log('[ResearchAgent] 💾 Инсайты сохранены в IndexedDB');
+          resolve();
+        };
+        tx.onerror = () => reject(tx.error);
+      });
+
       // Обновить время последнего анализа
       _lastAnalysisTime = new Date().toISOString();
       localStorage.setItem('_raLastAnalysisTime', _lastAnalysisTime);
@@ -389,6 +412,35 @@ const ResearchAgent = (() => {
       _isAnalyzing = false;
       return null;
     }
+  }
+
+  async function getLatestInsights(projectId, limit = 1) {
+    const db = await _initDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction([STORE_INSIGHTS], 'readonly');
+      const store = tx.objectStore(STORE_INSIGHTS);
+
+      // Если есть индекс по projectId, использовать его, иначе использовать getAll
+      let req;
+      try {
+        const index = store.index('projectId');
+        req = index.getAll(projectId);
+      } catch (e) {
+        // Если индекса нет, получить все и отфильтровать
+        req = store.getAll();
+      }
+
+      req.onsuccess = () => {
+        const records = (req.result || [])
+          .filter(r => !projectId || r.projectId === projectId)
+          .sort((a, b) => b.timestamp - a.timestamp)
+          .slice(0, limit);
+        resolve(records);
+      };
+
+      req.onerror = () => reject(req.error);
+      tx.onerror = () => reject(tx.error);
+    });
   }
 
   // ─── Диагностика (для отладки) ──────────────────────────────
@@ -413,6 +465,7 @@ const ResearchAgent = (() => {
     getAllResultsFromHistory,
     getStatus,
     runAnalysisManually,
+    getLatestInsights,
     getDebugInfo
   };
 })();
