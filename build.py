@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
 """
-build.py — собирает USE_Optimizer_vX_XX.html из четырёх файлов.
+build.py — собирает USE_Optimizer_vX_XX.html из исходников.
 Использование: python3 build.py [output.html]
 
-  shell.html  (~1700 строк) — HTML разметка + CSS
-  ui.js       (~4300 строк) — весь UI JavaScript
-  core.js      (~740 строк) — индикаторы + backtest engine
-  opt.js      (~1800 строк) — оптимизатор + тесты устойчивости
+  shell.html    (~1700 строк) — HTML разметка + CSS
+  ui.js         (~8700 строк) — основной UI JavaScript
+  ui_hc.js      (~1560 строк) — Hill Climbing / GA
+  core.js       (~1060 строк) — индикаторы + backtest engine
+  opt.js        (~4430 строк) — оптимизатор + тесты устойчивости
 
 Порядок сборки:
   1. opt.js   → разрезаем по SECTION_A/B/C/D
   2. core.js  → убираем заголовок
-  3. ui.js    → подставляем OPT_A, CORE, OPT_B, OPT_C, OPT_D
+  3. ui.js    → подставляем OPT_A, CORE, OPT_B, OPT_C, OPT_D, HC
   4. shell.html → подставляем готовый ui через ##UI##
 """
 import sys, os, time
@@ -23,6 +24,8 @@ shell    = open(os.path.join(base, 'shell.html'),    encoding='utf-8').read()
 core     = open(os.path.join(base, 'core.js'),       encoding='utf-8').read()
 opt      = open(os.path.join(base, 'opt.js'),        encoding='utf-8').read()
 ui       = open(os.path.join(base, 'ui.js'),         encoding='utf-8').read()
+ui_hc    = open(os.path.join(base, 'ui_hc.js'),      encoding='utf-8').read()
+ui_ml    = open(os.path.join(base, 'ui_ml.js'),      encoding='utf-8').read()
 pine     = open(os.path.join(base, 'pine_export.js'), encoding='utf-8').read()
 
 # ── ML: model + inference + in-browser training ────────────────────────────
@@ -87,6 +90,8 @@ for ph, content in [
     ('/* ##OPT_B## */', opt_B),
     ('/* ##OPT_C## */', opt_C),
     ('/* ##OPT_D## */', opt_D),
+    ('/* ##HC## */',   ui_hc),
+    ('/* ##ML_UI## */', ui_ml),
 ]:
     assert ph in ui_built, f"Placeholder not found in ui.js: {ph!r}"
     ui_built = ui_built.replace(ph, content, 1)

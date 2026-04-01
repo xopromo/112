@@ -25502,6 +25502,7 @@ function _initOOSColSettings() {
 }
 
 
+
 function openHCModal(mode) {
   if (!DATA) { alert('Нет данных'); return; }
   const modeMap = {
@@ -27064,6 +27065,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
 
+
+
 // ============================================================
 // OOS COMPARE — сравнение избранных стратегий на новых данных
 // ============================================================
@@ -28574,6 +28577,7 @@ async function refreshProjectFiles() {
   }
 }
 
+
 // ── ML Model Manager ──────────────────────────────────────────
 
 // IndexedDB хранилище моделей
@@ -29571,6 +29575,9 @@ async function runMLFeatureScreening() {
   }
 }
 try{window.runMLFeatureScreening=runMLFeatureScreening;}catch(e){}
+
+
+
 
 // ─── Market Structure Comparator config reader ───────────────────────────────
 
@@ -30918,7 +30925,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1775034122456;
+window._BUILD_TS = 1775034373260;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
