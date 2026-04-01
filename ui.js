@@ -1352,3 +1352,5 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
 /* ##COMPARATOR## */
+
+/* ##RESEARCH_UI## */
