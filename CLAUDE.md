@@ -77,27 +77,27 @@ git push -u origin claude/ваша-ветка
 - `parseRange` (23) — парсер диапазона
 - `_calcStatSig` (67) — z-тест WR > 50%
 - `_calcGTScore` (82) — anti-overfitting метрика
-- `_calcIndicators` (3396) — пересчёт MA, ATR и др.
-- `runOpt` (936) — главный цикл (MC/TPE/Ex)
-- `_runOOS` (991) — OOS прогон
-- `_attachOOS` (1006) — IS/OOS split
-- `buildBtCfg` (3770) — сборка cfg для бэктеста
-- `runMassRobust` (4026) — массовый тест устойчивости
-- `HC_NUMERIC_PARAMS` (4346) — список параметров HC
+- `_calcIndicators` (3403) — пересчёт MA, ATR и др.
+- `runOpt` (937) — главный цикл (MC/TPE/Ex)
+- `_runOOS` (992) — OOS прогон
+- `_attachOOS` (1007) — IS/OOS split
+- `buildBtCfg` (3777) — сборка cfg для бэктеста
+- `runMassRobust` (4033) — массовый тест устойчивости
+- `HC_NUMERIC_PARAMS` (4353) — список параметров HC
 
 **ui.js**:
 - `showDetail` (1263) — standard detail панель
 - `switchTableMode` (447) — HC/Fav/Results
 - `applyFilters` (844) — применение фильтров таблицы
 - `resetAllFilters` (828) — сброс фильтров
-- `runOOSScan` (5295) — OOS сканирование
-- `openHCModal` (5612) — открыть HC окно
-- `_hcRunBacktest` (5915) — HC бэктест с кэшем
-- `_hcNeighbours` (6102) — поиск соседей HC
-- `runHillClimbing` (6233) — главный HC цикл
-- `_hcOpenDetail` (7000) — HC detail панель
-- `openOOSDiagnostic` (7571) — запуск OOS диагностики
-- `showOOSTradeDiag` (10158) — UI диагностики расхождений
+- `runOOSScan` (5309) — OOS сканирование
+- `openHCModal` (5626) — открыть HC окно
+- `_hcRunBacktest` (5929) — HC бэктест с кэшем
+- `_hcNeighbours` (6116) — поиск соседей HC
+- `runHillClimbing` (6247) — главный HC цикл
+- `_hcOpenDetail` (7014) — HC detail панель
+- `openOOSDiagnostic` (7585) — запуск OOS диагностики
+- `showOOSTradeDiag` (10174) — UI диагностики расхождений
 
 **core.js**:
 - `_calcAdaptiveMultipliers` (520) — расчет адаптивных множителей TP/SL
