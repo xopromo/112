@@ -7,7 +7,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "INPUT=$(cat); CMD=$(echo \"$INPUT\" | jq -r '.tool_input.command // \"\"'); if echo \"$CMD\" | grep -q 'git push'; then BRANCH=$(cd /home/user/112 && git branch --show-current 2>/dev/null); if [ -n \"$BRANCH\" ] && [ \"$BRANCH\" != \"main\" ]; then PR_URL=\"https://github.com/xopromo/112/compare/main...${BRANCH}\"; printf '{\"hookSpecificOutput\":{\"hookEventName\":\"PostToolUse\",\"additionalContext\":\"После git push — свежая ссылка PR для мержа: %s\"},\"systemMessage\":\"🔗 PR: %s\"}' \"$PR_URL\" \"$PR_URL\"; fi; fi",
+            "command": "INPUT=$(cat); if printf '%s' \"$INPUT\" | grep -qF 'git push'; then BRANCH=$(cd /home/user/112 && git branch --show-current 2>/dev/null); if [ -n \"$BRANCH\" ] && [ \"$BRANCH\" != \"main\" ]; then PR_URL=\"https://github.com/xopromo/112/compare/main...${BRANCH}\"; printf '{\"hookSpecificOutput\":{\"hookEventName\":\"PostToolUse\",\"additionalContext\":\"После git push — свежая ссылка PR для мержа: %s\"},\"systemMessage\":\"PR: %s\"}' \"$PR_URL\" \"$PR_URL\"; fi; fi",
             "timeout": 10
           }
         ]
