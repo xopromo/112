@@ -2,10 +2,11 @@ name: Auto Build
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'claude/*']
     paths:
       - 'shell.html'
       - 'ui.js'
+      - 'ui_*.js'
       - 'core.js'
       - 'opt.js'
       - 'pine_export.js'
@@ -34,4 +35,4 @@ jobs:
           git add USE_Optimizer_v6_built.html
           git diff --cached --quiet && echo "No changes" || \
             git commit -m "build: auto-update bundle [skip ci]" && \
-            git push origin main
+            git push origin HEAD

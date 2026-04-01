@@ -20477,6 +20477,7 @@ function buildBtCfg(cfg, ind) {
   };
 }
 
+
 // ============================================================
 // RENDER
 // ============================================================
@@ -21287,6 +21288,7 @@ function renderVisibleResults() {
   $('pg-pages').innerHTML = pgHtml;
   $('pg-info').textContent = `${start + 1}–${end} из ${total}`;
 }
+
 
 // ============================================================
 // DETAIL PANEL
@@ -22481,6 +22483,7 @@ function showTplToast(msg, duration) {
 function toast(msg, duration) { showTplToast(msg, duration); }
 
 // Load default template on page load
+
 // --- Favourites ---
 function isFav(name) {
   return favourites.some(f => f.name===name && (f.ns||'')===_favNs);
@@ -22709,6 +22712,7 @@ function updateClxExitVisibility() {
 document.addEventListener('keydown', e => {
   if (e.key==='Escape') { closeDetail(); closeTplModal(); closeRobustModal(); closeParseModal(); }
 });
+
 
 // ============================================================
 // ROBUST TEST
@@ -22976,6 +22980,7 @@ async function runRobustTest() {
 
   setProgress(100, '✅ Готово');
 }
+
 
 // ============================================================
 // TEXT PARSER
@@ -23777,7 +23782,6 @@ function _drawOOSGraphicForResult(r) {
   gNew.addColorStop(0, 'rgba(255,160,40,0.9)'); gNew.addColorStop(1, 'rgba(255,100,20,0.8)');
   ctx.strokeStyle = gNew; ctx.lineWidth = 1.5; ctx.stroke();
 }
-
 
 // ── TV COMPARE ────────────────────────────────────────────────
 
@@ -31519,7 +31523,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1775040912134;
+window._BUILD_TS = 1775042344039;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;

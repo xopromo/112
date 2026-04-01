@@ -30,7 +30,15 @@ ui_heatmap  = open(os.path.join(base, 'ui_heatmap.js'),  encoding='utf-8').read(
 ui_projects = open(os.path.join(base, 'ui_projects.js'), encoding='utf-8').read()
 ui_oos       = open(os.path.join(base, 'ui_oos.js'),       encoding='utf-8').read()
 ui_comparator= open(os.path.join(base, 'ui_comparator.js'),encoding='utf-8').read()
-pine        = open(os.path.join(base, 'pine_export.js'), encoding='utf-8').read()
+ui_queue      = open(os.path.join(base, 'ui_queue.js'),    encoding='utf-8').read()
+ui_tvcompare  = open(os.path.join(base, 'ui_tvcompare.js'),encoding='utf-8').read()
+ui_detail     = open(os.path.join(base, 'ui_detail.js'),   encoding='utf-8').read()
+ui_table      = open(os.path.join(base, 'ui_table.js'),    encoding='utf-8').read()
+ui_equity     = open(os.path.join(base, 'ui_equity.js'),   encoding='utf-8').read()
+ui_favs       = open(os.path.join(base, 'ui_favs.js'),     encoding='utf-8').read()
+ui_robust     = open(os.path.join(base, 'ui_robust.js'),   encoding='utf-8').read()
+ui_parse      = open(os.path.join(base, 'ui_parse.js'),    encoding='utf-8').read()
+pine          = open(os.path.join(base, 'pine_export.js'), encoding='utf-8').read()
 
 # ── ML: model + inference + in-browser training ────────────────────────────
 _ml_model_path  = os.path.join(base, 'ml', 'model_generated.js')
@@ -96,6 +104,14 @@ for ph, content in [
     ('/* ##OPT_B## */', opt_B),
     ('/* ##OPT_C## */', opt_C),
     ('/* ##OPT_D## */', opt_D),
+    ('/* ##TABLE## */',    ui_table),
+    ('/* ##DETAIL## */',   ui_detail),
+    ('/* ##ROBUST## */',   ui_robust),
+    ('/* ##PARSE## */',    ui_parse),
+    ('/* ##FAVS## */',     ui_favs),
+    ('/* ##EQUITY## */',   ui_equity),
+    ('/* ##TVCOMPARE## */', ui_tvcompare),
+    ('/* ##QUEUE## */',    ui_queue),
     ('/* ##HC## */',       ui_hc),
     ('/* ##ML_UI## */',    ui_ml),
     ('/* ##HEATMAP## */',    ui_heatmap),
