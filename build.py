@@ -32,6 +32,7 @@ ui_oos       = open(os.path.join(base, 'ui_oos.js'),       encoding='utf-8').rea
 ui_comparator= open(os.path.join(base, 'ui_comparator.js'),encoding='utf-8').read()
 ui_queue      = open(os.path.join(base, 'ui_queue.js'),    encoding='utf-8').read()
 ui_tvcompare  = open(os.path.join(base, 'ui_tvcompare.js'),encoding='utf-8').read()
+ui_detail     = open(os.path.join(base, 'ui_detail.js'),   encoding='utf-8').read()
 pine          = open(os.path.join(base, 'pine_export.js'), encoding='utf-8').read()
 
 # ── ML: model + inference + in-browser training ────────────────────────────
@@ -98,6 +99,7 @@ for ph, content in [
     ('/* ##OPT_B## */', opt_B),
     ('/* ##OPT_C## */', opt_C),
     ('/* ##OPT_D## */', opt_D),
+    ('/* ##DETAIL## */',   ui_detail),
     ('/* ##TVCOMPARE## */', ui_tvcompare),
     ('/* ##QUEUE## */',    ui_queue),
     ('/* ##HC## */',       ui_hc),
