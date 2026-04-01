@@ -65,8 +65,9 @@ const ResearchAgent = (() => {
     const db = await _initDB();
     _currentRunId = `run_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     _resultsBuffer = [];
+    _pendingResultsQueues = [];  // Очистить очередь при новом прогоне
 
-    console.log('[ResearchAgent] ▶️  Новый прогон:', _currentRunId);
+    console.log('[ResearchAgent] ▶️  Новый прогон:', _currentRunId, 'mode=' + (taskInfo?.mode || 'unknown'));
   }
 
   // ─── API: Добавить результаты в буфер (вызывается из runOpt) ──
@@ -95,15 +96,26 @@ const ResearchAgent = (() => {
   // ─── API: Завершить прогон и сохранить ─────────────────────
 
   async function finishRun(metadata = {}) {
+    console.log('[ResearchAgent] finishRun: вызована', { _currentRunId, bufLen: _resultsBuffer.length, _isFinishingRun, metadata });
+
     // Защита от параллельных вызовов finishRun()
     if (_isFinishingRun) {
       console.log('[ResearchAgent] finishRun: уже выполняется, пропуск');
       return;
     }
 
-    if (!_currentRunId || _resultsBuffer.length === 0) {
-      console.log('[ResearchAgent] finishRun: пропуск (нет данных)', { hasId: !!_currentRunId, bufLen: _resultsBuffer.length });
+    if (!_currentRunId) {
+      console.error('[ResearchAgent] finishRun: ОШИБКА - нет _currentRunId! startRun() не был вызван или был очищен раньше времени');
       return;
+    }
+
+    if (_resultsBuffer.length === 0) {
+      console.log('[ResearchAgent] finishRun: пропуск - буфер пустой (очередь переместится в finishRun)');
+      // Это может быть OK если есть очередь
+      if (_pendingResultsQueues.length === 0) {
+        console.log('[ResearchAgent] finishRun: нет данных в буфере и очереди');
+        return;
+      }
     }
 
     _isFinishingRun = true;
