@@ -60,6 +60,10 @@ const ResearchAgent = (() => {
       console.log('[ResearchAgent] ⚠️  addResults: невалидные данные', { isArray: Array.isArray(newResults), len: newResults?.length });
       return;
     }
+    if (!_currentRunId) {
+      console.log('[ResearchAgent] ⚠️  addResults: нет активного прогона (_currentRunId не установлен)');
+      return;
+    }
     console.log('[ResearchAgent] 📥 addResults:', newResults.length, 'результатов, всего в буфере:', _resultsBuffer.length + newResults.length);
     _resultsBuffer.push(...newResults);
 
@@ -112,10 +116,14 @@ const ResearchAgent = (() => {
     }
 
     // Сохранить в IndexedDB
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const tx = db.transaction([STORE_RUNS], 'readwrite');
       const store = tx.objectStore(STORE_RUNS);
-      store.add(run);
+      const addReq = store.add(run);
+
+      addReq.onerror = () => {
+        console.warn('[ResearchAgent] Ошибка добавления в IndexedDB:', addReq.error);
+      };
 
       tx.oncomplete = async () => {
         console.log(`[ResearchAgent] 💾 Сохранено: ${run.resultCount} результатов (${_currentRunId})`);
@@ -128,6 +136,13 @@ const ResearchAgent = (() => {
         _currentRunId = null;
         _resultsBuffer = [];
         resolve(run);
+      };
+
+      tx.onerror = () => {
+        console.error('[ResearchAgent] Транзакция IndexedDB ошибка:', tx.error);
+        _currentRunId = null;
+        _resultsBuffer = [];
+        reject(tx.error);
       };
     });
   }
