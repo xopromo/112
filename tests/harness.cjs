@@ -216,6 +216,7 @@ function createUICtx(data) {
   uiCode = uiCode.replace('/* ##OPT_B## */', optB);
   uiCode = uiCode.replace('/* ##OPT_C## */', optC);
   uiCode = uiCode.replace('/* ##OPT_D## */', optD);
+  uiCode = uiCode.replace('/* ##TABLE## */',     readSrc('ui_table.js'));
   uiCode = uiCode.replace('/* ##DETAIL## */',    readSrc('ui_detail.js'));
   uiCode = uiCode.replace('/* ##ROBUST## */',    readSrc('ui_robust.js'));
   uiCode = uiCode.replace('/* ##PARSE## */',     readSrc('ui_parse.js'));
