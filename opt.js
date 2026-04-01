@@ -2234,6 +2234,8 @@ async function runOpt() {
     // 🤖 Research Agent: добавить результаты из MC режима
     if (typeof ResearchAgent !== 'undefined' && results.length > 0) {
       ResearchAgent.addResults(results);
+      // Завершить и сохранить прогон
+      ResearchAgent.finishRun({ mode: 'mc', resultCount: results.length });
     }
 
     renderResults(); showBestStats(); updateETA(done, mcTotal, results.length);
@@ -2808,6 +2810,8 @@ async function runOpt() {
     // 🤖 Research Agent: добавить результаты из TPE/Synthesis режима
     if (typeof ResearchAgent !== 'undefined' && results.length > 0) {
       ResearchAgent.addResults(results);
+      // Завершить и сохранить прогон
+      ResearchAgent.finishRun({ mode: _isSynthMode ? 'synthesis' : 'tpe', resultCount: results.length });
     }
 
     renderResults(); showBestStats(); updateETA(done, _tpeMaxIter, results.length);
@@ -2922,6 +2926,8 @@ async function runOpt() {
     // 🤖 Research Agent: добавить результаты из BO режима
     if (typeof ResearchAgent !== 'undefined' && results.length > 0) {
       ResearchAgent.addResults(results);
+      // Завершить и сохранить прогон
+      ResearchAgent.finishRun({ mode: 'bo', resultCount: results.length });
     }
 
     renderResults(); showBestStats();
@@ -3342,6 +3348,8 @@ async function runOpt() {
   // 🤖 Research Agent: добавить результаты в буфер (Grid/Exhaustive режим)
   if (typeof ResearchAgent !== 'undefined' && results.length > 0) {
     ResearchAgent.addResults(results);
+    // Завершить и сохранить прогон
+    ResearchAgent.finishRun({ mode: 'grid', resultCount: results.length });
   }
 
   renderResults();

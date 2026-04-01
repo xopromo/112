@@ -18786,6 +18786,8 @@ async function runOpt() {
     // 🤖 Research Agent: добавить результаты из MC режима
     if (typeof ResearchAgent !== 'undefined' && results.length > 0) {
       ResearchAgent.addResults(results);
+      // Завершить и сохранить прогон
+      ResearchAgent.finishRun({ mode: 'mc', resultCount: results.length });
     }
 
     renderResults(); showBestStats(); updateETA(done, mcTotal, results.length);
@@ -19360,6 +19362,8 @@ async function runOpt() {
     // 🤖 Research Agent: добавить результаты из TPE/Synthesis режима
     if (typeof ResearchAgent !== 'undefined' && results.length > 0) {
       ResearchAgent.addResults(results);
+      // Завершить и сохранить прогон
+      ResearchAgent.finishRun({ mode: _isSynthMode ? 'synthesis' : 'tpe', resultCount: results.length });
     }
 
     renderResults(); showBestStats(); updateETA(done, _tpeMaxIter, results.length);
@@ -19474,6 +19478,8 @@ async function runOpt() {
     // 🤖 Research Agent: добавить результаты из BO режима
     if (typeof ResearchAgent !== 'undefined' && results.length > 0) {
       ResearchAgent.addResults(results);
+      // Завершить и сохранить прогон
+      ResearchAgent.finishRun({ mode: 'bo', resultCount: results.length });
     }
 
     renderResults(); showBestStats();
@@ -19894,6 +19900,8 @@ async function runOpt() {
   // 🤖 Research Agent: добавить результаты в буфер (Grid/Exhaustive режим)
   if (typeof ResearchAgent !== 'undefined' && results.length > 0) {
     ResearchAgent.addResults(results);
+    // Завершить и сохранить прогон
+    ResearchAgent.finishRun({ mode: 'grid', resultCount: results.length });
   }
 
   renderResults();
@@ -32061,7 +32069,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1775045884373;
+window._BUILD_TS = 1775046154158;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
