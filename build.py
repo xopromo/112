@@ -28,6 +28,8 @@ ui_hc    = open(os.path.join(base, 'ui_hc.js'),      encoding='utf-8').read()
 ui_ml       = open(os.path.join(base, 'ui_ml.js'),       encoding='utf-8').read()
 ui_heatmap  = open(os.path.join(base, 'ui_heatmap.js'),  encoding='utf-8').read()
 ui_projects = open(os.path.join(base, 'ui_projects.js'), encoding='utf-8').read()
+ui_oos       = open(os.path.join(base, 'ui_oos.js'),       encoding='utf-8').read()
+ui_comparator= open(os.path.join(base, 'ui_comparator.js'),encoding='utf-8').read()
 pine        = open(os.path.join(base, 'pine_export.js'), encoding='utf-8').read()
 
 # ── ML: model + inference + in-browser training ────────────────────────────
@@ -94,8 +96,10 @@ for ph, content in [
     ('/* ##OPT_D## */', opt_D),
     ('/* ##HC## */',       ui_hc),
     ('/* ##ML_UI## */',    ui_ml),
-    ('/* ##HEATMAP## */',  ui_heatmap),
-    ('/* ##PROJECTS## */', ui_projects),
+    ('/* ##HEATMAP## */',    ui_heatmap),
+    ('/* ##PROJECTS## */',  ui_projects),
+    ('/* ##OOS## */',       ui_oos),
+    ('/* ##COMPARATOR## */',ui_comparator),
 ]:
     assert ph in ui_built, f"Placeholder not found in ui.js: {ph!r}"
     ui_built = ui_built.replace(ph, content, 1)
