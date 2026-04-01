@@ -22,13 +22,14 @@ async function openResearchModal() {
   let status = null;
 
   if (typeof ResearchAgent !== 'undefined') {
-    const currentProjectId = localStorage.getItem('_currentProjectId') || 'default';
+    const currentProjectId = ProjectManager?.getCurrentId() || localStorage.getItem('_currentProjectId') || 'default';
     history = await ResearchAgent.loadHistory(currentProjectId, 50);
     status = await ResearchAgent.getStatus();
 
-    if (history && history.length > 0) {
-      const latestRun = history[0];
-      insights = latestRun.analysis;
+    // 🔥 ПРАВИЛЬНО: загружаем последний анализ отдельно, а не из latestRun
+    const latestInsights = await ResearchAgent.getLatestInsights(currentProjectId, 1);
+    if (latestInsights && latestInsights.length > 0) {
+      insights = latestInsights[0].analysis;
     }
   }
 

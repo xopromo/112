@@ -13706,6 +13706,29 @@ const ResearchAgent = (() => {
 
       const analysis = await ResearchAnalysis.analyzeResults(allResults);
 
+      // 🔥 СОХРАНИТЬ ИНСАЙТЫ В INDEXEDDB
+      const db = await _initDB();
+      const insightRecord = {
+        id: `insight_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+        timestamp: Date.now(),
+        projectId: projectId,
+        analysis: analysis,
+        resultCount: allResults.length
+      };
+
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction([STORE_INSIGHTS], 'readwrite');
+        const store = tx.objectStore(STORE_INSIGHTS);
+        const req = store.add(insightRecord);
+
+        req.onerror = () => reject(req.error);
+        tx.oncomplete = () => {
+          console.log('[ResearchAgent] 💾 Инсайты сохранены в IndexedDB');
+          resolve();
+        };
+        tx.onerror = () => reject(tx.error);
+      });
+
       // Обновить время последнего анализа
       _lastAnalysisTime = new Date().toISOString();
       localStorage.setItem('_raLastAnalysisTime', _lastAnalysisTime);
@@ -13719,6 +13742,35 @@ const ResearchAgent = (() => {
       _isAnalyzing = false;
       return null;
     }
+  }
+
+  async function getLatestInsights(projectId, limit = 1) {
+    const db = await _initDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction([STORE_INSIGHTS], 'readonly');
+      const store = tx.objectStore(STORE_INSIGHTS);
+
+      // Если есть индекс по projectId, использовать его, иначе использовать getAll
+      let req;
+      try {
+        const index = store.index('projectId');
+        req = index.getAll(projectId);
+      } catch (e) {
+        // Если индекса нет, получить все и отфильтровать
+        req = store.getAll();
+      }
+
+      req.onsuccess = () => {
+        const records = (req.result || [])
+          .filter(r => !projectId || r.projectId === projectId)
+          .sort((a, b) => b.timestamp - a.timestamp)
+          .slice(0, limit);
+        resolve(records);
+      };
+
+      req.onerror = () => reject(req.error);
+      tx.onerror = () => reject(tx.error);
+    });
   }
 
   // ─── Диагностика (для отладки) ──────────────────────────────
@@ -13743,6 +13795,7 @@ const ResearchAgent = (() => {
     getAllResultsFromHistory,
     getStatus,
     runAnalysisManually,
+    getLatestInsights,
     getDebugInfo
   };
 })();
@@ -31049,13 +31102,14 @@ async function openResearchModal() {
   let status = null;
 
   if (typeof ResearchAgent !== 'undefined') {
-    const currentProjectId = localStorage.getItem('_currentProjectId') || 'default';
+    const currentProjectId = ProjectManager?.getCurrentId() || localStorage.getItem('_currentProjectId') || 'default';
     history = await ResearchAgent.loadHistory(currentProjectId, 50);
     status = await ResearchAgent.getStatus();
 
-    if (history && history.length > 0) {
-      const latestRun = history[0];
-      insights = latestRun.analysis;
+    // 🔥 ПРАВИЛЬНО: загружаем последний анализ отдельно, а не из latestRun
+    const latestInsights = await ResearchAgent.getLatestInsights(currentProjectId, 1);
+    if (latestInsights && latestInsights.length > 0) {
+      insights = latestInsights[0].analysis;
     }
   }
 
@@ -32207,7 +32261,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1775048517261;
+window._BUILD_TS = 1775049079280;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
