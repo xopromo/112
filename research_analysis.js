@@ -288,7 +288,10 @@ const ResearchAnalysis = (() => {
       // Difference of means
       const diff = Math.abs(mean(sucVals) - mean(unsucVals));
       const stdDiff = Math.sqrt(Math.pow(stdev(sucVals), 2) + Math.pow(stdev(unsucVals), 2)) || 1;
-      const tScore = diff / stdDiff;
+      const tScore = (diff === 0 && stdDiff === 0) ? 0 : (diff / stdDiff);
+
+      // Защита от NaN
+      if (!isFinite(tScore)) continue;
 
       importance[param] = {
         successMean: mean(sucVals),

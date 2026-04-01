@@ -14,6 +14,7 @@ const ResearchAgent = (() => {
   let _dbPromise = null;  // Кэш для защиты от параллельной инициализации
   let _currentRunId = null;
   let _resultsBuffer = [];
+  let _pendingResultsQueues = [];  // ОЧЕРЕДЬ для защиты от race condition
   let _lastAnalysisTime = localStorage.getItem('_raLastAnalysisTime') || null;
   let _totalDataPoints = 0;
   let _totalRuns = 0;
@@ -79,6 +80,14 @@ const ResearchAgent = (() => {
       console.log('[ResearchAgent] ⚠️  addResults: нет активного прогона (_currentRunId не установлен)');
       return;
     }
+
+    // Защита от race condition: если finishRun выполняется, добавляем в очередь
+    if (_isFinishingRun) {
+      console.log('[ResearchAgent] ⚠️  addResults: finishRun выполняется, добавляю в очередь');
+      _pendingResultsQueues.push(newResults);
+      return;
+    }
+
     console.log('[ResearchAgent] 📥 addResults:', newResults.length, 'результатов, всего в буфере:', _resultsBuffer.length + newResults.length);
     _resultsBuffer.push(...newResults);
   }
@@ -159,16 +168,36 @@ const ResearchAgent = (() => {
           console.warn('[ResearchAgent] Ошибка экспорта (некритичная):', e);
         }
 
+        // Перенести очереди результатов обратно в буфер если есть новые результаты
+        if (_pendingResultsQueues.length > 0) {
+          console.log('[ResearchAgent] ℹ️  Обработка', _pendingResultsQueues.length, 'очередей результатов');
+          const allQueued = [];
+          for (const queue of _pendingResultsQueues) {
+            allQueued.push(...queue);
+          }
+          _resultsBuffer = allQueued;
+          _pendingResultsQueues = [];
+        } else {
+          _resultsBuffer = [];
+        }
+
         _currentRunId = null;
-        _resultsBuffer = [];
         _isFinishingRun = false;
         resolve(run);
       };
 
       tx.onerror = () => {
         console.error('[ResearchAgent] Транзакция IndexedDB ошибка:', tx.error);
+        // Перенести очередь обратно в буфер для переПопытки
+        if (_pendingResultsQueues.length > 0) {
+          const allQueued = [];
+          for (const queue of _pendingResultsQueues) {
+            allQueued.push(...queue);
+          }
+          _resultsBuffer = allQueued;
+          _pendingResultsQueues = [];
+        }
         _currentRunId = null;
-        _resultsBuffer = [];
         _isFinishingRun = false;
         reject(tx.error);
       };
