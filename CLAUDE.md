@@ -91,13 +91,15 @@ git push -u origin claude/ваша-ветка
 - `applyFilters` (844) — применение фильтров таблицы
 - `resetAllFilters` (828) — сброс фильтров
 - `runOOSScan` (5309) — OOS сканирование
-- `openHCModal` (5626) — открыть HC окно
-- `_hcRunBacktest` (5929) — HC бэктест с кэшем
-- `_hcNeighbours` (6116) — поиск соседей HC
-- `runHillClimbing` (6247) — главный HC цикл
-- `_hcOpenDetail` (7014) — HC detail панель
-- `openOOSDiagnostic` (7585) — запуск OOS диагностики
-- `showOOSTradeDiag` (10174) — UI диагностики расхождений
+- `openOOSDiagnostic` (6030) — запуск OOS диагностики
+- `showOOSTradeDiag` (8619) — UI диагностики расхождений
+
+**ui_hc.js**:
+- `openHCModal` (1) — открыть HC окно
+- `_hcRunBacktest` (304) — HC бэктест с кэшем
+- `_hcNeighbours` (491) — поиск соседей HC
+- `runHillClimbing` (622) — главный HC цикл
+- `_hcOpenDetail` (1389) — HC detail панель
 
 **core.js**:
 - `_calcAdaptiveMultipliers` (520) — расчет адаптивных множителей TP/SL
