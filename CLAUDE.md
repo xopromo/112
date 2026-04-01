@@ -77,13 +77,13 @@ git push -u origin claude/ваша-ветка
 - `parseRange` (23) — парсер диапазона
 - `_calcStatSig` (67) — z-тест WR > 50%
 - `_calcGTScore` (82) — anti-overfitting метрика
-- `_calcIndicators` (3386) — пересчёт MA, ATR и др.
+- `_calcIndicators` (3396) — пересчёт MA, ATR и др.
 - `runOpt` (936) — главный цикл (MC/TPE/Ex)
 - `_runOOS` (991) — OOS прогон
 - `_attachOOS` (1006) — IS/OOS split
-- `buildBtCfg` (3760) — сборка cfg для бэктеста
-- `runMassRobust` (4016) — массовый тест устойчивости
-- `HC_NUMERIC_PARAMS` (4336) — список параметров HC
+- `buildBtCfg` (3770) — сборка cfg для бэктеста
+- `runMassRobust` (4026) — массовый тест устойчивости
+- `HC_NUMERIC_PARAMS` (4346) — список параметров HC
 
 **ui.js**:
 - `showDetail` (1263) — standard detail панель
@@ -106,9 +106,9 @@ git push -u origin claude/ваша-ветка
 
 **pine_export.js**:
 - `generatePineScript` (20) — экспорт Pine индикатора
-- `generatePineStrategy` (1813) — экспорт Pine стратегии (strategy.exit)
-- `fixPineScript` (1822) — автоисправление Pine v5→v6
-- `_addActivePinev6` (1938) — toggle-группы Pine v6
+- `generatePineStrategy` (1841) — экспорт Pine стратегии (strategy.exit)
+- `fixPineScript` (1850) — автоисправление Pine v5→v6
+- `_addActivePinev6` (1966) — toggle-группы Pine v6
 
 ---
 
