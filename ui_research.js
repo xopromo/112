@@ -86,12 +86,12 @@ async function openResearchModal() {
 
   box.innerHTML = headerHTML + statusHTML + `
     <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;border-bottom:1px solid #444;padding-bottom:10px">
-      <button onclick="document.querySelector('[data-tab=overview]')?.click()" style="background:rgba(139,92,246,.2);border:1px solid rgba(139,92,246,.6);color:var(--fg,#cdd6f4);border-radius:4px;padding:4px 12px;cursor:pointer;font-size:.82em">📊 Обзор</button>
-      <button onclick="document.querySelector('[data-tab=correlations]')?.click()" style="background:none;border:1px solid #444;color:var(--fg,#cdd6f4);border-radius:4px;padding:4px 12px;cursor:pointer;font-size:.82em">🔗 Корреляции</button>
-      <button onclick="document.querySelector('[data-tab=anomalies]')?.click()" style="background:none;border:1px solid #444;color:var(--fg,#cdd6f4);border-radius:4px;padding:4px 12px;cursor:pointer;font-size:.82em">⚠️ Аномалии</button>
-      <button onclick="document.querySelector('[data-tab=clusters]')?.click()" style="background:none;border:1px solid #444;color:var(--fg,#cdd6f4);border-radius:4px;padding:4px 12px;cursor:pointer;font-size:.82em">🎯 Кластеры</button>
-      <button onclick="document.querySelector('[data-tab=features]')?.click()" style="background:none;border:1px solid #444;color:var(--fg,#cdd6f4);border-radius:4px;padding:4px 12px;cursor:pointer;font-size:.82em">⭐ Факторы</button>
-      <button onclick="document.querySelector('[data-tab=history]')?.click()" style="background:none;border:1px solid #444;color:var(--fg,#cdd6f4);border-radius:4px;padding:4px 12px;cursor:pointer;font-size:.82em">📈 История</button>
+      <button data-tab="overview" style="background:rgba(139,92,246,.2);border:1px solid rgba(139,92,246,.6);color:var(--fg,#cdd6f4);border-radius:4px;padding:4px 12px;cursor:pointer;font-size:.82em">📊 Обзор</button>
+      <button data-tab="correlations" style="background:none;border:1px solid #444;color:var(--fg,#cdd6f4);border-radius:4px;padding:4px 12px;cursor:pointer;font-size:.82em">🔗 Корреляции</button>
+      <button data-tab="anomalies" style="background:none;border:1px solid #444;color:var(--fg,#cdd6f4);border-radius:4px;padding:4px 12px;cursor:pointer;font-size:.82em">⚠️ Аномалии</button>
+      <button data-tab="clusters" style="background:none;border:1px solid #444;color:var(--fg,#cdd6f4);border-radius:4px;padding:4px 12px;cursor:pointer;font-size:.82em">🎯 Кластеры</button>
+      <button data-tab="features" style="background:none;border:1px solid #444;color:var(--fg,#cdd6f4);border-radius:4px;padding:4px 12px;cursor:pointer;font-size:.82em">⭐ Факторы</button>
+      <button data-tab="history" style="background:none;border:1px solid #444;color:var(--fg,#cdd6f4);border-radius:4px;padding:4px 12px;cursor:pointer;font-size:.82em">📈 История</button>
     </div>
     <div id="research-modal-content">
       ${_renderResearchOverview(insights, history)}
