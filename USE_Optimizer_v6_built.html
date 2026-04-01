@@ -19854,6 +19854,12 @@ async function runOpt() {
   try { await _batchCPCV(results, 200); } catch(_cpcvErr) { console.error('[Exhaustive _batchCPCV]', _cpcvErr); }
   if (typeof setMcPhase === 'function') setMcPhase(null);
   _curPage = 0;
+
+  // 🤖 Research Agent: добавить результаты в буфер
+  if (typeof ResearchAgent !== 'undefined' && window._queueMode && results.length > 0) {
+    ResearchAgent.addResults(results);
+  }
+
   renderResults();
   if(results.length>0) showBestStats();
   updateETA(done, total, results.length);
@@ -32019,7 +32025,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1775043973470;
+window._BUILD_TS = 1775044379643;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
