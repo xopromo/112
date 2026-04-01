@@ -1395,7 +1395,8 @@ async function runOpt() {
   }
   const vsaMult=$n('f_vsam')||1.5;
   const vsaP=$n('f_vsap')||20;
-  const liqMin=$n('f_liqm')||0.5;
+  // liqMin больше НЕ читается как константа — перебирается через liqMinArr
+  // const liqMin=$n('f_liqm')||0.5;
   const volDirPArr = useVolDir ? parseRange('f_vdirp') : [$n('f_vdirp')||10];
   const clxVolMult=$n('f_clxm')||3.0;
   const clxBodyMult=$n('f_clxb')||1.5;
@@ -1652,6 +1653,8 @@ async function runOpt() {
   const tpAtrMults=useAdaptiveTP?parseRange('x_tp_atr_mult'):[1.0];
   const slAtrLens=useAdaptiveSL?parseRange('x_sl_atr_len'):[20];
   const slAtrMults=useAdaptiveSL?parseRange('x_sl_atr_mult'):[0.5];
+  // TrendLine Zone с защитой от пустого массива
+  const tlZonePctArr=useTrendFigures ? (()=>{const a=parseRange('e_tl_zone'); return (Array.isArray(a)&&a.length>0)?a:[0.3];})() : [0.3];
   // Точное количество валидных BE комбинаций (beOff < beTrig)
   let beValidCount=1;
   if(useBE){let v=0;beTrigs.forEach(t=>{beOffs.forEach(o=>{if(o<t)v++;});});beValidCount=v||1;}
@@ -1660,7 +1663,7 @@ async function runOpt() {
     (adxTs.length||1)*(adxHtfArr.length||1)*(rsiPairs.length||1)*(vfMs.length||1)*(atrExpMs.length||1)*(mdMaxs.length||1)*
     slPairs.length*tpPairs.length*beValidCount*(trTrigs.length||1)*(trDists.length||1)*
     (timeBarsArr.length||1)*(freshMaxs.length||1)*(wtThreshs.length||1)*
-    (vsaMs.length||1)*(atrBoMults.length||1)*(confNArr.length||1)*(confTypeArr.length||1)*
+    (vsaMs.length||1)*(liqMinArr.length||1)*(atrBoMults.length||1)*(confNArr.length||1)*(confTypeArr.length||1)*
     (confHtfArr.length||1)*(maCrossTypeArr.length||1)*(revBarsArr.length||1)*
     (revSkipArr.length||1)*(revCooldownArr.length||1)*
     (_adxLArr.length||1)*(_sTrendArr.length||1)*
@@ -1804,7 +1807,7 @@ async function runOpt() {
       ['pinRatio',       (Array.isArray(pinRatioArr) && pinRatioArr.length > 0) ? pinRatioArr : [2]],
       ['matPeriod',      (Array.isArray(matPArr) && matPArr.length > 0) ? matPArr : [20]],
       ['matZone',        (Array.isArray(matZoneArr) && matZoneArr.length > 0) ? matZoneArr : [0.2]],
-      ['tlZonePct',      useTrendFigures ? parseRange('e_tl_zone') : [0.3]],
+      ['tlZonePct',      (Array.isArray(tlZonePctArr) && tlZonePctArr.length > 0) ? tlZonePctArr : [0.3]],
     ];
     // Defaults for all params (first element of each array)
     window._ipDef = Object.fromEntries(_allIp.map(([n,a])=>[n,a[0]]));
