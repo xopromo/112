@@ -14,6 +14,10 @@ const ResearchAgent = (() => {
   let _currentRunId = null;
   let _resultsBuffer = [];
   let _saveTimer = null;
+  let _lastAnalysisTime = localStorage.getItem('_raLastAnalysisTime') || null;
+  let _totalDataPoints = 0;
+  let _totalRuns = 0;
+  let _isAnalyzing = false;
 
   // ─── Инициализация IndexedDB ────────────────────────────────
 
@@ -200,6 +204,80 @@ const ResearchAgent = (() => {
     return results;
   }
 
+  // ─── API: Получить статус агента ──────────────────────────────
+
+  async function getStatus() {
+    const db = await _initDB();
+    const projectId = localStorage.getItem('_currentProjectId') || 'default';
+
+    return new Promise((resolve) => {
+      const tx = db.transaction([STORE_RUNS], 'readonly');
+      const store = tx.objectStore(STORE_RUNS);
+      const index = store.index('projectId');
+
+      const req = index.getAll(projectId);
+      req.onsuccess = () => {
+        const runs = req.result || [];
+        const totalData = runs.reduce((sum, r) => sum + (r.resultCount || 0), 0);
+        const lastRun = runs.length > 0 ? runs[runs.length - 1] : null;
+
+        resolve({
+          totalRuns: runs.length,
+          totalDataPoints: totalData,
+          lastAnalysisTime: _lastAnalysisTime ? new Date(_lastAnalysisTime) : null,
+          lastRunTime: lastRun ? new Date(lastRun.timestamp) : null,
+          isAnalyzing: _isAnalyzing,
+          lastAnalysisRunId: runs[0]?.id || null
+        });
+      };
+    });
+  }
+
+  // ─── API: Запустить анализ вручную ────────────────────────────
+
+  async function runAnalysisManually() {
+    if (_isAnalyzing) {
+      console.warn('[ResearchAgent] Анализ уже запущен');
+      return null;
+    }
+
+    _isAnalyzing = true;
+    const projectId = localStorage.getItem('_currentProjectId') || 'default';
+
+    try {
+      // Получить все накопленные результаты
+      const allResults = await getAllResultsFromHistory(projectId);
+
+      if (allResults.length === 0) {
+        console.warn('[ResearchAgent] Нет результатов для анализа');
+        _isAnalyzing = false;
+        return null;
+      }
+
+      // Запустить анализ
+      if (typeof ResearchAnalysis === 'undefined') {
+        console.error('[ResearchAgent] ResearchAnalysis не загружен');
+        _isAnalyzing = false;
+        return null;
+      }
+
+      const analysis = ResearchAnalysis.analyzeResults(allResults);
+
+      // Обновить время последнего анализа
+      _lastAnalysisTime = new Date().toISOString();
+      localStorage.setItem('_raLastAnalysisTime', _lastAnalysisTime);
+
+      _isAnalyzing = false;
+      console.log('[ResearchAgent] ✅ Анализ завершён:', analysis.summary);
+
+      return analysis;
+    } catch (e) {
+      console.error('[ResearchAgent] Ошибка анализа:', e);
+      _isAnalyzing = false;
+      return null;
+    }
+  }
+
   // ─── Public API ─────────────────────────────────────────────
 
   return {
@@ -207,7 +285,9 @@ const ResearchAgent = (() => {
     addResults,
     finishRun,
     loadHistory,
-    getAllResultsFromHistory
+    getAllResultsFromHistory,
+    getStatus,
+    runAnalysisManually
   };
 })();
 
