@@ -25,6 +25,7 @@ core     = open(os.path.join(base, 'core.js'),       encoding='utf-8').read()
 opt      = open(os.path.join(base, 'opt.js'),        encoding='utf-8').read()
 ui       = open(os.path.join(base, 'ui.js'),         encoding='utf-8').read()
 ui_hc    = open(os.path.join(base, 'ui_hc.js'),      encoding='utf-8').read()
+ui_ml    = open(os.path.join(base, 'ui_ml.js'),      encoding='utf-8').read()
 pine     = open(os.path.join(base, 'pine_export.js'), encoding='utf-8').read()
 
 # ── ML: model + inference + in-browser training ────────────────────────────
@@ -90,6 +91,7 @@ for ph, content in [
     ('/* ##OPT_C## */', opt_C),
     ('/* ##OPT_D## */', opt_D),
     ('/* ##HC## */',   ui_hc),
+    ('/* ##ML_UI## */', ui_ml),
 ]:
     assert ph in ui_built, f"Placeholder not found in ui.js: {ph!r}"
     ui_built = ui_built.replace(ph, content, 1)

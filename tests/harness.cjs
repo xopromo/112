@@ -217,6 +217,7 @@ function createUICtx(data) {
   uiCode = uiCode.replace('/* ##OPT_C## */', optC);
   uiCode = uiCode.replace('/* ##OPT_D## */', optD);
   uiCode = uiCode.replace('/* ##HC## */',   readSrc('ui_hc.js'));
+  uiCode = uiCode.replace('/* ##ML_UI## */', readSrc('ui_ml.js'));
 
   try {
     vm.runInContext(uiCode, ctx, { filename: 'ui.js' });
