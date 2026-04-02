@@ -95,8 +95,7 @@ if bearBreak
 // ── FlatScore нижняя панель ──────────────────────────────────────
 // Перетащи этот индикатор в отдельную панель чтобы видеть Score
 var flatScoreColor = color.new(color.blue, 0)
-plot(showScore ? flatScore : na, "FlatScore", color=flatScoreColor, display=display.pane)
-hline(flatThr, "Порог флэта", color.new(color.orange, 0),
-      hline.style_dashed, display=display.pane)
+plot(showScore ? flatScore : na, "FlatScore", color=flatScoreColor)
+hline(flatThr, "Порог флэта", color.new(color.orange, 0), hline.style_dashed)
 hline(0, "", color.new(color.gray, 80))
 hline(1, "", color.new(color.gray, 80))
