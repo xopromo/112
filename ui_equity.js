@@ -3,7 +3,11 @@ function showBestStats() { /* removed */ }
 // Параметры последнего нарисованного графика — для crosshair
 let _eqChartParams = null;
 
-function drawEquityData(eq, label, splitPct) {
+// Настройки отображения MA Equity Filter
+let _eqMAFilterShowBaseline = true;
+let _eqMAFilterBaselineColor = '#00b4d8'; // голубой по умолчанию (вместо красного)
+
+function drawEquityData(eq, label, splitPct, baselineEq=null) {
   if (!eq || !eq.length) return;
   const wrap = document.getElementById('eq-wrap');
   const canvas=$('eqc');
@@ -24,8 +28,12 @@ function drawEquityData(eq, label, splitPct) {
   const W=canvas.offsetWidth,H=150;
   ctx.fillStyle='#080b10'; ctx.fillRect(0,0,W,H);
 
+  // Рассчитываем min/max для обеих линий
   let mn=0,mx=0;
   for(let i=0;i<eq.length;i++) {if(eq[i]<mn)mn=eq[i];if(eq[i]>mx)mx=eq[i];}
+  if (_eqMAFilterShowBaseline && baselineEq && baselineEq.length) {
+    for(let i=0;i<baselineEq.length;i++) {if(baselineEq[i]<mn)mn=baselineEq[i];if(baselineEq[i]>mx)mx=baselineEq[i];}
+  }
   const range=mx-mn||1, pad=14;
 
   ctx.strokeStyle='rgba(30,42,56,0.8)'; ctx.lineWidth=0.5;
@@ -77,6 +85,24 @@ function drawEquityData(eq, label, splitPct) {
     if(px===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
   }
   ctx.stroke();
+
+  // Рисуем baseline (без фильтра) если доступен и включен
+  if (_eqMAFilterShowBaseline && baselineEq && baselineEq.length) {
+    const baselineNLast = Math.max(baselineEq.length - 1, 1);
+    ctx.strokeStyle = _eqMAFilterBaselineColor;
+    ctx.globalAlpha = 0.6;
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    for(let px=0;px<nPx;px++) {
+      const x=pad+px;
+      const i=Math.round(px*(baselineNLast)/(nPx-1));
+      const y=H-pad-((baselineEq[i]-mn)/range*(H-2*pad));
+      if(px===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
   ctx.fillStyle='rgba(180,200,220,0.6)'; ctx.font='8px JetBrains Mono,monospace';
   ctx.fillText(mx.toFixed(1)+'%',1,pad+7);
   ctx.fillText(mn.toFixed(1)+'%',1,H-pad-2);
@@ -128,17 +154,19 @@ function drawEquityForResult(r) {
   }
 
   const splitPct = r.cfg?._oos?.isPct ?? null;
+  const baselineEq = r.eqCalcMAArr || null; // Baseline для MA Equity Filter
+
   // Проверяем доступные источники equity
   if (r.eq && r.eq.length) {
-    drawEquityData(r.eq, r.name, splitPct);
+    drawEquityData(r.eq, r.name, splitPct, baselineEq);
   } else if (equities[r.name]) {
-    drawEquityData(equities[r.name], r.name, splitPct);
+    drawEquityData(equities[r.name], r.name, splitPct, baselineEq);
   } else if (r.cfg) {
     // Для fav и hc результатов без eq — запускаем лёгкий бэктест
     const raw = _hcRunBacktest(r.cfg);
     if (raw && raw.eq) {
       r.eq = raw.eq; // кэшируем
-      drawEquityData(raw.eq, r.name, splitPct);
+      drawEquityData(raw.eq, r.name, splitPct, baselineEq);
     }
   }
 }

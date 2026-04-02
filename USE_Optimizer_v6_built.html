@@ -1961,6 +1961,30 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
   </div>
   <div class="dp-stats" id="dp-stats"></div>
   <div class="dp-body" id="dp-body"></div>
+  <!-- MA Equity Filter baseline comparison controls -->
+  <div id="dp-baseline-controls" style="display:none;padding:10px;background:var(--bg2);border-top:1px solid var(--border);font-size:.8em;gap:8px;flex-direction:column;flex-shrink:0">
+    <div style="display:flex;align-items:center;gap:8px">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;flex:1">
+        <input type="checkbox" id="chk-show-baseline" checked style="accent-color:var(--accent)" onchange="toggleBaselineDisplay()">
+        <span>Показать baseline (без фильтра)</span>
+      </label>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <label style="display:flex;align-items:center;gap:6px;flex:1">
+        <span style="opacity:.8">Цвет:</span>
+        <input type="color" id="baseline-color-picker" value="#00b4d8" style="width:32px;height:24px;border:1px solid var(--border);border-radius:3px;cursor:pointer" onchange="updateBaselineColor()">
+      </label>
+      <select id="baseline-color-preset" style="flex:1;font-size:.8em;padding:4px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:3px;cursor:pointer" onchange="setBaselineColorPreset(this.value)">
+        <option value="#00b4d8">Голубой</option>
+        <option value="#fbbf24">Жёлтый</option>
+        <option value="#a78bfa">Фиолетовый</option>
+        <option value="#10b981">Зелёный</option>
+        <option value="#f97316">Оранжевый</option>
+        <option value="#06b6d4">Бирюзовый</option>
+        <option value="#ec4899">Розовый</option>
+      </select>
+    </div>
+  </div>
   <div class="dp-footer">
     <button class="dp-copy-btn" style="flex:1 1 calc(33% - 6px)" id="btn-copy-detail" onclick="copyDetail()">📋 Скопировать настройки</button>
     <button class="dp-copy-btn" style="flex:1 1 calc(33% - 6px);background:var(--bg4);border-color:var(--accent2);color:var(--accent2)" id="btn-open-robust-from-detail" onclick="openRobustModal()">🔬 Тест устойчивости</button>
@@ -22253,11 +22277,24 @@ function showDetail(r) {
 
   $('dp-body').innerHTML = html;
 
+  // Управление baseline (MA Equity Filter)
+  const baselineCtrl = $('dp-baseline-controls');
+  if (baselineCtrl) {
+    if (r.eqCalcMAArr && r.eqCalcMAArr.length) {
+      baselineCtrl.style.display = 'flex';
+    } else {
+      baselineCtrl.style.display = 'none';
+    }
+  }
+
   // Build copy text
   _detailText = buildCopyText(r, c, slName, tpName);
 
   $('detail-overlay').classList.add('open');
   $('detail-panel').classList.add('open');
+
+  // Перерисовываем график после открытия панели
+  setTimeout(() => drawEquityForResult(r), 100);
 }
 
 // Карта: поле cfg → {id: HTML-элемент, type: 'chk'|'val'|'sel'}
@@ -22550,6 +22587,28 @@ function copyDetail() {
     btn.textContent = '✅ Скопировано!';
     setTimeout(() => btn.textContent = orig, 2000);
   });
+}
+
+// ── Управление отображением baseline (MA Equity Filter) ────
+function toggleBaselineDisplay() {
+  const chk = $('chk-show-baseline');
+  if (!chk) return;
+  _eqMAFilterShowBaseline = chk.checked;
+  if (_robustResult) drawEquityForResult(_robustResult);
+}
+
+function updateBaselineColor() {
+  const picker = $('baseline-color-picker');
+  if (!picker) return;
+  _eqMAFilterBaselineColor = picker.value;
+  if (_robustResult) drawEquityForResult(_robustResult);
+}
+
+function setBaselineColorPreset(value) {
+  const picker = $('baseline-color-picker');
+  if (picker) picker.value = value;
+  _eqMAFilterBaselineColor = value;
+  if (_robustResult) drawEquityForResult(_robustResult);
 }
 
 
@@ -24072,7 +24131,11 @@ function showBestStats() { /* removed */ }
 // Параметры последнего нарисованного графика — для crosshair
 let _eqChartParams = null;
 
-function drawEquityData(eq, label, splitPct) {
+// Настройки отображения MA Equity Filter
+let _eqMAFilterShowBaseline = true;
+let _eqMAFilterBaselineColor = '#00b4d8'; // голубой по умолчанию (вместо красного)
+
+function drawEquityData(eq, label, splitPct, baselineEq=null) {
   if (!eq || !eq.length) return;
   const wrap = document.getElementById('eq-wrap');
   const canvas=$('eqc');
@@ -24093,8 +24156,12 @@ function drawEquityData(eq, label, splitPct) {
   const W=canvas.offsetWidth,H=150;
   ctx.fillStyle='#080b10'; ctx.fillRect(0,0,W,H);
 
+  // Рассчитываем min/max для обеих линий
   let mn=0,mx=0;
   for(let i=0;i<eq.length;i++) {if(eq[i]<mn)mn=eq[i];if(eq[i]>mx)mx=eq[i];}
+  if (_eqMAFilterShowBaseline && baselineEq && baselineEq.length) {
+    for(let i=0;i<baselineEq.length;i++) {if(baselineEq[i]<mn)mn=baselineEq[i];if(baselineEq[i]>mx)mx=baselineEq[i];}
+  }
   const range=mx-mn||1, pad=14;
 
   ctx.strokeStyle='rgba(30,42,56,0.8)'; ctx.lineWidth=0.5;
@@ -24146,6 +24213,24 @@ function drawEquityData(eq, label, splitPct) {
     if(px===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
   }
   ctx.stroke();
+
+  // Рисуем baseline (без фильтра) если доступен и включен
+  if (_eqMAFilterShowBaseline && baselineEq && baselineEq.length) {
+    const baselineNLast = Math.max(baselineEq.length - 1, 1);
+    ctx.strokeStyle = _eqMAFilterBaselineColor;
+    ctx.globalAlpha = 0.6;
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    for(let px=0;px<nPx;px++) {
+      const x=pad+px;
+      const i=Math.round(px*(baselineNLast)/(nPx-1));
+      const y=H-pad-((baselineEq[i]-mn)/range*(H-2*pad));
+      if(px===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
   ctx.fillStyle='rgba(180,200,220,0.6)'; ctx.font='8px JetBrains Mono,monospace';
   ctx.fillText(mx.toFixed(1)+'%',1,pad+7);
   ctx.fillText(mn.toFixed(1)+'%',1,H-pad-2);
@@ -24197,17 +24282,19 @@ function drawEquityForResult(r) {
   }
 
   const splitPct = r.cfg?._oos?.isPct ?? null;
+  const baselineEq = r.eqCalcMAArr || null; // Baseline для MA Equity Filter
+
   // Проверяем доступные источники equity
   if (r.eq && r.eq.length) {
-    drawEquityData(r.eq, r.name, splitPct);
+    drawEquityData(r.eq, r.name, splitPct, baselineEq);
   } else if (equities[r.name]) {
-    drawEquityData(equities[r.name], r.name, splitPct);
+    drawEquityData(equities[r.name], r.name, splitPct, baselineEq);
   } else if (r.cfg) {
     // Для fav и hc результатов без eq — запускаем лёгкий бэктест
     const raw = _hcRunBacktest(r.cfg);
     if (raw && raw.eq) {
       r.eq = raw.eq; // кэшируем
-      drawEquityData(raw.eq, r.name, splitPct);
+      drawEquityData(raw.eq, r.name, splitPct, baselineEq);
     }
   }
 }
@@ -32697,7 +32784,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1775139123930;
+window._BUILD_TS = 1775139692267;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
