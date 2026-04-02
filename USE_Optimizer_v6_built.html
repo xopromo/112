@@ -15680,7 +15680,7 @@ const FILTER_REGISTRY = [
       if (ma <= 0) return true;  // warmup
       if (i < 2) return true;    // need at least 2 bars for comparison
       const prevMa = cfg.eqCalcMAArr[i-2];
-      return prevMa <= 0 || ma <= prevMa;  // block if falling or flat
+      return prevMa <= 0 || ma < prevMa;  // block only if FALLING (ma < prevMa), not flat
     },
     blocksS:  (cfg, i) => {
       if (!cfg.eqCalcMAArr) return false;
@@ -15688,7 +15688,7 @@ const FILTER_REGISTRY = [
       if (ma <= 0) return true;  // warmup
       if (i < 2) return true;    // need at least 2 bars for comparison
       const prevMa = cfg.eqCalcMAArr[i-2];
-      return prevMa <= 0 || ma <= prevMa;  // block if falling or flat
+      return prevMa <= 0 || ma < prevMa;  // block only if FALLING (ma < prevMa), not flat
     },
     nameLabel: (cfg) => `EqMA(${cfg.eqMALen||20})`,
   },
@@ -32844,7 +32844,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1775142266034;
+window._BUILD_TS = 1775142897155;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
