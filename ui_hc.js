@@ -309,7 +309,30 @@ function _hcRunBacktest(cfg) {
   try {
     const ind    = _calcIndicators(cfg);
     const btCfg  = buildBtCfg(cfg, ind);
+
+    // ##EQ_MA_FILTER## Двупроходный цикл для базовой линии, если фильтр включен
+    if (cfg.useEqMA) {
+      const _shadowCfg = JSON.parse(JSON.stringify(btCfg));
+      _shadowCfg.useEqMA = false;
+      const _shadowRes = backtest(ind.pvLo, ind.pvHi, ind.atrArr, _shadowCfg);
+      if (_shadowRes && _shadowRes.eq && _shadowRes.eq.length > 0) {
+        const maLen = cfg.eqMALen || 20;
+        const maType = cfg.eqMAType || 'SMA';
+        btCfg.eqCalcMAArr = calcMA(Array.from(_shadowRes.eq), maLen, maType);
+        btCfg.eqCalcBaselineArr = Array.from(_shadowRes.eq);
+      }
+    }
+
     const _hcRes = backtest(ind.pvLo, ind.pvHi, ind.atrArr, btCfg);
+
+    // ##EQ_MA_FILTER## Fallback: если baseline не был установлен, используем filtered equity
+    if (cfg.useEqMA && _hcRes && (!btCfg.eqCalcBaselineArr || !btCfg.eqCalcMAArr)) {
+      if (!btCfg.eqCalcBaselineArr) btCfg.eqCalcBaselineArr = _hcRes.eq || [];
+      if (!btCfg.eqCalcMAArr) btCfg.eqCalcMAArr = _hcRes.eq ? calcMA(Array.from(_hcRes.eq), cfg.eqMALen || 20, cfg.eqMAType || 'SMA') : [];
+      _hcRes.eqCalcBaselineArr = btCfg.eqCalcBaselineArr;
+      _hcRes.eqCalcMAArr = btCfg.eqCalcMAArr;
+    }
+
     _robSliceCacheSet(_hcsk, _hcRes);
     return _hcRes;
   } catch(e) { return null; }
@@ -333,7 +356,31 @@ function _hcBuildOOS(cfg) {
     try {
       const ind = _calcIndicators(cfg);
       const btCfg = buildBtCfg(cfg, ind);
-      return backtest(ind.pvLo, ind.pvHi, ind.atrArr, btCfg);
+
+      // ##EQ_MA_FILTER## Двупроходный цикл для базовой линии, если фильтр включен
+      if (cfg.useEqMA) {
+        const _shadowCfg = JSON.parse(JSON.stringify(btCfg));
+        _shadowCfg.useEqMA = false;
+        const _shadowRes = backtest(ind.pvLo, ind.pvHi, ind.atrArr, _shadowCfg);
+        if (_shadowRes && _shadowRes.eq && _shadowRes.eq.length > 0) {
+          const maLen = cfg.eqMALen || 20;
+          const maType = cfg.eqMAType || 'SMA';
+          btCfg.eqCalcMAArr = calcMA(Array.from(_shadowRes.eq), maLen, maType);
+          btCfg.eqCalcBaselineArr = Array.from(_shadowRes.eq);
+        }
+      }
+
+      const r = backtest(ind.pvLo, ind.pvHi, ind.atrArr, btCfg);
+
+      // ##EQ_MA_FILTER## Fallback: если baseline не был установлен, используем filtered equity
+      if (cfg.useEqMA && r && (!btCfg.eqCalcBaselineArr || !btCfg.eqCalcMAArr)) {
+        if (!btCfg.eqCalcBaselineArr) btCfg.eqCalcBaselineArr = r.eq || [];
+        if (!btCfg.eqCalcMAArr) btCfg.eqCalcMAArr = r.eq ? calcMA(Array.from(r.eq), cfg.eqMALen || 20, cfg.eqMAType || 'SMA') : [];
+        r.eqCalcBaselineArr = btCfg.eqCalcBaselineArr;
+        r.eqCalcMAArr = btCfg.eqCalcMAArr;
+      }
+
+      return r;
     } catch(e) { return null; }
     finally { DATA = origData; }
   }
