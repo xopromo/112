@@ -1012,6 +1012,16 @@ function drawOOSChart(idx, rowEl) {
     oosCharts.addEventListener('mousemove', _drawOOSCrosshair, { once: false });
     oosCharts.addEventListener('mouseleave', _clearOOSCrosshair, { once: false });
   }
+
+  // Показываем контролы baseline для OOS графика ##EQ_MA_FILTER##
+  const baselineCtrl = document.getElementById('eq-baseline-controls');
+  if (baselineCtrl) {
+    if ((r.old_eqCalcMAArr && r.old_eqCalcMAArr.length) || (r.new_eqCalcMAArr && r.new_eqCalcMAArr.length)) {
+      baselineCtrl.style.display = 'flex';
+    } else {
+      baselineCtrl.style.display = 'none';
+    }
+  }
 }
 
 // Функции mouse tracking для OOS графика

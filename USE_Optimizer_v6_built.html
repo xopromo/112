@@ -27870,6 +27870,17 @@ function _hcOpenDetail(idx) {
   });
   _robustResult = r;
   showDetail(r);
+  // Рисуем график с baseline (если доступен) ##EQ_MA_FILTER##
+  drawEquityForResult(r);
+  // Показываем контролы baseline если есть данные
+  const baselineCtrl = document.getElementById('eq-baseline-controls');
+  if (baselineCtrl) {
+    if (r.eqCalcMAArr && r.eqCalcMAArr.length) {
+      baselineCtrl.style.display = 'flex';
+    } else {
+      baselineCtrl.style.display = 'none';
+    }
+  }
 }
 
 // Добавляем HC результат в избранное
@@ -29030,6 +29041,16 @@ function drawOOSChart(idx, rowEl) {
     // Добавляем обработчики mouse (они будут работать на oosCharts overlay)
     oosCharts.addEventListener('mousemove', _drawOOSCrosshair, { once: false });
     oosCharts.addEventListener('mouseleave', _clearOOSCrosshair, { once: false });
+  }
+
+  // Показываем контролы baseline для OOS графика ##EQ_MA_FILTER##
+  const baselineCtrl = document.getElementById('eq-baseline-controls');
+  if (baselineCtrl) {
+    if ((r.old_eqCalcMAArr && r.old_eqCalcMAArr.length) || (r.new_eqCalcMAArr && r.new_eqCalcMAArr.length)) {
+      baselineCtrl.style.display = 'flex';
+    } else {
+      baselineCtrl.style.display = 'none';
+    }
   }
 }
 
@@ -32823,7 +32844,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1775142151817;
+window._BUILD_TS = 1775142255124;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
