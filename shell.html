@@ -1961,6 +1961,30 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
   </div>
   <div class="dp-stats" id="dp-stats"></div>
   <div class="dp-body" id="dp-body"></div>
+  <!-- MA Equity Filter baseline comparison controls -->
+  <div id="dp-baseline-controls" style="display:none;padding:10px;background:var(--bg2);border-top:1px solid var(--border);font-size:.8em;gap:8px;flex-direction:column;flex-shrink:0">
+    <div style="display:flex;align-items:center;gap:8px">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;flex:1">
+        <input type="checkbox" id="chk-show-baseline" checked style="accent-color:var(--accent)" onchange="toggleBaselineDisplay()">
+        <span>Показать baseline (без фильтра)</span>
+      </label>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <label style="display:flex;align-items:center;gap:6px;flex:1">
+        <span style="opacity:.8">Цвет:</span>
+        <input type="color" id="baseline-color-picker" value="#00b4d8" style="width:32px;height:24px;border:1px solid var(--border);border-radius:3px;cursor:pointer" onchange="updateBaselineColor()">
+      </label>
+      <select id="baseline-color-preset" style="flex:1;font-size:.8em;padding:4px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:3px;cursor:pointer" onchange="setBaselineColorPreset(this.value)">
+        <option value="#00b4d8">Голубой</option>
+        <option value="#fbbf24">Жёлтый</option>
+        <option value="#a78bfa">Фиолетовый</option>
+        <option value="#10b981">Зелёный</option>
+        <option value="#f97316">Оранжевый</option>
+        <option value="#06b6d4">Бирюзовый</option>
+        <option value="#ec4899">Розовый</option>
+      </select>
+    </div>
+  </div>
   <div class="dp-footer">
     <button class="dp-copy-btn" style="flex:1 1 calc(33% - 6px)" id="btn-copy-detail" onclick="copyDetail()">📋 Скопировать настройки</button>
     <button class="dp-copy-btn" style="flex:1 1 calc(33% - 6px);background:var(--bg4);border-color:var(--accent2);color:var(--accent2)" id="btn-open-robust-from-detail" onclick="openRobustModal()">🔬 Тест устойчивости</button>
