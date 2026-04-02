@@ -18995,6 +18995,7 @@ async function runOpt() {
       };
 
       // ##EQ_MA_FILTER## Двупроходный цикл: сначала расчётная equity, потом с фильтром
+      let _eqCalc = null;
       if (_effUseEqMA) {
         const _shadowCfg = JSON.parse(JSON.stringify(btCfg));
         _shadowCfg.useEqMA = false;  // отключаем фильтр для расчётной equity
@@ -19010,6 +19011,7 @@ async function runOpt() {
         if (_shadowEq && _shadowEq.length > 0) {
           const maLen = eqMALen || 20;
           btCfg.eqCalcMAArr = calcSMA(Array.from(_shadowEq), maLen);
+          _eqCalc = _shadowEq;  // сохраняем для последующего использования
         }
       }
 
@@ -19086,8 +19088,9 @@ async function runOpt() {
             p1:r.p1,p2:r.p2,dwr:r.dwr,c1:r.c1,c2:r.c2,nL:r.nL||0,pL:r.pL||0,wrL:r.wrL,nS:r.nS||0,pS:r.pS||0,wrS:r.wrS,dwrLS:r.dwrLS,
             cvr:_calcCVR(r.eq),upi:_calcUlcerIdx(r.eq),sortino:_calcSortino(r.eq),kRatio:_calcKRatio(r.eq),sqn:r.sqn??null,mlAvg:r.mlAvg??null, // ##ML_FILTER
             omega:_calcOmega(r.eq),pain:_calcPainRatio(r.eq),
-            burke:_calcBurke(r.eq),serenity:_calcSerenity(r.eq),ir:_calcInfoRatio(r.eq),eq:r.eq,cfg:_cfg}); // ##OMG ##PAIN ##BURKE ##SRNTY ##IR
+            burke:_calcBurke(r.eq),serenity:_calcSerenity(r.eq),ir:_calcInfoRatio(r.eq),eq:r.eq,eqCalc:_eqCalc,cfg:_cfg}); // ##OMG ##PAIN ##BURKE ##SRNTY ##IR ##EQ_MA_FILTER##
           equities[name] = r.eq;
+          if (_eqCalc) equities[name+'_calc'] = _eqCalc;  // ##EQ_MA_FILTER##
         }
       }
       if (done % 300 === 0 || done === mcTotal) {
@@ -19393,6 +19396,7 @@ async function runOpt() {
       };
 
       // ##EQ_MA_FILTER## Двупроходный цикл: сначала расчётная equity, потом с фильтром
+      let _eqCalc = null;
       if (_effUseEqMA) {
         const _shadowCfg = JSON.parse(JSON.stringify(btCfg));
         _shadowCfg.useEqMA = false;  // отключаем фильтр для расчётной equity
@@ -19407,6 +19411,7 @@ async function runOpt() {
         if (_shadowEq && _shadowEq.length > 0) {
           const maLen = eqMALen || 20;
           btCfg.eqCalcMAArr = calcSMA(Array.from(_shadowEq), maLen);
+          _eqCalc = _shadowEq;  // сохраняем для последующего использования
         }
       }
 
@@ -19519,8 +19524,9 @@ async function runOpt() {
           results.push({name,pnl:r.pnl,wr:r.wr,n:r.n,dd:r.dd,pdd,avg:r.avg,sig,gt,
             p1:r.p1,p2:r.p2,dwr:r.dwr,c1:r.c1,c2:r.c2,nL:r.nL||0,pL:r.pL||0,wrL:r.wrL,nS:r.nS||0,pS:r.pS||0,wrS:r.wrS,dwrLS:r.dwrLS,
             cvr:null,upi:null,sortino:null,kRatio:null,sqn:r.sqn??null,mlAvg:r.mlAvg??null, // ##ML_FILTER
-            omega:null,pain:null,burke:null,serenity:null,ir:null,eq:r.eq,cfg:_cfg_tpe}); // ##OMG ##PAIN ##BURKE ##SRNTY ##IR (null — батч)
+            omega:null,pain:null,burke:null,serenity:null,ir:null,eq:r.eq,eqCalc:_eqCalc,cfg:_cfg_tpe}); // ##OMG ##PAIN ##BURKE ##SRNTY ##IR ##EQ_MA_FILTER## (null — батч)
           equities[name] = r.eq;
+          if (_eqCalc) equities[name+'_calc'] = _eqCalc;  // ##EQ_MA_FILTER##
         }
       }
       return score;
@@ -20099,6 +20105,7 @@ async function runOpt() {
                                     };
 
                                     // ##EQ_MA_FILTER## Двупроходный цикл: сначала расчётная equity, потом с фильтром
+                                    let _eqCalc = null;
                                     if (_effUseEqMA) {
                                       const _shadowCfg = JSON.parse(JSON.stringify(btCfg));
                                       _shadowCfg.useEqMA = false;  // отключаем фильтр для расчётной equity
@@ -20112,6 +20119,7 @@ async function runOpt() {
                                       if (_shadowEq && _shadowEq.length > 0) {
                                         const maLen = eqMALen || 20;
                                         btCfg.eqCalcMAArr = calcSMA(Array.from(_shadowEq), maLen);
+                                        _eqCalc = _shadowEq;  // сохраняем для последующего использования
                                       }
                                     }
 
@@ -20214,8 +20222,9 @@ async function runOpt() {
                                         p1:r.p1,p2:r.p2,dwr:r.dwr,c1:r.c1,c2:r.c2,nL:r.nL||0,pL:r.pL||0,wrL:r.wrL,nS:r.nS||0,pS:r.pS||0,wrS:r.wrS,dwrLS:r.dwrLS,
                                         cvr:_calcCVR(r.eq),upi:_calcUlcerIdx(r.eq),sortino:_calcSortino(r.eq),kRatio:_calcKRatio(r.eq),sqn:r.sqn??null,mlAvg:r.mlAvg??null, // ##ML_FILTER
                                         omega:_calcOmega(r.eq),pain:_calcPainRatio(r.eq),
-                                        burke:_calcBurke(r.eq),serenity:_calcSerenity(r.eq),ir:_calcInfoRatio(r.eq),eq:r.eq,cfg:_cfg_ex}); // ##OMG ##PAIN ##BURKE ##SRNTY ##IR
+                                        burke:_calcBurke(r.eq),serenity:_calcSerenity(r.eq),ir:_calcInfoRatio(r.eq),eq:r.eq,eqCalc:_eqCalc,cfg:_cfg_ex}); // ##OMG ##PAIN ##BURKE ##SRNTY ##IR ##EQ_MA_FILTER##
                                       equities[name]=r.eq;
+                                      if (_eqCalc) equities[name+'_calc']=_eqCalc;  // ##EQ_MA_FILTER##
                                       } // end else (не дубль)
                                     } // end if(r passed filter)
                                     // Yield каждые 300 итераций для отзывчивости UI (кнопка Стоп)
@@ -32666,7 +32675,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1775136805328;
+window._BUILD_TS = 1775136887509;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
