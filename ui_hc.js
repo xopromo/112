@@ -399,7 +399,7 @@ function _hcBuildOOS(cfg) {
     pain:    _calcPainRatio(rIS.eq) // ##PAIN
   } : null;
 
-  return { _oos, isStats, eq: rFull.eq };
+  return { _oos, isStats, eq: rFull.eq, eqCalcMAArr: rFull.eqCalcMAArr }; // ##EQ_MA_FILTER##
 }
 
 // ── MULTI-START: генерирует N случайных стартовых точек ──────────────────────
