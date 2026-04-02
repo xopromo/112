@@ -19037,6 +19037,7 @@ async function runOpt() {
         if (_shadowEq && _shadowEq.length > 0) {
           const maLen = eqMALen || 20;
           btCfg.eqCalcMAArr = calcSMA(Array.from(_shadowEq), maLen);
+          btCfg.eqCalcBaselineArr = Array.from(_shadowEq); // ##EQ_MA_FILTER## сохраняем саму baseline (не MA)
           _eqCalc = _shadowEq;  // сохраняем для последующего использования
         }
       }
@@ -19114,7 +19115,7 @@ async function runOpt() {
             p1:r.p1,p2:r.p2,dwr:r.dwr,c1:r.c1,c2:r.c2,nL:r.nL||0,pL:r.pL||0,wrL:r.wrL,nS:r.nS||0,pS:r.pS||0,wrS:r.wrS,dwrLS:r.dwrLS,
             cvr:_calcCVR(r.eq),upi:_calcUlcerIdx(r.eq),sortino:_calcSortino(r.eq),kRatio:_calcKRatio(r.eq),sqn:r.sqn??null,mlAvg:r.mlAvg??null, // ##ML_FILTER
             omega:_calcOmega(r.eq),pain:_calcPainRatio(r.eq),
-            burke:_calcBurke(r.eq),serenity:_calcSerenity(r.eq),ir:_calcInfoRatio(r.eq),eq:r.eq,eqCalc:_eqCalc,eqCalcMAArr:btCfg.eqCalcMAArr||null,cfg:_cfg}); // ##OMG ##PAIN ##BURKE ##SRNTY ##IR ##EQ_MA_FILTER##
+            burke:_calcBurke(r.eq),serenity:_calcSerenity(r.eq),ir:_calcInfoRatio(r.eq),eq:r.eq,eqCalc:_eqCalc,eqCalcMAArr:btCfg.eqCalcMAArr||null,eqCalcBaselineArr:btCfg.eqCalcBaselineArr||null,cfg:_cfg}); // ##OMG ##PAIN ##BURKE ##SRNTY ##IR ##EQ_MA_FILTER##
           equities[name] = r.eq;
           if (_eqCalc) equities[name+'_calc'] = _eqCalc;  // ##EQ_MA_FILTER##
         }
@@ -19439,6 +19440,7 @@ async function runOpt() {
         if (_shadowEq && _shadowEq.length > 0) {
           const maLen = eqMALen || 20;
           btCfg.eqCalcMAArr = calcSMA(Array.from(_shadowEq), maLen);
+          btCfg.eqCalcBaselineArr = Array.from(_shadowEq); // ##EQ_MA_FILTER## сохраняем саму baseline (не MA)
           _eqCalc = _shadowEq;  // сохраняем для последующего использования
         }
       }
@@ -19552,7 +19554,7 @@ async function runOpt() {
           results.push({name,pnl:r.pnl,wr:r.wr,n:r.n,dd:r.dd,pdd,avg:r.avg,sig,gt,
             p1:r.p1,p2:r.p2,dwr:r.dwr,c1:r.c1,c2:r.c2,nL:r.nL||0,pL:r.pL||0,wrL:r.wrL,nS:r.nS||0,pS:r.pS||0,wrS:r.wrS,dwrLS:r.dwrLS,
             cvr:null,upi:null,sortino:null,kRatio:null,sqn:r.sqn??null,mlAvg:r.mlAvg??null, // ##ML_FILTER
-            omega:null,pain:null,burke:null,serenity:null,ir:null,eq:r.eq,eqCalc:_eqCalc,eqCalcMAArr:btCfg.eqCalcMAArr||null,cfg:_cfg_tpe}); // ##OMG ##PAIN ##BURKE ##SRNTY ##IR ##EQ_MA_FILTER## (null — батч)
+            omega:null,pain:null,burke:null,serenity:null,ir:null,eq:r.eq,eqCalc:_eqCalc,eqCalcMAArr:btCfg.eqCalcMAArr||null,eqCalcBaselineArr:btCfg.eqCalcBaselineArr||null,cfg:_cfg_tpe}); // ##OMG ##PAIN ##BURKE ##SRNTY ##IR ##EQ_MA_FILTER## (null — батч)
           equities[name] = r.eq;
           if (_eqCalc) equities[name+'_calc'] = _eqCalc;  // ##EQ_MA_FILTER##
         }
@@ -20148,6 +20150,7 @@ async function runOpt() {
                                       if (_shadowEq && _shadowEq.length > 0) {
                                         const maLen = eqMALen || 20;
                                         btCfg.eqCalcMAArr = calcSMA(Array.from(_shadowEq), maLen);
+                                        btCfg.eqCalcBaselineArr = Array.from(_shadowEq); // ##EQ_MA_FILTER## сохраняем саму baseline (не MA)
                                         _eqCalc = _shadowEq;  // сохраняем для последующего использования
                                       }
                                     }
@@ -20251,7 +20254,7 @@ async function runOpt() {
                                         p1:r.p1,p2:r.p2,dwr:r.dwr,c1:r.c1,c2:r.c2,nL:r.nL||0,pL:r.pL||0,wrL:r.wrL,nS:r.nS||0,pS:r.pS||0,wrS:r.wrS,dwrLS:r.dwrLS,
                                         cvr:_calcCVR(r.eq),upi:_calcUlcerIdx(r.eq),sortino:_calcSortino(r.eq),kRatio:_calcKRatio(r.eq),sqn:r.sqn??null,mlAvg:r.mlAvg??null, // ##ML_FILTER
                                         omega:_calcOmega(r.eq),pain:_calcPainRatio(r.eq),
-                                        burke:_calcBurke(r.eq),serenity:_calcSerenity(r.eq),ir:_calcInfoRatio(r.eq),eq:r.eq,eqCalc:_eqCalc,eqCalcMAArr:btCfg.eqCalcMAArr||null,cfg:_cfg_ex}); // ##OMG ##PAIN ##BURKE ##SRNTY ##IR ##EQ_MA_FILTER##
+                                        burke:_calcBurke(r.eq),serenity:_calcSerenity(r.eq),ir:_calcInfoRatio(r.eq),eq:r.eq,eqCalc:_eqCalc,eqCalcMAArr:btCfg.eqCalcMAArr||null,eqCalcBaselineArr:btCfg.eqCalcBaselineArr||null,cfg:_cfg_ex}); // ##OMG ##PAIN ##BURKE ##SRNTY ##IR ##EQ_MA_FILTER##
                                       equities[name]=r.eq;
                                       if (_eqCalc) equities[name+'_calc']=_eqCalc;  // ##EQ_MA_FILTER##
                                       } // end else (не дубль)
@@ -24272,7 +24275,7 @@ function drawEquityForResult(r) {
   }
 
   const splitPct = r.cfg?._oos?.isPct ?? null;
-  const baselineEq = r.eqCalcMAArr || null; // Baseline для MA Equity Filter
+  const baselineEq = r.eqCalcBaselineArr || null; // Baseline для MA Equity Filter (саму эквити, не MA) ##EQ_MA_FILTER##
 
   // Проверяем доступные источники equity
   if (r.eq && r.eq.length) {
@@ -24296,8 +24299,8 @@ function _drawOOSGraphicForResult(r) {
 
   const eq_old = r.old_eq;
   const eq_new = r.new_eq;
-  const baseline_old = r.old_eqCalcMAArr; // baseline на истории ##EQ_MA_FILTER##
-  const baseline_new = r.new_eqCalcMAArr; // baseline на новых данных ##EQ_MA_FILTER##
+  const baseline_old = r.old_eqCalcBaselineArr; // baseline на истории ##EQ_MA_FILTER##
+  const baseline_new = r.new_eqCalcBaselineArr; // baseline на новых данных ##EQ_MA_FILTER##
 
   // Определяем пересечение данных по timestamps
   let overlapIdx = 0; // индекс в NEW_DATA где начинаются новые бары без пересечения
@@ -29046,7 +29049,7 @@ function drawOOSChart(idx, rowEl) {
   // Показываем контролы baseline для OOS графика ##EQ_MA_FILTER##
   const baselineCtrl = document.getElementById('eq-baseline-controls');
   if (baselineCtrl) {
-    if ((r.old_eqCalcMAArr && r.old_eqCalcMAArr.length) || (r.new_eqCalcMAArr && r.new_eqCalcMAArr.length)) {
+    if ((r.old_eqCalcBaselineArr && r.old_eqCalcBaselineArr.length) || (r.new_eqCalcBaselineArr && r.new_eqCalcBaselineArr.length)) {
       baselineCtrl.style.display = 'flex';
     } else {
       baselineCtrl.style.display = 'none';
@@ -29341,8 +29344,8 @@ async function runOOSOnNewData() {
       })(),
       old_eq:    rOld ? rOld.eq  : null,       // equity curve на истории
       new_eq:    rNew ? rNew.eq  : null,       // equity curve на новых данных (полная, график обрезает сам)
-      old_eqCalcMAArr: rOld ? rOld.eqCalcMAArr : null, // baseline (без MA фильтра) на истории ##EQ_MA_FILTER##
-      new_eqCalcMAArr: rNew ? rNew.eqCalcMAArr : null, // baseline (без MA фильтра) на новых данных ##EQ_MA_FILTER##
+      old_eqCalcBaselineArr: rOld ? rOld.eqCalcBaselineArr : null, // baseline (без MA фильтра) на истории ##EQ_MA_FILTER##
+      new_eqCalcBaselineArr: rNew ? rNew.eqCalcBaselineArr : null, // baseline (без MA фильтра) на новых данных ##EQ_MA_FILTER##
     });
   }
 
@@ -32844,7 +32847,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1775147141306;
+window._BUILD_TS = 1775147399221;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
