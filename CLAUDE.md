@@ -96,7 +96,7 @@ git push -u origin claude/ваша-ветка
 - `switchTableMode` (15) — HC/Fav/Results
 - `applyFilters` (412) — применение фильтров таблицы
 - `resetAllFilters` (396) — сброс фильтров
-- `runOOSScan` (3) — OOS сканирование (→ ui_oos.js:3)
+- `runOOSScan` (39) — OOS сканирование (→ ui_oos.js:3)
 
 **ui_hc.js**:
 - `openHCModal` (1) — открыть HC окно
@@ -113,7 +113,7 @@ git push -u origin claude/ваша-ветка
 **ui_oos.js**:
 - `runOOSScan` (3) — массовый OOS-скан видимых результатов
 - `openOOSCompareModal` (379) — открыть OOS-сравнение
-- `openOOSDiagnostic` (716) — запуск OOS диагностики
+- `openOOSDiagnostic` (752) — запуск OOS диагностики
 - `runOOSOnNewData` (1169) — OOS-прогон на новых данных
 
 **ui_comparator.js**:
