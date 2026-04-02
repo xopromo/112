@@ -2187,6 +2187,7 @@ async function runOpt() {
         if (_shadowEq && _shadowEq.length > 0) {
           const maLen = eqMALen || 20;
           btCfg.eqCalcMAArr = calcSMA(Array.from(_shadowEq), maLen);
+          btCfg.eqCalcBaselineArr = Array.from(_shadowEq); // ##EQ_MA_FILTER## сохраняем саму baseline (не MA)
           _eqCalc = _shadowEq;  // сохраняем для последующего использования
         }
       }
@@ -2264,7 +2265,7 @@ async function runOpt() {
             p1:r.p1,p2:r.p2,dwr:r.dwr,c1:r.c1,c2:r.c2,nL:r.nL||0,pL:r.pL||0,wrL:r.wrL,nS:r.nS||0,pS:r.pS||0,wrS:r.wrS,dwrLS:r.dwrLS,
             cvr:_calcCVR(r.eq),upi:_calcUlcerIdx(r.eq),sortino:_calcSortino(r.eq),kRatio:_calcKRatio(r.eq),sqn:r.sqn??null,mlAvg:r.mlAvg??null, // ##ML_FILTER
             omega:_calcOmega(r.eq),pain:_calcPainRatio(r.eq),
-            burke:_calcBurke(r.eq),serenity:_calcSerenity(r.eq),ir:_calcInfoRatio(r.eq),eq:r.eq,eqCalc:_eqCalc,eqCalcMAArr:btCfg.eqCalcMAArr||null,cfg:_cfg}); // ##OMG ##PAIN ##BURKE ##SRNTY ##IR ##EQ_MA_FILTER##
+            burke:_calcBurke(r.eq),serenity:_calcSerenity(r.eq),ir:_calcInfoRatio(r.eq),eq:r.eq,eqCalc:_eqCalc,eqCalcMAArr:btCfg.eqCalcMAArr||null,eqCalcBaselineArr:btCfg.eqCalcBaselineArr||null,cfg:_cfg}); // ##OMG ##PAIN ##BURKE ##SRNTY ##IR ##EQ_MA_FILTER##
           equities[name] = r.eq;
           if (_eqCalc) equities[name+'_calc'] = _eqCalc;  // ##EQ_MA_FILTER##
         }
@@ -2589,6 +2590,7 @@ async function runOpt() {
         if (_shadowEq && _shadowEq.length > 0) {
           const maLen = eqMALen || 20;
           btCfg.eqCalcMAArr = calcSMA(Array.from(_shadowEq), maLen);
+          btCfg.eqCalcBaselineArr = Array.from(_shadowEq); // ##EQ_MA_FILTER## сохраняем саму baseline (не MA)
           _eqCalc = _shadowEq;  // сохраняем для последующего использования
         }
       }
@@ -2702,7 +2704,7 @@ async function runOpt() {
           results.push({name,pnl:r.pnl,wr:r.wr,n:r.n,dd:r.dd,pdd,avg:r.avg,sig,gt,
             p1:r.p1,p2:r.p2,dwr:r.dwr,c1:r.c1,c2:r.c2,nL:r.nL||0,pL:r.pL||0,wrL:r.wrL,nS:r.nS||0,pS:r.pS||0,wrS:r.wrS,dwrLS:r.dwrLS,
             cvr:null,upi:null,sortino:null,kRatio:null,sqn:r.sqn??null,mlAvg:r.mlAvg??null, // ##ML_FILTER
-            omega:null,pain:null,burke:null,serenity:null,ir:null,eq:r.eq,eqCalc:_eqCalc,eqCalcMAArr:btCfg.eqCalcMAArr||null,cfg:_cfg_tpe}); // ##OMG ##PAIN ##BURKE ##SRNTY ##IR ##EQ_MA_FILTER## (null — батч)
+            omega:null,pain:null,burke:null,serenity:null,ir:null,eq:r.eq,eqCalc:_eqCalc,eqCalcMAArr:btCfg.eqCalcMAArr||null,eqCalcBaselineArr:btCfg.eqCalcBaselineArr||null,cfg:_cfg_tpe}); // ##OMG ##PAIN ##BURKE ##SRNTY ##IR ##EQ_MA_FILTER## (null — батч)
           equities[name] = r.eq;
           if (_eqCalc) equities[name+'_calc'] = _eqCalc;  // ##EQ_MA_FILTER##
         }
@@ -3298,6 +3300,7 @@ async function runOpt() {
                                       if (_shadowEq && _shadowEq.length > 0) {
                                         const maLen = eqMALen || 20;
                                         btCfg.eqCalcMAArr = calcSMA(Array.from(_shadowEq), maLen);
+                                        btCfg.eqCalcBaselineArr = Array.from(_shadowEq); // ##EQ_MA_FILTER## сохраняем саму baseline (не MA)
                                         _eqCalc = _shadowEq;  // сохраняем для последующего использования
                                       }
                                     }
@@ -3401,7 +3404,7 @@ async function runOpt() {
                                         p1:r.p1,p2:r.p2,dwr:r.dwr,c1:r.c1,c2:r.c2,nL:r.nL||0,pL:r.pL||0,wrL:r.wrL,nS:r.nS||0,pS:r.pS||0,wrS:r.wrS,dwrLS:r.dwrLS,
                                         cvr:_calcCVR(r.eq),upi:_calcUlcerIdx(r.eq),sortino:_calcSortino(r.eq),kRatio:_calcKRatio(r.eq),sqn:r.sqn??null,mlAvg:r.mlAvg??null, // ##ML_FILTER
                                         omega:_calcOmega(r.eq),pain:_calcPainRatio(r.eq),
-                                        burke:_calcBurke(r.eq),serenity:_calcSerenity(r.eq),ir:_calcInfoRatio(r.eq),eq:r.eq,eqCalc:_eqCalc,eqCalcMAArr:btCfg.eqCalcMAArr||null,cfg:_cfg_ex}); // ##OMG ##PAIN ##BURKE ##SRNTY ##IR ##EQ_MA_FILTER##
+                                        burke:_calcBurke(r.eq),serenity:_calcSerenity(r.eq),ir:_calcInfoRatio(r.eq),eq:r.eq,eqCalc:_eqCalc,eqCalcMAArr:btCfg.eqCalcMAArr||null,eqCalcBaselineArr:btCfg.eqCalcBaselineArr||null,cfg:_cfg_ex}); // ##OMG ##PAIN ##BURKE ##SRNTY ##IR ##EQ_MA_FILTER##
                                       equities[name]=r.eq;
                                       if (_eqCalc) equities[name+'_calc']=_eqCalc;  // ##EQ_MA_FILTER##
                                       } // end else (не дубль)

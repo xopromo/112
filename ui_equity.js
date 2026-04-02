@@ -154,7 +154,7 @@ function drawEquityForResult(r) {
   }
 
   const splitPct = r.cfg?._oos?.isPct ?? null;
-  const baselineEq = r.eqCalcMAArr || null; // Baseline для MA Equity Filter
+  const baselineEq = r.eqCalcBaselineArr || null; // Baseline для MA Equity Filter (саму эквити, не MA) ##EQ_MA_FILTER##
 
   // Проверяем доступные источники equity
   if (r.eq && r.eq.length) {
@@ -178,8 +178,8 @@ function _drawOOSGraphicForResult(r) {
 
   const eq_old = r.old_eq;
   const eq_new = r.new_eq;
-  const baseline_old = r.old_eqCalcMAArr; // baseline на истории ##EQ_MA_FILTER##
-  const baseline_new = r.new_eqCalcMAArr; // baseline на новых данных ##EQ_MA_FILTER##
+  const baseline_old = r.old_eqCalcBaselineArr; // baseline на истории ##EQ_MA_FILTER##
+  const baseline_new = r.new_eqCalcBaselineArr; // baseline на новых данных ##EQ_MA_FILTER##
 
   // Определяем пересечение данных по timestamps
   let overlapIdx = 0; // индекс в NEW_DATA где начинаются новые бары без пересечения
