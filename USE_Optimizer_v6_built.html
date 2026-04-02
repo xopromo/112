@@ -19049,6 +19049,8 @@ async function runOpt() {
       if (_effUseEqMA) {
         const _shadowCfg = JSON.parse(JSON.stringify(btCfg));
         _shadowCfg.useEqMA = false;  // отключаем фильтр для расчётной equity
+        _shadowCfg.waitBars = 0;     // ##EQ_MA_FILTER## отключаем отложенный вход для baseline (должна быть идеальная)
+        _shadowCfg.waitRetrace = false; // базовая equity без задержек
         if (_useOOS) DATA = _isData;
         let _shadowEq;
         try {
@@ -29372,6 +29374,8 @@ async function runOOSOnNewData() {
 
         // Первый проход БЕЗ фильтра для расчета baseline
         _btCfg_old.useEqMA = false;
+        _btCfg_old.waitBars = 0;     // ##EQ_MA_FILTER## отключаем отложенный вход для baseline (идеальная)
+        _btCfg_old.waitRetrace = false;
         const _shadowRes_old = backtest(_ind_old.pvLo, _ind_old.pvHi, _ind_old.atrArr, _btCfg_old);
 
         if (_shadowRes_old && _shadowRes_old.eq && _shadowRes_old.eq.length > 0) {
@@ -29397,6 +29401,8 @@ async function runOOSOnNewData() {
         // Рассчитываем baseline ДЛЯ NEW ДАННЫХ (всегда нужна свежая, не от old)
         const _shadowCfg = JSON.parse(JSON.stringify(_btCfg));
         _shadowCfg.useEqMA = false;
+        _shadowCfg.waitBars = 0;     // ##EQ_MA_FILTER## отключаем отложенный вход для baseline (идеальная)
+        _shadowCfg.waitRetrace = false;
         const _shadowRes = backtest(_ind.pvLo, _ind.pvHi, _ind.atrArr, _shadowCfg);
         if (_shadowRes && _shadowRes.eq && _shadowRes.eq.length > 0) {
           // Baseline НОВАЯ от new данных
@@ -32987,7 +32993,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1775154912519;
+window._BUILD_TS = 1775155188118;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;

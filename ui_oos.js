@@ -1315,6 +1315,8 @@ async function runOOSOnNewData() {
 
         // Первый проход БЕЗ фильтра для расчета baseline
         _btCfg_old.useEqMA = false;
+        _btCfg_old.waitBars = 0;     // ##EQ_MA_FILTER## отключаем отложенный вход для baseline (идеальная)
+        _btCfg_old.waitRetrace = false;
         const _shadowRes_old = backtest(_ind_old.pvLo, _ind_old.pvHi, _ind_old.atrArr, _btCfg_old);
 
         if (_shadowRes_old && _shadowRes_old.eq && _shadowRes_old.eq.length > 0) {
@@ -1340,6 +1342,8 @@ async function runOOSOnNewData() {
         // Рассчитываем baseline ДЛЯ NEW ДАННЫХ (всегда нужна свежая, не от old)
         const _shadowCfg = JSON.parse(JSON.stringify(_btCfg));
         _shadowCfg.useEqMA = false;
+        _shadowCfg.waitBars = 0;     // ##EQ_MA_FILTER## отключаем отложенный вход для baseline (идеальная)
+        _shadowCfg.waitRetrace = false;
         const _shadowRes = backtest(_ind.pvLo, _ind.pvHi, _ind.atrArr, _shadowCfg);
         if (_shadowRes && _shadowRes.eq && _shadowRes.eq.length > 0) {
           // Baseline НОВАЯ от new данных
