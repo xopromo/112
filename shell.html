@@ -1620,6 +1620,27 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
 <div id="oos-chart-wrap">
   <canvas id="oos-eqc"></canvas>
   <canvas id="oos-crosshair" style="position:absolute;top:0;left:0;cursor:crosshair"></canvas>
+  <!-- ##EQ_MA_FILTER## Контролы baseline для OOS графика -->
+  <div id="oos-baseline-controls" style="display:none;padding:8px;background:var(--bg3);border-top:1px solid var(--border);display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+    <label style="display:flex;align-items:center;gap:6px;color:var(--text2);cursor:pointer">
+      <input type="checkbox" id="oos-chk-show-baseline" checked onchange="toggleOOSBaselineDisplay()">
+      <span>Baseline</span>
+    </label>
+    <label style="display:flex;align-items:center;gap:4px;color:var(--text2)">
+      <span style="font-size:.85em">Цвет:</span>
+      <input type="color" id="oos-baseline-color-picker" value="#00b4d8" onchange="updateOOSBaselineColor()" style="cursor:pointer;width:32px;height:24px;border:1px solid var(--border);border-radius:3px">
+    </label>
+    <select id="oos-baseline-color-preset" onchange="setOOSBaselineColorPreset(this.value)" style="background:var(--bg4);color:var(--text1);border:1px solid var(--border);border-radius:3px;padding:2px 6px;font-size:.85em;cursor:pointer">
+      <option value="#00b4d8">Голубой</option>
+      <option value="#fbbf24">Жёлтый</option>
+      <option value="#f97316">Оранжевый</option>
+      <option value="#ec4899">Розовый</option>
+      <option value="#8b5cf6">Фиолетовый</option>
+      <option value="#06b6d4">Аква</option>
+      <option value="#10b981">Зелёный</option>
+      <option value="#f43f5e">Красный</option>
+    </select>
+  </div>
 </div>
 
 <div class="tbl-wrap">

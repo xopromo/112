@@ -1,3 +1,39 @@
+// ── ##EQ_MA_FILTER## Глобальные переменные для baseline в OOS режиме
+let _oosShowBaseline = true;
+let _oosBaselineColor = '#00b4d8';
+
+// Переключить отображение baseline в OOS графике
+function toggleOOSBaselineDisplay() {
+  const chk = document.getElementById('oos-chk-show-baseline');
+  _oosShowBaseline = chk ? chk.checked : true;
+  // Перерисовать текущий OOS граф
+  const r = window._oosCurrentResult;
+  if (r && window._oosCurrentIdx !== undefined) {
+    drawOOSChart(window._oosCurrentIdx, null);
+  }
+}
+
+// Обновить цвет baseline в OOS графике
+function updateOOSBaselineColor() {
+  const picker = document.getElementById('oos-baseline-color-picker');
+  _oosBaselineColor = picker ? picker.value : '#00b4d8';
+  const r = window._oosCurrentResult;
+  if (r && window._oosCurrentIdx !== undefined) {
+    drawOOSChart(window._oosCurrentIdx, null);
+  }
+}
+
+// Установить preset цвета для baseline
+function setOOSBaselineColorPreset(value) {
+  const picker = document.getElementById('oos-baseline-color-picker');
+  if (picker) picker.value = value;
+  _oosBaselineColor = value;
+  const r = window._oosCurrentResult;
+  if (r && window._oosCurrentIdx !== undefined) {
+    drawOOSChart(window._oosCurrentIdx, null);
+  }
+}
+
 // ── ИДЕЯ 3: Массовый OOS-скан всех видимых результатов
 let _oosScanRunning = false;
 async function runOOSScan() {
@@ -845,6 +881,9 @@ function drawOOSChart(idx, rowEl) {
   const eqWrap = document.getElementById('eq-wrap');
   if (!canvas || !wrap) return;
   const r = _oosTableResults[idx];
+  // ##EQ_MA_FILTER## Сохраняем текущий результат для функций управления baseline
+  window._oosCurrentResult = r;
+  window._oosCurrentIdx = idx;
   // Синхронизируем _selectedIdx чтобы клавиатурная навигация шла с этой строки
   const visIdx = _visibleResults.indexOf(r);
   if (visIdx >= 0) _selectedIdx = visIdx;
@@ -965,6 +1004,44 @@ function drawOOSChart(idx, rowEl) {
   ctx.lineTo(W - pad, zy); ctx.lineTo(pad + pxSp, zy); ctx.closePath();
   ctx.fillStyle = 'rgba(255,160,40,0.06)'; ctx.fill();
 
+  // ##EQ_MA_FILTER## Рисуем baseline если включена опция
+  if (_oosShowBaseline && (r.old_eqCalcBaselineArr || r.new_eqCalcBaselineArr)) {
+    const baseline_old = r.old_eqCalcBaselineArr || eq_old;
+    const baseline_new = r.new_eqCalcBaselineArr || eq_new;
+    let newBaselineClean = baseline_new.slice(overlapIdx);
+    if (newBaselineClean && newBaselineClean.length > 0) {
+      const cfg = r.cfg || {};
+      const maWarmup = cfg.useMA ? (cfg.maP || 20) : 0;
+      const pivotWarmup = cfg.usePivot ? ((cfg.pvL || 5) + (cfg.pvR || 2) + 5) : 0;
+      const atrWarmup = cfg.useATR ? (cfg.atrPeriod || 14) * 3 : 0;
+      const warmup = Math.max(maWarmup, pivotWarmup, atrWarmup, 1);
+      const warmupEndIdx = Math.min(warmup, newBaselineClean.length - 1);
+      if (warmupEndIdx > 0 && warmupEndIdx < newBaselineClean.length) {
+        const warmupValue = newBaselineClean[warmupEndIdx];
+        newBaselineClean = newBaselineClean.slice(warmupEndIdx).map(v => v - warmupValue);
+      }
+    }
+    const lastOldBaseline = baseline_old[baseline_old.length - 1];
+    const combined_baseline = [...baseline_old, ...newBaselineClean.map(v => v + lastOldBaseline)];
+
+    // Рисуем baseline линию
+    function pathSegBaseline(pxA, pxB) {
+      ctx.beginPath();
+      for (let px = pxA; px <= pxB; px++) {
+        const i = Math.round(px * nLst / (nPx - 1));
+        const x = pad + px, y = toY(combined_baseline[Math.min(i, combined_baseline.length - 1)]);
+        px === pxA ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      }
+    }
+
+    pathSegBaseline(0, nPx - 1);
+    ctx.strokeStyle = _oosBaselineColor;
+    ctx.globalAlpha = 0.65;
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+    ctx.globalAlpha = 1.0;
+  }
+
   // Линия — история
   pathSeg(0, pxSp);
   const gOld = ctx.createLinearGradient(pad, 0, pad + pxSp, 0);
@@ -1014,12 +1091,12 @@ function drawOOSChart(idx, rowEl) {
   }
 
   // Показываем контролы baseline для OOS графика ##EQ_MA_FILTER##
-  const baselineCtrl = document.getElementById('eq-baseline-controls');
-  if (baselineCtrl) {
+  const oosBaselineCtrl = document.getElementById('oos-baseline-controls');
+  if (oosBaselineCtrl) {
     if ((r.old_eqCalcBaselineArr && r.old_eqCalcBaselineArr.length) || (r.new_eqCalcBaselineArr && r.new_eqCalcBaselineArr.length)) {
-      baselineCtrl.style.display = 'flex';
+      oosBaselineCtrl.style.display = 'flex';
     } else {
-      baselineCtrl.style.display = 'none';
+      oosBaselineCtrl.style.display = 'none';
     }
   }
 }
@@ -1242,19 +1319,23 @@ async function runOOSOnNewData() {
       _btCfg.tradeLog = [];
 
       // ##EQ_MA_FILTER## Двухпроходный цикл для OOS новых данных
-      if (rOld && rOld.eqCalcMAArr && rOld.eqCalcBaselineArr && r.cfg.useEqMA) {
-        // Используем MA, рассчитанную от old (IS) данных для фильтрации на new (OOS)
-        _btCfg.eqCalcMAArr = rOld.eqCalcMAArr;
-        _btCfg.eqCalcBaselineArr = rOld.eqCalcBaselineArr;
-      } else if (r.cfg.useEqMA) {
-        // Если нет old результата, рассчитаем MA для new данных отдельно
+      if (r.cfg.useEqMA) {
+        // Рассчитываем baseline ДЛЯ NEW ДАННЫХ (всегда нужна свежая, не от old)
         const _shadowCfg = JSON.parse(JSON.stringify(_btCfg));
         _shadowCfg.useEqMA = false;
         const _shadowRes = backtest(_ind.pvLo, _ind.pvHi, _ind.atrArr, _shadowCfg);
         if (_shadowRes && _shadowRes.eq && _shadowRes.eq.length > 0) {
-          const maLen = r.cfg.eqMALen || 20;
-          _btCfg.eqCalcMAArr = calcSMA(Array.from(_shadowRes.eq), maLen);
+          // Baseline НОВАЯ от new данных
           _btCfg.eqCalcBaselineArr = Array.from(_shadowRes.eq);
+
+          // MA берём от old если доступна (для консистентности с IS режимом)
+          // иначе рассчитываем от new baseline
+          if (rOld && rOld.eqCalcMAArr) {
+            _btCfg.eqCalcMAArr = rOld.eqCalcMAArr;
+          } else {
+            const maLen = r.cfg.eqMALen || 20;
+            _btCfg.eqCalcMAArr = calcSMA(Array.from(_shadowRes.eq), maLen);
+          }
         }
       }
 
