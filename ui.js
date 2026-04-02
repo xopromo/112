@@ -1090,8 +1090,8 @@ function selectRow(idx) {
 
   const r = _visibleResults[idx];
   if (!r) return;
-  if (_tableMode === 'results') drawEquity(r.name);
-  else drawEquityForResult(r);
+  // Используем drawEquityForResult для обоих режимов, чтобы baseline всегда отображался
+  drawEquityForResult(r);
 
   // Показываем контролы baseline если есть данные MA Equity Filter
   const baselineCtrl = $('eq-baseline-controls');
