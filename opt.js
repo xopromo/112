@@ -628,6 +628,25 @@ function _buildKalmanVelocity(prices, len) {
 }
 // ─────────────────────────────────────────────────────────────────
 
+// ── Flat Zone Exit — вычисление streak-массива ────────────────────
+// ##FLAT_EXIT## Откат: удалить функцию + fzStreakCache + useFlatExit блоки
+function _calcFzStreak(atrArr, fzN, fzAtrMult, fzFlatThr) {
+  const N = DATA.length;
+  const streak = new Uint16Array(N);
+  for (let i = fzN + 1; i < N; i++) {
+    const cl  = DATA[i].c;
+    const eps = atrArr[i] * fzAtrMult;
+    let visits = 0;
+    for (let j = 1; j <= fzN; j++) {
+      const b = DATA[i - j];
+      if (b.h >= cl - eps && b.l <= cl + eps) visits++;
+    }
+    streak[i] = (visits / fzN) >= fzFlatThr ? (streak[i - 1] || 0) + 1 : 0;
+  }
+  return streak;
+}
+// ─────────────────────────────────────────────────────────────────
+
 // ── Gaussian Process helpers — Tier 3 (Bayesian Optimisation) ─────
 // RBF kernel, Cholesky, GP predict, EI acquisition.
 // Откат: удалить все _gp* функции + runBayesOpt + ##BAYES_OPT в ui.js / shell.html
@@ -857,6 +876,11 @@ function buildName(cfg, pvL, pvR, slDesc, tpDesc, filters, extras) {
   if (cfg.usePartial) exits.push(`Partial${cfg.partPct}%`);
   if (cfg.useClimax) exits.push('Clmx');
   if (cfg.useStExit) exits.push(`STex(${cfg.stAtrP||10},${cfg.stMult||3})`);
+  if (cfg.useFlatExit) { // ##FLAT_EXIT##
+    let _fzLabel = `FlatEx(n${cfg.fzN||20}×${cfg.fzAtrMult||0.5}thr${cfg.fzFlatThr||0.5}mf${cfg.fzMinFlat||5})`;
+    if (cfg.fzMinProfit > 0) _fzLabel += `+${cfg.fzMinProfit}%`;
+    exits.push(_fzLabel);
+  }
   if (exits.length>0) parts.push(exits.join('+'));
   // Delay
   if (cfg.waitBars > 0 || cfg.waitRetrace) {
@@ -1166,6 +1190,12 @@ async function runOpt() {
   const usePChgB      = usePChg && $c('e_pchgb');
   const useSupertrend = $c('e_st');
   const useStExit     = $c('x_st');
+  const useFlatExit   = $c('x_flatex');   // ##FLAT_EXIT##
+  const fzN           = $n('x_fzn')   || 20;
+  const fzAtrMult     = $n('x_fzatr') || 0.5;
+  const fzFlatThr     = $n('x_fzthr') || 0.5;
+  const fzMinFlat     = $n('x_fzmf')  || 5;
+  const fzMinProfit   = $n('x_fzmp')  || 0;
   const useWaitEntry  = $c('e_wait_on');
   const useWaitRetrace= useWaitEntry && $c('e_wait_retrace');
   const useEIS        = $c('e_eis');
@@ -1568,7 +1598,7 @@ async function runOpt() {
   const waitMaxBars     = useWaitEntry ? ($n('e_wait_maxb') || 0) : 0;
   const waitCancelAtr   = useWaitEntry ? ($n('e_wait_catr') || 0) : 0;
   // ── Per-iteration indicator caches ─────────────────────────────────
-  const rsiExitCache = {}, maCrossNewCache = {}, macdNewCache = {}, stochNewCache = {}, stDirCache = {};
+  const rsiExitCache = {}, maCrossNewCache = {}, macdNewCache = {}, stochNewCache = {}, stDirCache = {}, fzStreakCache = {}; // ##FLAT_EXIT##
   const kalmanCrossCache = {}; // ##KALMAN_CROSS##
   const kalmanMACache = {}; // ##KALMAN_MA##
 
@@ -2090,6 +2120,9 @@ async function runOpt() {
       if (!atrCache[atrP]) atrCache[atrP] = calcRMA_ATR(atrP);
       if (!atrAvgCache[atrP]) atrAvgCache[atrP] = calcSMA(atrCache[atrP], 50);
       const atrAvg = atrAvgCache[atrP];
+      // ##FLAT_EXIT## fzStreakArr: кэш по atrP + fz-параметрам (не оптимизируются)
+      const _fzCk = 'fz_'+atrP+'_'+fzN+'_'+fzAtrMult+'_'+fzFlatThr;
+      const fzStreakArr = useFlatExit ? (fzStreakCache[_fzCk]||(fzStreakCache[_fzCk]=_calcFzStreak(atrCache[atrP],fzN,fzAtrMult,fzFlatThr))) : null;
       const mk = _mType+'_'+maP+'_htf'+htfRatio;
       let maArr = null;
       if (maP > 0) {
@@ -2131,6 +2164,7 @@ async function runOpt() {
         useEIS,eisEMAArr,eisHistArr,eisPeriod:eisPeriod||13,
         useSoldiers,
         useStExit,
+        useFlatExit,fzStreakArr,fzN,fzAtrMult,fzFlatThr,fzMinFlat,fzMinProfit, // ##FLAT_EXIT##
         waitBars:waitBars||0,waitRetrace:waitRetrace||false,waitMaxBars,waitCancelAtr,
         hasSLA:!!(slPair.a),slMult:slPair.a?slPair.a.m:0,hasSLB:!!(slPair.p),slPctMult:slPair.p?slPair.p.m:0,slLogic,
         hasTPA:!!(tpPair.a),tpMult:tpPair.a?tpPair.a.m:0,tpMode:tpPair.a?tpPair.a.type:'rr',
@@ -2237,6 +2271,7 @@ async function runOpt() {
         usePChg,pChgPctA,pChgPeriodA,pChgHtfA,usePChgB,pChgPctB,pChgPeriodB,pChgHtfB,
               useSupertrend,stAtrP,stMult,
               useStExit,
+              useFlatExit,fzN,fzAtrMult,fzFlatThr,fzMinFlat,fzMinProfit, // ##FLAT_EXIT##
               waitBars:waitBars||0,waitRetrace:waitRetrace||false,waitMaxBars,waitCancelAtr,
               slPair,slLogic,tpPair,tpLogic,
               useSLPiv,slPivOff,slPivMax,slPivL,slPivR,slPivTrail,
@@ -2501,6 +2536,9 @@ async function runOpt() {
       if (!atrCache[atrP]) atrCache[atrP] = calcRMA_ATR(atrP);
       if (!atrAvgCache[atrP]) atrAvgCache[atrP] = calcSMA(atrCache[atrP], 50);
       const atrAvg = atrAvgCache[atrP];
+      // ##FLAT_EXIT## fzStreakArr: кэш по atrP + fz-параметрам
+      const _fzCkTpe = 'fz_'+atrP+'_'+fzN+'_'+fzAtrMult+'_'+fzFlatThr;
+      const fzStreakArr = useFlatExit ? (fzStreakCache[_fzCkTpe]||(fzStreakCache[_fzCkTpe]=_calcFzStreak(atrCache[atrP],fzN,fzAtrMult,fzFlatThr))) : null;
       const mk = _mType+'_'+maP+'_htf'+htfRatio;
       let maArr = null;
       if (maP > 0) {
@@ -2546,6 +2584,7 @@ async function runOpt() {
         useEIS,eisEMAArr,eisHistArr,eisPeriod:eisPeriod||13,
         useSoldiers,
         useStExit,
+        useFlatExit,fzStreakArr,fzN,fzAtrMult,fzFlatThr,fzMinFlat,fzMinProfit, // ##FLAT_EXIT##
         waitBars:waitBars||0,waitRetrace:waitRetrace||false,waitMaxBars,waitCancelAtr,
         hasSLA:!!(slPair.a),slMult:slPair.a?slPair.a.m:0,hasSLB:!!(slPair.p),slPctMult:slPair.p?slPair.p.m:0,slLogic,
         hasTPA:!!(tpPair.a),tpMult:tpPair.a?tpPair.a.m:0,tpMode:tpPair.a?tpPair.a.type:'rr',
@@ -2677,6 +2716,7 @@ async function runOpt() {
         usePChg,pChgPctA,pChgPeriodA,pChgHtfA,usePChgB,pChgPctB,pChgPeriodB,pChgHtfB,
               useSupertrend,stAtrP,stMult,
               useStExit,
+              useFlatExit,fzN,fzAtrMult,fzFlatThr,fzMinFlat,fzMinProfit, // ##FLAT_EXIT##
               waitBars:waitBars||0,waitRetrace:waitRetrace||false,waitMaxBars,waitCancelAtr,
               slPair,slLogic,tpPair,tpLogic,
               useSLPiv,slPivOff,slPivMax,slPivL,slPivR,slPivTrail,
@@ -3071,6 +3111,9 @@ async function runOpt() {
       if(_mcDone) break;
       if(!atrCache[atrP]) atrCache[atrP]=calcRMA_ATR(atrP);
       const atrAvg=calcSMA(Array.from(atrCache[atrP]),50);
+      // ##FLAT_EXIT##
+      const _fzCkEx='fz_'+atrP+'_'+fzN+'_'+fzAtrMult+'_'+fzFlatThr;
+      const fzStreakArr=useFlatExit?(fzStreakCache[_fzCkEx]||(fzStreakCache[_fzCkEx]=_calcFzStreak(atrCache[atrP],fzN,fzAtrMult,fzFlatThr))):null;
 
       for(const maP of maPs) {
         if(_mcDone) break;
@@ -3236,6 +3279,7 @@ async function runOpt() {
         usePChg,pChgPctA,pChgPeriodA,pChgHtfA,usePChgB,pChgPctB,pChgPeriodB,pChgHtfB,
                                       useSupertrend,stDir,stAtrP,stMult,
                                       useStExit,
+                                      useFlatExit,fzStreakArr,fzN,fzAtrMult,fzFlatThr,fzMinFlat,fzMinProfit, // ##FLAT_EXIT##
                                       waitBars:waitBars||0,waitRetrace:waitRetrace||false,waitMaxBars,waitCancelAtr,
                                       // SL
                                       hasSLA:!!slPair.a,
@@ -3373,6 +3417,7 @@ async function runOpt() {
         usePChg,pChgPctA,pChgPeriodA,pChgHtfA,usePChgB,pChgPctB,pChgPeriodB,pChgHtfB,
                                           useSupertrend,stAtrP,stMult,
                                           useStExit,
+                                          useFlatExit,fzN,fzAtrMult,fzFlatThr,fzMinFlat,fzMinProfit, // ##FLAT_EXIT##
                                           waitBars:waitBars||0,waitRetrace:waitRetrace||false,waitMaxBars,waitCancelAtr,
                                           slPair, slLogic, tpPair, tpLogic,
                                           useSLPiv, slPivOff, slPivMax, slPivL, slPivR, slPivTrail,
@@ -3954,6 +3999,9 @@ function _calcIndicators(cfg) {
           return arr;
         })()
       : null,
+    fzStreakArr: cfg.useFlatExit // ##FLAT_EXIT##
+      ? _calcFzStreak(atrArr, cfg.fzN || 20, cfg.fzAtrMult || 0.5, cfg.fzFlatThr || 0.5)
+      : null,
   };
 }
 
@@ -4055,6 +4103,13 @@ function buildBtCfg(cfg, ind) {
     stAtrP:        cfg.stAtrP        || 10,
     stMult:        cfg.stMult        || 3.0,
     useStExit:     cfg.useStExit     || false,
+    useFlatExit:   cfg.useFlatExit   || false, // ##FLAT_EXIT##
+    fzStreakArr:   ind.fzStreakArr   || null,
+    fzN:           cfg.fzN           || 20,
+    fzAtrMult:     cfg.fzAtrMult     || 0.5,
+    fzFlatThr:     cfg.fzFlatThr     || 0.5,
+    fzMinFlat:     cfg.fzMinFlat     || 5,
+    fzMinProfit:   cfg.fzMinProfit   || 0,
     waitBars:      cfg.waitBars      || 0,
     waitRetrace:   cfg.waitRetrace   || false,
     waitMaxBars:   cfg.waitMaxBars   || 0,

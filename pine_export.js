@@ -253,6 +253,13 @@ function generatePineScript(r, mode = 'indicator') {
   lines.push(`use_climax  = input.bool(${b(c.useClimax)}, "Climax выход (только в плюс)", group=grp_exit)`);
   lines.push(`use_clx_any = input.bool(false, "Climax± (любой)", group=grp_exit)`);
   lines.push(`use_st_exit = input.bool(${b(c.useStExit)}, "Supertrend-выход (смена тренда против позиции)", group=grp_exit)`);
+  // ##FLAT_EXIT##
+  lines.push(`use_flat_ex  = input.bool(${b(c.useFlatExit)}, "Выход по флэту (рынок «завис»)", group=grp_exit)`);
+  lines.push(`fz_n         = input.int(${c.fzN||20}, "Окно флэта N баров", minval=5, maxval=200, group=grp_exit)`);
+  lines.push(`fz_atr_mult  = input.float(${f(c.fzAtrMult||0.5,2)}, "Флэт: зона ±ATR×", step=0.05, minval=0.05, maxval=5.0, group=grp_exit)`);
+  lines.push(`fz_thr       = input.float(${f(c.fzFlatThr||0.5,2)}, "Флэт: порог (0..1)", step=0.05, minval=0.05, maxval=0.95, group=grp_exit)`);
+  lines.push(`fz_min_flat  = input.int(${c.fzMinFlat||5}, "Флэт: мин баров подряд", minval=1, maxval=100, group=grp_exit)`);
+  lines.push(`fz_min_pnl   = input.float(${f(c.fzMinProfit||0,2)}, "Флэт: мин прибыль % (0=любой)", step=0.1, minval=0, group=grp_exit)`);
   lines.push(``);
 
   // ===== АДАПТИВНЫЕ TP/SL И KELLY CRITERION =====
@@ -794,6 +801,27 @@ function generatePineScript(r, mode = 'indicator') {
   lines.push(`bool pchg_s      = use_pchg and pchg_a_s and pchg_b_s`);
   lines.push(``);
 
+  // ── Flat Zone Exit — глобальные расчёты (пересчитываются каждый бар) ─ ##FLAT_EXIT##
+  lines.push(`// ── Flat Zone Exit ──`);
+  lines.push(`float _fz_atr     = ta.atr(14)`);
+  lines.push(`float _fz_eps     = _fz_atr * fz_atr_mult`);
+  lines.push(`float _fz_visits  = 0.0`);
+  lines.push(`for _fj = 1 to fz_n`);
+  lines.push(`    if high[_fj] >= close - _fz_eps and low[_fj] <= close + _fz_eps`);
+  lines.push(`        _fz_visits += 1.0`);
+  lines.push(`float fz_score    = _fz_visits / fz_n`);
+  lines.push(`bool  fz_is_flat  = fz_score >= fz_thr`);
+  lines.push(`var int fz_streak = 0`);
+  lines.push(`fz_streak        := fz_is_flat ? fz_streak[1] + 1 : 0`);
+  lines.push(`bool fz_confirmed = fz_streak >= fz_min_flat`);
+  lines.push(`bool fz_exit_now  = fz_streak == fz_min_flat  // первый бар подтверждённого флэта`);
+  lines.push(``);
+  // Визуализация флэт-зоны (фон + границы) — показываем только когда флэт подтверждён
+  lines.push(`bgcolor(use_flat_ex and fz_confirmed ? color.new(color.orange, 90) : na, title="Флэт-зона")`);
+  lines.push(`plot(use_flat_ex and fz_confirmed ? close + _fz_eps : na, "Верх флэт-зоны", color.new(color.orange, 50), 1, plot.style_linebr)`);
+  lines.push(`plot(use_flat_ex and fz_confirmed ? close - _fz_eps : na, "Низ флэт-зоны",  color.new(color.orange, 50), 1, plot.style_linebr)`);
+  lines.push(``);
+
   // ── Supertrend ────────────────────────────────────────────
   lines.push(`[st_val, st_dir_raw] = ta.supertrend(st_mult, st_atr_p)`);
   lines.push(`bool st_bull = st_dir_raw < 0  // Pine: -1 = bullish, +1 = bearish`);
@@ -1053,6 +1081,11 @@ function generatePineScript(r, mode = 'indicator') {
   lines.push(`            // Supertrend exit`);
   lines.push(`            if use_st_exit and not frc`);
   lines.push(`                if (_dir == 1 and st_flip_bear) or (_dir == -1 and st_flip_bull)`);
+  lines.push(`                    frc := true`);
+  lines.push(`            // Flat Zone exit ##FLAT_EXIT##`);
+  lines.push(`            if use_flat_ex and fz_exit_now and not frc`);
+  lines.push(`                bool _fz_pnl_ok = fz_min_pnl <= 0 or cpnl >= fz_min_pnl`);
+  lines.push(`                if _fz_pnl_ok`);
   lines.push(`                    frc := true`);
   lines.push(`            // BE`);
   lines.push(`            if use_be and not _bea and be_offset >= be_trig and not frc`);
@@ -1344,6 +1377,12 @@ function generatePineScript(r, mode = 'indicator') {
   lines.push(`            if (v_dir == 1 and st_flip_bear) or (v_dir == -1 and st_flip_bull)`);
     lines.push(`                frc := true`);
     lines.push(`                vxt := "ST"`);
+  lines.push(`        // Flat Zone exit ##FLAT_EXIT##`);
+  lines.push(`        if use_flat_ex and fz_exit_now and not frc`);
+  lines.push(`            float _vfz_cpnl = v_dir == 1 ? (close - v_ep) / v_ep * 100 : (v_ep - close) / v_ep * 100`);
+  lines.push(`            if fz_min_pnl <= 0 or _vfz_cpnl >= fz_min_pnl`);
+    lines.push(`                frc := true`);
+    lines.push(`                vxt := "FLAT"`);
   lines.push(`        // Time exit`);
   lines.push(`        if use_time_ex and (bar_index - v_eb) >= max_bars_in and not frc`);
     lines.push(`            frc := true`);
@@ -1717,6 +1756,11 @@ function generatePineScript(r, mode = 'indicator') {
     lines.push(`        s_frc := true`);
     lines.push(`    if use_st_exit and not s_frc`);
     lines.push(`        if (s_dir == 1 and st_flip_bear) or (s_dir == -1 and st_flip_bull)`);
+    lines.push(`            s_frc := true`);
+    lines.push(`    // Flat Zone exit ##FLAT_EXIT##`);
+    lines.push(`    if use_flat_ex and fz_exit_now and not s_frc`);
+    lines.push(`        float _sfz_cpnl = s_dir == 1 ? (close - s_ep) / s_ep * 100 : (s_ep - close) / s_ep * 100`);
+    lines.push(`        if fz_min_pnl <= 0 or _sfz_cpnl >= fz_min_pnl`);
     lines.push(`            s_frc := true`);
     lines.push(`    if use_time_ex and (bar_index - s_ep_bar) >= max_bars_in and not s_frc`);
     lines.push(`        s_frc := true`);
