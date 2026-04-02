@@ -476,18 +476,27 @@ async function storeSave(key, data) {
     localStorage.setItem(key, JSON.stringify(data));
   };
   const _isQuota = e => e.name === 'QuotaExceededError' || (e.code && (e.code === 22 || e.code === 1014));
+  const _freeAllCaches = () => {
+    try { _freeRobCache(); } catch(_) {}
+    try {
+      Object.keys(localStorage)
+        .filter(k => k.startsWith('robSurrogate_') || k.startsWith('use6_csv_'))
+        .forEach(k => localStorage.removeItem(k));
+    } catch(_) {}
+  };
   try {
     await _write();
   } catch(e) {
     if (_isQuota(e)) {
-      // Free rob cache + rob surrogate and retry
-      try { _freeRobCache(); } catch(_) {}
-      try {
-        const keys = Object.keys(localStorage).filter(k => k.startsWith('robSurrogate_'));
-        keys.forEach(k => localStorage.removeItem(k));
-      } catch(_) {}
+      _freeAllCaches();
       try { await _write(); }
-      catch(e2) { console.warn('[storeSave] quota exceeded after cleanup:', key, e2.message); }
+      catch(e2) {
+        console.warn('[storeSave] quota exceeded after cleanup:', key, e2.message);
+        if (typeof showTplToast === 'function') showTplToast('⚠️ Не удалось сохранить — нет места в localStorage');
+      }
+    } else {
+      console.warn('[storeSave] ошибка сохранения:', key, e.message);
+      if (typeof showTplToast === 'function') showTplToast('⚠️ Ошибка сохранения: ' + e.message);
     }
   }
 }

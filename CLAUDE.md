@@ -83,13 +83,13 @@ git push -u origin claude/ваша-ветка
 - `parseRange` (23) — парсер диапазона
 - `_calcStatSig` (95) — z-тест WR > 50%
 - `_calcGTScore` (110) — anti-overfitting метрика
-- `_calcIndicators` (3642) — пересчёт MA, ATR и др.
+- `_calcIndicators` (3658) — пересчёт MA, ATR и др.
 - `runOpt` (991) — главный цикл (MC/TPE/Ex)
 - `_runOOS` (1054) — OOS прогон
 - `_attachOOS` (1072) — IS/OOS split
-- `buildBtCfg` (4020) — сборка cfg для бэктеста
-- `runMassRobust` (4290) — массовый тест устойчивости
-- `HC_NUMERIC_PARAMS` (4610) — список параметров HC
+- `buildBtCfg` (4036) — сборка cfg для бэктеста
+- `runMassRobust` (4306) — массовый тест устойчивости
+- `HC_NUMERIC_PARAMS` (4626) — список параметров HC
 
 **ui.js**:
 - `showDetail` (20) — standard detail панель
@@ -101,9 +101,9 @@ git push -u origin claude/ваша-ветка
 **ui_hc.js**:
 - `openHCModal` (1) — открыть HC окно
 - `_hcRunBacktest` (304) — HC бэктест с кэшем
-- `_hcNeighbours` (491) — поиск соседей HC
-- `runHillClimbing` (622) — главный HC цикл
-- `_hcOpenDetail` (1389) — HC detail панель
+- `_hcNeighbours` (538) — поиск соседей HC
+- `runHillClimbing` (669) — главный HC цикл
+- `_hcOpenDetail` (1436) — HC detail панель
 
 **ui_ml.js**:
 - `openMLModal` (86) — открыть ML модал
