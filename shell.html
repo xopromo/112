@@ -867,6 +867,82 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
 .tbl-tpl-date { font-size: .58em; color: var(--text3); }
 .panels-toolbar .tpl-ibtn { font-size: .85em; padding: 5px 12px; }
 
+/* ##ARCHIVE## Context menu для архивирования опций */
+.context-menu {
+  position: fixed;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+  z-index: 10000;
+  min-width: 160px;
+  padding: 4px 0;
+}
+.context-menu button {
+  display: block;
+  width: 100%;
+  padding: 6px 12px;
+  border: none;
+  background: none;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.85em;
+  text-align: left;
+  font-family: var(--font-mono);
+}
+.context-menu button:hover {
+  background: rgba(0,153,255,0.15);
+  color: var(--accent);
+}
+
+/* ##ARCHIVE## Панель архивированных опций */
+#archived-options-panel {
+  display: none;
+  flex-direction: column;
+  padding: 8px;
+  gap: 6px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+#archived-options-panel.active {
+  display: flex;
+}
+#archived-options-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.archived-option {
+  padding: 8px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: context-menu;
+  font-size: 0.8em;
+  transition: background 0.15s;
+}
+.archived-option:hover {
+  background: rgba(0,153,255,0.08);
+}
+.archived-option-name {
+  flex: 1;
+  color: var(--text);
+}
+.archived-option-date {
+  font-size: 0.7em;
+  color: var(--text3);
+  margin-left: 8px;
+}
+#archived-empty {
+  padding: 12px;
+  text-align: center;
+  color: var(--text3);
+  font-size: 0.75em;
+}
+
 </style>
 </head>
 <body>
@@ -895,6 +971,8 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
   <span style="color:var(--border2);margin:0 1px;font-size:1.3em;line-height:1">│</span>
   <!-- Collapse/Expand -->
   <button class="tpl-ibtn" id="btn-toggle-panels" onclick="togglePanels()" title="Свернуть неактивные / Развернуть все">↗ Свернуть</button>
+  <!-- Archive tab for options -->
+  <button class="tpl-ibtn" id="btn-archive-tab" onclick="toggleArchiveTab()" title="Показать архивированные опции">📦 Архив (<span id="archive-count">0</span>)</button>
   <!-- Notes -->
   <button class="tpl-ibtn" id="notepad-fab" onclick="toggleNotepad()" title="Записная книжка (глобальная)">📝</button>
   <!-- Spacer -->
@@ -914,6 +992,13 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
       <span class="perf-val" id="pw-res" style="min-width:28px">—</span>
     </div>
   </div>
+</div>
+
+<!-- ##ARCHIVE## Архивированные опции -->
+<div id="archived-options-panel" class="panel">
+  <h3>📦 Архив опций</h3>
+  <div id="archived-options-list"></div>
+  <div id="archived-empty">Архив пуст</div>
 </div>
 
 <div class="panels" id="panels">
