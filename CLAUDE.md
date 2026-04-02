@@ -83,13 +83,13 @@ git push -u origin claude/ваша-ветка
 - `parseRange` (23) — парсер диапазона
 - `_calcStatSig` (95) — z-тест WR > 50%
 - `_calcGTScore` (110) — anti-overfitting метрика
-- `_calcIndicators` (3572) — пересчёт MA, ATR и др.
+- `_calcIndicators` (3574) — пересчёт MA, ATR и др.
 - `runOpt` (967) — главный цикл (MC/TPE/Ex)
 - `_runOOS` (1030) — OOS прогон
 - `_attachOOS` (1045) — IS/OOS split
-- `buildBtCfg` (3947) — сборка cfg для бэктеста
-- `runMassRobust` (4208) — массовый тест устойчивости
-- `HC_NUMERIC_PARAMS` (4528) — список параметров HC
+- `buildBtCfg` (3949) — сборка cfg для бэктеста
+- `runMassRobust` (4210) — массовый тест устойчивости
+- `HC_NUMERIC_PARAMS` (4530) — список параметров HC
 
 **ui.js**:
 - `showDetail` (20) — standard detail панель
