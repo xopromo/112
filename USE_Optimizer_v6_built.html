@@ -18026,7 +18026,6 @@ async function runOpt() {
   const useKalmanMA   = $c('f_kalman');      // ##KALMAN_MA##
   const kalmanLen     = $n('f_kalmanl') || 20; // ##KALMAN_MA##
   const useEqMA       = $c('f_eq_ma');         // ##EQ_MA_FILTER##
-  const eqMALen       = $n('f_eq_ma_len') || 20; // ##EQ_MA_FILTER##
   const eqMAMode      = $v('f_eq_ma_mode') || 'filter'; // ##EQ_MA_FILTER## режим: 'filter' | 'display' | 'both'
   const useMLFilter     = $c('c_ml_filter')      && typeof mlScore     === 'function'; // ##ML_FILTER##
   const mlThreshold     = $n('c_ml_thresh')      || 0.55; // ##ML_FILTER##
@@ -18131,6 +18130,7 @@ async function runOpt() {
   const mdMaxs=useMaDist?parseRange('f_madv'):[0];
   const wtThreshs=useWT?parseRange('f_wtt'):[0];
   const freshMaxs=useFresh?parseRange('f_freshm'):[20];
+  const eqMALenArr=useEqMA?parseRange('f_eq_ma_len'):[20]; // ##EQ_MA_FILTER##
   const beOffs=useBE?parseRange('x_beo'):[0];
   if(!beOffs.length) beOffs.push(0);
   const trTrigs=useTrail?parseRange('x_trt'):[0.5];  // Default 0.5 when Trail disabled
@@ -18715,6 +18715,7 @@ async function runOpt() {
     (dynSLStructMults.length?dynSLStructMults:[0.3]),
     (tpAtrLens.length?tpAtrLens:[20]), (tpAtrMults.length?tpAtrMults:[1.0]),
     (slAtrLens.length?slAtrLens:[20]), (slAtrMults.length?slAtrMults:[0.5]),
+    (eqMALenArr.length?eqMALenArr:[20]), // ##EQ_MA_FILTER##
     _filterCombos  // powerset фильтров (последнее измерение)
   ];
   const _mcDimSizes = _mcDims.map(d => d.length || 1);
@@ -18820,6 +18821,7 @@ async function runOpt() {
       const tpAtrMult = _dims[_d][_di[_d++]];
       const slAtrLen = _dims[_d][_di[_d++]];
       const slAtrMult = _dims[_d][_di[_d++]];
+      const eqMALen = _dims[_d][_di[_d++]]; // ##EQ_MA_FILTER##
       const _fCombo  = _dims[_d][_di[_d++]]; // powerset: объект с bool-флагами фильтров
       // Эффективные флаги фильтров: берём из _fCombo если там есть, иначе из внешней области
       const _effUseMa      = _fCombo.useMa      ?? useMa;
@@ -32675,7 +32677,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1775137320703;
+window._BUILD_TS = 1775137475968;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
