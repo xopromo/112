@@ -369,4 +369,30 @@ const FILTER_REGISTRY = [
     blocksS:  (cfg, i) => !cfg.sqzOn || !cfg.sqzOn[i-1],
     nameLabel: () => 'SqzPrev',
   },
+
+  // ── MA Equity Filter ──────────────────────────────────────
+  // Блокирует вход если MA(расчётная эквити) падает.
+  // eqCalcMAArr[i-1] ≤ 0 = индикатор не прогрелся (warmup)
+  // Блокирует если MA(equity) не растёт (falling or flat)
+  {
+    id:       'eqma',
+    flag:     'useEqMA',
+    blocksL:  (cfg, i) => {
+      if (!cfg.eqCalcMAArr) return false;
+      const ma = cfg.eqCalcMAArr[i-1];
+      if (ma <= 0) return true;  // warmup
+      if (i < 2) return true;    // need at least 2 bars for comparison
+      const prevMa = cfg.eqCalcMAArr[i-2];
+      return prevMa <= 0 || ma <= prevMa;  // block if falling or flat
+    },
+    blocksS:  (cfg, i) => {
+      if (!cfg.eqCalcMAArr) return false;
+      const ma = cfg.eqCalcMAArr[i-1];
+      if (ma <= 0) return true;  // warmup
+      if (i < 2) return true;    // need at least 2 bars for comparison
+      const prevMa = cfg.eqCalcMAArr[i-2];
+      return prevMa <= 0 || ma <= prevMa;  // block if falling or flat
+    },
+    nameLabel: (cfg) => `EqMA(${cfg.eqMALen||20})`,
+  },
 ];
