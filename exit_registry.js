@@ -59,4 +59,27 @@ const EXIT_REGISTRY = [
       return false;
     },
   },
+
+  // ── Flat Zone Exit ────────────────────────────────────────
+  // Выход когда рынок входит в флэт-зону после тренда.
+  // Алгоритм: для каждого бара считаем FlatScore = доля из последних N баров,
+  // которые пересекали уровень close ± ATR×mult. Если FlatScore >= порог —
+  // бар считается "флэтовым". flatStreak = кол-во флэтовых баров подряд.
+  // Выход срабатывает РОВНО когда streak достигает minFlat (первый момент подтверждения).
+  // fzMinProfit: минимальный % прибыли для разрешения выхода (0 = любой P&L).
+  {
+    id:    'flatExit',
+    flag:  'useFlatExit',
+    check: (cfg, i, ts) => {
+      if (!cfg.fzStreakArr || i < 2) return false;
+      // Выход: предыдущий бар — первый подтверждённый флэтовый бар (streak == minFlat)
+      if (cfg.fzStreakArr[i-1] !== cfg.fzMinFlat) return false;
+      // Порог минимальной прибыли
+      if (cfg.fzMinProfit > 0) {
+        const cpnl = ts.dir * (DATA[i].c - ts.entry) / ts.entry * 100;
+        if (cpnl < cfg.fzMinProfit) return false;
+      }
+      return true;
+    },
+  },
 ];

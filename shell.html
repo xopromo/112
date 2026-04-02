@@ -1282,6 +1282,19 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
   <div class="cb"><input type="checkbox" id="x_st"><label data-tip="Supertrend-выход (Вариант A): закрывает позицию когда Supertrend разворачивается против неё. Параметры ATR-период и множитель берутся из блока «Точки входа → Supertrend» (поля e_st_atrp / e_st_mult).">Supertrend-выход</label></div>
 
   <div class="sep"></div>
+  <!-- ##FLAT_EXIT## Выход по началу флэт-зоны -->
+  <div class="cb"><input type="checkbox" id="x_flatex"><label data-tip="Выход когда цена входит во флэт-зону: N последних баров слишком часто пересекали текущий уровень (рынок «завис»). Выходим ровно когда флэт подтверждён minFlat барами подряд.">Выход по флэту</label></div>
+  <div class="g2">
+    <div class="field"><label>Окно N баров</label><input id="x_fzn" value="20" data-tip="Сколько последних баров анализировать. 20–30 — стандарт"></div>
+    <div class="field"><label>ATR × (зона)</label><input id="x_fzatr" value="0.5" data-tip="Полуширина зоны = ATR × этот множитель. Чем больше — тем шире зона (легче попасть во флэт)"></div>
+  </div>
+  <div class="g2">
+    <div class="field"><label>Порог (0..1)</label><input id="x_fzthr" value="0.5" data-tip="Минимальная доля баров из N, которые пересекли зону. 0.5 = 50% баров «были здесь»"></div>
+    <div class="field"><label>Мин. баров</label><input id="x_fzmf" value="5" data-tip="Сколько баров подряд должен длиться флэт, прежде чем выход сработает"></div>
+  </div>
+  <div class="field"><label data-tip="Выходить только если открытая прибыль ≥ N%. 0 = выходить при любом P&L">Мин. прибыль %</label><input id="x_fzmp" value="0" data-tip="Порог прибыли для выхода. 0 = без ограничения"></div>
+
+  <div class="sep"></div>
   <div class="cb"><input type="checkbox" id="x_part"><label data-tip="Закрывает часть позиции на промежуточном уровне, позволяя остатку расти">Частичный TP1</label></div>
   <div class="g2">
     <div class="field"><label>TP1 = SL ×</label><input id="x_partr" value="1.0" data-tip="TP1 = расстояние до SL × этот коэффициент (например 1.0 = 1:1 R/R)"></div>
