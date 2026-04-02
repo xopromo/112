@@ -25194,8 +25194,8 @@ function selectRow(idx) {
 
   const r = _visibleResults[idx];
   if (!r) return;
-  if (_tableMode === 'results') drawEquity(r.name);
-  else drawEquityForResult(r);
+  // Используем drawEquityForResult для обоих режимов, чтобы baseline всегда отображался
+  drawEquityForResult(r);
 
   // Показываем контролы baseline если есть данные MA Equity Filter
   const baselineCtrl = $('eq-baseline-controls');
@@ -32784,7 +32784,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1775140851272;
+window._BUILD_TS = 1775141527371;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
