@@ -1092,6 +1092,16 @@ function selectRow(idx) {
   if (!r) return;
   if (_tableMode === 'results') drawEquity(r.name);
   else drawEquityForResult(r);
+
+  // Показываем контролы baseline если есть данные MA Equity Filter
+  const baselineCtrl = $('eq-baseline-controls');
+  if (baselineCtrl) {
+    if (r.eqCalcMAArr && r.eqCalcMAArr.length) {
+      baselineCtrl.style.display = 'flex';
+    } else {
+      baselineCtrl.style.display = 'none';
+    }
+  }
 }
 
 // Клавиатурная навигация по таблице результатов

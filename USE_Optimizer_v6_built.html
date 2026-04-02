@@ -1596,6 +1596,26 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
 <div id="eq-wrap">
   <canvas id="eqc"></canvas>
   <canvas id="eq-crosshair"></canvas>
+  <!-- MA Equity Filter baseline comparison controls -->
+  <div id="eq-baseline-controls" style="display:none;padding:8px;background:rgba(0,0,0,0.2);border-top:1px solid var(--border);font-size:.75em;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+    <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+      <input type="checkbox" id="chk-show-baseline" checked style="accent-color:var(--accent)" onchange="toggleBaselineDisplay()">
+      <span style="color:var(--text2)">Baseline</span>
+    </label>
+    <label style="display:flex;align-items:center;gap:4px">
+      <span style="color:var(--text3);font-size:.85em">Цвет:</span>
+      <input type="color" id="baseline-color-picker" value="#00b4d8" style="width:28px;height:20px;border:1px solid var(--border);border-radius:3px;cursor:pointer" onchange="updateBaselineColor()">
+    </label>
+    <select id="baseline-color-preset" style="font-size:.75em;padding:2px 6px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:3px;cursor:pointer" onchange="setBaselineColorPreset(this.value)">
+      <option value="#00b4d8">Голубой</option>
+      <option value="#fbbf24">Жёлтый</option>
+      <option value="#a78bfa">Фиолетовый</option>
+      <option value="#10b981">Зелёный</option>
+      <option value="#f97316">Оранжевый</option>
+      <option value="#06b6d4">Бирюзовый</option>
+      <option value="#ec4899">Розовый</option>
+    </select>
+  </div>
 </div>
 <div id="oos-chart-wrap">
   <canvas id="oos-eqc"></canvas>
@@ -1961,30 +1981,6 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
   </div>
   <div class="dp-stats" id="dp-stats"></div>
   <div class="dp-body" id="dp-body"></div>
-  <!-- MA Equity Filter baseline comparison controls -->
-  <div id="dp-baseline-controls" style="display:none;padding:10px;background:var(--bg2);border-top:1px solid var(--border);font-size:.8em;gap:8px;flex-direction:column;flex-shrink:0">
-    <div style="display:flex;align-items:center;gap:8px">
-      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;flex:1">
-        <input type="checkbox" id="chk-show-baseline" checked style="accent-color:var(--accent)" onchange="toggleBaselineDisplay()">
-        <span>Показать baseline (без фильтра)</span>
-      </label>
-    </div>
-    <div style="display:flex;align-items:center;gap:8px">
-      <label style="display:flex;align-items:center;gap:6px;flex:1">
-        <span style="opacity:.8">Цвет:</span>
-        <input type="color" id="baseline-color-picker" value="#00b4d8" style="width:32px;height:24px;border:1px solid var(--border);border-radius:3px;cursor:pointer" onchange="updateBaselineColor()">
-      </label>
-      <select id="baseline-color-preset" style="flex:1;font-size:.8em;padding:4px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:3px;cursor:pointer" onchange="setBaselineColorPreset(this.value)">
-        <option value="#00b4d8">Голубой</option>
-        <option value="#fbbf24">Жёлтый</option>
-        <option value="#a78bfa">Фиолетовый</option>
-        <option value="#10b981">Зелёный</option>
-        <option value="#f97316">Оранжевый</option>
-        <option value="#06b6d4">Бирюзовый</option>
-        <option value="#ec4899">Розовый</option>
-      </select>
-    </div>
-  </div>
   <div class="dp-footer">
     <button class="dp-copy-btn" style="flex:1 1 calc(33% - 6px)" id="btn-copy-detail" onclick="copyDetail()">📋 Скопировать настройки</button>
     <button class="dp-copy-btn" style="flex:1 1 calc(33% - 6px);background:var(--bg4);border-color:var(--accent2);color:var(--accent2)" id="btn-open-robust-from-detail" onclick="openRobustModal()">🔬 Тест устойчивости</button>
@@ -22277,24 +22273,11 @@ function showDetail(r) {
 
   $('dp-body').innerHTML = html;
 
-  // Управление baseline (MA Equity Filter)
-  const baselineCtrl = $('dp-baseline-controls');
-  if (baselineCtrl) {
-    if (r.eqCalcMAArr && r.eqCalcMAArr.length) {
-      baselineCtrl.style.display = 'flex';
-    } else {
-      baselineCtrl.style.display = 'none';
-    }
-  }
-
   // Build copy text
   _detailText = buildCopyText(r, c, slName, tpName);
 
   $('detail-overlay').classList.add('open');
   $('detail-panel').classList.add('open');
-
-  // Перерисовываем график после открытия панели
-  setTimeout(() => drawEquityForResult(r), 100);
 }
 
 // Карта: поле cfg → {id: HTML-элемент, type: 'chk'|'val'|'sel'}
@@ -22594,21 +22577,28 @@ function toggleBaselineDisplay() {
   const chk = $('chk-show-baseline');
   if (!chk) return;
   _eqMAFilterShowBaseline = chk.checked;
-  if (_robustResult) drawEquityForResult(_robustResult);
+  // Перерисовываем текущий результат если он выбран
+  if (_selectedIdx >= 0 && _visibleResults[_selectedIdx]) {
+    drawEquityForResult(_visibleResults[_selectedIdx]);
+  }
 }
 
 function updateBaselineColor() {
   const picker = $('baseline-color-picker');
   if (!picker) return;
   _eqMAFilterBaselineColor = picker.value;
-  if (_robustResult) drawEquityForResult(_robustResult);
+  if (_selectedIdx >= 0 && _visibleResults[_selectedIdx]) {
+    drawEquityForResult(_visibleResults[_selectedIdx]);
+  }
 }
 
 function setBaselineColorPreset(value) {
   const picker = $('baseline-color-picker');
   if (picker) picker.value = value;
   _eqMAFilterBaselineColor = value;
-  if (_robustResult) drawEquityForResult(_robustResult);
+  if (_selectedIdx >= 0 && _visibleResults[_selectedIdx]) {
+    drawEquityForResult(_visibleResults[_selectedIdx]);
+  }
 }
 
 
@@ -25206,6 +25196,16 @@ function selectRow(idx) {
   if (!r) return;
   if (_tableMode === 'results') drawEquity(r.name);
   else drawEquityForResult(r);
+
+  // Показываем контролы baseline если есть данные MA Equity Filter
+  const baselineCtrl = $('eq-baseline-controls');
+  if (baselineCtrl) {
+    if (r.eqCalcMAArr && r.eqCalcMAArr.length) {
+      baselineCtrl.style.display = 'flex';
+    } else {
+      baselineCtrl.style.display = 'none';
+    }
+  }
 }
 
 // Клавиатурная навигация по таблице результатов
@@ -32784,7 +32784,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1775140292174;
+window._BUILD_TS = 1775140583954;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;

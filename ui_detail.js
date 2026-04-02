@@ -407,24 +407,11 @@ function showDetail(r) {
 
   $('dp-body').innerHTML = html;
 
-  // Управление baseline (MA Equity Filter)
-  const baselineCtrl = $('dp-baseline-controls');
-  if (baselineCtrl) {
-    if (r.eqCalcMAArr && r.eqCalcMAArr.length) {
-      baselineCtrl.style.display = 'flex';
-    } else {
-      baselineCtrl.style.display = 'none';
-    }
-  }
-
   // Build copy text
   _detailText = buildCopyText(r, c, slName, tpName);
 
   $('detail-overlay').classList.add('open');
   $('detail-panel').classList.add('open');
-
-  // Перерисовываем график после открытия панели
-  setTimeout(() => drawEquityForResult(r), 100);
 }
 
 // Карта: поле cfg → {id: HTML-элемент, type: 'chk'|'val'|'sel'}
@@ -724,19 +711,26 @@ function toggleBaselineDisplay() {
   const chk = $('chk-show-baseline');
   if (!chk) return;
   _eqMAFilterShowBaseline = chk.checked;
-  if (_robustResult) drawEquityForResult(_robustResult);
+  // Перерисовываем текущий результат если он выбран
+  if (_selectedIdx >= 0 && _visibleResults[_selectedIdx]) {
+    drawEquityForResult(_visibleResults[_selectedIdx]);
+  }
 }
 
 function updateBaselineColor() {
   const picker = $('baseline-color-picker');
   if (!picker) return;
   _eqMAFilterBaselineColor = picker.value;
-  if (_robustResult) drawEquityForResult(_robustResult);
+  if (_selectedIdx >= 0 && _visibleResults[_selectedIdx]) {
+    drawEquityForResult(_visibleResults[_selectedIdx]);
+  }
 }
 
 function setBaselineColorPreset(value) {
   const picker = $('baseline-color-picker');
   if (picker) picker.value = value;
   _eqMAFilterBaselineColor = value;
-  if (_robustResult) drawEquityForResult(_robustResult);
+  if (_selectedIdx >= 0 && _visibleResults[_selectedIdx]) {
+    drawEquityForResult(_visibleResults[_selectedIdx]);
+  }
 }
