@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Тест API источников корреляции</title>
+<style>
+  body { font-family: monospace; background: #1a1a2e; color: #cdd6f4; padding: 20px; }
+  h2 { color: #89b4fa; }
+  .ok  { color: #a6e3a1; }
+  .err { color: #f38ba8; }
+  .warn { color: #f9e2af; }
+  table { border-collapse: collapse; width: 100%; margin-top: 12px; }
+  td, th { padding: 6px 12px; border: 1px solid #313244; text-align: left; font-size: .85em; }
+  th { background: #313244; color: #89b4fa; }
+  tr:hover { background: #1e1e2e; }
+  pre { background: #181825; padding: 10px; border-radius: 4px; overflow-x: auto; font-size: .75em; max-height: 120px; }
+  .tag { display:inline-block; padding:1px 6px; border-radius:3px; font-size:.75em; margin-left:6px; }
+  .tag-ok { background:rgba(166,227,161,.15); color:#a6e3a1; }
+  .tag-err { background:rgba(243,139,168,.15); color:#f38ba8; }
+  button { background:#313244; color:#cdd6f4; border:1px solid #45475a; padding:8px 18px; border-radius:4px; cursor:pointer; font-size:.9em; }
+  button:hover { background:#45475a; }
+</style>
+</head>
+<body>
+<h2>🔌 Тест API источников для фильтра корреляции</h2>
+<p style="color:#a6adc8;font-size:.85em">Открой в браузере — проверяет доступность Binance и Yahoo Finance напрямую.</p>
+<button onclick="runAll()">▶ Запустить все тесты</button>
+<table id="tbl">
+  <tr><th>Источник</th><th>Актив</th><th>Статус</th><th>Записей</th><th>Время</th><th>Preview</th></tr>
+</table>
+<div id="summary" style="margin-top:16px;font-size:.85em"></div>
+
+<script>
+const TESTS = [
+  // ── Binance ──
+  { src:'Binance', asset:'BTC/USDT 1d',  url:'https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=10', parse: parseBinance },
+  { src:'Binance', asset:'XAUUSDT (Gold)',url:'https://api.binance.com/api/v3/klines?symbol=XAUUSDT&interval=1d&limit=10', parse: parseBinance },
+  { src:'Binance', asset:'XAGUSDT (Silver)',url:'https://api.binance.com/api/v3/klines?symbol=XAGUSDT&interval=1d&limit=10', parse: parseBinance },
+  { src:'Binance', asset:'SOLUSDT 15m',  url:'https://api.binance.com/api/v3/klines?symbol=SOLUSDT&interval=15m&limit=10', parse: parseBinance },
+  { src:'Binance', asset:'ETHUSDT 1h',   url:'https://api.binance.com/api/v3/klines?symbol=ETHUSDT&interval=1h&limit=10', parse: parseBinance },
+  { src:'Binance', asset:'ping',         url:'https://api.binance.com/api/v3/ping', parse: j => ({ rows: 1, preview: '{}' }) },
+
+  // ── Yahoo Finance query1 ──
+  { src:'Yahoo q1', asset:'GOLD (GC=F)',  url:'https://query1.finance.yahoo.com/v8/finance/chart/GC%3DF?interval=1d&range=10d', parse: parseYahoo },
+  { src:'Yahoo q1', asset:'OIL (CL=F)',   url:'https://query1.finance.yahoo.com/v8/finance/chart/CL%3DF?interval=1d&range=10d', parse: parseYahoo },
+  { src:'Yahoo q1', asset:'SPX (^GSPC)',  url:'https://query1.finance.yahoo.com/v8/finance/chart/%5EGSPC?interval=1d&range=10d', parse: parseYahoo },
+  { src:'Yahoo q1', asset:'DXY (DX-Y.NYB)',url:'https://query1.finance.yahoo.com/v8/finance/chart/DX-Y.NYB?interval=1d&range=10d', parse: parseYahoo },
+  { src:'Yahoo q1', asset:'BONDS (^TNX)', url:'https://query1.finance.yahoo.com/v8/finance/chart/%5ETNX?interval=1d&range=10d', parse: parseYahoo },
+  { src:'Yahoo q1', asset:'AAPL (акция)', url:'https://query1.finance.yahoo.com/v8/finance/chart/AAPL?interval=1d&range=10d', parse: parseYahoo },
+
+  // ── Yahoo Finance query2 ──
+  { src:'Yahoo q2', asset:'GOLD (GC=F)',  url:'https://query2.finance.yahoo.com/v8/finance/chart/GC%3DF?interval=1d&range=10d', parse: parseYahoo },
+  { src:'Yahoo q2', asset:'SPX (^GSPC)',  url:'https://query2.finance.yahoo.com/v8/finance/chart/%5EGSPC?interval=1d&range=10d', parse: parseYahoo },
+  { src:'Yahoo q2', asset:'DXY (DX-Y.NYB)',url:'https://query2.finance.yahoo.com/v8/finance/chart/DX-Y.NYB?interval=1d&range=10d', parse: parseYahoo },
+];
+
+function parseBinance(j) {
+  if (!Array.isArray(j)) return { rows: 0, preview: 'не массив' };
+  // [[openTime, open, high, low, close, vol, ...], ...]
+  const last = j[j.length - 1];
+  return {
+    rows: j.length,
+    preview: `openTime=${last[0]}, o=${last[1]}, h=${last[2]}, l=${last[3]}, c=${last[4]}, vol=${last[5]}`
+  };
+}
+
+function parseYahoo(j) {
+  const result = j?.chart?.result?.[0];
+  if (!result) return { rows: 0, preview: JSON.stringify(j).slice(0, 100) };
+  const ts = result.timestamp || [];
+  const close = result.indicators?.quote?.[0]?.close || [];
+  const last = ts.length - 1;
+  return {
+    rows: ts.length,
+    preview: `date=${new Date(ts[last]*1000).toISOString().slice(0,10)}, close=${close[last]?.toFixed(2)}`
+  };
+}
+
+function addRow(test, status, rows, ms, preview, err) {
+  const tbl = document.getElementById('tbl');
+  const tr = document.createElement('tr');
+  const isOk = status === 'ok';
+  tr.innerHTML = `
+    <td>${test.src}</td>
+    <td>${test.asset}</td>
+    <td class="${isOk ? 'ok' : 'err'}">${isOk
+      ? '✅ OK'
+      : `❌ ${err || status}`}</td>
+    <td>${isOk ? rows : '—'}</td>
+    <td>${ms}ms</td>
+    <td><pre>${isOk ? (preview||'') : (err||'')}</pre></td>
+  `;
+  tbl.appendChild(tr);
+}
+
+async function runTest(test) {
+  const t0 = Date.now();
+  try {
+    const r = await fetch(test.url, { signal: AbortSignal.timeout(8000) });
+    const ms = Date.now() - t0;
+    if (!r.ok) { addRow(test, 'error', 0, ms, '', `HTTP ${r.status}`); return false; }
+    const j = await r.json();
+    const { rows, preview } = test.parse(j);
+    addRow(test, 'ok', rows, ms, preview, '');
+    return true;
+  } catch(e) {
+    addRow(test, 'error', 0, Date.now() - t0, '', e.message.slice(0, 80));
+    return false;
+  }
+}
+
+async function runAll() {
+  document.getElementById('tbl').innerHTML =
+    '<tr><th>Источник</th><th>Актив</th><th>Статус</th><th>Записей</th><th>Время</th><th>Preview</th></tr>';
+  document.getElementById('summary').textContent = 'Тестируем...';
+
+  const results = await Promise.all(TESTS.map(t => runTest(t)));
+  const ok = results.filter(Boolean).length;
+  const total = results.length;
+  document.getElementById('summary').innerHTML =
+    `<span class="${ok===total?'ok':'warn'}">Итого: ${ok}/${total} OK</span>`;
+}
+</script>
+</body>
+</html>
