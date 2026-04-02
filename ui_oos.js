@@ -1319,19 +1319,23 @@ async function runOOSOnNewData() {
       _btCfg.tradeLog = [];
 
       // ##EQ_MA_FILTER## Двухпроходный цикл для OOS новых данных
-      if (rOld && rOld.eqCalcMAArr && rOld.eqCalcBaselineArr && r.cfg.useEqMA) {
-        // Используем MA, рассчитанную от old (IS) данных для фильтрации на new (OOS)
-        _btCfg.eqCalcMAArr = rOld.eqCalcMAArr;
-        _btCfg.eqCalcBaselineArr = rOld.eqCalcBaselineArr;
-      } else if (r.cfg.useEqMA) {
-        // Если нет old результата, рассчитаем MA для new данных отдельно
+      if (r.cfg.useEqMA) {
+        // Рассчитываем baseline ДЛЯ NEW ДАННЫХ (всегда нужна свежая, не от old)
         const _shadowCfg = JSON.parse(JSON.stringify(_btCfg));
         _shadowCfg.useEqMA = false;
         const _shadowRes = backtest(_ind.pvLo, _ind.pvHi, _ind.atrArr, _shadowCfg);
         if (_shadowRes && _shadowRes.eq && _shadowRes.eq.length > 0) {
-          const maLen = r.cfg.eqMALen || 20;
-          _btCfg.eqCalcMAArr = calcSMA(Array.from(_shadowRes.eq), maLen);
+          // Baseline НОВАЯ от new данных
           _btCfg.eqCalcBaselineArr = Array.from(_shadowRes.eq);
+
+          // MA берём от old если доступна (для консистентности с IS режимом)
+          // иначе рассчитываем от new baseline
+          if (rOld && rOld.eqCalcMAArr) {
+            _btCfg.eqCalcMAArr = rOld.eqCalcMAArr;
+          } else {
+            const maLen = r.cfg.eqMALen || 20;
+            _btCfg.eqCalcMAArr = calcSMA(Array.from(_shadowRes.eq), maLen);
+          }
         }
       }
 
