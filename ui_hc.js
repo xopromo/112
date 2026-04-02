@@ -1411,6 +1411,17 @@ function _hcOpenDetail(idx) {
   });
   _robustResult = r;
   showDetail(r);
+  // Рисуем график с baseline (если доступен) ##EQ_MA_FILTER##
+  drawEquityForResult(r);
+  // Показываем контролы baseline если есть данные
+  const baselineCtrl = document.getElementById('eq-baseline-controls');
+  if (baselineCtrl) {
+    if (r.eqCalcMAArr && r.eqCalcMAArr.length) {
+      baselineCtrl.style.display = 'flex';
+    } else {
+      baselineCtrl.style.display = 'none';
+    }
+  }
 }
 
 // Добавляем HC результат в избранное

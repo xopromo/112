@@ -383,7 +383,7 @@ const FILTER_REGISTRY = [
       if (ma <= 0) return true;  // warmup
       if (i < 2) return true;    // need at least 2 bars for comparison
       const prevMa = cfg.eqCalcMAArr[i-2];
-      return prevMa <= 0 || ma <= prevMa;  // block if falling or flat
+      return prevMa <= 0 || ma < prevMa;  // block only if FALLING (ma < prevMa), not flat
     },
     blocksS:  (cfg, i) => {
       if (!cfg.eqCalcMAArr) return false;
@@ -391,7 +391,7 @@ const FILTER_REGISTRY = [
       if (ma <= 0) return true;  // warmup
       if (i < 2) return true;    // need at least 2 bars for comparison
       const prevMa = cfg.eqCalcMAArr[i-2];
-      return prevMa <= 0 || ma <= prevMa;  // block if falling or flat
+      return prevMa <= 0 || ma < prevMa;  // block only if FALLING (ma < prevMa), not flat
     },
     nameLabel: (cfg) => `EqMA(${cfg.eqMALen||20})`,
   },
