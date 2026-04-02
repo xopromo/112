@@ -603,4 +603,35 @@ const ENTRY_REGISTRY = [
       `pchg_htf_b   = input.int(${c.pChgHtfB||1}, "  B: HTF множитель", minval=1, group=grp_entry)`,
     ],
   },
+
+  // ── Flat Zone Breakout ───────────────────────────────────── ##FLAT_EXIT##
+  // Вход на пробое из флэт-зоны.
+  // Условие: предыдущий бар — первый бар пробоя (streak упал ниже minFlat),
+  //          два бара назад — подтверждённый флэт (streak >= minFlat).
+  // Направление: опционально подтверждается направлением свечи пробоя.
+  // Использует те же параметры что и "Выход по флэту" (fzStreakArr, fzMinFlat).
+  {
+    id:        'flatBreak',
+    flag:      'useFlatBreak',
+    htmlId:    'e_flatbr',
+    shortName: c => `FlatBr(n${c.fzN||20}mf${c.fzMinFlat||5})`,
+    detectL: (cfg, i) => {
+      if (!cfg.fzStreakArr || i < 3) return false;
+      if (cfg.fzStreakArr[i-2] < cfg.fzMinFlat) return false;  // не было флэта
+      if (cfg.fzStreakArr[i-1] >= cfg.fzMinFlat) return false; // ещё во флэте
+      if (cfg.fzBrConfirm && DATA[i-1].c <= DATA[i-1].o) return false; // нет бычьего бара
+      return true;
+    },
+    detectS: (cfg, i) => {
+      if (!cfg.fzStreakArr || i < 3) return false;
+      if (cfg.fzStreakArr[i-2] < cfg.fzMinFlat) return false;
+      if (cfg.fzStreakArr[i-1] >= cfg.fzMinFlat) return false;
+      if (cfg.fzBrConfirm && DATA[i-1].c >= DATA[i-1].o) return false; // нет медвежьего бара
+      return true;
+    },
+    pineLines: (c, b) => [
+      `use_flat_br  = input.bool(${b(c.useFlatBreak)}, "Flat Zone Breakout (пробой флэта)", group=grp_entry)`,
+      `fz_br_confirm = input.bool(${b(c.fzBrConfirm !== false)}, "FlatBr: подтверждать свечой пробоя", group=grp_entry)`,
+    ],
+  },
 ];

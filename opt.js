@@ -1196,6 +1196,8 @@ async function runOpt() {
   const fzFlatThr     = $n('x_fzthr') || 0.5;
   const fzMinFlat     = $n('x_fzmf')  || 5;
   const fzMinProfit   = $n('x_fzmp')  || 0;
+  const useFlatBreak  = $c('e_flatbr');   // ##FLAT_EXIT## вход по пробою флэта
+  const fzBrConfirm   = !document.getElementById('e_flatbr_nc')?.checked; // true = подтверждать свечой
   const useWaitEntry  = $c('e_wait_on');
   const useWaitRetrace= useWaitEntry && $c('e_wait_retrace');
   const useEIS        = $c('e_eis');
@@ -2122,7 +2124,7 @@ async function runOpt() {
       const atrAvg = atrAvgCache[atrP];
       // ##FLAT_EXIT## fzStreakArr: кэш по atrP + fz-параметрам (не оптимизируются)
       const _fzCk = 'fz_'+atrP+'_'+fzN+'_'+fzAtrMult+'_'+fzFlatThr;
-      const fzStreakArr = useFlatExit ? (fzStreakCache[_fzCk]||(fzStreakCache[_fzCk]=_calcFzStreak(atrCache[atrP],fzN,fzAtrMult,fzFlatThr))) : null;
+      const fzStreakArr = (useFlatExit||useFlatBreak) ? (fzStreakCache[_fzCk]||(fzStreakCache[_fzCk]=_calcFzStreak(atrCache[atrP],fzN,fzAtrMult,fzFlatThr))) : null;
       const mk = _mType+'_'+maP+'_htf'+htfRatio;
       let maArr = null;
       if (maP > 0) {
@@ -2165,6 +2167,7 @@ async function runOpt() {
         useSoldiers,
         useStExit,
         useFlatExit,fzStreakArr,fzN,fzAtrMult,fzFlatThr,fzMinFlat,fzMinProfit, // ##FLAT_EXIT##
+        useFlatBreak,fzBrConfirm, // ##FLAT_EXIT## breakout entry
         waitBars:waitBars||0,waitRetrace:waitRetrace||false,waitMaxBars,waitCancelAtr,
         hasSLA:!!(slPair.a),slMult:slPair.a?slPair.a.m:0,hasSLB:!!(slPair.p),slPctMult:slPair.p?slPair.p.m:0,slLogic,
         hasTPA:!!(tpPair.a),tpMult:tpPair.a?tpPair.a.m:0,tpMode:tpPair.a?tpPair.a.type:'rr',
@@ -2272,6 +2275,7 @@ async function runOpt() {
               useSupertrend,stAtrP,stMult,
               useStExit,
               useFlatExit,fzN,fzAtrMult,fzFlatThr,fzMinFlat,fzMinProfit, // ##FLAT_EXIT##
+              useFlatBreak,fzBrConfirm, // ##FLAT_EXIT## breakout entry
               waitBars:waitBars||0,waitRetrace:waitRetrace||false,waitMaxBars,waitCancelAtr,
               slPair,slLogic,tpPair,tpLogic,
               useSLPiv,slPivOff,slPivMax,slPivL,slPivR,slPivTrail,
@@ -2538,7 +2542,7 @@ async function runOpt() {
       const atrAvg = atrAvgCache[atrP];
       // ##FLAT_EXIT## fzStreakArr: кэш по atrP + fz-параметрам
       const _fzCkTpe = 'fz_'+atrP+'_'+fzN+'_'+fzAtrMult+'_'+fzFlatThr;
-      const fzStreakArr = useFlatExit ? (fzStreakCache[_fzCkTpe]||(fzStreakCache[_fzCkTpe]=_calcFzStreak(atrCache[atrP],fzN,fzAtrMult,fzFlatThr))) : null;
+      const fzStreakArr = (useFlatExit||useFlatBreak) ? (fzStreakCache[_fzCkTpe]||(fzStreakCache[_fzCkTpe]=_calcFzStreak(atrCache[atrP],fzN,fzAtrMult,fzFlatThr))) : null;
       const mk = _mType+'_'+maP+'_htf'+htfRatio;
       let maArr = null;
       if (maP > 0) {
@@ -2585,6 +2589,7 @@ async function runOpt() {
         useSoldiers,
         useStExit,
         useFlatExit,fzStreakArr,fzN,fzAtrMult,fzFlatThr,fzMinFlat,fzMinProfit, // ##FLAT_EXIT##
+        useFlatBreak,fzBrConfirm, // ##FLAT_EXIT## breakout entry
         waitBars:waitBars||0,waitRetrace:waitRetrace||false,waitMaxBars,waitCancelAtr,
         hasSLA:!!(slPair.a),slMult:slPair.a?slPair.a.m:0,hasSLB:!!(slPair.p),slPctMult:slPair.p?slPair.p.m:0,slLogic,
         hasTPA:!!(tpPair.a),tpMult:tpPair.a?tpPair.a.m:0,tpMode:tpPair.a?tpPair.a.type:'rr',
@@ -2717,6 +2722,7 @@ async function runOpt() {
               useSupertrend,stAtrP,stMult,
               useStExit,
               useFlatExit,fzN,fzAtrMult,fzFlatThr,fzMinFlat,fzMinProfit, // ##FLAT_EXIT##
+              useFlatBreak,fzBrConfirm, // ##FLAT_EXIT## breakout entry
               waitBars:waitBars||0,waitRetrace:waitRetrace||false,waitMaxBars,waitCancelAtr,
               slPair,slLogic,tpPair,tpLogic,
               useSLPiv,slPivOff,slPivMax,slPivL,slPivR,slPivTrail,
@@ -3113,7 +3119,7 @@ async function runOpt() {
       const atrAvg=calcSMA(Array.from(atrCache[atrP]),50);
       // ##FLAT_EXIT##
       const _fzCkEx='fz_'+atrP+'_'+fzN+'_'+fzAtrMult+'_'+fzFlatThr;
-      const fzStreakArr=useFlatExit?(fzStreakCache[_fzCkEx]||(fzStreakCache[_fzCkEx]=_calcFzStreak(atrCache[atrP],fzN,fzAtrMult,fzFlatThr))):null;
+      const fzStreakArr=(useFlatExit||useFlatBreak)?(fzStreakCache[_fzCkEx]||(fzStreakCache[_fzCkEx]=_calcFzStreak(atrCache[atrP],fzN,fzAtrMult,fzFlatThr))):null;
 
       for(const maP of maPs) {
         if(_mcDone) break;
@@ -3280,6 +3286,7 @@ async function runOpt() {
                                       useSupertrend,stDir,stAtrP,stMult,
                                       useStExit,
                                       useFlatExit,fzStreakArr,fzN,fzAtrMult,fzFlatThr,fzMinFlat,fzMinProfit, // ##FLAT_EXIT##
+                                      useFlatBreak,fzBrConfirm, // ##FLAT_EXIT## breakout entry
                                       waitBars:waitBars||0,waitRetrace:waitRetrace||false,waitMaxBars,waitCancelAtr,
                                       // SL
                                       hasSLA:!!slPair.a,
@@ -3418,6 +3425,7 @@ async function runOpt() {
                                           useSupertrend,stAtrP,stMult,
                                           useStExit,
                                           useFlatExit,fzN,fzAtrMult,fzFlatThr,fzMinFlat,fzMinProfit, // ##FLAT_EXIT##
+                                          useFlatBreak,fzBrConfirm, // ##FLAT_EXIT## breakout entry
                                           waitBars:waitBars||0,waitRetrace:waitRetrace||false,waitMaxBars,waitCancelAtr,
                                           slPair, slLogic, tpPair, tpLogic,
                                           useSLPiv, slPivOff, slPivMax, slPivL, slPivR, slPivTrail,
@@ -3999,7 +4007,7 @@ function _calcIndicators(cfg) {
           return arr;
         })()
       : null,
-    fzStreakArr: cfg.useFlatExit // ##FLAT_EXIT##
+    fzStreakArr: (cfg.useFlatExit || cfg.useFlatBreak) // ##FLAT_EXIT##
       ? _calcFzStreak(atrArr, cfg.fzN || 20, cfg.fzAtrMult || 0.5, cfg.fzFlatThr || 0.5)
       : null,
   };
@@ -4104,6 +4112,8 @@ function buildBtCfg(cfg, ind) {
     stMult:        cfg.stMult        || 3.0,
     useStExit:     cfg.useStExit     || false,
     useFlatExit:   cfg.useFlatExit   || false, // ##FLAT_EXIT##
+    useFlatBreak:  cfg.useFlatBreak  || false,
+    fzBrConfirm:   cfg.fzBrConfirm   !== false,
     fzStreakArr:   ind.fzStreakArr   || null,
     fzN:           cfg.fzN           || 20,
     fzAtrMult:     cfg.fzAtrMult     || 0.5,
