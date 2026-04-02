@@ -20303,7 +20303,8 @@ async function runOpt() {
                                       // Рассчитываем MA(расчётная equity)
                                       if (_shadowEq && _shadowEq.length > 0) {
                                         const maLen = eqMALen || 20;
-                                        btCfg.eqCalcMAArr = calcSMA(Array.from(_shadowEq), maLen);
+                                        const maType = eqMAType || 'SMA'; // ##EQ_MA_FILTER## выбор типа MA
+                                        btCfg.eqCalcMAArr = calcMA(Array.from(_shadowEq), maLen, maType);
                                         btCfg.eqCalcBaselineArr = Array.from(_shadowEq); // ##EQ_MA_FILTER## сохраняем саму baseline (не MA)
                                         _eqCalc = _shadowEq;  // сохраняем для последующего использования
                                       }
@@ -33132,7 +33133,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1775168304192;
+window._BUILD_TS = 1775168599750;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;

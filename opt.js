@@ -3351,7 +3351,8 @@ async function runOpt() {
                                       // Рассчитываем MA(расчётная equity)
                                       if (_shadowEq && _shadowEq.length > 0) {
                                         const maLen = eqMALen || 20;
-                                        btCfg.eqCalcMAArr = calcSMA(Array.from(_shadowEq), maLen);
+                                        const maType = eqMAType || 'SMA'; // ##EQ_MA_FILTER## выбор типа MA
+                                        btCfg.eqCalcMAArr = calcMA(Array.from(_shadowEq), maLen, maType);
                                         btCfg.eqCalcBaselineArr = Array.from(_shadowEq); // ##EQ_MA_FILTER## сохраняем саму baseline (не MA)
                                         _eqCalc = _shadowEq;  // сохраняем для последующего использования
                                       }
