@@ -1432,6 +1432,13 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
   <div class="g2">
     <div class="field"><label>База период</label><input id="f_kalmanl" value="20" data-tip="Базовый период для Kalman MA. Фактический период адаптируется ±N в зависимости от текущей волатильности."></div>
   </div>
+
+  <div class="sep"></div>
+  <div class="cb" id="eq-ma-cb"><input type="checkbox" id="f_eq_ma"><label data-tip="MA Equity фильтр: блокирует входы когда MA(Эквити) падает — признак серии убыточных сделок и нестабильности">MA Equity фильтр</label></div>
+  <div class="g2">
+    <div class="field"><label>MA период</label><input id="f_eq_ma_len" value="20" data-tip="Период скользящей средней для Эквити. Больше = более гладкий, меньше = быстрее реагирует на убытки"></div>
+    <div class="field"><label>Режим</label><input id="f_eq_ma_mode" value="Фильтр" data-tip="Фильтр = блокирует входы. Отображение = только показывает на графике. Оба = и то и то"></div>
+  </div>
 </div>
 
 </div><!-- end panels -->

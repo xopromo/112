@@ -1199,6 +1199,9 @@ async function runOpt() {
   const erThresh      = $n('f_ert') || 0.3;
   const useKalmanMA   = $c('f_kalman');      // ##KALMAN_MA##
   const kalmanLen     = $n('f_kalmanl') || 20; // ##KALMAN_MA##
+  const useEqMA       = $c('f_eq_ma');         // ##EQ_MA_FILTER##
+  const eqMALen       = $n('f_eq_ma_len') || 20; // ##EQ_MA_FILTER##
+  const eqMAMode      = $v('f_eq_ma_mode') || 'filter'; // ##EQ_MA_FILTER## режим: 'filter' | 'display' | 'both'
   const useMLFilter     = $c('c_ml_filter')      && typeof mlScore     === 'function'; // ##ML_FILTER##
   const mlThreshold     = $n('c_ml_thresh')      || 0.55; // ##ML_FILTER##
   const useMLHighFilter = $c('c_ml_high_filter') && typeof mlScoreHigh === 'function'; // ##ML_FILTER_HIGH##
@@ -1253,6 +1256,7 @@ async function runOpt() {
     {key:'useMacdFilter', active:useMacdFilter},
     {key:'useER',         active:useER},
     {key:'useKalmanMA',   active:useKalmanMA}, // ##KALMAN_MA##
+    {key:'useEqMA',       active:useEqMA},     // ##EQ_MA_FILTER##
   ].filter(f => f.active); // только те что включены
   let _filterCombos;
   if (_usePowerset && _psFilterDefs.length > 0) {
@@ -2009,6 +2013,7 @@ async function runOpt() {
       const _effUseVolDir  = _fCombo.useVolDir  ?? useVolDir;
       const _effUseWT      = _fCombo.useWT      ?? useWT;
       const _effUseFat     = _fCombo.useFat     ?? useFat;
+      const _effUseEqMA    = _fCombo.useEqMA    ?? useEqMA; // ##EQ_MA_FILTER##
       const adxL        = (_ip && _ip.adxL) || window._ipDef?.adxL || 14;
       const sTrendWin   = _ip.sTrendWin   ?? window._ipDef.sTrendWin;
       const confN       = _ip.confN       ?? window._ipDef.confN;
@@ -2153,6 +2158,7 @@ async function runOpt() {
         useMacdFilter:_fCombo.useMacdFilter??useMacdFilter,
         useER:_fCombo.useER??useER,erArr,erPeriod:erPeriod||10,erThresh,
         useKalmanMA:_fCombo.useKalmanMA??useKalmanMA,kalmanArr,kalmanLen, // ##KALMAN_MA##
+        useEqMA:_fCombo.useEqMA??useEqMA,eqMALen,eqMAMode,eqCalcMAArr:null, // ##EQ_MA_FILTER##
         useMLFilter,mlThreshold,mlScoresArr:_precompMlScores, // ##ML_FILTER## горячий цикл IS
         useMLHighFilter,mlHighThreshold,mlHighScoresArr:_precompMlHighScores, // ##ML_FILTER_HIGH##
         start:Math.max(
@@ -2161,6 +2167,25 @@ async function runOpt() {
           50)+2,
         pruning:false, maxDDLimit:maxDD
       };
+
+      // ##EQ_MA_FILTER## Двупроходный цикл: сначала расчётная equity, потом с фильтром
+      if (_effUseEqMA) {
+        const _shadowCfg = JSON.parse(JSON.stringify(btCfg));
+        _shadowCfg.useEqMA = false;  // отключаем фильтр для расчётной equity
+        if (_useOOS) DATA = _isData;
+        let _shadowEq;
+        try {
+          const _shadowResult = backtest(pvCache[pk].lo, pvCache[pk].hi, atrCache[atrP], _shadowCfg);
+          _shadowEq = _shadowResult ? _shadowResult.eq : null;
+        } finally {
+          if (_useOOS) DATA = _fullDATA;
+        }
+        // Рассчитываем MA(расчётная equity)
+        if (_shadowEq && _shadowEq.length > 0) {
+          const maLen = eqMALen || 20;
+          btCfg.eqCalcMAArr = calcSMA(Array.from(_shadowEq), maLen);
+        }
+      }
 
       if (_useOOS) DATA = _isData;
       let r;
@@ -2224,6 +2249,7 @@ async function runOpt() {
               useWT:_effUseWT&&wtT>0,wtThresh:wtT,wtN,wtVolW,wtBodyW,wtUseDist,
               useFat:_effUseFat,fatConsec,fatVolDrop,
               useKalmanMA:_fCombo.useKalmanMA??useKalmanMA,kalmanLen, // ##KALMAN_MA##
+              useEqMA:_fCombo.useEqMA??useEqMA,eqMALen,eqMAMode,eqCalcMAArr:null, // ##EQ_MA_FILTER##
               useMacdFilter:_fCombo.useMacdFilter??useMacdFilter,
               useER:_fCombo.useER??useER,erPeriod:erPeriod||10,erThresh,
               useMLFilter,mlThreshold,mlScoresArr:_precompMlScores, // ##ML_FILTER##
@@ -2531,6 +2557,7 @@ async function runOpt() {
         useMacdFilter:_fCombo.useMacdFilter??useMacdFilter,
         useER:_fCombo.useER??useER,erArr,erPeriod:erPeriod||10,erThresh,
         useKalmanMA:_fCombo.useKalmanMA??useKalmanMA,kalmanArr,kalmanLen, // ##KALMAN_MA##
+        useEqMA:_fCombo.useEqMA??useEqMA,eqMALen,eqMAMode,eqCalcMAArr:null, // ##EQ_MA_FILTER##
         useMLFilter,mlThreshold,mlScoresArr:_precompMlScores, // ##ML_FILTER## горячий цикл IS
         useMLHighFilter,mlHighThreshold,mlHighScoresArr:_precompMlHighScores, // ##ML_FILTER_HIGH##
         start:Math.max(
@@ -2538,6 +2565,24 @@ async function runOpt() {
           (_effUseConfirm&&confN>0?(confN||0)*(_confHtf||1)*(_confType==='EMA'||_confType==='DEMA'||_confType==='TEMA'?3:1):0),
           50)+2,pruning:false,maxDDLimit:maxDD
       };
+
+      // ##EQ_MA_FILTER## Двупроходный цикл: сначала расчётная equity, потом с фильтром
+      if (_effUseEqMA) {
+        const _shadowCfg = JSON.parse(JSON.stringify(btCfg));
+        _shadowCfg.useEqMA = false;  // отключаем фильтр для расчётной equity
+        if (_useOOS) DATA = _isData;
+        let _shadowEq;
+        try {
+          const _shadowResult = backtest(pvCache[pk].lo, pvCache[pk].hi, atrCache[atrP], _shadowCfg);
+          _shadowEq = _shadowResult ? _shadowResult.eq : null;
+        } catch(_btErr) { console.error('[TPE shadow] backtest ошибка:', _btErr); _shadowEq = null; }
+        finally { if (_useOOS) DATA = _fullDATA; }
+        // Рассчитываем MA(расчётная equity)
+        if (_shadowEq && _shadowEq.length > 0) {
+          const maLen = eqMALen || 20;
+          btCfg.eqCalcMAArr = calcSMA(Array.from(_shadowEq), maLen);
+        }
+      }
 
       if (_useOOS) DATA = _isData;
       let r;
@@ -2637,6 +2682,7 @@ async function runOpt() {
               useWT:_effUseWT&&wtT>0,wtThresh:wtT,wtN,wtVolW,wtBodyW,wtUseDist,
               useFat:_effUseFat,fatConsec,fatVolDrop,
               useKalmanMA:_fCombo.useKalmanMA??useKalmanMA,kalmanLen, // ##KALMAN_MA##
+              useEqMA:_fCombo.useEqMA??useEqMA,eqMALen,eqMAMode,eqCalcMAArr:null, // ##EQ_MA_FILTER##
               useMacdFilter:_fCombo.useMacdFilter??useMacdFilter,
               useER:_fCombo.useER??useER,erPeriod:erPeriod||10,erThresh,
               useMLFilter,mlThreshold,mlScoresArr:_precompMlScores, // ##ML_FILTER##
@@ -3225,6 +3271,23 @@ async function runOpt() {
                                       // Pruning
                                       pruning:optMode==='prune',maxDDLimit:maxDD
                                     };
+
+                                    // ##EQ_MA_FILTER## Двупроходный цикл: сначала расчётная equity, потом с фильтром
+                                    if (_effUseEqMA) {
+                                      const _shadowCfg = JSON.parse(JSON.stringify(btCfg));
+                                      _shadowCfg.useEqMA = false;  // отключаем фильтр для расчётной equity
+                                      if (_useOOS) DATA = _isData;
+                                      let _shadowEq;
+                                      try {
+                                        const _shadowResult = backtest(pvCache[pk].lo, pvCache[pk].hi, atrCache[atrP], _shadowCfg);
+                                        _shadowEq = _shadowResult ? _shadowResult.eq : null;
+                                      } finally { if (_useOOS) DATA = _fullDATA; }
+                                      // Рассчитываем MA(расчётная equity)
+                                      if (_shadowEq && _shadowEq.length > 0) {
+                                        const maLen = eqMALen || 20;
+                                        btCfg.eqCalcMAArr = calcSMA(Array.from(_shadowEq), maLen);
+                                      }
+                                    }
 
                                     if (_useOOS) DATA = _isData;
                                     let r;
@@ -3837,6 +3900,7 @@ function _calcIndicators(cfg) {
     erArr,
     kalmanArr, // ##KALMAN_MA##
     kalmanCrossArr, // ##KALMAN_CROSS##
+    eqCalcMAArr: null, // ##EQ_MA_FILTER## будет вычислена в два-проходном цикле
     mlScoresArr: cfg.useMLFilter && typeof mlComputeFeatures === 'function' && typeof mlScore === 'function'
       ? (() => {
           // Если в кеше есть массив для бо́льшего или равного набора данных —
@@ -4100,6 +4164,11 @@ function buildBtCfg(cfg, ind) {
     useKalmanCross: cfg.useKalmanCross || false, // ##KALMAN_CROSS##
     kalmanCrossArr: ind.kalmanCrossArr,
     kalmanCrossLen: cfg.kalmanCrossLen || 20,
+
+    useEqMA: cfg.useEqMA || false, // ##EQ_MA_FILTER##
+    eqCalcMAArr: ind.eqCalcMAArr || null,
+    eqMALen: cfg.eqMALen || 20,
+    eqMAMode: cfg.eqMAMode || 'filter',
 
     useMLFilter:      cfg.useMLFilter      || false, // ##ML_FILTER##
     mlThreshold:      cfg.mlThreshold      || 0.55,
