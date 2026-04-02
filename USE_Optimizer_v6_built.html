@@ -19232,6 +19232,11 @@ async function runOpt() {
       let r;
       try { r = backtest(pvCache[pk].lo, pvCache[pk].hi, atrCache[atrP], btCfg); }
       finally { if (_useOOS) DATA = _fullDATA; }
+      // ##EQ_MA_FILTER## Гарантируем что eqCalcBaselineArr и eqCalcMAArr установлены если фильтр включен
+      if (_effUseEqMA && (!btCfg.eqCalcBaselineArr || !btCfg.eqCalcMAArr)) {
+        if (!btCfg.eqCalcBaselineArr) btCfg.eqCalcBaselineArr = r?.eq || [];
+        if (!btCfg.eqCalcMAArr) btCfg.eqCalcMAArr = r?.eq ? calcMA(Array.from(r.eq), eqMALen || 20, eqMAType || 'SMA') : [];
+      }
       done++;
       if (r && r.n >= minTrades && r.dd <= maxDD) {
         const pdd = r.dd>0 ? r.pnl/r.dd : 0;
@@ -19644,6 +19649,11 @@ async function runOpt() {
       try { r = backtest(pvCache[pk].lo, pvCache[pk].hi, atrCache[atrP], btCfg); }
       catch(_btErr) { console.error('[TPE] backtest ошибка:', _btErr); r = null; }
       finally { if (_useOOS) DATA = _fullDATA; }
+      // ##EQ_MA_FILTER## Гарантируем что eqCalcBaselineArr и eqCalcMAArr установлены если фильтр включен
+      if (_effUseEqMA && r && (!btCfg.eqCalcBaselineArr || !btCfg.eqCalcMAArr)) {
+        if (!btCfg.eqCalcBaselineArr) btCfg.eqCalcBaselineArr = r.eq || [];
+        if (!btCfg.eqCalcMAArr) btCfg.eqCalcMAArr = r.eq ? calcMA(Array.from(r.eq), eqMALen || 20, eqMAType || 'SMA') : [];
+      }
       done++;
       // Мягкий score: градация для всех результатов, не только прошедших фильтр
       // Прошёл фильтр: P/DD или GT-Score (зависит от c_use_gt)
@@ -20350,7 +20360,8 @@ async function runOpt() {
                                       // Рассчитываем MA(расчётная equity)
                                       if (_shadowEq && _shadowEq.length > 0) {
                                         const maLen = eqMALen || 20;
-                                        btCfg.eqCalcMAArr = calcSMA(Array.from(_shadowEq), maLen);
+                                        const maType = eqMAType || 'SMA'; // ##EQ_MA_FILTER## выбор типа MA
+                                        btCfg.eqCalcMAArr = calcMA(Array.from(_shadowEq), maLen, maType);
                                         btCfg.eqCalcBaselineArr = Array.from(_shadowEq); // ##EQ_MA_FILTER## сохраняем саму baseline (не MA)
                                         _eqCalc = _shadowEq;  // сохраняем для последующего использования
                                       }
@@ -20360,6 +20371,11 @@ async function runOpt() {
                                     let r;
                                     try { r=backtest(pvCache[pk].lo,pvCache[pk].hi,atrCache[atrP],btCfg); }
                                     finally { if (_useOOS) DATA = _fullDATA; }
+                                    // ##EQ_MA_FILTER## Гарантируем что eqCalcBaselineArr и eqCalcMAArr установлены если фильтр включен
+                                    if (_effUseEqMA && r && (!btCfg.eqCalcBaselineArr || !btCfg.eqCalcMAArr)) {
+                                      if (!btCfg.eqCalcBaselineArr) btCfg.eqCalcBaselineArr = r.eq || [];
+                                      if (!btCfg.eqCalcMAArr) btCfg.eqCalcMAArr = r.eq ? calcMA(Array.from(r.eq), eqMALen || 20, eqMAType || 'SMA') : [];
+                                    }
                                     done++;
 
                                     if(r && r.n>=minTrades && r.dd<=maxDD) {
@@ -26986,7 +27002,30 @@ function _hcRunBacktest(cfg) {
   try {
     const ind    = _calcIndicators(cfg);
     const btCfg  = buildBtCfg(cfg, ind);
+
+    // ##EQ_MA_FILTER## Двупроходный цикл для базовой линии, если фильтр включен
+    if (cfg.useEqMA) {
+      const _shadowCfg = JSON.parse(JSON.stringify(btCfg));
+      _shadowCfg.useEqMA = false;
+      const _shadowRes = backtest(ind.pvLo, ind.pvHi, ind.atrArr, _shadowCfg);
+      if (_shadowRes && _shadowRes.eq && _shadowRes.eq.length > 0) {
+        const maLen = cfg.eqMALen || 20;
+        const maType = cfg.eqMAType || 'SMA';
+        btCfg.eqCalcMAArr = calcMA(Array.from(_shadowRes.eq), maLen, maType);
+        btCfg.eqCalcBaselineArr = Array.from(_shadowRes.eq);
+      }
+    }
+
     const _hcRes = backtest(ind.pvLo, ind.pvHi, ind.atrArr, btCfg);
+
+    // ##EQ_MA_FILTER## Fallback: если baseline не был установлен, используем filtered equity
+    if (cfg.useEqMA && _hcRes && (!btCfg.eqCalcBaselineArr || !btCfg.eqCalcMAArr)) {
+      if (!btCfg.eqCalcBaselineArr) btCfg.eqCalcBaselineArr = _hcRes.eq || [];
+      if (!btCfg.eqCalcMAArr) btCfg.eqCalcMAArr = _hcRes.eq ? calcMA(Array.from(_hcRes.eq), cfg.eqMALen || 20, cfg.eqMAType || 'SMA') : [];
+      _hcRes.eqCalcBaselineArr = btCfg.eqCalcBaselineArr;
+      _hcRes.eqCalcMAArr = btCfg.eqCalcMAArr;
+    }
+
     _robSliceCacheSet(_hcsk, _hcRes);
     return _hcRes;
   } catch(e) { return null; }
@@ -27010,7 +27049,31 @@ function _hcBuildOOS(cfg) {
     try {
       const ind = _calcIndicators(cfg);
       const btCfg = buildBtCfg(cfg, ind);
-      return backtest(ind.pvLo, ind.pvHi, ind.atrArr, btCfg);
+
+      // ##EQ_MA_FILTER## Двупроходный цикл для базовой линии, если фильтр включен
+      if (cfg.useEqMA) {
+        const _shadowCfg = JSON.parse(JSON.stringify(btCfg));
+        _shadowCfg.useEqMA = false;
+        const _shadowRes = backtest(ind.pvLo, ind.pvHi, ind.atrArr, _shadowCfg);
+        if (_shadowRes && _shadowRes.eq && _shadowRes.eq.length > 0) {
+          const maLen = cfg.eqMALen || 20;
+          const maType = cfg.eqMAType || 'SMA';
+          btCfg.eqCalcMAArr = calcMA(Array.from(_shadowRes.eq), maLen, maType);
+          btCfg.eqCalcBaselineArr = Array.from(_shadowRes.eq);
+        }
+      }
+
+      const r = backtest(ind.pvLo, ind.pvHi, ind.atrArr, btCfg);
+
+      // ##EQ_MA_FILTER## Fallback: если baseline не был установлен, используем filtered equity
+      if (cfg.useEqMA && r && (!btCfg.eqCalcBaselineArr || !btCfg.eqCalcMAArr)) {
+        if (!btCfg.eqCalcBaselineArr) btCfg.eqCalcBaselineArr = r.eq || [];
+        if (!btCfg.eqCalcMAArr) btCfg.eqCalcMAArr = r.eq ? calcMA(Array.from(r.eq), cfg.eqMALen || 20, cfg.eqMAType || 'SMA') : [];
+        r.eqCalcBaselineArr = btCfg.eqCalcBaselineArr;
+        r.eqCalcMAArr = btCfg.eqCalcMAArr;
+      }
+
+      return r;
     } catch(e) { return null; }
     finally { DATA = origData; }
   }
@@ -29610,6 +29673,15 @@ async function runOOSOnNewData() {
 
       rNew = backtest(_ind.pvLo, _ind.pvHi, _ind.atrArr, _btCfg);
       _newTradeLog = _btCfg.tradeLog || [];
+      // ##EQ_MA_FILTER## Копируем baseline данные в результат если они есть
+      if (rNew && r.cfg.useEqMA) {
+        if (_btCfg.eqCalcBaselineArr && !rNew.eqCalcBaselineArr) {
+          rNew.eqCalcBaselineArr = _btCfg.eqCalcBaselineArr;
+        }
+        if (_btCfg.eqCalcMAArr && !rNew.eqCalcMAArr) {
+          rNew.eqCalcMAArr = _btCfg.eqCalcMAArr;
+        }
+      }
     } catch(e) { }
     DATA = origDATA;
 
@@ -33182,7 +33254,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1775168701923;
+window._BUILD_TS = 1775169780564;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;

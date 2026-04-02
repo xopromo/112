@@ -2240,6 +2240,11 @@ async function runOpt() {
       let r;
       try { r = backtest(pvCache[pk].lo, pvCache[pk].hi, atrCache[atrP], btCfg); }
       finally { if (_useOOS) DATA = _fullDATA; }
+      // ##EQ_MA_FILTER## Гарантируем что eqCalcBaselineArr и eqCalcMAArr установлены если фильтр включен
+      if (_effUseEqMA && (!btCfg.eqCalcBaselineArr || !btCfg.eqCalcMAArr)) {
+        if (!btCfg.eqCalcBaselineArr) btCfg.eqCalcBaselineArr = r?.eq || [];
+        if (!btCfg.eqCalcMAArr) btCfg.eqCalcMAArr = r?.eq ? calcMA(Array.from(r.eq), eqMALen || 20, eqMAType || 'SMA') : [];
+      }
       done++;
       if (r && r.n >= minTrades && r.dd <= maxDD) {
         const pdd = r.dd>0 ? r.pnl/r.dd : 0;
@@ -2652,6 +2657,11 @@ async function runOpt() {
       try { r = backtest(pvCache[pk].lo, pvCache[pk].hi, atrCache[atrP], btCfg); }
       catch(_btErr) { console.error('[TPE] backtest ошибка:', _btErr); r = null; }
       finally { if (_useOOS) DATA = _fullDATA; }
+      // ##EQ_MA_FILTER## Гарантируем что eqCalcBaselineArr и eqCalcMAArr установлены если фильтр включен
+      if (_effUseEqMA && r && (!btCfg.eqCalcBaselineArr || !btCfg.eqCalcMAArr)) {
+        if (!btCfg.eqCalcBaselineArr) btCfg.eqCalcBaselineArr = r.eq || [];
+        if (!btCfg.eqCalcMAArr) btCfg.eqCalcMAArr = r.eq ? calcMA(Array.from(r.eq), eqMALen || 20, eqMAType || 'SMA') : [];
+      }
       done++;
       // Мягкий score: градация для всех результатов, не только прошедших фильтр
       // Прошёл фильтр: P/DD или GT-Score (зависит от c_use_gt)
@@ -3358,7 +3368,8 @@ async function runOpt() {
                                       // Рассчитываем MA(расчётная equity)
                                       if (_shadowEq && _shadowEq.length > 0) {
                                         const maLen = eqMALen || 20;
-                                        btCfg.eqCalcMAArr = calcSMA(Array.from(_shadowEq), maLen);
+                                        const maType = eqMAType || 'SMA'; // ##EQ_MA_FILTER## выбор типа MA
+                                        btCfg.eqCalcMAArr = calcMA(Array.from(_shadowEq), maLen, maType);
                                         btCfg.eqCalcBaselineArr = Array.from(_shadowEq); // ##EQ_MA_FILTER## сохраняем саму baseline (не MA)
                                         _eqCalc = _shadowEq;  // сохраняем для последующего использования
                                       }
@@ -3368,6 +3379,11 @@ async function runOpt() {
                                     let r;
                                     try { r=backtest(pvCache[pk].lo,pvCache[pk].hi,atrCache[atrP],btCfg); }
                                     finally { if (_useOOS) DATA = _fullDATA; }
+                                    // ##EQ_MA_FILTER## Гарантируем что eqCalcBaselineArr и eqCalcMAArr установлены если фильтр включен
+                                    if (_effUseEqMA && r && (!btCfg.eqCalcBaselineArr || !btCfg.eqCalcMAArr)) {
+                                      if (!btCfg.eqCalcBaselineArr) btCfg.eqCalcBaselineArr = r.eq || [];
+                                      if (!btCfg.eqCalcMAArr) btCfg.eqCalcMAArr = r.eq ? calcMA(Array.from(r.eq), eqMALen || 20, eqMAType || 'SMA') : [];
+                                    }
                                     done++;
 
                                     if(r && r.n>=minTrades && r.dd<=maxDD) {
