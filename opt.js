@@ -2423,6 +2423,7 @@ async function runOpt() {
       const _effUseVolDir  = _fCombo.useVolDir  ?? useVolDir;
       const _effUseWT      = _fCombo.useWT      ?? useWT;
       const _effUseFat     = _fCombo.useFat     ?? useFat;
+      const _effUseEqMA   = _fCombo.useEqMA    ?? useEqMA; // ##EQ_MA_FILTER##
       const adxL        = _ip.adxL        ?? window._ipDef.adxL;
       const sTrendWin   = _ip.sTrendWin   ?? window._ipDef.sTrendWin;
       const confN       = _ip.confN       ?? window._ipDef.confN;
