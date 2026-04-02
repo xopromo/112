@@ -2403,6 +2403,7 @@ async function runOpt() {
       const tpAtrMult = _dims[_d][dimIndices[_d++]];
       const slAtrLen = _dims[_d][dimIndices[_d++]];
       const slAtrMult = _dims[_d][dimIndices[_d++]];
+      const eqMALen = _dims[_d][dimIndices[_d++]]; // ##EQ_MA_FILTER##
       const _fCombo  = _dims[_d][dimIndices[_d++]]; // powerset: объект с bool-флагами фильтров
       // Эффективные флаги фильтров (TPE)
       const _effUseMa      = _fCombo.useMa      ?? useMa;
@@ -3119,6 +3120,7 @@ async function runOpt() {
                                   for(const timeBars of (timeBarsArr.length?timeBarsArr:[50])) {
                                     for(const tlPvL of (tlPvLs.length?tlPvLs:[5])) {
                                       for(const tlPvR of (tlPvRs.length?tlPvRs:[3])) {
+                                    for(const eqMALen of (eqMALenArr.length?eqMALenArr:[20])) { // ##EQ_MA_FILTER##
                                     for(const _ip of window._ipCombos) {
                                     if(_mcDone||stopped) break;
                                     const adxL     = _ip.adxL     ?? window._ipDef.adxL;
@@ -3417,6 +3419,7 @@ async function runOpt() {
                                       } // tlPvR
                                     } // tlPvL
                                   } // _ip combo
+                                  } // eqMALen ##EQ_MA_FILTER##
                                   } // wickMult
                                 } // trDist
                               } // trTrig
