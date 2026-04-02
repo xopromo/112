@@ -17884,6 +17884,9 @@ async function runOpt() {
     try {
       const ind   = _calcIndicators(cfg);
       const btCfg = buildBtCfg(cfg, ind);
+      // ##EQ_MA_FILTER## Сохраняем MA из IS режима для OOS прогона (фильтр должен использовать ту же MA)
+      if (cfg.eqCalcMAArr) btCfg.eqCalcMAArr = cfg.eqCalcMAArr;
+      if (cfg.eqCalcBaselineArr) btCfg.eqCalcBaselineArr = cfg.eqCalcBaselineArr;
       return backtest(ind.pvLo, ind.pvHi, ind.atrArr, btCfg);
     } catch(e) { console.error('[_runOOS] exception:', e, cfg); return null; }
     finally { DATA = origDATA; }
@@ -29273,6 +29276,24 @@ async function runOOSOnNewData() {
       const _ind    = _calcIndicators(r.cfg);
       const _btCfg  = buildBtCfg(r.cfg, _ind);
       _btCfg.tradeLog = [];
+
+      // ##EQ_MA_FILTER## Двухпроходный цикл для OOS новых данных
+      if (rOld && rOld.eqCalcMAArr && rOld.eqCalcBaselineArr && r.cfg.useEqMA) {
+        // Используем MA, рассчитанную от old (IS) данных для фильтрации на new (OOS)
+        _btCfg.eqCalcMAArr = rOld.eqCalcMAArr;
+        _btCfg.eqCalcBaselineArr = rOld.eqCalcBaselineArr;
+      } else if (r.cfg.useEqMA) {
+        // Если нет old результата, рассчитаем MA для new данных отдельно
+        const _shadowCfg = JSON.parse(JSON.stringify(_btCfg));
+        _shadowCfg.useEqMA = false;
+        const _shadowRes = backtest(_ind.pvLo, _ind.pvHi, _ind.atrArr, _shadowCfg);
+        if (_shadowRes && _shadowRes.eq && _shadowRes.eq.length > 0) {
+          const maLen = r.cfg.eqMALen || 20;
+          _btCfg.eqCalcMAArr = calcSMA(Array.from(_shadowRes.eq), maLen);
+          _btCfg.eqCalcBaselineArr = Array.from(_shadowRes.eq);
+        }
+      }
+
       rNew = backtest(_ind.pvLo, _ind.pvHi, _ind.atrArr, _btCfg);
       _newTradeLog = _btCfg.tradeLog || [];
     } catch(e) { }
@@ -32847,7 +32868,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1775147438656;
+window._BUILD_TS = 1775153446549;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
