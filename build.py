@@ -39,6 +39,7 @@ ui_favs       = open(os.path.join(base, 'ui_favs.js'),     encoding='utf-8').rea
 ui_robust     = open(os.path.join(base, 'ui_robust.js'),   encoding='utf-8').read()
 ui_parse      = open(os.path.join(base, 'ui_parse.js'),    encoding='utf-8').read()
 ui_research  = open(os.path.join(base, 'ui_research.js'),  encoding='utf-8').read()
+ui_archive    = open(os.path.join(base, 'ui_archive.js'),  encoding='utf-8').read()
 pine          = open(os.path.join(base, 'pine_export.js'), encoding='utf-8').read()
 
 # ── ML: model + inference + in-browser training ────────────────────────────
@@ -120,6 +121,7 @@ for ph, content in [
     ('/* ##OOS## */',       ui_oos),
     ('/* ##COMPARATOR## */',ui_comparator),
     ('/* ##RESEARCH_UI## */',ui_research),
+    ('/* ##ARCHIVE## */',   ui_archive),
 ]:
     assert ph in ui_built, f"Placeholder not found in ui.js: {ph!r}"
     ui_built = ui_built.replace(ph, content, 1)
