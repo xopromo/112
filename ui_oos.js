@@ -1307,6 +1307,23 @@ async function runOOSOnNewData() {
     try {
       DATA = origDATA;
       rOld = _hcRunBacktest(r.cfg);
+
+      // ##EQ_MA_FILTER## Добавляем двухпроходный цикл для rOld (старых данных)
+      if (rOld && r.cfg.useEqMA) {
+        const _ind_old = _calcIndicators(r.cfg);
+        const _btCfg_old = buildBtCfg(r.cfg, _ind_old);
+
+        // Первый проход БЕЗ фильтра для расчета baseline
+        _btCfg_old.useEqMA = false;
+        const _shadowRes_old = backtest(_ind_old.pvLo, _ind_old.pvHi, _ind_old.atrArr, _btCfg_old);
+
+        if (_shadowRes_old && _shadowRes_old.eq && _shadowRes_old.eq.length > 0) {
+          // Сохраняем baseline и рассчитываем MA
+          const maLen = r.cfg.eqMALen || 20;
+          rOld.eqCalcBaselineArr = Array.from(_shadowRes_old.eq);
+          rOld.eqCalcMAArr = calcSMA(Array.from(_shadowRes_old.eq), maLen);
+        }
+      }
     } catch(e) { }
 
     // Для new результата: прямой запуск с tradeLog на полном NEW_DATA.
