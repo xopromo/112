@@ -32,26 +32,38 @@
 
 <script>
 const TESTS = [
-  // ── Binance ──
-  { src:'Binance', asset:'BTC/USDT 1d',  url:'https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=10', parse: parseBinance },
-  { src:'Binance', asset:'XAUUSDT (Gold)',url:'https://api.binance.com/api/v3/klines?symbol=XAUUSDT&interval=1d&limit=10', parse: parseBinance },
-  { src:'Binance', asset:'XAGUSDT (Silver)',url:'https://api.binance.com/api/v3/klines?symbol=XAGUSDT&interval=1d&limit=10', parse: parseBinance },
-  { src:'Binance', asset:'SOLUSDT 15m',  url:'https://api.binance.com/api/v3/klines?symbol=SOLUSDT&interval=15m&limit=10', parse: parseBinance },
-  { src:'Binance', asset:'ETHUSDT 1h',   url:'https://api.binance.com/api/v3/klines?symbol=ETHUSDT&interval=1h&limit=10', parse: parseBinance },
-  { src:'Binance', asset:'ping',         url:'https://api.binance.com/api/v3/ping', parse: j => ({ rows: 1, preview: '{}' }) },
+  // ── Binance Spot ──
+  { src:'Binance Spot', asset:'BTCUSDT 1d',    url:'https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=10', parse: parseBinance },
+  { src:'Binance Spot', asset:'ETHUSDT 1h',    url:'https://api.binance.com/api/v3/klines?symbol=ETHUSDT&interval=1h&limit=10', parse: parseBinance },
+  { src:'Binance Spot', asset:'SOLUSDT 15m',   url:'https://api.binance.com/api/v3/klines?symbol=SOLUSDT&interval=15m&limit=10', parse: parseBinance },
+  { src:'Binance Spot', asset:'PAXGUSDT (Gold token)', url:'https://api.binance.com/api/v3/klines?symbol=PAXGUSDT&interval=1d&limit=10', parse: parseBinance },
+  { src:'Binance Spot', asset:'XAUUSDT (spot?)',url:'https://api.binance.com/api/v3/klines?symbol=XAUUSDT&interval=1d&limit=10', parse: parseBinance },
+  { src:'Binance Spot', asset:'XAGUSDT (spot?)',url:'https://api.binance.com/api/v3/klines?symbol=XAGUSDT&interval=1d&limit=10', parse: parseBinance },
+
+  // ── Binance Futures (fapi) ──
+  { src:'Binance Futures', asset:'XAUUSDT 1d', url:'https://fapi.binance.com/fapi/v1/klines?symbol=XAUUSDT&interval=1d&limit=10', parse: parseBinance },
+  { src:'Binance Futures', asset:'BTCUSDT 1d', url:'https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDT&interval=1d&limit=10', parse: parseBinance },
 
   // ── Yahoo Finance query1 ──
-  { src:'Yahoo q1', asset:'GOLD (GC=F)',  url:'https://query1.finance.yahoo.com/v8/finance/chart/GC%3DF?interval=1d&range=10d', parse: parseYahoo },
-  { src:'Yahoo q1', asset:'OIL (CL=F)',   url:'https://query1.finance.yahoo.com/v8/finance/chart/CL%3DF?interval=1d&range=10d', parse: parseYahoo },
-  { src:'Yahoo q1', asset:'SPX (^GSPC)',  url:'https://query1.finance.yahoo.com/v8/finance/chart/%5EGSPC?interval=1d&range=10d', parse: parseYahoo },
-  { src:'Yahoo q1', asset:'DXY (DX-Y.NYB)',url:'https://query1.finance.yahoo.com/v8/finance/chart/DX-Y.NYB?interval=1d&range=10d', parse: parseYahoo },
-  { src:'Yahoo q1', asset:'BONDS (^TNX)', url:'https://query1.finance.yahoo.com/v8/finance/chart/%5ETNX?interval=1d&range=10d', parse: parseYahoo },
-  { src:'Yahoo q1', asset:'AAPL (акция)', url:'https://query1.finance.yahoo.com/v8/finance/chart/AAPL?interval=1d&range=10d', parse: parseYahoo },
+  { src:'Yahoo q1', asset:'GOLD (GC=F)',    url:'https://query1.finance.yahoo.com/v8/finance/chart/GC%3DF?interval=1d&range=10d', parse: parseYahoo },
+  { src:'Yahoo q1', asset:'OIL (CL=F)',     url:'https://query1.finance.yahoo.com/v8/finance/chart/CL%3DF?interval=1d&range=10d', parse: parseYahoo },
+  { src:'Yahoo q1', asset:'SPX (^GSPC)',    url:'https://query1.finance.yahoo.com/v8/finance/chart/%5EGSPC?interval=1d&range=10d', parse: parseYahoo },
+  { src:'Yahoo q1', asset:'DXY',            url:'https://query1.finance.yahoo.com/v8/finance/chart/DX-Y.NYB?interval=1d&range=10d', parse: parseYahoo },
+  { src:'Yahoo q1', asset:'BONDS (^TNX)',   url:'https://query1.finance.yahoo.com/v8/finance/chart/%5ETNX?interval=1d&range=10d', parse: parseYahoo },
 
   // ── Yahoo Finance query2 ──
-  { src:'Yahoo q2', asset:'GOLD (GC=F)',  url:'https://query2.finance.yahoo.com/v8/finance/chart/GC%3DF?interval=1d&range=10d', parse: parseYahoo },
-  { src:'Yahoo q2', asset:'SPX (^GSPC)',  url:'https://query2.finance.yahoo.com/v8/finance/chart/%5EGSPC?interval=1d&range=10d', parse: parseYahoo },
-  { src:'Yahoo q2', asset:'DXY (DX-Y.NYB)',url:'https://query2.finance.yahoo.com/v8/finance/chart/DX-Y.NYB?interval=1d&range=10d', parse: parseYahoo },
+  { src:'Yahoo q2', asset:'GOLD (GC=F)',    url:'https://query2.finance.yahoo.com/v8/finance/chart/GC%3DF?interval=1d&range=10d', parse: parseYahoo },
+  { src:'Yahoo q2', asset:'SPX (^GSPC)',    url:'https://query2.finance.yahoo.com/v8/finance/chart/%5EGSPC?interval=1d&range=10d', parse: parseYahoo },
+  { src:'Yahoo q2', asset:'DXY',            url:'https://query2.finance.yahoo.com/v8/finance/chart/DX-Y.NYB?interval=1d&range=10d', parse: parseYahoo },
+
+  // ── Alternative: Stooq (CSV) ──
+  { src:'Stooq', asset:'SPX (^spx)',        url:'https://stooq.com/q/d/l/?s=^spx&i=d', parse: parseCsv },
+  { src:'Stooq', asset:'GOLD (xauusd)',     url:'https://stooq.com/q/d/l/?s=xauusd&i=d', parse: parseCsv },
+  { src:'Stooq', asset:'OIL (cl.f)',        url:'https://stooq.com/q/d/l/?s=cl.f&i=d', parse: parseCsv },
+  { src:'Stooq', asset:'DXY (^dxy)',        url:'https://stooq.com/q/d/l/?s=^dxy&i=d', parse: parseCsv },
+
+  // ── Alternative: FRED ──
+  { src:'FRED', asset:'DXY (DTWEXBGS)',     url:'https://api.stlouisfed.org/fred/series/observations?series_id=DTWEXBGS&api_key=abcdefghijklmnopqrstuvwxyz123456&file_type=json&limit=10', parse: parseFred },
 ];
 
 function parseBinance(j) {
@@ -62,6 +74,21 @@ function parseBinance(j) {
     rows: j.length,
     preview: `openTime=${last[0]}, o=${last[1]}, h=${last[2]}, l=${last[3]}, c=${last[4]}, vol=${last[5]}`
   };
+}
+
+function parseCsv(text) {
+  // Stooq returns CSV: Date,Open,High,Low,Close,Volume
+  const lines = text.trim().split('\n').filter(l => l.trim());
+  if (lines.length < 2) return { rows: 0, preview: text.slice(0, 80) };
+  const last = lines[lines.length - 1].split(',');
+  return { rows: lines.length - 1, preview: `date=${last[0]}, close=${last[4]}` };
+}
+
+function parseFred(j) {
+  const obs = j?.observations || [];
+  if (!obs.length) return { rows: 0, preview: JSON.stringify(j).slice(0, 80) };
+  const last = obs[obs.length - 1];
+  return { rows: obs.length, preview: `date=${last.date}, value=${last.value}` };
 }
 
 function parseYahoo(j) {
@@ -99,10 +126,18 @@ async function runTest(test) {
     const r = await fetch(test.url, { signal: AbortSignal.timeout(8000) });
     const ms = Date.now() - t0;
     if (!r.ok) { addRow(test, 'error', 0, ms, '', `HTTP ${r.status}`); return false; }
-    const j = await r.json();
-    const { rows, preview } = test.parse(j);
-    addRow(test, 'ok', rows, ms, preview, '');
-    return true;
+    const ct = r.headers.get('content-type') || '';
+    let parsed;
+    if (ct.includes('json') || test.parse === parseYahoo || test.parse === parseBinance || test.parse === parseFred) {
+      const j = await r.json();
+      parsed = test.parse(j);
+    } else {
+      const text = await r.text();
+      parsed = test.parse(text);
+    }
+    const { rows, preview } = parsed;
+    addRow(test, rows > 0 ? 'ok' : 'error', rows, ms, preview, rows === 0 ? 'нет данных' : '');
+    return rows > 0;
   } catch(e) {
     addRow(test, 'error', 0, Date.now() - t0, '', e.message.slice(0, 80));
     return false;
