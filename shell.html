@@ -2547,14 +2547,26 @@ function expandAllPanels() {
 }
 
 function togglePanels() {
-  const anyCollapsed = document.querySelectorAll('.panels .panel.panel-collapsed').length > 0;
-  const btn = document.getElementById('btn-toggle-panels');
-  if (anyCollapsed) {
-    expandAllPanels();
-    if (btn) { btn.textContent = '↗ Свернуть'; btn.title = 'Свернуть неактивные группы и панели'; }
-  } else {
-    collapseInactivePanels();
-    if (btn) { btn.textContent = '↙ Развернуть'; btn.title = 'Развернуть все панели и группы'; }
+  try {
+    const btn = document.getElementById('btn-toggle-panels');
+    if (!btn) return;
+
+    const anyCollapsed = document.querySelectorAll('.panels .panel.panel-collapsed').length > 0;
+    if (anyCollapsed) {
+      expandAllPanels();
+      btn.textContent = '↗ Свернуть';
+      btn.title = 'Свернуть неактивные группы и панели';
+      btn.disabled = false;
+    } else {
+      collapseInactivePanels();
+      btn.textContent = '↙ Развернуть';
+      btn.title = 'Развернуть все панели и группы';
+      btn.disabled = false;
+    }
+  } catch (e) {
+    console.error('[togglePanels] Ошибка:', e);
+    const btn = document.getElementById('btn-toggle-panels');
+    if (btn) btn.disabled = false;  // разблокируем кнопку при ошибке
   }
 }
 
