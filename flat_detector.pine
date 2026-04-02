@@ -1,0 +1,102 @@
+// ═══════════════════════════════════════════════════════════════
+// FLAT ZONE DETECTOR — без перерисовки, без заглядывания вперёд
+// Гипотеза: если цена часто "была здесь" за N баров → флэт
+// Сигнал: пробой из флэта (первый бар вне зоны после серии внутри)
+//
+// Как читать:
+//   Оранжевый фон     = зона флэта (цена крутится на месте)
+//   ▲ зелёный         = пробой вверх из флэта → лонг
+//   ▼ красный         = пробой вниз из флэта → шорт
+//   Нижняя панель     = FlatScore (0..1), порог — пунктирная линия
+// ═══════════════════════════════════════════════════════════════
+//@version=6
+indicator("Flat Zone Detector", overlay=true, max_bars_back=500)
+
+// ── Настройки ───────────────────────────────────────────────────
+var grp1 = "Параметры флэта"
+n        = input.int   (20,   "Окно N (баров)",              minval=5,    maxval=300, group=grp1)
+atrLen   = input.int   (14,   "Период ATR",                  minval=2,    maxval=100, group=grp1)
+atrMult  = input.float (0.35, "Зона ±ATR×  (чувствит-ть)",  minval=0.05, maxval=3.0, step=0.05, group=grp1)
+flatThr  = input.float (0.40, "Порог флэта 0..1",            minval=0.05, maxval=0.95, step=0.05, group=grp1,
+                        tooltip="Доля баров из N, которые пересекали текущий уровень.\n0.4 = 40% баров 'побывали здесь' → флэт")
+minFlat  = input.int   (5,    "Мин. баров флэта для сигнала", minval=1,   maxval=100, group=grp1,
+                        tooltip="Сколько баров подряд должен длиться флэт, прежде чем сигнал пробоя считается валидным")
+
+var grp2 = "Сигналы"
+confirmCandle = input.bool(true, "Подтверждать направлением свечи пробоя", group=grp2,
+                        tooltip="ВКЛ: лонг только если свеча пробоя бычья (close > open), и наоборот")
+showScore     = input.bool(true, "Показывать FlatScore (нижняя панель)", group=grp2)
+
+// ── ATR и зона ±eps ─────────────────────────────────────────────
+atr = ta.atr(atrLen)
+eps = atr * atrMult  // полуширина зоны, нормированная по волатильности
+
+// ── FlatScore ────────────────────────────────────────────────────
+// Считаем: сколько из последних N ЗАВЕРШЁННЫХ баров
+// пересекали диапазон [close - eps, close + eps].
+// j=1..N → смотрим ТОЛЬКО на прошлые бары (j=0 = текущий, пропускаем)
+// → нет заглядывания вперёд.
+//
+// high[j] >= close-eps AND low[j] <= close+eps означает:
+// свеча j "была" на нашем уровне (тело или тень пересекала зону)
+
+visits = 0.0
+for j = 1 to n
+    if high[j] >= close - eps and low[j] <= close + eps
+        visits += 1.0
+
+flatScore = visits / n           // 0.0..1.0
+isFlat    = flatScore >= flatThr
+
+// ── Длина текущей флэт-серии ────────────────────────────────────
+// flatStreak — сколько баров ПОДРЯД isFlat=true
+// Используем var чтобы накапливать между барами
+var int flatStreak = 0
+flatStreak := isFlat ? flatStreak[1] + 1 : 0
+
+// Флэт "валидный" только после minFlat баров подряд
+realFlat = flatStreak >= minFlat
+
+// ── Сигнал пробоя ────────────────────────────────────────────────
+// realFlat[1] = предыдущий бар был подтверждённым флэтом (закрытая свеча, не меняется)
+// not isFlat  = текущий бар вышел из зоны
+// → сигнал генерируется на ЗАКРЫТИИ свечи пробоя, не перерисовывается
+breakout  = realFlat[1] and not isFlat
+bullBreak = breakout and (not confirmCandle or close > open)
+bearBreak = breakout and (not confirmCandle or close < open)
+
+// ── Визуализация ────────────────────────────────────────────────
+
+// 1. Оранжевый фон в зоне флэта
+bgcolor(realFlat ? color.new(color.orange, 88) : na,
+        title="Зона флэта", display=display.pane)
+
+// 2. Границы зоны (±eps вокруг текущего close)
+//    plot.style_linebr = линия рвётся когда значение na → границы видны только в флэте
+plot(realFlat ? close + eps : na, "Верх зоны",
+     color.new(color.orange, 40), 1, plot.style_linebr)
+plot(realFlat ? close - eps : na, "Низ зоны",
+     color.new(color.orange, 40), 1, plot.style_linebr)
+
+// 3. Сигналы входа — стрелки на баре пробоя
+plotshape(bullBreak, "▲ Лонг", shape.triangleup,
+          location.belowbar, color.new(color.lime, 0), size=size.normal)
+plotshape(bearBreak, "▼ Шорт", shape.triangledown,
+          location.abovebar, color.new(color.red,  0), size=size.normal)
+
+// 4. Метка на сигнале (опционально — видна при увеличении)
+if bullBreak
+    label.new(bar_index, low - eps,  "B", color=color.new(color.lime, 70),
+              textcolor=color.white, size=size.tiny, style=label.style_label_up)
+if bearBreak
+    label.new(bar_index, high + eps, "S", color=color.new(color.red,  70),
+              textcolor=color.white, size=size.tiny, style=label.style_label_down)
+
+// ── FlatScore нижняя панель ──────────────────────────────────────
+// Перетащи этот индикатор в отдельную панель чтобы видеть Score
+var flatScoreColor = color.new(color.blue, 0)
+plot(showScore ? flatScore : na, "FlatScore", color=flatScoreColor, display=display.pane)
+hline(flatThr, "Порог флэта", color.new(color.orange, 0),
+      hline.style_dashed, display=display.pane)
+hline(0, "", color.new(color.gray, 80))
+hline(1, "", color.new(color.gray, 80))
