@@ -1126,6 +1126,11 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
   <div class="field"><label>HTF B (×)</label><input id="e_pchg_htf_b" value="1" data-tip="HTF множитель для условия B. 1 = тот же TF, 4 = 4× выше."></div>
 
   <div class="sep"></div>
+  <!-- ##FLAT_EXIT## Вход по пробою флэт-зоны -->
+  <div class="cb"><input type="checkbox" id="e_flatbr"><label data-tip="Flat Zone Breakout: вход когда цена выходит из флэт-зоны. Параметры зоны (N баров, ATR×, порог, мин.баров) берутся из блока «Выход по флэту». Подтверждение свечой — опционально.">Flat Zone Breakout (пробой флэта)</label></div>
+  <div class="cb" style="margin-left:16px"><input type="checkbox" id="e_flatbr_nc"><label data-tip="Снять флажок = подтверждать направление свечой пробоя (бычья → лонг, медвежья → шорт). По умолчанию: подтверждать">Без подтверждения свечой</label></div>
+
+  <div class="sep"></div>
   <div class="cb"><input type="checkbox" id="e_eis"><label data-tip="Elder Impulse System: лонг когда EMA растёт И MACD-гистограмма растёт (двойное согласование импульса и тренда). Шорт — оба падают">Elder Impulse System</label></div>
   <div class="field"><label>EMA период</label><input id="e_eis_p" value="13" data-tip="Период EMA для определения тренда. Классическое значение = 13. MACD гистограмма использует фиксированные 12/26/9"></div>
 
