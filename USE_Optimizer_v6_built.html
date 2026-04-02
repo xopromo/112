@@ -26858,7 +26858,7 @@ function _hcBuildOOS(cfg) {
     pain:    _calcPainRatio(rIS.eq) // ##PAIN
   } : null;
 
-  return { _oos, isStats, eq: rFull.eq };
+  return { _oos, isStats, eq: rFull.eq, eqCalcMAArr: rFull.eqCalcMAArr }; // ##EQ_MA_FILTER##
 }
 
 // ── MULTI-START: генерирует N случайных стартовых точек ──────────────────────
@@ -32844,7 +32844,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1775143186474;
+window._BUILD_TS = 1775146898525;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
