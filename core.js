@@ -885,8 +885,12 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
               if (pendingDir === 1  && _f.blocksL(cfg, i, ac)) _pendingFilterOk = false;
               if (pendingDir === -1 && _f.blocksS(cfg, i, ac)) _pendingFilterOk = false;
             }
-            if (_pendingFilterOk) { doDir = pendingDir; }
-            pendingDir = 0;
+            if (_pendingFilterOk) {
+              doDir = pendingDir;
+              pendingDir = 0; // вход сработал — сбрасываем pending
+            }
+            // Если фильтры заблокировали — pending остаётся активным.
+            // Вход будет повторён на следующем баре отката (до maxBars / cancelAtr).
           }
         }
       }
