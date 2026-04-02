@@ -2213,8 +2213,8 @@ async function runOpt() {
       if (_effUseEqMA) {
         const _shadowCfg = JSON.parse(JSON.stringify(btCfg));
         _shadowCfg.useEqMA = false;  // отключаем фильтр для расчётной equity
-        _shadowCfg.waitBars = 0;     // ##EQ_MA_FILTER## отключаем отложенный вход для baseline (должна быть идеальная)
-        _shadowCfg.waitRetrace = false; // базовая equity без задержек
+        // ##EQ_MA_FILTER## baseline использует ТЕ ЖЕ параметры входа (waitBars, waitRetrace)
+        // только отключаем фильтр — так оба входа (baseline и filtered) будут на одной цене
         if (_useOOS) DATA = _isData;
         let _shadowEq;
         try {
