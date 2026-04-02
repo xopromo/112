@@ -1362,6 +1362,15 @@ async function runOOSOnNewData() {
 
       rNew = backtest(_ind.pvLo, _ind.pvHi, _ind.atrArr, _btCfg);
       _newTradeLog = _btCfg.tradeLog || [];
+      // ##EQ_MA_FILTER## Копируем baseline данные в результат если они есть
+      if (rNew && r.cfg.useEqMA) {
+        if (_btCfg.eqCalcBaselineArr && !rNew.eqCalcBaselineArr) {
+          rNew.eqCalcBaselineArr = _btCfg.eqCalcBaselineArr;
+        }
+        if (_btCfg.eqCalcMAArr && !rNew.eqCalcMAArr) {
+          rNew.eqCalcMAArr = _btCfg.eqCalcMAArr;
+        }
+      }
     } catch(e) { }
     DATA = origDATA;
 
