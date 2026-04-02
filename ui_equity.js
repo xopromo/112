@@ -178,6 +178,8 @@ function _drawOOSGraphicForResult(r) {
 
   const eq_old = r.old_eq;
   const eq_new = r.new_eq;
+  const baseline_old = r.old_eqCalcMAArr; // baseline на истории ##EQ_MA_FILTER##
+  const baseline_new = r.new_eqCalcMAArr; // baseline на новых данных ##EQ_MA_FILTER##
 
   // Определяем пересечение данных по timestamps
   let overlapIdx = 0; // индекс в NEW_DATA где начинаются новые бары без пересечения
@@ -198,6 +200,7 @@ function _drawOOSGraphicForResult(r) {
 
   // Пропускаем пересекающиеся бары из eq_new
   let newEqClean = eq_new.slice(overlapIdx);
+  let newBaselineClean = baseline_new ? baseline_new.slice(overlapIdx) : null; // ##EQ_MA_FILTER##
 
   // Рассчитаем прогрев для новых данных (игнорируем первые N баров)
   if (newEqClean && newEqClean.length > 0) {
@@ -214,12 +217,25 @@ function _drawOOSGraphicForResult(r) {
       // Берём значение при окончании прогрева и смещаем
       const warmupValue = newEqClean[warmupEndIdx];
       newEqClean = newEqClean.slice(warmupEndIdx).map(v => v - warmupValue);
+      // Аналогично для baseline ##EQ_MA_FILTER##
+      if (newBaselineClean && newBaselineClean.length > warmupEndIdx) {
+        const warmupValueBL = newBaselineClean[warmupEndIdx];
+        newBaselineClean = newBaselineClean.slice(warmupEndIdx).map(v => v - warmupValueBL);
+      }
     }
   }
 
   // Concatenate: новый сегмент продолжает с последнего значения истории (без пересечения)
   const lastOld = eq_old[eq_old.length - 1];
   const combined = [...eq_old, ...newEqClean.map(v => v + lastOld)];
+
+  // Аналогично для baseline ##EQ_MA_FILTER##
+  let combined_baseline = null;
+  if (_eqMAFilterShowBaseline && baseline_old && baseline_new && newBaselineClean) {
+    const lastOldBL = baseline_old[baseline_old.length - 1];
+    combined_baseline = [...baseline_old, ...newBaselineClean.map(v => v + lastOldBL)];
+  }
+
   const splitIdx  = eq_old.length;
   const splitFrac = (splitIdx - 1) / (combined.length - 1);
 
@@ -296,4 +312,25 @@ function _drawOOSGraphicForResult(r) {
   const gNew = ctx.createLinearGradient(pad + pxSp, 0, W - pad, 0);
   gNew.addColorStop(0, 'rgba(255,160,40,0.9)'); gNew.addColorStop(1, 'rgba(255,100,20,0.8)');
   ctx.strokeStyle = gNew; ctx.lineWidth = 1.5; ctx.stroke();
+
+  // Рисуем baseline (без фильтра) если доступен и включен ##EQ_MA_FILTER##
+  if (_eqMAFilterShowBaseline && combined_baseline && combined_baseline.length === combined.length) {
+    const toYBL = v => H - pad - ((v - mn) / range * (H - 2 * pad));
+
+    function pathSegBL(pxA, pxB) {
+      ctx.beginPath();
+      for (let px = pxA; px <= pxB; px++) {
+        const i = Math.round(px * nLst / (nPx - 1));
+        const x = pad + px, y = toYBL(combined_baseline[Math.min(i, combined_baseline.length - 1)]);
+        px === pxA ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      }
+    }
+
+    ctx.strokeStyle = _eqMAFilterBaselineColor;
+    ctx.globalAlpha = 0.6;
+    ctx.lineWidth = 1.2;
+    pathSegBL(0, nPx - 1);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
 }

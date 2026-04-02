@@ -1301,6 +1301,8 @@ async function runOOSOnNewData() {
       })(),
       old_eq:    rOld ? rOld.eq  : null,       // equity curve на истории
       new_eq:    rNew ? rNew.eq  : null,       // equity curve на новых данных (полная, график обрезает сам)
+      old_eqCalcMAArr: rOld ? rOld.eqCalcMAArr : null, // baseline (без MA фильтра) на истории ##EQ_MA_FILTER##
+      new_eqCalcMAArr: rNew ? rNew.eqCalcMAArr : null, // baseline (без MA фильтра) на новых данных ##EQ_MA_FILTER##
     });
   }
 
