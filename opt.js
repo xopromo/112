@@ -1203,6 +1203,7 @@ async function runOpt() {
   const useKalmanMA   = $c('f_kalman');      // ##KALMAN_MA##
   const kalmanLen     = $n('f_kalmanl') || 20; // ##KALMAN_MA##
   const useEqMA       = $c('f_eq_ma');         // ##EQ_MA_FILTER##
+  const eqMAType      = $v('f_eq_ma_type') || 'SMA';    // ##EQ_MA_FILTER## тип MA: SMA, EMA, WMA, DEMA, TEMA
   const eqMAMode      = $v('f_eq_ma_mode') || 'filter'; // ##EQ_MA_FILTER## режим: 'filter' | 'display' | 'both'
   const useMLFilter     = $c('c_ml_filter')      && typeof mlScore     === 'function'; // ##ML_FILTER##
   const mlThreshold     = $n('c_ml_thresh')      || 0.55; // ##ML_FILTER##
@@ -2163,7 +2164,7 @@ async function runOpt() {
         useMacdFilter:_fCombo.useMacdFilter??useMacdFilter,
         useER:_fCombo.useER??useER,erArr,erPeriod:erPeriod||10,erThresh,
         useKalmanMA:_fCombo.useKalmanMA??useKalmanMA,kalmanArr,kalmanLen, // ##KALMAN_MA##
-        useEqMA:_fCombo.useEqMA??useEqMA,eqMALen,eqMAMode,eqCalcMAArr:null, // ##EQ_MA_FILTER##
+        useEqMA:_fCombo.useEqMA??useEqMA,eqMALen,eqMAType,eqMAMode,eqCalcMAArr:null, // ##EQ_MA_FILTER##
         useMLFilter,mlThreshold,mlScoresArr:_precompMlScores, // ##ML_FILTER## горячий цикл IS
         useMLHighFilter,mlHighThreshold,mlHighScoresArr:_precompMlHighScores, // ##ML_FILTER_HIGH##
         start:Math.max(
@@ -2191,7 +2192,8 @@ async function runOpt() {
         // Рассчитываем MA(расчётная equity)
         if (_shadowEq && _shadowEq.length > 0) {
           const maLen = eqMALen || 20;
-          btCfg.eqCalcMAArr = calcSMA(Array.from(_shadowEq), maLen);
+          const maType = eqMAType || 'SMA'; // ##EQ_MA_FILTER## выбор типа MA
+          btCfg.eqCalcMAArr = calcMA(Array.from(_shadowEq), maLen, maType);
           btCfg.eqCalcBaselineArr = Array.from(_shadowEq); // ##EQ_MA_FILTER## сохраняем саму baseline (не MA)
           _eqCalc = _shadowEq;  // сохраняем для последующего использования
         }
@@ -2259,7 +2261,7 @@ async function runOpt() {
               useWT:_effUseWT&&wtT>0,wtThresh:wtT,wtN,wtVolW,wtBodyW,wtUseDist,
               useFat:_effUseFat,fatConsec,fatVolDrop,
               useKalmanMA:_fCombo.useKalmanMA??useKalmanMA,kalmanLen, // ##KALMAN_MA##
-              useEqMA:_fCombo.useEqMA??useEqMA,eqMALen,eqMAMode,eqCalcMAArr:null, // ##EQ_MA_FILTER##
+              useEqMA:_fCombo.useEqMA??useEqMA,eqMALen,eqMAType,eqMAMode,eqCalcMAArr:null, // ##EQ_MA_FILTER##
               useMacdFilter:_fCombo.useMacdFilter??useMacdFilter,
               useER:_fCombo.useER??useER,erPeriod:erPeriod||10,erThresh,
               useMLFilter,mlThreshold,mlScoresArr:_precompMlScores, // ##ML_FILTER##
@@ -2570,7 +2572,7 @@ async function runOpt() {
         useMacdFilter:_fCombo.useMacdFilter??useMacdFilter,
         useER:_fCombo.useER??useER,erArr,erPeriod:erPeriod||10,erThresh,
         useKalmanMA:_fCombo.useKalmanMA??useKalmanMA,kalmanArr,kalmanLen, // ##KALMAN_MA##
-        useEqMA:_fCombo.useEqMA??useEqMA,eqMALen,eqMAMode,eqCalcMAArr:null, // ##EQ_MA_FILTER##
+        useEqMA:_fCombo.useEqMA??useEqMA,eqMALen,eqMAType,eqMAMode,eqCalcMAArr:null, // ##EQ_MA_FILTER##
         useMLFilter,mlThreshold,mlScoresArr:_precompMlScores, // ##ML_FILTER## горячий цикл IS
         useMLHighFilter,mlHighThreshold,mlHighScoresArr:_precompMlHighScores, // ##ML_FILTER_HIGH##
         start:Math.max(
@@ -2594,7 +2596,8 @@ async function runOpt() {
         // Рассчитываем MA(расчётная equity)
         if (_shadowEq && _shadowEq.length > 0) {
           const maLen = eqMALen || 20;
-          btCfg.eqCalcMAArr = calcSMA(Array.from(_shadowEq), maLen);
+          const maType = eqMAType || 'SMA'; // ##EQ_MA_FILTER## выбор типа MA
+          btCfg.eqCalcMAArr = calcMA(Array.from(_shadowEq), maLen, maType);
           btCfg.eqCalcBaselineArr = Array.from(_shadowEq); // ##EQ_MA_FILTER## сохраняем саму baseline (не MA)
           _eqCalc = _shadowEq;  // сохраняем для последующего использования
         }
@@ -2698,7 +2701,7 @@ async function runOpt() {
               useWT:_effUseWT&&wtT>0,wtThresh:wtT,wtN,wtVolW,wtBodyW,wtUseDist,
               useFat:_effUseFat,fatConsec,fatVolDrop,
               useKalmanMA:_fCombo.useKalmanMA??useKalmanMA,kalmanLen, // ##KALMAN_MA##
-              useEqMA:_fCombo.useEqMA??useEqMA,eqMALen,eqMAMode,eqCalcMAArr:null, // ##EQ_MA_FILTER##
+              useEqMA:_fCombo.useEqMA??useEqMA,eqMALen,eqMAType,eqMAMode,eqCalcMAArr:null, // ##EQ_MA_FILTER##
               useMacdFilter:_fCombo.useMacdFilter??useMacdFilter,
               useER:_fCombo.useER??useER,erPeriod:erPeriod||10,erThresh,
               useMLFilter,mlThreshold,mlScoresArr:_precompMlScores, // ##ML_FILTER##

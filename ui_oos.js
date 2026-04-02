@@ -1323,7 +1323,8 @@ async function runOOSOnNewData() {
           // Сохраняем baseline и рассчитываем MA
           const maLen = r.cfg.eqMALen || 20;
           rOld.eqCalcBaselineArr = Array.from(_shadowRes_old.eq);
-          rOld.eqCalcMAArr = calcSMA(Array.from(_shadowRes_old.eq), maLen);
+          const maType = r.cfg.eqMAType || 'SMA';
+          rOld.eqCalcMAArr = calcMA(Array.from(_shadowRes_old.eq), maLen, maType);
         }
       }
     } catch(e) { }
@@ -1355,7 +1356,8 @@ async function runOOSOnNewData() {
             _btCfg.eqCalcMAArr = rOld.eqCalcMAArr;
           } else {
             const maLen = r.cfg.eqMALen || 20;
-            _btCfg.eqCalcMAArr = calcSMA(Array.from(_shadowRes.eq), maLen);
+            const maType = r.cfg.eqMAType || 'SMA';
+            _btCfg.eqCalcMAArr = calcMA(Array.from(_shadowRes.eq), maLen, maType);
           }
         }
       }
