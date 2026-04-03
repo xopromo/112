@@ -338,6 +338,45 @@ async function runRegressionTests(options = {}) {
   const runsPerConfig = options.runsPerConfig || 20;
   const detailed = options.detailed || false;
 
+  // ============================================================
+  // PROTECTION: Infinite Loop Prevention (RULE 13)
+  // ============================================================
+  const START_TIME = Date.now();
+  const MAX_TIMEOUT_MS = 5 * 60 * 1000;  // 5 minutes
+  const MAX_PASSES = 50;  // Maximum passes allowed
+  let passCount = 0;
+  let lastIssueCount = null;
+  let convergenceCount = 0;
+
+  const checkTimeoutAndConvergence = () => {
+    const elapsed = Date.now() - START_TIME;
+    if (elapsed > MAX_TIMEOUT_MS) {
+      console.error(`\n❌ TIMEOUT! Regression detector ran > 5 minutes. Infinite loop suspected.`);
+      process.exit(1);
+    }
+
+    if (passCount > MAX_PASSES) {
+      console.error(`\n❌ MAX PASSES EXCEEDED! Ran ${passCount} passes (limit: ${MAX_PASSES})`);
+      process.exit(1);
+    }
+  };
+
+  const checkConvergence = (currentIssueCount) => {
+    if (lastIssueCount !== null && lastIssueCount === currentIssueCount) {
+      convergenceCount++;
+      if (convergenceCount >= 2) {
+        console.log(`\n✓ CONVERGED! Results stable (${currentIssueCount} issues for 2 passes) → stopping`);
+        return true;  // Stop searching, results are stable
+      }
+    } else {
+      convergenceCount = 0;  // Reset if changed
+    }
+    lastIssueCount = currentIssueCount;
+    return false;  // Continue searching
+  };
+
+  // ============================================================
+
   const detector = new AnomalyDetector();
   const diagnostics = detailed ? new DetailedDiagnostics() : null;
 
@@ -345,12 +384,16 @@ async function runRegressionTests(options = {}) {
   console.log(`Configs: ${TEST_CONFIGS.length}`);
   console.log(`Runs per config: ${runsPerConfig}`);
   console.log(`Total iterations: ${TEST_CONFIGS.length * runsPerConfig}`);
-  console.log(`Detailed mode: ${detailed ? '✅ ON' : '⭕ OFF'}\n`);
+  console.log(`Detailed mode: ${detailed ? '✅ ON' : '⭕ OFF'}`);
+  console.log(`\n⚙️  Protection: Timeout=5min, MaxPasses=${MAX_PASSES}, Convergence=enabled\n`);
 
   for (const testConfig of TEST_CONFIGS) {
     console.log(`📊 Testing: ${testConfig.name}`);
 
     for (let run = 0; run < runsPerConfig; run++) {
+      // PROTECTION: Check for infinite loops (RULE 13)
+      checkTimeoutAndConvergence();
+      passCount++;
       // Генерируем данные
       const data = generateSyntheticData(300 + Math.random() * 200);
       const eqBefore = generateMockEquity(data.length);
@@ -402,10 +445,17 @@ async function runRegressionTests(options = {}) {
     console.log(` ✓\n`);
   }
 
+  // PROTECTION: Check convergence before returning (RULE 13)
+  checkConvergence(detector.issues.length);
+
   detector.printReport();
   if (detailed && diagnostics) {
     diagnostics.printTraces();
   }
+
+  const elapsedSeconds = ((Date.now() - START_TIME) / 1000).toFixed(1);
+  console.log(`\n⏱️  Total time: ${elapsedSeconds}s | Passes: ${passCount} | Issues: ${detector.issues.length}`);
+
   return detector.issues;
 }
 
