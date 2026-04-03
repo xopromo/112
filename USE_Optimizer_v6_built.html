@@ -29689,6 +29689,9 @@ async function runOOSOnNewData() {
 
     const origDATA = DATA;
     let rOld = null, rNew = null, _newTradeLog = [];
+    // ##EQ_MA_FILTER## Рассчитаем индекс раздела IS/OOS для правильного split eq_old
+    const _isDataLen = origDATA.length;
+    const _isN = Math.round(_isDataLen * 0.70);  // 70% точка в исходных данных
 
     // Пересчитываем ПОЛНЫЙ результат на исходных 100% данных (не IS часть)
     try {
@@ -29823,9 +29826,21 @@ async function runOOSOnNewData() {
         }
         return null;
       })(),
-      old_eq:    rOld ? rOld.eq  : null,       // equity curve на истории
+      // ##EQ_MA_FILTER## КРИТИЧНО: рассчитываем точный split для eq_old (только IS часть, не полная)
+      // rOld.eq = полная кривая (100% данных), но нужно вернуть только IS часть (70%)
+      //映射: eq_split_idx ≈ (0.70 * eq_length), так как рыночные данные распределены пропорционально
+      old_eq:    (() => {
+        if (!rOld || !rOld.eq || !rOld.eq.length) return null;
+        const isEndIdx = Math.round(0.70 * rOld.eq.length) || 0;
+        return rOld.eq.slice(0, Math.min(isEndIdx + 1, rOld.eq.length));
+      })(),
       new_eq:    rNew ? rNew.eq  : null,       // equity curve на новых данных (полная, график обрезает сам)
-      old_eqCalcBaselineArr: rOld ? rOld.eqCalcBaselineArr : null, // baseline (без MA фильтра) на истории ##EQ_MA_FILTER##
+      // Аналогично для baseline ##EQ_MA_FILTER##
+      old_eqCalcBaselineArr: (() => {
+        if (!rOld || !rOld.eqCalcBaselineArr || !rOld.eqCalcBaselineArr.length) return null;
+        const isEndIdx = Math.round(0.70 * rOld.eqCalcBaselineArr.length) || 0;
+        return rOld.eqCalcBaselineArr.slice(0, Math.min(isEndIdx + 1, rOld.eqCalcBaselineArr.length));
+      })(),
       new_eqCalcBaselineArr: rNew ? rNew.eqCalcBaselineArr : null, // baseline (без MA фильтра) на новых данных ##EQ_MA_FILTER##
     });
   }
@@ -33597,7 +33612,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1775210843237;
+window._BUILD_TS = 1775210983101;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
