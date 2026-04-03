@@ -161,9 +161,13 @@ function drawEquityForResult(r) {
   const splitPct = r.cfg?._oos?.isPct ?? null;
   const baselineEq = r.eqCalcBaselineArr || null; // Baseline для MA Equity Filter (саму эквити, не MA) ##EQ_MA_FILTER##
 
+  // ⚠️ Для HC результатов: используем _fullEq если доступен (полный eq с OOS split)
+  // Это полный backtest(100%), а не оригинальный HC результат
+  let eqToDisplay = r._fullEq || r.eq;
+
   // Проверяем доступные источники equity
-  if (r.eq && r.eq.length) {
-    drawEquityData(r.eq, r.name, splitPct, baselineEq);
+  if (eqToDisplay && eqToDisplay.length) {
+    drawEquityData(eqToDisplay, r.name, splitPct, baselineEq);
   } else if (equities[r.name]) {
     drawEquityData(equities[r.name], r.name, splitPct, baselineEq);
   } else if (r.cfg) {

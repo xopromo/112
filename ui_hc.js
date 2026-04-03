@@ -1113,8 +1113,10 @@ async function runHillClimbing() {
     const _oosData = _hcBuildOOS(c);
     if (_oosData) {
       c._oos = _oosData._oos;
-      // Обновляем equity полным прогоном чтобы график показывал IS/OOS split
-      if (_oosData.eq) x.r.eq = _oosData.eq;
+      // ⚠️ ВАЖНО: Сохраняем полный eq в отдельное поле, НЕ перезаписываем x.r.eq!
+      // x.r.eq это оригинальный результат HC, он должен остаться без изменений.
+      // Используем _fullEq для OOS отрисовки, если график с OOS-расчетом.
+      if (_oosData.eq) x.r._fullEq = _oosData.eq;
     }
     // IS-статы: из IS-прогона (70%) если доступны, иначе из HC full-data прогона
     const _is = _oosData?.isStats || null;
@@ -1440,7 +1442,9 @@ function _hcOpenDetail(idx) {
     const _oosData = _hcBuildOOS(x.cfg);
     if (_oosData) {
       x.cfg._oos = _oosData._oos;
-      if (_oosData.eq) x.r.eq = _oosData.eq; // полная equity для графика
+      // ⚠️ ВАЖНО: Сохраняем полный eq в отдельное поле, НЕ перезаписываем x.r.eq!
+      // x.r.eq это оригинальный результат HC, он должен остаться без изменений.
+      if (_oosData.eq) x.r._fullEq = _oosData.eq;
     }
   }
   const raw = x.r;
