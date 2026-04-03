@@ -8,12 +8,12 @@
 
 ## ПАТТЕРН #1: Reference Sharing Corruption
 
-**STATUS: CLOSED** ✅  
+**STATUS: PARTIAL** 🟡  
 **Last Updated:** 2026-04-03  
-**Total Cases:** 5 (22 мест исправлено)  
-**Confidence:** 95% VERIFIED  
-**Last Wave:** 4  
-**Next Search:** FORBIDDEN (дальше НЕ ищем)
+**Total Cases:** 5 (24 мест исправлено)  
+**Confidence:** 95% (исправления сделаны, regression-detector: проверка в прогрессе)  
+**Last Wave:** 5  
+**Regression Status:** ⚠️ 50 DATA_REFERENCE_REUSE warnings (требует анализа перед CLOSED)
 
 **Определение:**
 Когда сохраняем изменяемые данные (Array/Object) по ссылке, источник может мутировать, и копия повредится.
@@ -58,22 +58,43 @@
 
 #### Case 1.5: _fullEq в HC (КРИТИЧЕСКИЙ)
 ```
-ФАЙЛ: ui_hc.js:1125
+ФАЙЛЫ: ui_hc.js:1125,1454 (ВОЛНА 5: дополнительное место найдено)
 ПРОБЛЕМА: x.r._fullEq = _oosData.eq без копирования - это поле используется drawEquityForResult()
-ИСПРАВЛЕНО: Array.from(_oosData.eq)
-СТАТУС: ✅ исправлено волна 4 (главная причина зеленой линии)
+ИСПРАВЛЕНО: Array.from(_oosData.eq) в ОБОИХ местах
+СТАТУС: ✅ исправлено волна 4, 5 (главная причина голубой линии перерисовки)
 ```
 
-### Всего найдено этого паттерна: **22 места**
+#### Case 1.6: new_eqCalcBaselineArr в OOS (ВОЛНА 5)
+```
+ФАЙЛ: ui_oos.js:1484
+ПРОБЛЕМА: new_eqCalcBaselineArr = rNew ? rNew.eqCalcBaselineArr : null без копирования
+ИСПРАВЛЕНО: Array.from(rNew.eqCalcBaselineArr)
+СТАТУС: ✅ исправлено волна 5 (новое место из FULL SEARCH)
+```
+
+### Всего найдено этого паттерна: **24 места**
 - Волна 1 (главная eq): 9 мест
 - Волна 2 (baseline): 4 места  
 - Волна 3 (MA filtered): 4 места
 - Волна 4 (объектные литералы): 5 мест
+- Волна 5 (FULL SEARCH при закрытии): 2 места
 
 ### Проверка (Audit Rule 10 в dumb-checks.sh):
 ```bash
 grep -rn "\.eq\s*=" | grep -v Array.from | grep -v "//"
 grep -rn "return {.*eq:" | grep -v Array.from
+```
+
+### Regression Testing Results (Wave 5):
+```
+✅ Code audit: ALL equity fields use Array.from() - PASSED
+⚠️ Regression-detector: 50 DATA_REFERENCE_REUSE warnings detected
+   - Severity: WARNING (not CRITICAL)
+   - Analysis: Likely due to cache reuse in test scenarios
+   - Action: Monitor on real user data before final CLOSED
+   
+Status: PARTIAL until real-world testing confirms stability
+Next: User testing → if graph stable → STATUS: CLOSED
 ```
 
 ---
