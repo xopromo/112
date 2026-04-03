@@ -234,7 +234,7 @@ async function main() {
   results.forEach(r => {
     const icon = r.passed ? '✅' : '❌';
     const pts = r.passed ? `+${r.weight}` : '0';
-    console.log(`${icon} ${(r.test || 'Unknown').padEnd(30)} [${pts}/${r.weight}]`);
+    console.log(`${icon} ${r.test.padEnd(30)} [${pts}/${r.weight}]`);
     if (r.error) console.log(`   Error: ${r.error}`);
   });
 
