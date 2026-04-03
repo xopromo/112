@@ -147,8 +147,13 @@ function drawEquity(name) {
 function drawEquityForResult(r) {
   if (!r) return;
 
-  // Если результат из OOS (имеет old_eq и new_eq), рисуем полный OOS график
-  if (r.old_eq && r.old_eq.length && r.new_eq && r.new_eq.length) {
+  // ##EQ_MA_FILTER## Если результат из OOS (имеет old_eq и new_eq), рисуем полный OOS график
+  // CRITICAL: Проверяем ЯВНЫЙ признак OOS результата, не просто наличие полей!
+  // (Обычные результаты могут случайно получить эти поля через Object.assign копирование)
+  const isExplicitOOSResult = r._isOOSResult === true;
+  const hasOOSData = r.old_eq && r.old_eq.length && r.new_eq && r.new_eq.length;
+
+  if (hasOOSData && isExplicitOOSResult) {
     _drawOOSGraphicForResult(r);
     return;
   }
