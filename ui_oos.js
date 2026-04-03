@@ -1339,7 +1339,8 @@ async function runOOSOnNewData() {
     let rOld_IS = null;
     if (rOld && rOld.eq && origDATA && origDATA.length > 0) {
       const _isN = Math.round(origDATA.length * 0.70);
-      const _isEq = rOld.eq.slice(0, _isN);
+      // Копируем eq для безопасности - если rOld.eq переиспользуется, _isEq не пострадает
+      const _isEq = Array.from(rOld.eq.slice(0, _isN));
 
       // Старые трейды - только те что заканчиваются до 70%
       const _isTrades = (rOld.tradePnl || []).filter(t => t.exitBar != null && t.exitBar < _isN);
@@ -1439,7 +1440,8 @@ async function runOOSOnNewData() {
       old_eq:    (() => {
         if (!rOld || !rOld.eq || !rOld.eq.length) return null;
         const isEndIdx = Math.round(0.70 * rOld.eq.length) || 0;
-        return rOld.eq.slice(0, Math.min(isEndIdx + 1, rOld.eq.length));
+        // Копируем для безопасности - если rOld.eq переиспользуется, old_eq не пострадает
+        return Array.from(rOld.eq.slice(0, Math.min(isEndIdx + 1, rOld.eq.length)));
       })(),
       new_eq:    rNew ? Array.from(rNew.eq) : null,  // Копируем массив, не ссылку
       // OOS-специфичные поля — история (только IS часть 70%)

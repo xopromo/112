@@ -1122,7 +1122,8 @@ async function runOpt() {
       ir: _calcInfoRatio(rFull.eq) }; // ##OMG ##PAIN ##BURKE ##SRNTY ##IR
     // Обновляем глобальный equities полной кривой — чтобы график показывал 100% данных
     // с правильным split-маркером на IS/OOS границе, а не растянутую IS-кривую.
-    if (name && typeof equities !== 'undefined') equities[name] = rFull.eq;
+    // КРИТИЧНО: Копируем eq чтобы избежать корупции если rFull.eq переиспользуется позже
+    if (name && typeof equities !== 'undefined') equities[name] = Array.from(rFull.eq);
   }
   // Экспортируем _attachOOS для вызова из pauseOpt (ui.js)
   // При паузе пользователь видит результаты до завершения OOS-батча → TV колонки "—".
@@ -1139,7 +1140,7 @@ async function runOpt() {
     for (let oi = 0; oi < pending.length; oi++) {
       try {
         _attachOOS(pending[oi].cfg, pending[oi].name, pending[oi].n);
-        if (equities[pending[oi].name]) pending[oi].eq = equities[pending[oi].name];
+        if (equities[pending[oi].name]) pending[oi].eq = Array.from(equities[pending[oi].name]);  // Копируем для безопасности
       } catch(_oosErr) {
         console.error('[_batchOOS] oi='+oi, _oosErr);
         if (!pending[oi].cfg._oos) pending[oi].cfg._oos = { forward: null, isPct: Math.round(_isN / N * 100) };
@@ -2314,7 +2315,7 @@ async function runOpt() {
             omega:_calcOmega(r.eq),pain:_calcPainRatio(r.eq),
             burke:_calcBurke(r.eq),serenity:_calcSerenity(r.eq),ir:_calcInfoRatio(r.eq),eq:Array.from(r.eq),eqCalc:_eqCalc,eqCalcMAArr:btCfg.eqCalcMAArr||null,eqCalcBaselineArr:btCfg.eqCalcBaselineArr||null,cfg:_cfg}); // ##OMG ##PAIN ##BURKE ##SRNTY ##IR ##EQ_MA_FILTER##
           equities[name] = Array.from(r.eq);
-          if (_eqCalc) equities[name+'_calc'] = _eqCalc;  // ##EQ_MA_FILTER##
+          if (_eqCalc) equities[name+'_calc'] = Array.isArray(_eqCalc) ? _eqCalc : Array.from(_eqCalc);  // ##EQ_MA_FILTER## Копируем для безопасности
         }
       }
       if (done % 300 === 0 || done === mcTotal) {
@@ -2761,7 +2762,7 @@ async function runOpt() {
             cvr:null,upi:null,sortino:null,kRatio:null,sqn:r.sqn??null,mlAvg:r.mlAvg??null, // ##ML_FILTER
             omega:null,pain:null,burke:null,serenity:null,ir:null,eq:Array.from(r.eq),eqCalc:_eqCalc,eqCalcMAArr:btCfg.eqCalcMAArr||null,eqCalcBaselineArr:btCfg.eqCalcBaselineArr||null,cfg:_cfg_tpe}); // ##OMG ##PAIN ##BURKE ##SRNTY ##IR ##EQ_MA_FILTER## (null — батч)
           equities[name] = Array.from(r.eq);
-          if (_eqCalc) equities[name+'_calc'] = _eqCalc;  // ##EQ_MA_FILTER##
+          if (_eqCalc) equities[name+'_calc'] = Array.isArray(_eqCalc) ? _eqCalc : Array.from(_eqCalc);  // ##EQ_MA_FILTER## Копируем для безопасности
         }
       }
       return score;
@@ -3469,7 +3470,7 @@ async function runOpt() {
                                         omega:_calcOmega(r.eq),pain:_calcPainRatio(r.eq),
                                         burke:_calcBurke(r.eq),serenity:_calcSerenity(r.eq),ir:_calcInfoRatio(r.eq),eq:Array.from(r.eq),eqCalc:_eqCalc,eqCalcMAArr:btCfg.eqCalcMAArr||null,eqCalcBaselineArr:btCfg.eqCalcBaselineArr||null,cfg:_cfg_ex}); // ##OMG ##PAIN ##BURKE ##SRNTY ##IR ##EQ_MA_FILTER##
                                       equities[name]=Array.from(r.eq);
-                                      if (_eqCalc) equities[name+'_calc']=_eqCalc;  // ##EQ_MA_FILTER##
+                                      if (_eqCalc) equities[name+'_calc']=Array.isArray(_eqCalc)?_eqCalc:Array.from(_eqCalc);  // ##EQ_MA_FILTER## Копируем для безопасности
                                       } // end else (не дубль)
                                     } // end if(r passed filter)
                                     // Yield каждые 300 итераций для отзывчивости UI (кнопка Стоп)
