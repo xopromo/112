@@ -225,27 +225,42 @@ function _drawOOSGraphicForResult(r) {
   }
 
   // КРИТИЧНО: eq_new это ПОЛНЫЙ eq (включая пересечение и warmup)
-  // Обрезаем одновременно по overlapIdx (время) и warmup (индикаторы)
-  // чтобы гарантировать что eq_old и eq_new выравнены по warmup
+  // ВОЛНА 7: ТАКЖЕ очищаем eq_old от warmup чтобы обе кривые выравнены
+  // Проблема: eq_old содержала warmup бары (0-29), eq_new их удаляла
+  // Результат: синие линия казалась "впереди" потому что не имела flat warmup-периода
+  // Решение: удалить warmup из ОБЕИХ кривых перед конкатенацией
 
+  let oldEqClean = eq_old;  // ВОЛНА 7: Новое - очищение eq_old
+  let oldBaselineClean = baseline_old;
   let newEqClean = eq_new;
   let newBaselineClean = baseline_new;
 
-  if (newEqClean && newEqClean.length > 0) {
+  if ((oldEqClean || newEqClean) && (oldEqClean?.length > 0 || newEqClean?.length > 0)) {
     const cfg = r.cfg || {};
 
-    // Рассчитываем warmup
+    // Рассчитываем warmup (используется для ОБЕИХ кривых)
     const maWarmup = cfg.useMA ? (cfg.maP || 20) : 0;
     const pivotWarmup = cfg.usePivot ? ((cfg.pvL || 5) + (cfg.pvR || 2) + 5) : 0;
     const atrWarmup = cfg.useATR ? (cfg.atrPeriod || 14) * 3 : 0;
     const eqMAWarmup = cfg.useEqMA ? (cfg.eqMALen || 20) : 0;
     const warmup = Math.max(maWarmup, pivotWarmup, atrWarmup, eqMAWarmup, 1);
 
-    // ГЛАВНОЕ: обрезаем по МАКСИМУМУ из (overlapIdx, warmup)
+    // ВОЛНА 7: Очищаем eq_old от warmup (просто удаляем первые warmup баров)
+    if (oldEqClean && oldEqClean.length > warmup) {
+      const startValOld = oldEqClean[warmup];
+      oldEqClean = oldEqClean.slice(warmup).map(v => v - startValOld);
+
+      if (oldBaselineClean && oldBaselineClean.length > warmup) {
+        const startValOldBL = oldBaselineClean[warmup];
+        oldBaselineClean = oldBaselineClean.slice(warmup).map(v => v - startValOldBL);
+      }
+    }
+
+    // ГЛАВНОЕ: обрезаем eq_new по МАКСИМУМУ из (overlapIdx, warmup)
     // Это гарантирует что оба удалены и warmup совпадает
     const minCleanIdx = Math.max(overlapIdx, warmup);
 
-    if (minCleanIdx < newEqClean.length) {
+    if (newEqClean && minCleanIdx < newEqClean.length) {
       // Вычитаем значение при окончании warmup из ВСЕХ данных
       const warmupValue = newEqClean[minCleanIdx];
       newEqClean = newEqClean.map(v => v - warmupValue);
@@ -256,23 +271,25 @@ function _drawOOSGraphicForResult(r) {
       }
     }
 
-    // Теперь обрезаем ОБЕ по minCleanIdx чтобы убрать overlap и warmup
-    newEqClean = newEqClean.slice(minCleanIdx);
-    if (newBaselineClean) newBaselineClean = newBaselineClean.slice(minCleanIdx);
+    // Теперь обрезаем eq_new по minCleanIdx чтобы убрать overlap и warmup
+    if (newEqClean) {
+      newEqClean = newEqClean.slice(minCleanIdx);
+      if (newBaselineClean) newBaselineClean = newBaselineClean.slice(minCleanIdx);
+    }
   }
 
   // Concatenate: новый сегмент продолжает с последнего значения истории (без пересечения)
-  const lastOld = eq_old[eq_old.length - 1];
-  const combined = [...eq_old, ...newEqClean.map(v => v + lastOld)];
+  const lastOld = oldEqClean[oldEqClean.length - 1];
+  const combined = [...oldEqClean, ...newEqClean.map(v => v + lastOld)];
 
   // Аналогично для baseline ##EQ_MA_FILTER##
   let combined_baseline = null;
-  if (_eqMAFilterShowBaseline && baseline_old && baseline_new && newBaselineClean) {
-    const lastOldBL = baseline_old[baseline_old.length - 1];
-    combined_baseline = [...baseline_old, ...newBaselineClean.map(v => v + lastOldBL)];
+  if (_eqMAFilterShowBaseline && oldBaselineClean && newBaselineClean) {
+    const lastOldBL = oldBaselineClean[oldBaselineClean.length - 1];
+    combined_baseline = [...oldBaselineClean, ...newBaselineClean.map(v => v + lastOldBL)];
   }
 
-  const splitIdx  = eq_old.length;
+  const splitIdx  = oldEqClean.length;  // ВОЛНА 7: использовать очищенную длину
   const splitFrac = (splitIdx - 1) / (combined.length - 1);
 
   const dpr = window.devicePixelRatio || 1;
