@@ -53,17 +53,44 @@ bash .claude/scripts/dumb-checks.sh  # Блокирует пуш если ест
 
 **Детали**: см. `.claude/memory/push-checklist.md`
 
+### 🎯 Pattern-First подход (ВАЖНО!)
+
+Когда находишь баг:
+
+1. **Определи ПАТТЕРН** (это класс проблем, а не один баг)
+   - Float32Array corruption → Reference Sharing Corruption (общий паттерн)
+
+2. **Напиши ПРАВИЛО** (обобщенное решение)
+   - Copy-on-Storage Pattern → все Array/Object должны копироваться
+
+3. **Добавь в АУДИТ** (проверка в dumb-checks.sh, не отдельный скрипт!)
+   - Rule 10 проверяет ВСЕ случаи этого паттерна
+
+4. **Исправь ВСЕ СРАЗУ** (не волнами!)
+   - FULL SEARCH → находишь все 22 места → исправляешь за один раз
+
+5. **Документируй** (whiteboard + whitelist)
+   - .claude/memory/pattern-bugs-whiteboard.md отслеживает все cases
+   - .claude/rules/forbidden-patterns.md описывает что нельзя
+
+**Запрещено:**
+- ❌ Частные скрипты (float32-audit.sh, eq-check.sh)
+- ❌ Исправления волнами (волна 1, потом волна 2, потом волна 3)
+- ❌ Паттерн-специфичные проверки вместо универсальных
+
+**Детали**: см. `.claude/rules/pattern-bug-methodology.md`
 
 ### Критичные правила
 
 | Правило | Файл | Штраф |
 |---------|------|-------|
+| **Pattern-First подход** (определи паттерн перед исправлением) | .claude/rules/pattern-bug-methodology.md | Инкрементальные исправления |
+| **Copy-on-Storage Pattern** (Array/Object ВСЕГДА копировать) | dumb-checks.sh (Rule 10) | Reference corruption |
 | 3 версии _cfg (_cfg, _cfg_tpe, _cfg_ex) одновременно | opt.js:1909,2265,2847 | OOS скалывается |
 | Все фильтры WITH warmup проверка (indicator <= 0) | filter_registry.js | JS ≠ TV |
 | Новый фильтр в 4 местах (ui, opt, filter_registry, buildBtCfg) | Сеч. 🚫 | Баг |
-| **Float32Array ВСЕГДА копировать** | opt.js, ui_oos.js, ui_hc.js | Corruption |
-| **FULL SEARCH перед фиксом паттерна** | dumb-checks.sh (критично 8) | Pre-push блокирует |
-| Запрещены: console.log, hardcoded цвета, вложенные ternary | .claude/rules/ | Pre-push блокирует |
+| **FULL SEARCH перед фиксом паттерна** | dumb-checks.sh (Rule 8,9,10) | Pre-push блокирует |
+| Запрещены: console.log, hardcoded цвета, частные скрипты | .claude/rules/ | Pre-push блокирует |
 
 ---
 
