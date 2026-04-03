@@ -170,6 +170,42 @@ if echo "$LAST_MSG" | grep -iE "$PATTERN_ERRORS" > /dev/null 2>&1; then
 fi
 
 # ======================================================================
+# 🔴 Критично 10: Copy-on-Storage Pattern (Reference Sharing Corruption)
+# Паттерн: Изменяемые данные (Array/Object) НЕ должны передаваться по ссылке
+# Правило: Array.from() при сохранении, {...} для объектов, Object.assign для вложенных
+# ======================================================================
+echo "  Проверка Copy-on-Storage Pattern (Float32Array, eq-like поля)..."
+COS_VIOLATIONS=$(grep -rn "\.eq\s*=\|\.eqCalc\|\.old_eq\|\.new_eq\|\.config\|\.state" \
+  opt.js ui_*.js 2>/dev/null | \
+  grep "=" | \
+  grep -v "Array.from\|{\.\.\..*}\|Object.assign\|const\|let\|for\|if\|=>\|==\|!=\|['\"]" | \
+  grep -v "^[[:space:]]*//\|DEBUG\|console" || true)
+
+if [ -n "$COS_VIOLATIONS" ]; then
+  VIOLATIONS_COUNT=$(echo "$COS_VIOLATIONS" | wc -l)
+  # Исключаем известные безопасные места из whitelist
+  SAFE_PATTERNS="DataSync|calcOnly|readOnly|primitive|number|string|boolean|const \|let \|for \|if ("
+  REAL_VIOLATIONS=$(echo "$COS_VIOLATIONS" | grep -v "$SAFE_PATTERNS" || true)
+
+  if [ -n "$REAL_VIOLATIONS" ]; then
+    echo "  ❌ ОШИБКА: Copy-on-Storage violations найдены ($VIOLATIONS_COUNT):"
+    echo "$REAL_VIOLATIONS" | head -5
+    echo ""
+    echo "     Правило: Все изменяемые данные при сохранении ДОЛЖНЫ быть скопированы:"
+    echo "     ✅ obj.field = Array.from(source.field);  // для массивов"
+    echo "     ✅ obj.field = {...source.field};         // для объектов"
+    echo "     ✅ obj.field = Object.assign({}, src);    // для вложенных"
+    echo ""
+    echo "     Используй: bash .claude/scripts/pattern-search-template.sh Copy-on-Storage"
+    ERRORS=$((ERRORS + 1))
+  else
+    echo "  ✓ Copy-on-Storage: только безопасные присвоения"
+  fi
+else
+  echo "  ✓ Copy-on-Storage: нарушений не найдено"
+fi
+
+# ======================================================================
 # Результаты
 # ======================================================================
 echo ""

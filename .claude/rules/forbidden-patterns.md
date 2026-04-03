@@ -252,6 +252,46 @@ grep -o "}" ui_oos.js | wc -l  # закрывающих
 
 ---
 
+## 🔴 Запрещено: Частные скрипты для частных багов
+
+**Проблема**: Когда находишь баг, нельзя создавать частный скрипт для его проверки. 
+Это приводит к:
+- Паттерн-специфичным скриптам (float32-audit.sh, eq-check.sh, abc-xyz-check.sh)
+- Раздувающейся папке .claude/scripts/
+- Непереиспользуемым кодом
+- Волнам одинакового бага (когда забываешь проверить все места)
+
+**Правильный подход:**
+1. Определить ПАТТЕРН (что это класс проблем, а не один баг?)
+2. Написать УНИВЕРСАЛЬНОЕ ПРАВИЛО в .claude/rules/
+3. Добавить проверку в dumb-checks.sh (не отдельный скрипт)
+4. Документировать case-ы в .claude/memory/pattern-bugs-whiteboard.md
+
+**❌ ЗАПРЕЩЕНО:**
+```bash
+.claude/scripts/float32-audit.sh           # ← частный для Float32Array
+.claude/scripts/eq-corruption-check.sh     # ← частный для eq
+.claude/scripts/check-xy-pattern.sh        # ← частный для XY pattern
+```
+
+**✅ ПРАВИЛЬНО:**
+```
+.claude/rules/pattern-bug-methodology.md   # ← как думать паттернами
+.claude/rules/forbidden-patterns.md        # ← добавить паттерн сюда
+.claude/memory/pattern-bugs-whiteboard.md  # ← отслеживать все case-ы
+dumb-checks.sh (RULE 10)                   # ← проверка в универсальном аудите
+```
+
+**Пример Float32Array:**
+- ❌ Создал бы float32-audit.sh (частный скрипт)
+- ✅ Вместо этого: обобщенное правило "Copy-on-Storage" в dumb-checks.sh
+
+**Как это проверяется:**
+- Перед пушем проверяется что не создано новых .claude/scripts/*.sh файлов без соответствующего обобщенного правила
+- Если нарушение → пуш блокируется с сообщением "Create universal rule first!"
+
+---
+
 ## Как это проверяется
 
 **Pre-push hook** (`.git/hooks/pre-push`):
