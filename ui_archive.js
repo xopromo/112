@@ -185,8 +185,10 @@ function attachArchiveContextMenu(element, label) {
 
   element.addEventListener('contextmenu', (e) => {
     e.preventDefault();
+    e.stopPropagation();
     showOptionContextMenu(e, element.id, label || element.textContent);
-  });
+    return false;
+  }, true); // Используем capture phase для раннего перехвата события
 }
 
 /**

@@ -32763,8 +32763,10 @@ function attachArchiveContextMenu(element, label) {
 
   element.addEventListener('contextmenu', (e) => {
     e.preventDefault();
+    e.stopPropagation();
     showOptionContextMenu(e, element.id, label || element.textContent);
-  });
+    return false;
+  }, true); // Используем capture phase для раннего перехвата события
 }
 
 /**
@@ -33615,7 +33617,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1775207471759;
+window._BUILD_TS = 1775207609055;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
