@@ -88,6 +88,34 @@ bash .claude/scripts/dumb-checks.sh  # Блокирует пуш если ест
 - `.claude/rules/pattern-bug-methodology.md` — как мыслить паттернами
 - `.claude/memory/pattern-classification-guide.md` — как определить CLASS
 
+### 🔐 Loop Prevention (защита от infinite loops)
+
+Каждый паттерн имеет **STATUS**:
+
+```
+OPEN    — Паттерн открыт, можно исправлять
+PARTIAL — Часть исправлена, нужно доисправить
+CLOSED  — ВСЕ исправлено → дальше ЗАПРЕЩЕНО искать
+```
+
+**Процесс:**
+```
+Диагностика находит баг
+    ↓
+ПРОВЕРЯЕМ WHITEBOARD: статус паттерна?
+    ├─ CLOSED → "Уже исправлен, дальше не ищем"
+    ├─ PARTIAL → "Нужно доисправить"
+    └─ OPEN → "Новый, начинаем"
+    ↓
+Исправляем ВСЕ СРАЗУ → STATUS: CLOSED
+    ↓
+RULE 13 блокирует волны (паттерн закрыт → волна 5 запрещена)
+```
+
+**Результат:** Невозможен infinite loop! Паттерн либо OPEN (исправляем), либо CLOSED (дальше не ищем).
+
+**Детали**: см. `.claude/rules/loop-prevention-policy.md`
+
 ### Критичные правила
 
 | Правило | Файл | Штраф |
@@ -95,6 +123,7 @@ bash .claude/scripts/dumb-checks.sh  # Блокирует пуш если ест
 | **Классифицируй баг** (CLASS A паттерн vs CLASS B ошибка) | .claude/memory/pattern-classification-guide.md | Amnesia-driven development |
 | **Pattern-First подход** (определи паттерн перед исправлением) | .claude/rules/pattern-bug-methodology.md | Инкрементальные исправления |
 | **Copy-on-Storage Pattern** (Array/Object ВСЕГДА копировать) | dumb-checks.sh (Rule 10) | Reference corruption |
+| **Loop Prevention** (паттерны имеют STATUS: OPEN/PARTIAL/CLOSED) | .claude/rules/loop-prevention-policy.md (Rule 13) | Infinite loops |
 | **FULL SEARCH перед фиксом паттерна** | dumb-checks.sh (Rule 8,9,10) | Pre-push блокирует |
 | 3 версии _cfg (_cfg, _cfg_tpe, _cfg_ex) одновременно | opt.js:1909,2265,2847 | OOS скалывается |
 | Все фильтры WITH warmup проверка (indicator <= 0) | filter_registry.js | JS ≠ TV |

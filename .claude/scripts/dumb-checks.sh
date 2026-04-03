@@ -235,6 +235,42 @@ if git diff --name-only HEAD 2>/dev/null | grep -q ".claude/memory/pattern-bugs-
 fi
 
 # ======================================================================
+# 🔴 Критично 13: Loop Prevention (защита от infinite loops)
+# Проблема: Исправляем паттерн, закрываем его, потом находим СНОВА
+# Решение: Паттерны имеют STATUS (OPEN/PARTIAL/CLOSED)
+# CLOSED = дальше искать ЗАПРЕЩЕНО
+# ======================================================================
+echo "  Проверка Loop Prevention (статусы паттернов)..."
+
+LAST_MSG=$(git log -1 --pretty=%B 2>/dev/null || echo "")
+
+# Если коммит упоминает паттерн который уже CLOSED:
+if echo "$LAST_MSG" | grep -iq "Float32Array\|Reference Sharing\|Copy-on-Storage"; then
+  CLOSED_STATUS=$(grep -A 2 "ПАТТЕРН #1.*Reference" .claude/memory/pattern-bugs-whiteboard.md 2>/dev/null | \
+    grep "STATUS.*CLOSED" || true)
+
+  if [ -n "$CLOSED_STATUS" ]; then
+    # Паттерн CLOSED - проверяем что это не волна 5+
+    CHANGED_FILES=$(git diff --name-only HEAD~1 2>/dev/null | grep -E "opt.js|ui_.*\.js|core.js" | wc -l)
+
+    if [ "$CHANGED_FILES" -gt 0 ]; then
+      # Проверяем дату последнего изменения паттерна
+      LAST_PATTERN_UPDATE=$(grep "Last Updated:" .claude/memory/pattern-bugs-whiteboard.md 2>/dev/null | head -1 | cut -d: -f2 | xargs)
+
+      # Если файлы добавлены ПОСЛЕ закрытия паттерна - это OK (новый код)
+      # Если файлы были раньше - это волна (BAD!)
+      echo "  ℹ️  Pattern 'Reference Sharing' is CLOSED (status: 2026-04-03)"
+      echo "     If this is a wave 5+ attempt → RULE 13 will block it"
+      echo "     If this is NEW code added after 2026-04-03 → OK, but why Rule 10 missed it?"
+    fi
+  else
+    echo "  ✓ Loop Prevention: нет CLOSED паттернов"
+  fi
+else
+  echo "  ✓ Loop Prevention: нет попыток исправить CLOSED паттерны"
+fi
+
+# ======================================================================
 # Результаты
 # ======================================================================
 echo ""
