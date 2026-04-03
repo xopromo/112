@@ -327,7 +327,7 @@ function _hcRunBacktest(cfg) {
 
     // ##EQ_MA_FILTER## Сохраняем baseline в результат если он был рассчитан
     if (cfg.useEqMA && _hcRes) {
-      if (btCfg.eqCalcBaselineArr) _hcRes.eqCalcBaselineArr = btCfg.eqCalcBaselineArr;
+      if (btCfg.eqCalcBaselineArr) _hcRes.eqCalcBaselineArr = Array.from(btCfg.eqCalcBaselineArr);
       if (btCfg.eqCalcMAArr) _hcRes.eqCalcMAArr = btCfg.eqCalcMAArr;
     }
 
@@ -378,7 +378,7 @@ function _hcBuildOOS(cfg) {
 
       // ##EQ_MA_FILTER## Сохраняем baseline в результат если он был рассчитан
       if (cfg.useEqMA && r) {
-        if (btCfg.eqCalcBaselineArr) r.eqCalcBaselineArr = btCfg.eqCalcBaselineArr;
+        if (btCfg.eqCalcBaselineArr) r.eqCalcBaselineArr = Array.from(btCfg.eqCalcBaselineArr);
         if (btCfg.eqCalcMAArr) r.eqCalcMAArr = btCfg.eqCalcMAArr;
       }
 

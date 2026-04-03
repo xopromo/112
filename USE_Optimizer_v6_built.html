@@ -18138,7 +18138,7 @@ async function runOpt() {
       const btCfg = buildBtCfg(cfg, ind);
       // ##EQ_MA_FILTER## Сохраняем MA из IS режима для OOS прогона (фильтр должен использовать ту же MA)
       if (cfg.eqCalcMAArr) btCfg.eqCalcMAArr = cfg.eqCalcMAArr;
-      if (cfg.eqCalcBaselineArr) btCfg.eqCalcBaselineArr = cfg.eqCalcBaselineArr;
+      if (cfg.eqCalcBaselineArr) btCfg.eqCalcBaselineArr = Array.from(cfg.eqCalcBaselineArr);
       return backtest(ind.pvLo, ind.pvHi, ind.atrArr, btCfg);
     } catch(e) { console.error('[_runOOS] exception:', e, cfg); return null; }
     finally { DATA = origDATA; }
@@ -27132,7 +27132,7 @@ function _hcRunBacktest(cfg) {
 
     // ##EQ_MA_FILTER## Сохраняем baseline в результат если он был рассчитан
     if (cfg.useEqMA && _hcRes) {
-      if (btCfg.eqCalcBaselineArr) _hcRes.eqCalcBaselineArr = btCfg.eqCalcBaselineArr;
+      if (btCfg.eqCalcBaselineArr) _hcRes.eqCalcBaselineArr = Array.from(btCfg.eqCalcBaselineArr);
       if (btCfg.eqCalcMAArr) _hcRes.eqCalcMAArr = btCfg.eqCalcMAArr;
     }
 
@@ -27183,7 +27183,7 @@ function _hcBuildOOS(cfg) {
 
       // ##EQ_MA_FILTER## Сохраняем baseline в результат если он был рассчитан
       if (cfg.useEqMA && r) {
-        if (btCfg.eqCalcBaselineArr) r.eqCalcBaselineArr = btCfg.eqCalcBaselineArr;
+        if (btCfg.eqCalcBaselineArr) r.eqCalcBaselineArr = Array.from(btCfg.eqCalcBaselineArr);
         if (btCfg.eqCalcMAArr) r.eqCalcMAArr = btCfg.eqCalcMAArr;
       }
 
@@ -29823,7 +29823,7 @@ async function runOOSOnNewData() {
       // ##EQ_MA_FILTER## Копируем baseline данные в результат если они есть
       if (rNew && r.cfg.useEqMA) {
         if (_btCfg.eqCalcBaselineArr && !rNew.eqCalcBaselineArr) {
-          rNew.eqCalcBaselineArr = _btCfg.eqCalcBaselineArr;
+          rNew.eqCalcBaselineArr = Array.from(_btCfg.eqCalcBaselineArr);
         }
         if (_btCfg.eqCalcMAArr && !rNew.eqCalcMAArr) {
           rNew.eqCalcMAArr = _btCfg.eqCalcMAArr;
@@ -33687,7 +33687,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1775222476326;
+window._BUILD_TS = 1775222603081;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
