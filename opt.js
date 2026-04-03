@@ -2213,38 +2213,32 @@ async function runOpt() {
 
       // ##EQ_MA_FILTER## Двупроходный цикл: сначала расчётная equity, потом с фильтром
       let _eqCalc = null;
+      // ##EQ_MA_FILTER## ПЕРВЫЙ ПРОХОД: рассчитываем baseline БЕЗ фильтра
+      // Это ВСЕГДА должно срабатывать, чтобы гарантировать правильный baseline
       if (_effUseEqMA) {
-        const _shadowCfg = JSON.parse(JSON.stringify(btCfg));
-        _shadowCfg.useEqMA = false;  // отключаем фильтр для расчётной equity
-        // ##EQ_MA_FILTER## baseline использует ТЕ ЖЕ параметры входа (waitBars, waitRetrace)
-        // только отключаем фильтр — так оба входа (baseline и filtered) будут на одной цене
+        const _baselineCfg = JSON.parse(JSON.stringify(btCfg));
+        _baselineCfg.useEqMA = false;  // КРИТИЧНО: отключаем фильтр для базовой equity
         if (_useOOS) DATA = _isData;
-        let _shadowEq;
+        let _baselineResult;
         try {
-          const _shadowResult = backtest(pvCache[pk].lo, pvCache[pk].hi, atrCache[atrP], _shadowCfg);
-          _shadowEq = _shadowResult ? _shadowResult.eq : null;
+          _baselineResult = backtest(pvCache[pk].lo, pvCache[pk].hi, atrCache[atrP], _baselineCfg);
         } finally {
           if (_useOOS) DATA = _fullDATA;
         }
-        // Рассчитываем MA(расчётная equity)
-        if (_shadowEq && _shadowEq.length > 0) {
+        // Сохраняем baseline и MA независимо от результата
+        if (_baselineResult && _baselineResult.eq && _baselineResult.eq.length > 0) {
+          btCfg.eqCalcBaselineArr = Array.from(_baselineResult.eq); // Сохраняем baseline equity
           const maLen = eqMALen || 20;
-          const maType = eqMAType || 'SMA'; // ##EQ_MA_FILTER## выбор типа MA
-          btCfg.eqCalcMAArr = calcMA(Array.from(_shadowEq), maLen, maType);
-          btCfg.eqCalcBaselineArr = Array.from(_shadowEq); // ##EQ_MA_FILTER## сохраняем саму baseline (не MA)
-          _eqCalc = _shadowEq;  // сохраняем для последующего использования
+          const maType = eqMAType || 'SMA';
+          btCfg.eqCalcMAArr = calcMA(Array.from(btCfg.eqCalcBaselineArr), maLen, maType);
         }
       }
 
+      // ##EQ_MA_FILTER## ВТОРОЙ ПРОХОД: рассчитываем filtered equity С фильтром
       if (_useOOS) DATA = _isData;
       let r;
       try { r = backtest(pvCache[pk].lo, pvCache[pk].hi, atrCache[atrP], btCfg); }
       finally { if (_useOOS) DATA = _fullDATA; }
-      // ##EQ_MA_FILTER## Гарантируем что eqCalcBaselineArr и eqCalcMAArr установлены если фильтр включен
-      if (_effUseEqMA && (!btCfg.eqCalcBaselineArr || !btCfg.eqCalcMAArr)) {
-        if (!btCfg.eqCalcBaselineArr) btCfg.eqCalcBaselineArr = r?.eq || [];
-        if (!btCfg.eqCalcMAArr) btCfg.eqCalcMAArr = r?.eq ? calcMA(Array.from(r.eq), eqMALen || 20, eqMAType || 'SMA') : [];
-      }
       done++;
       if (r && r.n >= minTrades && r.dd <= maxDD) {
         const pdd = r.dd>0 ? r.pnl/r.dd : 0;
@@ -2657,11 +2651,6 @@ async function runOpt() {
       try { r = backtest(pvCache[pk].lo, pvCache[pk].hi, atrCache[atrP], btCfg); }
       catch(_btErr) { console.error('[TPE] backtest ошибка:', _btErr); r = null; }
       finally { if (_useOOS) DATA = _fullDATA; }
-      // ##EQ_MA_FILTER## Гарантируем что eqCalcBaselineArr и eqCalcMAArr установлены если фильтр включен
-      if (_effUseEqMA && r && (!btCfg.eqCalcBaselineArr || !btCfg.eqCalcMAArr)) {
-        if (!btCfg.eqCalcBaselineArr) btCfg.eqCalcBaselineArr = r.eq || [];
-        if (!btCfg.eqCalcMAArr) btCfg.eqCalcMAArr = r.eq ? calcMA(Array.from(r.eq), eqMALen || 20, eqMAType || 'SMA') : [];
-      }
       done++;
       // Мягкий score: градация для всех результатов, не только прошедших фильтр
       // Прошёл фильтр: P/DD или GT-Score (зависит от c_use_gt)
@@ -3379,11 +3368,6 @@ async function runOpt() {
                                     let r;
                                     try { r=backtest(pvCache[pk].lo,pvCache[pk].hi,atrCache[atrP],btCfg); }
                                     finally { if (_useOOS) DATA = _fullDATA; }
-                                    // ##EQ_MA_FILTER## Гарантируем что eqCalcBaselineArr и eqCalcMAArr установлены если фильтр включен
-                                    if (_effUseEqMA && r && (!btCfg.eqCalcBaselineArr || !btCfg.eqCalcMAArr)) {
-                                      if (!btCfg.eqCalcBaselineArr) btCfg.eqCalcBaselineArr = r.eq || [];
-                                      if (!btCfg.eqCalcMAArr) btCfg.eqCalcMAArr = r.eq ? calcMA(Array.from(r.eq), eqMALen || 20, eqMAType || 'SMA') : [];
-                                    }
                                     done++;
 
                                     if(r && r.n>=minTrades && r.dd<=maxDD) {
