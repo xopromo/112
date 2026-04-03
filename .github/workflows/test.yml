@@ -21,5 +21,31 @@ jobs:
         with:
           node-version: '22'
 
+      - name: Check JavaScript syntax (fail fast)
+        run: |
+          echo "Checking syntax for all JS files..."
+          node -c opt.js && \
+          node -c core.js && \
+          node -c ui.js && \
+          node -c ui_oos.js && \
+          node -c ui_hc.js && \
+          node -c ui_ml.js && \
+          node -c ui_heatmap.js && \
+          node -c ui_projects.js && \
+          node -c ui_comparator.js && \
+          node -c ui_equity.js && \
+          node -c ui_table.js && \
+          node -c ui_queue.js && \
+          node -c ui_archive.js && \
+          node -c ui_detail.js && \
+          node -c pine_export.js && \
+          node -c filter_registry.js && \
+          node -c synthesis.js && \
+          node -c synthesis_worker.js && \
+          node -c pareto_front.js && \
+          node -c projects.js && \
+          echo "✅ All files have valid syntax" || \
+          (echo "❌ Syntax error found - fix before running tests" && exit 1)
+
       - name: Run unit tests
         run: node --test tests/unit/*.test.cjs
