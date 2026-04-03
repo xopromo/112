@@ -1450,7 +1450,8 @@ function _hcOpenDetail(idx) {
       x.cfg._oos = _oosData._oos;
       // ⚠️ ВАЖНО: Сохраняем полный eq в отдельное поле, НЕ перезаписываем x.r.eq!
       // x.r.eq это оригинальный результат HC, он должен остаться без изменений.
-      if (_oosData.eq) x.r._fullEq = _oosData.eq;
+      // КРИТИЧНО: Копируем массив! Иначе _oosData.eq может мутироваться при пересчёте OOS
+      if (_oosData.eq) x.r._fullEq = Array.from(_oosData.eq);
     }
   }
   const raw = x.r;

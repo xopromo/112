@@ -1481,7 +1481,7 @@ async function runOOSOnNewData() {
         const isEndIdx = Math.round(0.70 * rOld.eqCalcBaselineArr.length) || 0;
         return rOld.eqCalcBaselineArr.slice(0, Math.min(isEndIdx + 1, rOld.eqCalcBaselineArr.length));
       })(),
-      new_eqCalcBaselineArr: rNew ? rNew.eqCalcBaselineArr : null, // baseline (без MA фильтра) на новых данных ##EQ_MA_FILTER##
+      new_eqCalcBaselineArr: (rNew && rNew.eqCalcBaselineArr) ? Array.from(rNew.eqCalcBaselineArr) : null, // baseline (без MA фильтра) на новых данных ##EQ_MA_FILTER## — КРИТИЧНО копируем!
     });
   }
 
