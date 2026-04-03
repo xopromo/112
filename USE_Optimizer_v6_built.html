@@ -24774,11 +24774,10 @@ function _drawOOSGraphicForResult(r) {
     }
   }
 
-  // Пропускаем пересекающиеся бары из eq_new
-  // ВАЖНО: warmup должен быть применен ДО пересечения, не ПОСЛЕ
-  // иначе данные смещаются дважды и синхронизируются неправильно
-  let newEqClean = eq_new.slice(overlapIdx);
-  let newBaselineClean = baseline_new ? baseline_new.slice(overlapIdx) : null; // ##EQ_MA_FILTER##
+  // new_eq уже очищена в ui_oos.js (без пересечения)
+  // Не обрезаем её снова - это нарушит warmup синхронизацию!
+  let newEqClean = eq_new;  // Уже очищена на стороне ui_oos.js
+  let newBaselineClean = baseline_new;  // Тоже очищена ##EQ_MA_FILTER##
 
   // Рассчитаем прогрев для новых данных (игнорируем первые N баров)
   // КРИТИЧНО: warmupEndIdx применяется на eq_new ПЕРЕД пересечением
@@ -29990,13 +29989,20 @@ async function runOOSOnNewData() {
       p2:        rOld ? rOld.p2  : 0,
       // КРИТИЧНО: OOS результаты должны ВСЕГДА иметь old_eq и new_eq чтобы отличаться от обычных результатов
       // Это гарантирует что drawEquityForResult покажет правильный график для каждого режима
+      // ВАЖНО: new_eq уже должна быть ОЧИЩЕНА (без пересечения) чтобы синхронизировать warmup
+      // иначе when мы обрезаем overlapIdx в _drawOOSGraphicForResult, мы нарушаем warmup синхронизацию
       old_eq:    (() => {
         if (!rOld || !rOld.eq || !rOld.eq.length) return null;
         const isEndIdx = Math.round(0.70 * rOld.eq.length) || 0;
         // Копируем для безопасности - если rOld.eq переиспользуется, old_eq не пострадает
         return Array.from(rOld.eq.slice(0, Math.min(isEndIdx + 1, rOld.eq.length)));
       })(),
-      new_eq:    rNew ? Array.from(rNew.eq) : null,  // Копируем массив, не ссылку
+      new_eq:    (() => {
+        // КРИТИЧНО: Отрезаем пересечение ЗДЕСЬ, чтобы warmup был синхронизирован с eq_old
+        if (!rNew || !rNew.eq || !rNew.eq.length) return null;
+        // Сохраняем только часть ПОСЛЕ пересечения (от _overlapIdx)
+        return Array.from(rNew.eq.slice(Math.min(_overlapIdx, rNew.eq.length)));
+      })(),
       // OOS-специфичные поля — история (только IS часть 70%)
       old_pnl:    rOld_IS ? rOld_IS.pnl : null,
       old_wr:     rOld_IS ? rOld_IS.wr  : null,
@@ -33737,7 +33743,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1775255604433;
+window._BUILD_TS = 1775255742826;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
