@@ -4,81 +4,54 @@
 
 const ARCHIVE_KEY = 'archived_filter_options';
 
-/**
- * Получить список архивированных опций из localStorage
- * @returns {Object} { fieldId: {label, timestamp}, ... }
- */
 function getArchivedOptions() {
   return JSON.parse(localStorage.getItem(ARCHIVE_KEY) || '{}');
 }
 
-/**
- * Архивировать опцию (скрыть из основного списка)
- * @param {string} fieldId - ID элемента (например, 'f_ma', 'f_rsi')
- * @param {string} fieldLabel - Название опции для отображения в архиве
- */
 function archiveOption(fieldId, fieldLabel) {
   const archived = getArchivedOptions();
-  archived[fieldId] = {
-    label: fieldLabel || fieldId,
-    timestamp: Date.now()
-  };
+  archived[fieldId] = { label: fieldLabel || fieldId, timestamp: Date.now() };
   localStorage.setItem(ARCHIVE_KEY, JSON.stringify(archived));
   updateArchiveUI();
 
-  // Скрыть элемент из основного интерфейса
-  const element = document.getElementById(fieldId);
-  if (element) {
-    element.style.display = 'none';
+  // Скрываем родительский блок (.cb или .field), а не только input
+  const el = document.getElementById(fieldId);
+  if (el) {
+    const block = el.closest('.cb, .field') || el;
+    block.style.display = 'none';
   }
 }
 
-/**
- * Восстановить опцию из архива (показать в основном списке)
- * @param {string} fieldId - ID элемента
- */
 function unarchiveOption(fieldId) {
   const archived = getArchivedOptions();
   delete archived[fieldId];
   localStorage.setItem(ARCHIVE_KEY, JSON.stringify(archived));
   updateArchiveUI();
 
-  // Показать элемент в основном интерфейсе
-  const element = document.getElementById(fieldId);
-  if (element) {
-    element.style.display = '';
+  const el = document.getElementById(fieldId);
+  if (el) {
+    const block = el.closest('.cb, .field') || el;
+    block.style.display = '';
   }
 }
 
-/**
- * Обновить UI: счётчик архива и список архивированных опций
- */
 function updateArchiveUI() {
   const archived = getArchivedOptions();
   const count = Object.keys(archived).length;
 
-  // Обновить счётчик в кнопке
   const countEl = document.getElementById('archive-count');
   if (countEl) countEl.textContent = count;
 
-  // Скрыть/показать кнопку если есть архивированные опции
   const btnArchive = document.getElementById('btn-archive-tab');
-  if (btnArchive) {
-    btnArchive.style.opacity = count > 0 ? '1' : '0.5';
-  }
+  if (btnArchive) btnArchive.style.opacity = count > 0 ? '1' : '0.5';
 
-  // Отрендерить список архивированных опций
   renderArchivedOptions();
 }
 
-/**
- * Отрендерить список архивированных опций
- */
 function renderArchivedOptions() {
   const archived = getArchivedOptions();
   const container = document.getElementById('archived-options-list');
-  const emptyMsg = document.getElementById('archived-empty');
-
+  const emptyMsg  = document.getElementById('archived-empty');
   if (!container) return;
 
   container.innerHTML = '';
@@ -87,7 +60,6 @@ function renderArchivedOptions() {
     if (emptyMsg) emptyMsg.style.display = 'block';
     return;
   }
-
   if (emptyMsg) emptyMsg.style.display = 'none';
 
   Object.entries(archived).forEach(([fieldId, data]) => {
@@ -101,167 +73,124 @@ function renderArchivedOptions() {
 
     const date = document.createElement('span');
     date.className = 'archived-option-date';
-    const dateObj = new Date(data.timestamp);
-    date.textContent = dateObj.toLocaleDateString('ru-RU');
+    date.textContent = new Date(data.timestamp).toLocaleDateString('ru-RU');
 
     item.appendChild(name);
     item.appendChild(date);
 
-    // Контекстное меню при правом клике
-    item.addEventListener('contextmenu', (e) => {
-      e.preventDefault();
-      showArchiveContextMenu(e, fieldId);
-    });
-
-    // Двойной клик для быстрого восстановления
-    item.addEventListener('dblclick', () => {
-      unarchiveOption(fieldId);
-    });
+    // Двойной клик — быстрое восстановление
+    item.addEventListener('dblclick', () => unarchiveOption(fieldId));
 
     container.appendChild(item);
   });
 }
 
-/**
- * Показать контекстное меню для архивированной опции
- */
-function showArchiveContextMenu(event, fieldId) {
-  const menu = document.createElement('div');
-  menu.className = 'context-menu';
-  menu.innerHTML = `
-    <button onclick="unarchiveOption('${fieldId}'); document.querySelector('.context-menu').remove()">
-      ↩️ Восстановить
-    </button>
-  `;
-
-  menu.style.left = event.pageX + 'px';
-  menu.style.top = event.pageY + 'px';
-  document.body.appendChild(menu);
-
-  // Удалить меню при клике в другое место
-  const removeMenu = () => {
-    if (menu.parentNode) menu.remove();
-    document.removeEventListener('click', removeMenu);
-  };
-  document.addEventListener('click', removeMenu);
-}
-
-/**
- * Переключить видимость панели архива
- */
 function toggleArchiveTab() {
   const panel = document.getElementById('archived-options-panel');
-  if (panel) {
-    panel.classList.toggle('active');
-  }
+  if (panel) panel.classList.toggle('active');
 }
 
-/**
- * Инициализировать архив при загрузке страницы
- */
-document.addEventListener('DOMContentLoaded', () => {
-  // Скрыть архивированные опции при загрузке
-  const archived = getArchivedOptions();
-  Object.keys(archived).forEach(fieldId => {
-    const element = document.getElementById(fieldId);
-    if (element) {
-      element.style.display = 'none';
-    }
-  });
+// ── Единое делегированное контекстное меню ──────────────────────────────────
+// Один обработчик на document (capture) вместо тысячи на каждый элемент.
+// capture=true гарантирует срабатывание ДО того как браузер успевает показать своё меню.
 
-  // Обновить UI архива
-  updateArchiveUI();
+document.addEventListener('contextmenu', (e) => {
+  _handlePanelsContextMenu(e);
+  _handleArchivedPanelContextMenu(e);
+}, true);
 
-  // Привязать контекстные меню ко всем элементам опций
-  attachContextMenusToAllOptions();
-});
+function _handlePanelsContextMenu(e) {
+  const panels = document.getElementById('panels');
+  if (!panels || !panels.contains(e.target)) return;
 
-/**
- * Добавить контекстное меню ко всем элементам в панелях (label, checkbox, input и т.д.)
- * Вызывается динамически при создании новых элементов
- */
-function attachArchiveContextMenu(element, label) {
-  if (!element || !element.id) return;
+  // Ищем ближайший блок опции
+  const block = e.target.closest('.cb, .field');
+  if (!block) return;
 
-  element.addEventListener('contextmenu', (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    showOptionContextMenu(e, element.id, label || element.textContent);
-    return false;
-  }, true); // Используем capture phase для раннего перехвата события
+  // Ищем основной input/select с архивируемым ID
+  const input = block.querySelector(
+    'input[id^="e_"], input[id^="f_"], input[id^="x_"], ' +
+    'select[id^="e_"], select[id^="f_"], select[id^="x_"]'
+  );
+  if (!input) return;
+
+  e.preventDefault();
+  e.stopPropagation();
+
+  const label = block.querySelector('label')?.textContent?.trim() || input.id;
+  _showOptionContextMenu(e, input.id, label);
 }
 
-/**
- * Показать контекстное меню для опции в основном списке
- */
-function showOptionContextMenu(event, fieldId, fieldLabel) {
+function _handleArchivedPanelContextMenu(e) {
+  const archList = document.getElementById('archived-options-list');
+  if (!archList || !archList.contains(e.target)) return;
+
+  const item = e.target.closest('.archived-option');
+  if (!item) return;
+
+  const fieldId = item.id.replace('arch-', '');
+  if (!fieldId) return;
+
+  e.preventDefault();
+  e.stopPropagation();
+
+  _showArchiveContextMenu(e, fieldId);
+}
+
+function _showOptionContextMenu(event, fieldId, fieldLabel) {
+  _removeContextMenu();
   const menu = document.createElement('div');
   menu.className = 'context-menu';
-  menu.innerHTML = `
-    <button onclick="archiveOption('${fieldId}', '${fieldLabel.replace(/'/g, "\\'")}'); document.querySelector('.context-menu').remove()">
-      💾 Архивировать
-    </button>
-  `;
+  const safeName = fieldLabel.replace(/'/g, "\\'");
+  menu.innerHTML = `<button onclick="archiveOption('${fieldId}', '${safeName}'); _removeContextMenu()">💾 Архивировать</button>`;
+  _positionAndShow(menu, event);
+}
 
-  menu.style.left = event.pageX + 'px';
-  menu.style.top = event.pageY + 'px';
+function _showArchiveContextMenu(event, fieldId) {
+  _removeContextMenu();
+  const menu = document.createElement('div');
+  menu.className = 'context-menu';
+  menu.innerHTML = `<button onclick="unarchiveOption('${fieldId}'); _removeContextMenu()">↩️ Восстановить</button>`;
+  _positionAndShow(menu, event);
+}
+
+function _positionAndShow(menu, event) {
+  // clientX/clientY корректны для position:fixed (не зависят от скролла)
+  menu.style.left = event.clientX + 'px';
+  menu.style.top  = event.clientY + 'px';
   document.body.appendChild(menu);
 
-  // Удалить меню при клике в другое место
-  const removeMenu = () => {
-    if (menu.parentNode) menu.remove();
-    document.removeEventListener('click', removeMenu);
+  const removeOnClick = (ev) => {
+    if (!menu.contains(ev.target)) {
+      _removeContextMenu();
+      document.removeEventListener('mousedown', removeOnClick, true);
+    }
   };
-  document.addEventListener('click', removeMenu);
+  // mousedown вместо click — срабатывает быстрее и не конфликтует с кнопками меню
+  document.addEventListener('mousedown', removeOnClick, true);
 }
 
-/**
- * Привязать контекстные меню ко всем элементам опций в панелях
- */
-function attachContextMenusToAllOptions() {
-  // Ищем все input и select элементы с ID начинающимся с e_, f_, x_, c_
-  const optionElements = document.querySelectorAll('input[id^="e_"], input[id^="f_"], input[id^="x_"], input[id^="c_"], select[id^="e_"], select[id^="f_"], select[id^="x_"], select[id^="c_"]');
+function _removeContextMenu() {
+  document.querySelectorAll('.context-menu').forEach(m => m.remove());
+}
 
-  optionElements.forEach(element => {
-    if (!element.id) return;
+// ── Инициализация ────────────────────────────────────────────────────────────
 
-    // Получить label если он есть
-    let label = element.id;
-    let labelEl = null;
-
-    // Ищем label в нескольких местах
-    if (element.parentElement) {
-      labelEl = element.parentElement.querySelector('label');
-      if (!labelEl && element.nextElementSibling?.tagName === 'LABEL') {
-        labelEl = element.nextElementSibling;
-      }
-    }
-
-    if (labelEl) {
-      label = labelEl.textContent.trim() || element.id;
-    }
-
-    // Привязать контекстное меню к самому input/select
-    attachArchiveContextMenu(element, label);
-
-    // Привязать контекстное меню и к label элементу
-    if (labelEl) {
-      attachArchiveContextMenu(labelEl, label);
-    }
-
-    // Привязать также к родительскому div (если это .cb или .field)
-    const parent = element.parentElement;
-    if (parent && (parent.classList.contains('cb') || parent.classList.contains('field'))) {
-      attachArchiveContextMenu(parent, label);
+document.addEventListener('DOMContentLoaded', () => {
+  const archived = getArchivedOptions();
+  Object.keys(archived).forEach(fieldId => {
+    const el = document.getElementById(fieldId);
+    if (el) {
+      const block = el.closest('.cb, .field') || el;
+      block.style.display = 'none';
     }
   });
-}
+  updateArchiveUI();
+});
 
-// Экспорт для использования в других модулях
 window.archiveOptions = {
-  archive: archiveOption,
-  unarchive: unarchiveOption,
-  attachContextMenu: attachArchiveContextMenu,
+  archive:    archiveOption,
+  unarchive:  unarchiveOption,
   getArchived: getArchivedOptions,
-  updateUI: updateArchiveUI
+  updateUI:   updateArchiveUI
 };
