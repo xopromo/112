@@ -325,4 +325,67 @@ describe('FILTER_REGISTRY — без данных (отсутствие масс
     assert.strictEqual(f.blocksL({}, i, ac), true,
       'ATRexp без atrAvg должен блокировать (нет данных = не безопасно)');
   });
+
+  it('macdfilter без macdFLine → блокирует (fail-safe: нет данных = не торгуем)', () => {
+    const f = ctx.FILTER_REGISTRY.find(f => f.id === 'macdfilter');
+    assert.strictEqual(f.blocksL({ macdFLine: null, macdFSignal: null }, i), true,
+      'macdfilter без данных должен блокировать лонг (fail-safe)');
+    assert.strictEqual(f.blocksS({ macdFLine: null, macdFSignal: null }, i), true,
+      'macdfilter без данных должен блокировать шорт (fail-safe)');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────
+describe('macdfilter — логика MACD Direction', () => {
+  const i = 60;
+
+  it('blocksL=false когда line > signal (бычий MACD)', () => {
+    const f   = ctx.FILTER_REGISTRY.find(f => f.id === 'macdfilter');
+    const N   = ohlcv300.length;
+    const cfg = {
+      macdFLine:   new Float32Array(N).fill(1.0),   // line > signal → бычий
+      macdFSignal: new Float32Array(N).fill(0.5),
+    };
+    assert.strictEqual(f.blocksL(cfg, i), false, 'Бычий MACD не должен блокировать лонг');
+  });
+
+  it('blocksL=true когда line < signal (медвежий MACD)', () => {
+    const f   = ctx.FILTER_REGISTRY.find(f => f.id === 'macdfilter');
+    const N   = ohlcv300.length;
+    const cfg = {
+      macdFLine:   new Float32Array(N).fill(-0.5),  // line < signal → медвежий
+      macdFSignal: new Float32Array(N).fill(0.5),
+    };
+    assert.strictEqual(f.blocksL(cfg, i), true, 'Медвежий MACD должен блокировать лонг');
+  });
+
+  it('blocksS=false когда line < signal (медвежий MACD)', () => {
+    const f   = ctx.FILTER_REGISTRY.find(f => f.id === 'macdfilter');
+    const N   = ohlcv300.length;
+    const cfg = {
+      macdFLine:   new Float32Array(N).fill(-0.5),
+      macdFSignal: new Float32Array(N).fill(0.5),
+    };
+    assert.strictEqual(f.blocksS(cfg, i), false, 'Медвежий MACD не должен блокировать шорт');
+  });
+
+  it('blocksS=true когда line > signal (бычий MACD блокирует шорт)', () => {
+    const f   = ctx.FILTER_REGISTRY.find(f => f.id === 'macdfilter');
+    const N   = ohlcv300.length;
+    const cfg = {
+      macdFLine:   new Float32Array(N).fill(1.0),
+      macdFSignal: new Float32Array(N).fill(0.5),
+    };
+    assert.strictEqual(f.blocksS(cfg, i), true, 'Бычий MACD должен блокировать шорт');
+  });
+
+  it('warmup: macdFLine[i-1]=0 блокирует лонг', () => {
+    const f   = ctx.FILTER_REGISTRY.find(f => f.id === 'macdfilter');
+    const N   = ohlcv300.length;
+    const cfg = {
+      macdFLine:   new Float32Array(N).fill(0),   // warmup
+      macdFSignal: new Float32Array(N).fill(0.5),
+    };
+    assert.strictEqual(f.blocksL(cfg, i), true, 'MACD warmup (line=0) должен блокировать лонг');
+  });
 });

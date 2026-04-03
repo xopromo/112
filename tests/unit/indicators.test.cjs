@@ -325,3 +325,52 @@ describe('calcMA (роутер типов)', () => {
     assert.equal(r.length, data.length);
   });
 });
+
+// ─── calcHTFMACD ─────────────────────────────────────────────────────────────
+
+describe('calcHTFMACD', () => {
+  const ctx = createCoreCtx(OHLCV300);
+
+  test('htfRatio=1 → результат совпадает с calcMACD', () => {
+    const r1 = ctx.calcHTFMACD(ctx.DATA, 1, 12, 26, 9);
+    const r2 = ctx.calcMACD(12, 26, 9);
+    assert.equal(r1.line.length, r2.line.length, 'длина line не совпадает');
+    // При htfRatio=1 ветка делегирует в calcMACD напрямую, значения должны совпадать
+    let diff = 0;
+    for (let i = 30; i < Math.min(r1.line.length, 100); i++) {
+      if (Math.abs(r1.line[i] - r2.line[i]) > 1e-6) diff++;
+    }
+    assert.equal(diff, 0, `htfRatio=1: line расходится на ${diff} барах`);
+  });
+
+  test('htfRatio=2 → возвращает объект {line, signal} нужной длины', () => {
+    const r = ctx.calcHTFMACD(ctx.DATA, 2, 12, 26, 9);
+    assert.ok(r && r.line && r.signal, 'Нет полей line/signal');
+    assert.equal(r.line.length, ctx.DATA.length, 'line.length ≠ DATA.length');
+    assert.equal(r.signal.length, ctx.DATA.length, 'signal.length ≠ DATA.length');
+  });
+
+  test('htfRatio=2 → [1]-shift: bar[0] всегда 0 (нет данных до первого HTF периода)', () => {
+    // [1]-shift гарантирует: первый базовый бар не имеет предыдущего HTF значения → 0
+    const r = ctx.calcHTFMACD(ctx.DATA, 2, 12, 26, 9);
+    assert.equal(r.line[0], 0,   `line[0] должен быть 0, получили ${r.line[0]}`);
+    assert.equal(r.signal[0], 0, `signal[0] должен быть 0, получили ${r.signal[0]}`);
+  });
+
+  test('htfRatio=2 → значения отличаются от htfRatio=1 (HTF реально применяется)', () => {
+    const r1 = ctx.calcHTFMACD(ctx.DATA, 1, 12, 26, 9);
+    const r2 = ctx.calcHTFMACD(ctx.DATA, 2, 12, 26, 9);
+    let diffCount = 0;
+    const startBar = 2 * (26 + 9) + 5;
+    for (let i = startBar; i < Math.min(r1.line.length, startBar + 50); i++) {
+      if (Math.abs(r1.line[i] - r2.line[i]) > 1e-9) diffCount++;
+    }
+    assert.ok(diffCount > 0, 'HTF MACD (ratio=2) не отличается от базового — HTF не применяется');
+  });
+
+  test('пустой массив данных → не падает', () => {
+    assert.doesNotThrow(() => {
+      ctx.calcHTFMACD([], 2, 12, 26, 9);
+    });
+  });
+});

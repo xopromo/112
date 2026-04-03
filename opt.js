@@ -1578,9 +1578,14 @@ async function runOpt() {
   const rsiExitOBA   = useRsiExit    ? parseRange('e_rsix_ob') : [$n('e_rsix_ob')||70];
   const kalmanCrossLenArr = useKalmanCross ? parseRange('e_kalcrl') : [$n('e_kalcrl') || 20]; // ##KALMAN_CROSS##
   const maCrossPArr  = useMaCross    ? parseRange('e_macr_p')  : [$n('e_macr_p') ||20];
-  const macdFastArr  = (useMacd||useMacdFilter) ? parseRange('e_macd_f')  : [$n('e_macd_f') ||12];
-  const macdSlowArr  = (useMacd||useMacdFilter) ? parseRange('e_macd_s')  : [$n('e_macd_s') ||26];
-  const macdSigPArr  = (useMacd||useMacdFilter) ? parseRange('e_macd_sg') : [$n('e_macd_sg')||9];
+  const macdFastArr  = useMacd ? parseRange('e_macd_f')  : [$n('e_macd_f') ||12];
+  const macdSlowArr  = useMacd ? parseRange('e_macd_s')  : [$n('e_macd_s') ||26];
+  const macdSigPArr  = useMacd ? parseRange('e_macd_sg') : [$n('e_macd_sg')||9];
+  // MACD Direction фильтр — собственные периоды и HTF (не зависят от MACD Entry)
+  const macdFastFArr = useMacdFilter ? parseRange('f_macd_f')   : [$n('f_macd_f')  || 12];
+  const macdSlowFArr = useMacdFilter ? parseRange('f_macd_s')   : [$n('f_macd_s')  || 26];
+  const macdSigPFArr = useMacdFilter ? parseRange('f_macd_sg')  : [$n('f_macd_sg') || 9];
+  const macdHtfFArr  = useMacdFilter ? parseRange('f_macd_htf') : [1];
   const eisPArr      = useEIS        ? parseRange('e_eis_p')   : [$n('e_eis_p')  ||13];
   const erPArr       = useER         ? parseRange('f_erp')     : [$n('f_erp')    ||10];
   const stochKPArr   = useStochExit  ? parseRange('e_stx_k')   : [$n('e_stx_k')  ||14];
@@ -1826,6 +1831,9 @@ async function runOpt() {
       ['macdFast',    (Array.isArray(macdFastArr) && macdFastArr.length > 0) ? macdFastArr : [12]],
       ['macdSlow',    (Array.isArray(macdSlowArr) && macdSlowArr.length > 0) ? macdSlowArr : [26]],
       ['macdSigP',    (Array.isArray(macdSigPArr) && macdSigPArr.length > 0) ? macdSigPArr : [9]],
+      ['macdFastF',   (Array.isArray(macdFastFArr) && macdFastFArr.length > 0) ? macdFastFArr : [12]],
+      ['macdSlowF',   (Array.isArray(macdSlowFArr) && macdSlowFArr.length > 0) ? macdSlowFArr : [26]],
+      ['macdSigPF',   (Array.isArray(macdSigPFArr) && macdSigPFArr.length > 0) ? macdSigPFArr : [9]],
       ['stochKP',     (Array.isArray(stochKPArr) && stochKPArr.length > 0) ? stochKPArr : [14]],
       ['stochDP',     (Array.isArray(stochDPArr) && stochDPArr.length > 0) ? stochDPArr : [3]],
       ['stochOS',     (Array.isArray(stochOSA) && stochOSA.length > 0) ? stochOSA : [20]],
@@ -1899,6 +1907,7 @@ async function runOpt() {
       adxL: 14, sTrendWin: 12, confN: 2, revBars: 5, revSkip: 2, revCooldown: 0,
       slPivOff: 0, slPivMax: 50, slPivL: 5, slPivR: 3, rsiExitPer: 14, rsiExitOS: 30,
       rsiExitOB: 70, maCrossP: 50, macdFast: 12, macdSlow: 26, macdSigP: 9,
+      macdFastF: 12, macdSlowF: 26, macdSigPF: 9,
       stochKP: 14, stochDP: 3, stochOS: 20, stochOB: 80, volMoveMult: 1.5, nReversalN: 3,
       pChgPctA: 1.0, pChgPeriodA: 10, pChgHtfA: 1, pChgPctB: 1.0, pChgPeriodB: 20, pChgHtfB: 1,
       structLen: 20, strPvL: 5, strPvR: 2, volDirPeriod: 10,
@@ -1929,6 +1938,7 @@ async function runOpt() {
     (tpAtrLens.length?tpAtrLens:[20]), (tpAtrMults.length?tpAtrMults:[1.0]),
     (slAtrLens.length?slAtrLens:[20]), (slAtrMults.length?slAtrMults:[0.5]),
     (eqMALenArr.length?eqMALenArr:[20]), // ##EQ_MA_FILTER##
+    (macdHtfFArr.length?macdHtfFArr:[1]), // ##MACD_FILTER_HTF##
     _filterCombos  // powerset фильтров (последнее измерение)
   ];
   const _mcDimSizes = _mcDims.map(d => d.length || 1);
@@ -2034,7 +2044,8 @@ async function runOpt() {
       const tpAtrMult = _dims[_d][_di[_d++]];
       const slAtrLen = _dims[_d][_di[_d++]];
       const slAtrMult = _dims[_d][_di[_d++]];
-      const eqMALen = _dims[_d][_di[_d++]]; // ##EQ_MA_FILTER##
+      const eqMALen  = _dims[_d][_di[_d++]]; // ##EQ_MA_FILTER##
+      const macdHtfF = _dims[_d][_di[_d++]]; // ##MACD_FILTER_HTF##
       const _fCombo  = _dims[_d][_di[_d++]]; // powerset: объект с bool-флагами фильтров
       // Эффективные флаги фильтров: берём из _fCombo если там есть, иначе из внешней области
       const _effUseMa      = _fCombo.useMa      ?? useMa;
@@ -2072,6 +2083,9 @@ async function runOpt() {
       const macdFast    = _ip.macdFast    ?? window._ipDef.macdFast;
       const macdSlow    = _ip.macdSlow    ?? window._ipDef.macdSlow;
       const macdSigP    = _ip.macdSigP    ?? window._ipDef.macdSigP;
+      const macdFastF   = _ip.macdFastF   ?? window._ipDef.macdFastF;
+      const macdSlowF   = _ip.macdSlowF   ?? window._ipDef.macdSlowF;
+      const macdSigPF   = _ip.macdSigPF   ?? window._ipDef.macdSigPF;
       const stochKP     = _ip.stochKP     ?? window._ipDef.stochKP;
       const stochDP     = _ip.stochDP     ?? window._ipDef.stochDP;
       const stochOS     = _ip.stochOS     ?? window._ipDef.stochOS;
@@ -2107,7 +2121,9 @@ async function runOpt() {
       const stDir      = (useSupertrend||useStExit) ? (()=>{const k=stAtrP+'_'+stMult;return stDirCache[k]||(stDirCache[k]=calcSupertrend(stAtrP,stMult));})() : null;
       const matMA      = useMaT ? (()=>{const k=$v('e_matt')+'_'+matPeriod;return matMACache[k]||(matMACache[k]=calcMA(closes,matPeriod,$v('e_matt')));})() : null;
       let macdLine=null,macdSignal=null;
-      if(useMacd||useMacdFilter){const mk=macdFast+'_'+macdSlow+'_'+macdSigP;if(!macdNewCache[mk]){const m=calcMACD(macdFast,macdSlow,macdSigP);macdNewCache[mk]=m;}macdLine=macdNewCache[mk].line;macdSignal=macdNewCache[mk].signal;}
+      if(useMacd){const mk=macdFast+'_'+macdSlow+'_'+macdSigP;if(!macdNewCache[mk]){macdNewCache[mk]=calcMACD(macdFast,macdSlow,macdSigP);}macdLine=macdNewCache[mk].line;macdSignal=macdNewCache[mk].signal;}
+      let macdFLine=null,macdFSignal=null;
+      if(useMacdFilter){const mfk='F_'+macdFastF+'_'+macdSlowF+'_'+macdSigPF+'_htf'+macdHtfF;if(!macdNewCache[mfk])macdNewCache[mfk]=macdHtfF>1?calcHTFMACD(DATA,macdHtfF,macdFastF,macdSlowF,macdSigPF):calcMACD(macdFastF,macdSlowF,macdSigPF);macdFLine=macdNewCache[mfk].line;macdFSignal=macdNewCache[mfk].signal;}
       let stochD=null;
       if(useStochExit){const sk=stochKP+'_'+stochDP;if(!stochNewCache[sk])stochNewCache[sk]=calcStochastic(stochKP,stochDP);stochD=stochNewCache[sk].dArr;}
       let eisEMAArr=null,eisHistArr=null;
@@ -2201,7 +2217,7 @@ async function runOpt() {
         useWT:_effUseWT&&wtT>0,wtScores,wtThresh:wtT,
         useFat:_effUseFat,fatConsec,fatVolDrop,
         bodyAvg:bodyAvgArr,
-        useMacdFilter:_fCombo.useMacdFilter??useMacdFilter,
+        useMacdFilter:_fCombo.useMacdFilter??useMacdFilter,macdFLine,macdFSignal,macdFastF,macdSlowF,macdSigPF,macdFHtfRatio:macdHtfF,
         useER:_fCombo.useER??useER,erArr,erPeriod:erPeriod||10,erThresh,
         useKalmanMA:_fCombo.useKalmanMA??useKalmanMA,kalmanArr,kalmanLen, // ##KALMAN_MA##
         useEqMA:_fCombo.useEqMA??useEqMA,eqMALen,eqMAType,eqMAMode,eqCalcMAArr:null, // ##EQ_MA_FILTER##
@@ -2303,7 +2319,7 @@ async function runOpt() {
               useFat:_effUseFat,fatConsec,fatVolDrop,
               useKalmanMA:_fCombo.useKalmanMA??useKalmanMA,kalmanLen, // ##KALMAN_MA##
               useEqMA:_fCombo.useEqMA??useEqMA,eqMALen,eqMAType,eqMAMode,eqCalcMAArr:null, // ##EQ_MA_FILTER##
-              useMacdFilter:_fCombo.useMacdFilter??useMacdFilter,
+              useMacdFilter:_fCombo.useMacdFilter??useMacdFilter,macdFLine,macdFSignal,macdFastF,macdSlowF,macdSigPF,macdFHtfRatio:macdHtfF,
               useER:_fCombo.useER??useER,erPeriod:erPeriod||10,erThresh,
               useMLFilter,mlThreshold,mlScoresArr:_precompMlScores, // ##ML_FILTER##
               useMLHighFilter,mlHighThreshold,mlHighScoresArr:_precompMlHighScores, // ##ML_FILTER_HIGH##
@@ -2452,7 +2468,8 @@ async function runOpt() {
       const tpAtrMult = _dims[_d][dimIndices[_d++]];
       const slAtrLen = _dims[_d][dimIndices[_d++]];
       const slAtrMult = _dims[_d][dimIndices[_d++]];
-      const eqMALen = _dims[_d][dimIndices[_d++]]; // ##EQ_MA_FILTER##
+      const eqMALen  = _dims[_d][dimIndices[_d++]]; // ##EQ_MA_FILTER##
+      const macdHtfF = _dims[_d][dimIndices[_d++]]; // ##MACD_FILTER_HTF##
       const _fCombo  = _dims[_d][dimIndices[_d++]]; // powerset: объект с bool-флагами фильтров
       // Эффективные флаги фильтров (TPE)
       const _effUseMa      = _fCombo.useMa      ?? useMa;
@@ -2490,6 +2507,9 @@ async function runOpt() {
       const macdFast    = _ip.macdFast    ?? window._ipDef.macdFast;
       const macdSlow    = _ip.macdSlow    ?? window._ipDef.macdSlow;
       const macdSigP    = _ip.macdSigP    ?? window._ipDef.macdSigP;
+      const macdFastF   = _ip.macdFastF   ?? window._ipDef.macdFastF;
+      const macdSlowF   = _ip.macdSlowF   ?? window._ipDef.macdSlowF;
+      const macdSigPF   = _ip.macdSigPF   ?? window._ipDef.macdSigPF;
       const stochKP     = _ip.stochKP     ?? window._ipDef.stochKP;
       const stochDP     = _ip.stochDP     ?? window._ipDef.stochDP;
       const stochOS     = _ip.stochOS     ?? window._ipDef.stochOS;
@@ -2525,7 +2545,9 @@ async function runOpt() {
       const stDir      = (useSupertrend||useStExit) ? (()=>{const k=stAtrP+'_'+stMult;return stDirCache[k]||(stDirCache[k]=calcSupertrend(stAtrP,stMult));})() : null;
       const matMA      = useMaT ? (()=>{const k=$v('e_matt')+'_'+matPeriod;return matMACache[k]||(matMACache[k]=calcMA(closes,matPeriod,$v('e_matt')));})() : null;
       let macdLine=null,macdSignal=null;
-      if(useMacd||useMacdFilter){const mk=macdFast+'_'+macdSlow+'_'+macdSigP;if(!macdNewCache[mk]){const m=calcMACD(macdFast,macdSlow,macdSigP);macdNewCache[mk]=m;}macdLine=macdNewCache[mk].line;macdSignal=macdNewCache[mk].signal;}
+      if(useMacd){const mk=macdFast+'_'+macdSlow+'_'+macdSigP;if(!macdNewCache[mk]){macdNewCache[mk]=calcMACD(macdFast,macdSlow,macdSigP);}macdLine=macdNewCache[mk].line;macdSignal=macdNewCache[mk].signal;}
+      let macdFLine=null,macdFSignal=null;
+      if(useMacdFilter){const mfk='F_'+macdFastF+'_'+macdSlowF+'_'+macdSigPF+'_htf'+macdHtfF;if(!macdNewCache[mfk])macdNewCache[mfk]=macdHtfF>1?calcHTFMACD(DATA,macdHtfF,macdFastF,macdSlowF,macdSigPF):calcMACD(macdFastF,macdSlowF,macdSigPF);macdFLine=macdNewCache[mfk].line;macdFSignal=macdNewCache[mfk].signal;}
       let stochD=null;
       if(useStochExit){const sk=stochKP+'_'+stochDP;if(!stochNewCache[sk])stochNewCache[sk]=calcStochastic(stochKP,stochDP);stochD=stochNewCache[sk].dArr;}
       let eisEMAArr=null,eisHistArr=null;
@@ -2615,7 +2637,7 @@ async function runOpt() {
         useLiq:_effUseLiq,liqMin,useVolDir:_effUseVolDir,volDirPeriod,
         useWT:_effUseWT&&wtT>0,wtScores,wtThresh:wtT,
         useFat:_effUseFat,fatConsec,fatVolDrop,bodyAvg:bodyAvgArr,
-        useMacdFilter:_fCombo.useMacdFilter??useMacdFilter,
+        useMacdFilter:_fCombo.useMacdFilter??useMacdFilter,macdFLine,macdFSignal,macdFastF,macdSlowF,macdSigPF,macdFHtfRatio:macdHtfF,
         useER:_fCombo.useER??useER,erArr,erPeriod:erPeriod||10,erThresh,
         useKalmanMA:_fCombo.useKalmanMA??useKalmanMA,kalmanArr,kalmanLen, // ##KALMAN_MA##
         useEqMA:_fCombo.useEqMA??useEqMA,eqMALen,eqMAType,eqMAMode,eqCalcMAArr:null, // ##EQ_MA_FILTER##
@@ -2750,7 +2772,7 @@ async function runOpt() {
               useFat:_effUseFat,fatConsec,fatVolDrop,
               useKalmanMA:_fCombo.useKalmanMA??useKalmanMA,kalmanLen, // ##KALMAN_MA##
               useEqMA:_fCombo.useEqMA??useEqMA,eqMALen,eqMAType,eqMAMode,eqCalcMAArr:null, // ##EQ_MA_FILTER##
-              useMacdFilter:_fCombo.useMacdFilter??useMacdFilter,
+              useMacdFilter:_fCombo.useMacdFilter??useMacdFilter,macdFLine,macdFSignal,macdFastF,macdSlowF,macdSigPF,macdFHtfRatio:macdHtfF,
               useER:_fCombo.useER??useER,erPeriod:erPeriod||10,erThresh,
               useMLFilter,mlThreshold,mlScoresArr:_precompMlScores, // ##ML_FILTER##
               useMLHighFilter,mlHighThreshold,mlHighScoresArr:_precompMlHighScores, // ##ML_FILTER_HIGH##
@@ -3183,6 +3205,7 @@ async function runOpt() {
                                     for(const tlPvL of (tlPvLs.length?tlPvLs:[5])) {
                                       for(const tlPvR of (tlPvRs.length?tlPvRs:[3])) {
                                     for(const eqMALen of (eqMALenArr.length?eqMALenArr:[20])) { // ##EQ_MA_FILTER##
+                                    for(const macdHtfF of (macdHtfFArr.length?macdHtfFArr:[1])) { // ##MACD_FILTER_HTF##
                                     for(const _ip of window._ipCombos) {
                                     if(_mcDone||stopped) break;
                                     const adxL     = _ip.adxL     ?? window._ipDef.adxL;
@@ -3204,6 +3227,9 @@ async function runOpt() {
                                     const macdFast    = _ip.macdFast    ?? window._ipDef.macdFast;
                                     const macdSlow    = _ip.macdSlow    ?? window._ipDef.macdSlow;
                                     const macdSigP    = _ip.macdSigP    ?? window._ipDef.macdSigP;
+                                    const macdFastF   = _ip.macdFastF   ?? window._ipDef.macdFastF;
+                                    const macdSlowF   = _ip.macdSlowF   ?? window._ipDef.macdSlowF;
+                                    const macdSigPF   = _ip.macdSigPF   ?? window._ipDef.macdSigPF;
                                     const stochKP     = _ip.stochKP     ?? window._ipDef.stochKP;
                                     const stochDP     = _ip.stochDP     ?? window._ipDef.stochDP;
                                     const stochOS     = _ip.stochOS     ?? window._ipDef.stochOS;
@@ -3242,7 +3268,9 @@ async function runOpt() {
                                     const stDir      = (useSupertrend||useStExit) ? (()=>{const k=stAtrP+'_'+stMult;return stDirCache[k]||(stDirCache[k]=calcSupertrend(stAtrP,stMult));})() : null;
                                     const matMA      = useMaT ? (()=>{const k=$v('e_matt')+'_'+matPeriod;return matMACache[k]||(matMACache[k]=calcMA(closes,matPeriod,$v('e_matt')));})() : null;
                                     let macdLine=null,macdSignal=null;
-                                    if(useMacd||useMacdFilter){const mk=macdFast+'_'+macdSlow+'_'+macdSigP;if(!macdNewCache[mk]){const m=calcMACD(macdFast,macdSlow,macdSigP);macdNewCache[mk]=m;}macdLine=macdNewCache[mk].line;macdSignal=macdNewCache[mk].signal;}
+                                    if(useMacd){const mk=macdFast+'_'+macdSlow+'_'+macdSigP;if(!macdNewCache[mk])macdNewCache[mk]=calcMACD(macdFast,macdSlow,macdSigP);macdLine=macdNewCache[mk].line;macdSignal=macdNewCache[mk].signal;}
+                                    let macdFLine=null,macdFSignal=null;
+                                    if(useMacdFilter){const mfk='F_'+macdFastF+'_'+macdSlowF+'_'+macdSigPF+'_htf'+macdHtfF;if(!macdNewCache[mfk])macdNewCache[mfk]=macdHtfF>1?calcHTFMACD(DATA,macdHtfF,macdFastF,macdSlowF,macdSigPF):calcMACD(macdFastF,macdSlowF,macdSigPF);macdFLine=macdNewCache[mfk].line;macdFSignal=macdNewCache[mfk].signal;}
                                     let stochD=null;
                                     if(useStochExit){const sk=stochKP+'_'+stochDP;if(!stochNewCache[sk])stochNewCache[sk]=calcStochastic(stochKP,stochDP);stochD=stochNewCache[sk].dArr;}
                                     let erArrEx=null;
@@ -3333,7 +3361,7 @@ async function runOpt() {
                                       useWT:useWT&&wtT>0,wtScores,wtThresh:wtT,
                                       useFat,fatConsec,fatVolDrop,
                                       useKalmanMA,kalmanArr,kalmanLen, // ##KALMAN_MA##
-                                      useMacdFilter,useER,erArr:erArrEx,erPeriod:erPArr[0]||10,erThresh,
+                                      useMacdFilter,macdFLine,macdFSignal,macdFastF,macdSlowF,macdSigPF,macdFHtfRatio:macdHtfF,useER,erArr:erArrEx,erPeriod:erPArr[0]||10,erThresh,
                                       useMLFilter,mlThreshold,mlScoresArr:_precompMlScores, // ##ML_FILTER##
               useMLHighFilter,mlHighThreshold,mlHighScoresArr:_precompMlHighScores, // ##ML_FILTER_HIGH## горячий цикл IS
         useMLHighFilter,mlHighThreshold,mlHighScoresArr:_precompMlHighScores, // ##ML_FILTER_HIGH##
@@ -3458,7 +3486,7 @@ async function runOpt() {
                                           useWT:useWT&&wtT>0, wtThresh:wtT, wtN, wtVolW, wtBodyW, wtUseDist,
                                           useFat, fatConsec, fatVolDrop,
                                           useKalmanMA, kalmanLen, // ##KALMAN_MA##
-                                          useMacdFilter, useER, erPeriod:erPArr[0]||10, erThresh,
+                                          useMacdFilter, macdFastF, macdSlowF, macdSigPF, macdFHtfRatio:macdHtfF, useER, erPeriod:erPArr[0]||10, erThresh,
                                           useMLFilter, mlThreshold, mlScoresArr:_precompMlScores, // ##ML_FILTER##
                                           useMLHighFilter, mlHighThreshold, mlHighScoresArr:_precompMlHighScores, // ##ML_FILTER_HIGH##
                                           atrPeriod:atrP, commission:commTotal, baseComm:comm, spreadVal:spread*2,
@@ -3487,6 +3515,7 @@ async function runOpt() {
                                       } // tlPvR
                                     } // tlPvL
                                   } // _ip combo
+                                  } // macdHtfF ##MACD_FILTER_HTF##
                                   } // eqMALen ##EQ_MA_FILTER##
                                   } // wickMult
                                 } // trDist
@@ -3827,12 +3856,26 @@ function _calcIndicators(cfg) {
     ? calcSupertrend(cfg.stAtrP || 10, cfg.stMult || 3.0)
     : null;
 
-  // ── MACD ──────────────────────────────────────────────────
+  // ── MACD (entry) ──────────────────────────────────────────
   let macdLine = null, macdSignal = null;
-  if (cfg.useMacd || cfg.useMacdFilter) {
+  if (cfg.useMacd) {
     const _macd = calcMACD(cfg.macdFast || 12, cfg.macdSlow || 26, cfg.macdSignalP || 9);
     macdLine   = _macd.line;
     macdSignal = _macd.signal;
+  }
+
+  // ── MACD (filter — независимые параметры) ─────────────────
+  let macdFLine = null, macdFSignal = null;
+  if (cfg.useMacdFilter) {
+    const _fFast = cfg.macdFastF || 12;
+    const _fSlow = cfg.macdSlowF || 26;
+    const _fSig  = cfg.macdSigPF || 9;
+    const _fHtf  = cfg.macdFHtfRatio || 1;
+    const _mf = _fHtf > 1
+      ? calcHTFMACD(DATA, _fHtf, _fFast, _fSlow, _fSig)
+      : calcMACD(_fFast, _fSlow, _fSig);
+    macdFLine   = _mf.line;
+    macdFSignal = _mf.signal;
   }
 
   // ── Elder Impulse System ──────────────────────────────────
@@ -3976,6 +4019,7 @@ function _calcIndicators(cfg) {
     tfSigL, tfSigS,
     rsiExitArr, maCrossArr,
     macdLine, macdSignal,
+    macdFLine, macdFSignal,
     stochD,
     stDir,
     eisEMAArr, eisHistArr,
@@ -4081,6 +4125,12 @@ function buildBtCfg(cfg, ind) {
     macdSlow:      cfg.macdSlow      || 26,
     macdSignalP:   cfg.macdSignalP   || 9,
     useMacdFilter: cfg.useMacdFilter || false,
+    macdFLine:     ind.macdFLine,
+    macdFSignal:   ind.macdFSignal,
+    macdFastF:     cfg.macdFastF     || 12,
+    macdSlowF:     cfg.macdSlowF     || 26,
+    macdSigPF:     cfg.macdSigPF     || 9,
+    macdFHtfRatio: cfg.macdFHtfRatio || 1,
     useEIS:        cfg.useEIS        || false,
     eisEMAArr:     ind.eisEMAArr,
     eisHistArr:    ind.eisHistArr,

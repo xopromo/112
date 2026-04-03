@@ -446,6 +446,63 @@ function calcMACD(fast, slow, signalP) {
   const signal = calcEMA(Array.from(line), signalP);
   return { line, signal };
 }
+
+// MACD на старшем таймфрейме — аналог calcHTFADX, только для MACD (нужна только close).
+// Группируем base-бары в HTF-бары по таймстэмпу (как в calcHTFMA/calcHTFADX),
+// считаем EMA(fast)/EMA(slow)/signal на HTF-closes, выравниваем на base-TF
+// с lookahead-free [1]-сдвигом — точно как сделал бы ta.ema на HTF в Pine Script.
+function calcHTFMACD(data, htfRatio, fast, slow, signalP) {
+  const N = data.length;
+  if (N < 2) return { line: new Float64Array(N), signal: new Float64Array(N) };
+  if (htfRatio <= 1) return calcMACD(fast, slow, signalP);
+
+  const baseInterval = Math.round(parseInt(data[1].t) - parseInt(data[0].t));
+  const htfPeriod    = baseInterval * htfRatio;
+
+  // Группируем bars → HTF-бары (берём close последнего base-бара в периоде)
+  const htfBars = []; // { C, lastBaseBar }
+  let prevHtfId = -1;
+  for (let i = 0; i < N; i++) {
+    const htfId = (baseInterval && data[0].t)
+      ? Math.floor(parseInt(data[i].t) / htfPeriod)
+      : Math.floor(i / htfRatio);
+    if (htfId !== prevHtfId) {
+      htfBars.push({ C: data[i].c, lastBaseBar: i });
+      prevHtfId = htfId;
+    } else {
+      const b = htfBars[htfBars.length - 1];
+      b.C = data[i].c;
+      b.lastBaseBar = i;
+    }
+  }
+
+  const htfN = htfBars.length;
+  const htfCloses = new Float64Array(htfN);
+  for (let k = 0; k < htfN; k++) htfCloses[k] = htfBars[k].C;
+
+  // MACD на HTF closes
+  const htfEmaFast = calcEMA(Array.from(htfCloses), fast);
+  const htfEmaSlow = calcEMA(Array.from(htfCloses), slow);
+  const htfLine    = new Float64Array(htfN);
+  for (let i = 0; i < htfN; i++) htfLine[i] = htfEmaFast[i] - htfEmaSlow[i];
+  const htfSignal  = calcEMA(Array.from(htfLine), signalP);
+
+  // Выравниваем на base-TF (lookahead-free: видим ЗАВЕРШЁННЫЙ HTF-бар)
+  const alignedLine   = new Float64Array(N);
+  const alignedSignal = new Float64Array(N);
+  let ki = 0;
+  for (let i = 0; i < N; i++) {
+    while (ki < htfBars.length - 1 && htfBars[ki].lastBaseBar < i) ki++;
+    const vis = ki - 1;
+    if (vis >= 0) { alignedLine[i] = htfLine[vis]; alignedSignal[i] = htfSignal[vis]; }
+  }
+
+  // [1]-сдвиг (как calcHTFADX): убираем lookahead
+  const line   = new Float64Array(N);
+  const signal = new Float64Array(N);
+  for (let i = 0; i + 1 < N; i++) { line[i] = alignedLine[i + 1]; signal[i] = alignedSignal[i + 1]; }
+  return { line, signal };
+}
 // Supertrend: возвращает Int8Array dir (+1 = бычий, -1 = медвежий)
 function calcSupertrend(atrP, mult) {
   const N = DATA.length;
