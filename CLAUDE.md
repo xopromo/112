@@ -73,7 +73,8 @@ node .claude/scripts/regression-detector.js --runs=20 --verbose
 | 3 версии _cfg (_cfg, _cfg_tpe, _cfg_ex) одновременно | opt.js:1909,2265,2847 | OOS скалывается |
 | Все фильтры WITH warmup проверка (indicator <= 0) | filter_registry.js | JS ≠ TV |
 | Новый фильтр в 4 местах (ui, opt, filter_registry, buildBtCfg) | Сеч. 🚫 | Баг |
-| **Float32Array ВСЕГДА копировать** | opt.js, ui_oos.js | Corruption |
+| **Float32Array ВСЕГДА копировать** | opt.js, ui_oos.js, ui_hc.js | Corruption |
+| **FULL SEARCH перед фиксом паттерна** | .claude/rules/investigation-methodology.md | Incomplete fix |
 | Запрещены: console.log, hardcoded цвета, вложенные ternary | .claude/rules/ | Pre-push блокирует |
 
 ---
