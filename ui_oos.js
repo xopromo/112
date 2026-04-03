@@ -1420,6 +1420,7 @@ async function runOOSOnNewData() {
     }
 
     _oosTableResults.push({
+      _isOOSResult: true,  // ##EQ_MA_FILTER## КРИТИЧНЫЙ флаг для drawEquityForResult!
       name:      r.name,
       cfg:       r.cfg,  // ВАЖНО: это создает НОВЫЙ объект, не ссылку на r
       // Поля для стандартного рендера (pnl = old_pnl для детали/избранного)

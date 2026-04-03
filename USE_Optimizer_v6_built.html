@@ -24579,8 +24579,13 @@ function drawEquity(name) {
 function drawEquityForResult(r) {
   if (!r) return;
 
-  // Если результат из OOS (имеет old_eq и new_eq), рисуем полный OOS график
-  if (r.old_eq && r.old_eq.length && r.new_eq && r.new_eq.length) {
+  // ##EQ_MA_FILTER## Если результат из OOS (имеет old_eq и new_eq), рисуем полный OOS график
+  // CRITICAL: Проверяем ЯВНЫЙ признак OOS результата, не просто наличие полей!
+  // (Обычные результаты могут случайно получить эти поля через Object.assign копирование)
+  const isExplicitOOSResult = r._isOOSResult === true;
+  const hasOOSData = r.old_eq && r.old_eq.length && r.new_eq && r.new_eq.length;
+
+  if (hasOOSData && isExplicitOOSResult) {
     _drawOOSGraphicForResult(r);
     return;
   }
@@ -24588,9 +24593,13 @@ function drawEquityForResult(r) {
   const splitPct = r.cfg?._oos?.isPct ?? null;
   const baselineEq = r.eqCalcBaselineArr || null; // Baseline для MA Equity Filter (саму эквити, не MA) ##EQ_MA_FILTER##
 
+  // ⚠️ Для HC результатов: используем _fullEq если доступен (полный eq с OOS split)
+  // Это полный backtest(100%), а не оригинальный HC результат
+  let eqToDisplay = r._fullEq || r.eq;
+
   // Проверяем доступные источники equity
-  if (r.eq && r.eq.length) {
-    drawEquityData(r.eq, r.name, splitPct, baselineEq);
+  if (eqToDisplay && eqToDisplay.length) {
+    drawEquityData(eqToDisplay, r.name, splitPct, baselineEq);
   } else if (equities[r.name]) {
     drawEquityData(equities[r.name], r.name, splitPct, baselineEq);
   } else if (r.cfg) {
@@ -27888,8 +27897,10 @@ async function runHillClimbing() {
     const _oosData = _hcBuildOOS(c);
     if (_oosData) {
       c._oos = _oosData._oos;
-      // Обновляем equity полным прогоном чтобы график показывал IS/OOS split
-      if (_oosData.eq) x.r.eq = _oosData.eq;
+      // ⚠️ ВАЖНО: Сохраняем полный eq в отдельное поле, НЕ перезаписываем x.r.eq!
+      // x.r.eq это оригинальный результат HC, он должен остаться без изменений.
+      // Используем _fullEq для OOS отрисовки, если график с OOS-расчетом.
+      if (_oosData.eq) x.r._fullEq = _oosData.eq;
     }
     // IS-статы: из IS-прогона (70%) если доступны, иначе из HC full-data прогона
     const _is = _oosData?.isStats || null;
@@ -28215,7 +28226,9 @@ function _hcOpenDetail(idx) {
     const _oosData = _hcBuildOOS(x.cfg);
     if (_oosData) {
       x.cfg._oos = _oosData._oos;
-      if (_oosData.eq) x.r.eq = _oosData.eq; // полная equity для графика
+      // ⚠️ ВАЖНО: Сохраняем полный eq в отдельное поле, НЕ перезаписываем x.r.eq!
+      // x.r.eq это оригинальный результат HC, он должен остаться без изменений.
+      if (_oosData.eq) x.r._fullEq = _oosData.eq;
     }
   }
   const raw = x.r;
@@ -29812,6 +29825,7 @@ async function runOOSOnNewData() {
     }
 
     _oosTableResults.push({
+      _isOOSResult: true,  // ##EQ_MA_FILTER## КРИТИЧНЫЙ флаг для drawEquityForResult!
       name:      r.name,
       cfg:       r.cfg,  // ВАЖНО: это создает НОВЫЙ объект, не ссылку на r
       // Поля для стандартного рендера (pnl = old_pnl для детали/избранного)
@@ -33644,7 +33658,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1775215275825;
+window._BUILD_TS = 1775216053265;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;

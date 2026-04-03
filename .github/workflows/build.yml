@@ -25,6 +25,36 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Check JavaScript syntax
+        run: |
+          echo "Checking JavaScript syntax..."
+          node -c opt.js
+          node -c core.js
+          node -c ui.js
+          node -c ui_oos.js
+          node -c ui_hc.js
+          node -c ui_ml.js
+          node -c ui_heatmap.js
+          node -c ui_projects.js
+          node -c ui_comparator.js
+          node -c ui_equity.js
+          node -c ui_table.js
+          node -c ui_queue.js
+          node -c ui_archive.js
+          node -c ui_detail.js
+          node -c pine_export.js
+          node -c filter_registry.js
+          node -c synthesis.js
+          node -c synthesis_worker.js
+          node -c pareto_front.js
+          node -c projects.js
+          echo "✅ All JavaScript files have valid syntax"
+
       - name: Build
         run: python3 build.py
 
