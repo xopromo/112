@@ -57,6 +57,11 @@ bash .claude/scripts/dumb-checks.sh  # Блокирует пуш если ест
 
 Когда находишь баг:
 
+0. **Классифицируй БАГ** (CLASS A или CLASS B?)
+   - CLASS A (ПАТТЕРН) → обобщить в правило ОБЯЗАТЕЛЬНО
+   - CLASS B (случайная ошибка) → просто исправить
+   - Подробнее: `.claude/memory/pattern-classification-guide.md`
+
 1. **Определи ПАТТЕРН** (это класс проблем, а не один баг)
    - Float32Array corruption → Reference Sharing Corruption (общий паттерн)
 
@@ -74,23 +79,27 @@ bash .claude/scripts/dumb-checks.sh  # Блокирует пуш если ест
    - .claude/rules/forbidden-patterns.md описывает что нельзя
 
 **Запрещено:**
-- ❌ Частные скрипты (float32-audit.sh, eq-check.sh)
+- ❌ Частные скрипты (float32-audit.sh, eq-check.sh) БЕЗ обобщения
 - ❌ Исправления волнами (волна 1, потом волна 2, потом волна 3)
-- ❌ Паттерн-специфичные проверки вместо универсальных
+- ❌ Paттерн-специфичные проверки вместо универсальных
+- ❌ Классифицировать CLASS A баг как CLASS B (забывание)
 
-**Детали**: см. `.claude/rules/pattern-bug-methodology.md`
+**Детали**: см. 
+- `.claude/rules/pattern-bug-methodology.md` — как мыслить паттернами
+- `.claude/memory/pattern-classification-guide.md` — как определить CLASS
 
 ### Критичные правила
 
 | Правило | Файл | Штраф |
 |---------|------|-------|
+| **Классифицируй баг** (CLASS A паттерн vs CLASS B ошибка) | .claude/memory/pattern-classification-guide.md | Amnesia-driven development |
 | **Pattern-First подход** (определи паттерн перед исправлением) | .claude/rules/pattern-bug-methodology.md | Инкрементальные исправления |
 | **Copy-on-Storage Pattern** (Array/Object ВСЕГДА копировать) | dumb-checks.sh (Rule 10) | Reference corruption |
+| **FULL SEARCH перед фиксом паттерна** | dumb-checks.sh (Rule 8,9,10) | Pre-push блокирует |
 | 3 версии _cfg (_cfg, _cfg_tpe, _cfg_ex) одновременно | opt.js:1909,2265,2847 | OOS скалывается |
 | Все фильтры WITH warmup проверка (indicator <= 0) | filter_registry.js | JS ≠ TV |
 | Новый фильтр в 4 местах (ui, opt, filter_registry, buildBtCfg) | Сеч. 🚫 | Баг |
-| **FULL SEARCH перед фиксом паттерна** | dumb-checks.sh (Rule 8,9,10) | Pre-push блокирует |
-| Запрещены: console.log, hardcoded цвета, частные скрипты | .claude/rules/ | Pre-push блокирует |
+| Запрещены: console.log, hardcoded цвета, частные скрипты БЕЗ обобщения | .claude/rules/ | Pre-push блокирует |
 
 ---
 

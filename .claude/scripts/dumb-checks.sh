@@ -206,6 +206,35 @@ else
 fi
 
 # ======================================================================
+# 🔴 Критично 12: Pattern Classification (CLASS A vs CLASS B)
+# Проблема: Создаешь quick-fix скрипт для CLASS B проблемы которая не повторится
+# и забываешь что это было (amnesia-driven development)
+# Решение: Определи КЛАСС баги перед тем как исправлять
+# ======================================================================
+echo "  Проверка Pattern Classification (CLASS A vs CLASS B)..."
+
+# Если был создан quick-fixes скрипт но класс не определен
+if git diff --name-only HEAD 2>/dev/null | grep -q ".claude/scripts/quick-fixes/"; then
+  LAST_MSG=$(git log -1 --pretty=%B 2>/dev/null || echo "")
+
+  if ! echo "$LAST_MSG" | grep -iq "CLASS A\|CLASS B\|паттерн\|pattern"; then
+    echo "  ⚠️  WARNING: Создан quick-fixes скрипт, но класс не определен"
+    echo "     Нужно ответить на вопросы:"
+    echo "     1. Есть ли ПОХОЖИЕ нарушения в других местах? (CLASS A = обобщить)"
+    echo "     2. Может ли эта ошибка повториться в НОВОМ коде? (CLASS A = обобщить)"
+    echo "     3. Это архитектурная проблема или случайная опечатка? (A vs B)"
+    echo ""
+    echo "     Подробнее: .claude/memory/pattern-classification-guide.md"
+  fi
+fi
+
+# Проверка что обобщенные правила существуют для всех CLASS A паттернов
+if git diff --name-only HEAD 2>/dev/null | grep -q ".claude/memory/pattern-bugs-whiteboard.md"; then
+  WHITEBOARD_UPDATED=true
+  # Это хороший знак - документируешь новый паттерн
+fi
+
+# ======================================================================
 # Результаты
 # ======================================================================
 echo ""
