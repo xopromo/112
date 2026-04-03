@@ -1468,8 +1468,13 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
   <div class="field"><label>Мин ATR/сред ×</label><input id="f_atrexpm" value="0.8,1.0,1.2" data-tip="Минимальное отношение текущего ATR к среднему. 1.0 = ATR выше среднего. 0.8 = допускает умеренный флет"></div>
 
   <div class="sep"></div>
-  <div class="cb"><input type="checkbox" id="f_macd"><label data-tip="MACD Direction: лонг только когда MACD line &gt; signal (бычий импульс), шорт — наоборот. Параметры берутся из MACD Entry">MACD Direction</label></div>
-  <div class="hint">Параметры: Fast/Slow/Signal из блока MACD Entry выше</div>
+  <div class="cb"><input type="checkbox" id="f_macd"><label data-tip="MACD Direction: лонг только когда MACD line &gt; signal (бычий импульс), шорт — наоборот. Собственные периоды и HTF — независимо от MACD Entry">MACD Direction</label></div>
+  <div class="g2">
+    <div class="field"><label>Fast</label><input id="f_macd_f" value="12" data-tip="Период быстрой EMA для MACD Direction. Поддерживает диапазоны: 8:16:4 → [8,12,16]"></div>
+    <div class="field"><label>Slow</label><input id="f_macd_s" value="26" data-tip="Период медленной EMA для MACD Direction. Поддерживает диапазоны: 20:30:5"></div>
+    <div class="field"><label>Signal</label><input id="f_macd_sg" value="9" data-tip="Период сигнальной EMA для MACD Direction. Поддерживает диапазоны: 7:11:2"></div>
+    <div class="field"><label>HTF ratio</label><input id="f_macd_htf" value="1" data-tip="Старший ТФ для MACD Direction. 1=текущий ТФ, 4=4x, 9=9x. Несколько: 1,4 → оба варианта"></div>
+  </div>
 
   <div class="cb"><input type="checkbox" id="f_er"><label data-tip="Efficiency Ratio (Perry Kaufman): ER = |net_change_N| / sum(|bar_changes|). ER→1 = чистый тренд, ER→0 = хаос. Блокирует вход при ER ниже порога">Efficiency Ratio (тренд)</label></div>
   <div class="g2">
@@ -15778,12 +15783,14 @@ const FILTER_REGISTRY = [
   // ── MACD Direction ───────────────────────────────────────
   // Лонг: MACD line > signal line (бычий импульс)
   // Шорт: MACD line < signal line (медвежий импульс)
+  // Собственные периоды (f_macd_f/s/sg) и HTF ratio (f_macd_htf), не зависят от MACD Entry.
+  // Warmup: calcEMA стартует с r[0]=data[0] (нет 0-зон), guard — !cfg.macdFLine.
   {
     id:       'macdfilter',
     flag:     'useMacdFilter',
-    blocksL:  (cfg, i) => cfg.macdLine && cfg.macdSignal && cfg.macdLine[i-1] <= cfg.macdSignal[i-1],
-    blocksS:  (cfg, i) => cfg.macdLine && cfg.macdSignal && cfg.macdLine[i-1] >= cfg.macdSignal[i-1],
-    nameLabel: () => 'MACDf',
+    blocksL:  (cfg, i) => !cfg.macdFLine || !cfg.macdFSignal || cfg.macdFLine[i-1] <= cfg.macdFSignal[i-1],
+    blocksS:  (cfg, i) => !cfg.macdFLine || !cfg.macdFSignal || cfg.macdFLine[i-1] >= cfg.macdFSignal[i-1],
+    nameLabel: (cfg) => cfg.macdFHtfRatio > 1 ? `MACDf(${cfg.macdFastF||12}/${cfg.macdSlowF||26}/${cfg.macdSigPF||9})×${cfg.macdFHtfRatio}` : `MACDf(${cfg.macdFastF||12}/${cfg.macdSlowF||26}/${cfg.macdSigPF||9})`,
   },
 
   // ── Efficiency Ratio (Kaufman) ────────────────────────────
@@ -16552,6 +16559,63 @@ function calcMACD(fast, slow, signalP) {
   const line = new Float64Array(N);
   for (let i = 0; i < N; i++) line[i] = emaFast[i] - emaSlow[i];
   const signal = calcEMA(Array.from(line), signalP);
+  return { line, signal };
+}
+
+// MACD на старшем таймфрейме — аналог calcHTFADX, только для MACD (нужна только close).
+// Группируем base-бары в HTF-бары по таймстэмпу (как в calcHTFMA/calcHTFADX),
+// считаем EMA(fast)/EMA(slow)/signal на HTF-closes, выравниваем на base-TF
+// с lookahead-free [1]-сдвигом — точно как сделал бы ta.ema на HTF в Pine Script.
+function calcHTFMACD(data, htfRatio, fast, slow, signalP) {
+  const N = data.length;
+  if (N < 2) return { line: new Float64Array(N), signal: new Float64Array(N) };
+  if (htfRatio <= 1) return calcMACD(fast, slow, signalP);
+
+  const baseInterval = Math.round(parseInt(data[1].t) - parseInt(data[0].t));
+  const htfPeriod    = baseInterval * htfRatio;
+
+  // Группируем bars → HTF-бары (берём close последнего base-бара в периоде)
+  const htfBars = []; // { C, lastBaseBar }
+  let prevHtfId = -1;
+  for (let i = 0; i < N; i++) {
+    const htfId = (baseInterval && data[0].t)
+      ? Math.floor(parseInt(data[i].t) / htfPeriod)
+      : Math.floor(i / htfRatio);
+    if (htfId !== prevHtfId) {
+      htfBars.push({ C: data[i].c, lastBaseBar: i });
+      prevHtfId = htfId;
+    } else {
+      const b = htfBars[htfBars.length - 1];
+      b.C = data[i].c;
+      b.lastBaseBar = i;
+    }
+  }
+
+  const htfN = htfBars.length;
+  const htfCloses = new Float64Array(htfN);
+  for (let k = 0; k < htfN; k++) htfCloses[k] = htfBars[k].C;
+
+  // MACD на HTF closes
+  const htfEmaFast = calcEMA(Array.from(htfCloses), fast);
+  const htfEmaSlow = calcEMA(Array.from(htfCloses), slow);
+  const htfLine    = new Float64Array(htfN);
+  for (let i = 0; i < htfN; i++) htfLine[i] = htfEmaFast[i] - htfEmaSlow[i];
+  const htfSignal  = calcEMA(Array.from(htfLine), signalP);
+
+  // Выравниваем на base-TF (lookahead-free: видим ЗАВЕРШЁННЫЙ HTF-бар)
+  const alignedLine   = new Float64Array(N);
+  const alignedSignal = new Float64Array(N);
+  let ki = 0;
+  for (let i = 0; i < N; i++) {
+    while (ki < htfBars.length - 1 && htfBars[ki].lastBaseBar < i) ki++;
+    const vis = ki - 1;
+    if (vis >= 0) { alignedLine[i] = htfLine[vis]; alignedSignal[i] = htfSignal[vis]; }
+  }
+
+  // [1]-сдвиг (как calcHTFADX): убираем lookahead
+  const line   = new Float64Array(N);
+  const signal = new Float64Array(N);
+  for (let i = 0; i + 1 < N; i++) { line[i] = alignedLine[i + 1]; signal[i] = alignedSignal[i + 1]; }
   return { line, signal };
 }
 // Supertrend: возвращает Int8Array dir (+1 = бычий, -1 = медвежий)
@@ -18656,9 +18720,14 @@ async function runOpt() {
   const rsiExitOBA   = useRsiExit    ? parseRange('e_rsix_ob') : [$n('e_rsix_ob')||70];
   const kalmanCrossLenArr = useKalmanCross ? parseRange('e_kalcrl') : [$n('e_kalcrl') || 20]; // ##KALMAN_CROSS##
   const maCrossPArr  = useMaCross    ? parseRange('e_macr_p')  : [$n('e_macr_p') ||20];
-  const macdFastArr  = (useMacd||useMacdFilter) ? parseRange('e_macd_f')  : [$n('e_macd_f') ||12];
-  const macdSlowArr  = (useMacd||useMacdFilter) ? parseRange('e_macd_s')  : [$n('e_macd_s') ||26];
-  const macdSigPArr  = (useMacd||useMacdFilter) ? parseRange('e_macd_sg') : [$n('e_macd_sg')||9];
+  const macdFastArr  = useMacd ? parseRange('e_macd_f')  : [$n('e_macd_f') ||12];
+  const macdSlowArr  = useMacd ? parseRange('e_macd_s')  : [$n('e_macd_s') ||26];
+  const macdSigPArr  = useMacd ? parseRange('e_macd_sg') : [$n('e_macd_sg')||9];
+  // MACD Direction фильтр — собственные периоды и HTF (не зависят от MACD Entry)
+  const macdFastFArr = useMacdFilter ? parseRange('f_macd_f')   : [$n('f_macd_f')  || 12];
+  const macdSlowFArr = useMacdFilter ? parseRange('f_macd_s')   : [$n('f_macd_s')  || 26];
+  const macdSigPFArr = useMacdFilter ? parseRange('f_macd_sg')  : [$n('f_macd_sg') || 9];
+  const macdHtfFArr  = useMacdFilter ? parseRange('f_macd_htf') : [1];
   const eisPArr      = useEIS        ? parseRange('e_eis_p')   : [$n('e_eis_p')  ||13];
   const erPArr       = useER         ? parseRange('f_erp')     : [$n('f_erp')    ||10];
   const stochKPArr   = useStochExit  ? parseRange('e_stx_k')   : [$n('e_stx_k')  ||14];
@@ -18904,6 +18973,9 @@ async function runOpt() {
       ['macdFast',    (Array.isArray(macdFastArr) && macdFastArr.length > 0) ? macdFastArr : [12]],
       ['macdSlow',    (Array.isArray(macdSlowArr) && macdSlowArr.length > 0) ? macdSlowArr : [26]],
       ['macdSigP',    (Array.isArray(macdSigPArr) && macdSigPArr.length > 0) ? macdSigPArr : [9]],
+      ['macdFastF',   (Array.isArray(macdFastFArr) && macdFastFArr.length > 0) ? macdFastFArr : [12]],
+      ['macdSlowF',   (Array.isArray(macdSlowFArr) && macdSlowFArr.length > 0) ? macdSlowFArr : [26]],
+      ['macdSigPF',   (Array.isArray(macdSigPFArr) && macdSigPFArr.length > 0) ? macdSigPFArr : [9]],
       ['stochKP',     (Array.isArray(stochKPArr) && stochKPArr.length > 0) ? stochKPArr : [14]],
       ['stochDP',     (Array.isArray(stochDPArr) && stochDPArr.length > 0) ? stochDPArr : [3]],
       ['stochOS',     (Array.isArray(stochOSA) && stochOSA.length > 0) ? stochOSA : [20]],
@@ -18977,6 +19049,7 @@ async function runOpt() {
       adxL: 14, sTrendWin: 12, confN: 2, revBars: 5, revSkip: 2, revCooldown: 0,
       slPivOff: 0, slPivMax: 50, slPivL: 5, slPivR: 3, rsiExitPer: 14, rsiExitOS: 30,
       rsiExitOB: 70, maCrossP: 50, macdFast: 12, macdSlow: 26, macdSigP: 9,
+      macdFastF: 12, macdSlowF: 26, macdSigPF: 9,
       stochKP: 14, stochDP: 3, stochOS: 20, stochOB: 80, volMoveMult: 1.5, nReversalN: 3,
       pChgPctA: 1.0, pChgPeriodA: 10, pChgHtfA: 1, pChgPctB: 1.0, pChgPeriodB: 20, pChgHtfB: 1,
       structLen: 20, strPvL: 5, strPvR: 2, volDirPeriod: 10,
@@ -19007,6 +19080,7 @@ async function runOpt() {
     (tpAtrLens.length?tpAtrLens:[20]), (tpAtrMults.length?tpAtrMults:[1.0]),
     (slAtrLens.length?slAtrLens:[20]), (slAtrMults.length?slAtrMults:[0.5]),
     (eqMALenArr.length?eqMALenArr:[20]), // ##EQ_MA_FILTER##
+    (macdHtfFArr.length?macdHtfFArr:[1]), // ##MACD_FILTER_HTF##
     _filterCombos  // powerset фильтров (последнее измерение)
   ];
   const _mcDimSizes = _mcDims.map(d => d.length || 1);
@@ -19112,7 +19186,8 @@ async function runOpt() {
       const tpAtrMult = _dims[_d][_di[_d++]];
       const slAtrLen = _dims[_d][_di[_d++]];
       const slAtrMult = _dims[_d][_di[_d++]];
-      const eqMALen = _dims[_d][_di[_d++]]; // ##EQ_MA_FILTER##
+      const eqMALen  = _dims[_d][_di[_d++]]; // ##EQ_MA_FILTER##
+      const macdHtfF = _dims[_d][_di[_d++]]; // ##MACD_FILTER_HTF##
       const _fCombo  = _dims[_d][_di[_d++]]; // powerset: объект с bool-флагами фильтров
       // Эффективные флаги фильтров: берём из _fCombo если там есть, иначе из внешней области
       const _effUseMa      = _fCombo.useMa      ?? useMa;
@@ -19150,6 +19225,9 @@ async function runOpt() {
       const macdFast    = _ip.macdFast    ?? window._ipDef.macdFast;
       const macdSlow    = _ip.macdSlow    ?? window._ipDef.macdSlow;
       const macdSigP    = _ip.macdSigP    ?? window._ipDef.macdSigP;
+      const macdFastF   = _ip.macdFastF   ?? window._ipDef.macdFastF;
+      const macdSlowF   = _ip.macdSlowF   ?? window._ipDef.macdSlowF;
+      const macdSigPF   = _ip.macdSigPF   ?? window._ipDef.macdSigPF;
       const stochKP     = _ip.stochKP     ?? window._ipDef.stochKP;
       const stochDP     = _ip.stochDP     ?? window._ipDef.stochDP;
       const stochOS     = _ip.stochOS     ?? window._ipDef.stochOS;
@@ -19185,7 +19263,9 @@ async function runOpt() {
       const stDir      = (useSupertrend||useStExit) ? (()=>{const k=stAtrP+'_'+stMult;return stDirCache[k]||(stDirCache[k]=calcSupertrend(stAtrP,stMult));})() : null;
       const matMA      = useMaT ? (()=>{const k=$v('e_matt')+'_'+matPeriod;return matMACache[k]||(matMACache[k]=calcMA(closes,matPeriod,$v('e_matt')));})() : null;
       let macdLine=null,macdSignal=null;
-      if(useMacd||useMacdFilter){const mk=macdFast+'_'+macdSlow+'_'+macdSigP;if(!macdNewCache[mk]){const m=calcMACD(macdFast,macdSlow,macdSigP);macdNewCache[mk]=m;}macdLine=macdNewCache[mk].line;macdSignal=macdNewCache[mk].signal;}
+      if(useMacd){const mk=macdFast+'_'+macdSlow+'_'+macdSigP;if(!macdNewCache[mk]){macdNewCache[mk]=calcMACD(macdFast,macdSlow,macdSigP);}macdLine=macdNewCache[mk].line;macdSignal=macdNewCache[mk].signal;}
+      let macdFLine=null,macdFSignal=null;
+      if(useMacdFilter){const mfk='F_'+macdFastF+'_'+macdSlowF+'_'+macdSigPF+'_htf'+macdHtfF;if(!macdNewCache[mfk])macdNewCache[mfk]=macdHtfF>1?calcHTFMACD(DATA,macdHtfF,macdFastF,macdSlowF,macdSigPF):calcMACD(macdFastF,macdSlowF,macdSigPF);macdFLine=macdNewCache[mfk].line;macdFSignal=macdNewCache[mfk].signal;}
       let stochD=null;
       if(useStochExit){const sk=stochKP+'_'+stochDP;if(!stochNewCache[sk])stochNewCache[sk]=calcStochastic(stochKP,stochDP);stochD=stochNewCache[sk].dArr;}
       let eisEMAArr=null,eisHistArr=null;
@@ -19279,7 +19359,7 @@ async function runOpt() {
         useWT:_effUseWT&&wtT>0,wtScores,wtThresh:wtT,
         useFat:_effUseFat,fatConsec,fatVolDrop,
         bodyAvg:bodyAvgArr,
-        useMacdFilter:_fCombo.useMacdFilter??useMacdFilter,
+        useMacdFilter:_fCombo.useMacdFilter??useMacdFilter,macdFLine,macdFSignal,macdFastF,macdSlowF,macdSigPF,macdFHtfRatio:macdHtfF,
         useER:_fCombo.useER??useER,erArr,erPeriod:erPeriod||10,erThresh,
         useKalmanMA:_fCombo.useKalmanMA??useKalmanMA,kalmanArr,kalmanLen, // ##KALMAN_MA##
         useEqMA:_fCombo.useEqMA??useEqMA,eqMALen,eqMAType,eqMAMode,eqCalcMAArr:null, // ##EQ_MA_FILTER##
@@ -19381,7 +19461,7 @@ async function runOpt() {
               useFat:_effUseFat,fatConsec,fatVolDrop,
               useKalmanMA:_fCombo.useKalmanMA??useKalmanMA,kalmanLen, // ##KALMAN_MA##
               useEqMA:_fCombo.useEqMA??useEqMA,eqMALen,eqMAType,eqMAMode,eqCalcMAArr:null, // ##EQ_MA_FILTER##
-              useMacdFilter:_fCombo.useMacdFilter??useMacdFilter,
+              useMacdFilter:_fCombo.useMacdFilter??useMacdFilter,macdFLine,macdFSignal,macdFastF,macdSlowF,macdSigPF,macdFHtfRatio:macdHtfF,
               useER:_fCombo.useER??useER,erPeriod:erPeriod||10,erThresh,
               useMLFilter,mlThreshold,mlScoresArr:_precompMlScores, // ##ML_FILTER##
               useMLHighFilter,mlHighThreshold,mlHighScoresArr:_precompMlHighScores, // ##ML_FILTER_HIGH##
@@ -19530,7 +19610,8 @@ async function runOpt() {
       const tpAtrMult = _dims[_d][dimIndices[_d++]];
       const slAtrLen = _dims[_d][dimIndices[_d++]];
       const slAtrMult = _dims[_d][dimIndices[_d++]];
-      const eqMALen = _dims[_d][dimIndices[_d++]]; // ##EQ_MA_FILTER##
+      const eqMALen  = _dims[_d][dimIndices[_d++]]; // ##EQ_MA_FILTER##
+      const macdHtfF = _dims[_d][dimIndices[_d++]]; // ##MACD_FILTER_HTF##
       const _fCombo  = _dims[_d][dimIndices[_d++]]; // powerset: объект с bool-флагами фильтров
       // Эффективные флаги фильтров (TPE)
       const _effUseMa      = _fCombo.useMa      ?? useMa;
@@ -19568,6 +19649,9 @@ async function runOpt() {
       const macdFast    = _ip.macdFast    ?? window._ipDef.macdFast;
       const macdSlow    = _ip.macdSlow    ?? window._ipDef.macdSlow;
       const macdSigP    = _ip.macdSigP    ?? window._ipDef.macdSigP;
+      const macdFastF   = _ip.macdFastF   ?? window._ipDef.macdFastF;
+      const macdSlowF   = _ip.macdSlowF   ?? window._ipDef.macdSlowF;
+      const macdSigPF   = _ip.macdSigPF   ?? window._ipDef.macdSigPF;
       const stochKP     = _ip.stochKP     ?? window._ipDef.stochKP;
       const stochDP     = _ip.stochDP     ?? window._ipDef.stochDP;
       const stochOS     = _ip.stochOS     ?? window._ipDef.stochOS;
@@ -19603,7 +19687,9 @@ async function runOpt() {
       const stDir      = (useSupertrend||useStExit) ? (()=>{const k=stAtrP+'_'+stMult;return stDirCache[k]||(stDirCache[k]=calcSupertrend(stAtrP,stMult));})() : null;
       const matMA      = useMaT ? (()=>{const k=$v('e_matt')+'_'+matPeriod;return matMACache[k]||(matMACache[k]=calcMA(closes,matPeriod,$v('e_matt')));})() : null;
       let macdLine=null,macdSignal=null;
-      if(useMacd||useMacdFilter){const mk=macdFast+'_'+macdSlow+'_'+macdSigP;if(!macdNewCache[mk]){const m=calcMACD(macdFast,macdSlow,macdSigP);macdNewCache[mk]=m;}macdLine=macdNewCache[mk].line;macdSignal=macdNewCache[mk].signal;}
+      if(useMacd){const mk=macdFast+'_'+macdSlow+'_'+macdSigP;if(!macdNewCache[mk]){macdNewCache[mk]=calcMACD(macdFast,macdSlow,macdSigP);}macdLine=macdNewCache[mk].line;macdSignal=macdNewCache[mk].signal;}
+      let macdFLine=null,macdFSignal=null;
+      if(useMacdFilter){const mfk='F_'+macdFastF+'_'+macdSlowF+'_'+macdSigPF+'_htf'+macdHtfF;if(!macdNewCache[mfk])macdNewCache[mfk]=macdHtfF>1?calcHTFMACD(DATA,macdHtfF,macdFastF,macdSlowF,macdSigPF):calcMACD(macdFastF,macdSlowF,macdSigPF);macdFLine=macdNewCache[mfk].line;macdFSignal=macdNewCache[mfk].signal;}
       let stochD=null;
       if(useStochExit){const sk=stochKP+'_'+stochDP;if(!stochNewCache[sk])stochNewCache[sk]=calcStochastic(stochKP,stochDP);stochD=stochNewCache[sk].dArr;}
       let eisEMAArr=null,eisHistArr=null;
@@ -19693,7 +19779,7 @@ async function runOpt() {
         useLiq:_effUseLiq,liqMin,useVolDir:_effUseVolDir,volDirPeriod,
         useWT:_effUseWT&&wtT>0,wtScores,wtThresh:wtT,
         useFat:_effUseFat,fatConsec,fatVolDrop,bodyAvg:bodyAvgArr,
-        useMacdFilter:_fCombo.useMacdFilter??useMacdFilter,
+        useMacdFilter:_fCombo.useMacdFilter??useMacdFilter,macdFLine,macdFSignal,macdFastF,macdSlowF,macdSigPF,macdFHtfRatio:macdHtfF,
         useER:_fCombo.useER??useER,erArr,erPeriod:erPeriod||10,erThresh,
         useKalmanMA:_fCombo.useKalmanMA??useKalmanMA,kalmanArr,kalmanLen, // ##KALMAN_MA##
         useEqMA:_fCombo.useEqMA??useEqMA,eqMALen,eqMAType,eqMAMode,eqCalcMAArr:null, // ##EQ_MA_FILTER##
@@ -19828,7 +19914,7 @@ async function runOpt() {
               useFat:_effUseFat,fatConsec,fatVolDrop,
               useKalmanMA:_fCombo.useKalmanMA??useKalmanMA,kalmanLen, // ##KALMAN_MA##
               useEqMA:_fCombo.useEqMA??useEqMA,eqMALen,eqMAType,eqMAMode,eqCalcMAArr:null, // ##EQ_MA_FILTER##
-              useMacdFilter:_fCombo.useMacdFilter??useMacdFilter,
+              useMacdFilter:_fCombo.useMacdFilter??useMacdFilter,macdFLine,macdFSignal,macdFastF,macdSlowF,macdSigPF,macdFHtfRatio:macdHtfF,
               useER:_fCombo.useER??useER,erPeriod:erPeriod||10,erThresh,
               useMLFilter,mlThreshold,mlScoresArr:_precompMlScores, // ##ML_FILTER##
               useMLHighFilter,mlHighThreshold,mlHighScoresArr:_precompMlHighScores, // ##ML_FILTER_HIGH##
@@ -20261,6 +20347,7 @@ async function runOpt() {
                                     for(const tlPvL of (tlPvLs.length?tlPvLs:[5])) {
                                       for(const tlPvR of (tlPvRs.length?tlPvRs:[3])) {
                                     for(const eqMALen of (eqMALenArr.length?eqMALenArr:[20])) { // ##EQ_MA_FILTER##
+                                    for(const macdHtfF of (macdHtfFArr.length?macdHtfFArr:[1])) { // ##MACD_FILTER_HTF##
                                     for(const _ip of window._ipCombos) {
                                     if(_mcDone||stopped) break;
                                     const adxL     = _ip.adxL     ?? window._ipDef.adxL;
@@ -20282,6 +20369,9 @@ async function runOpt() {
                                     const macdFast    = _ip.macdFast    ?? window._ipDef.macdFast;
                                     const macdSlow    = _ip.macdSlow    ?? window._ipDef.macdSlow;
                                     const macdSigP    = _ip.macdSigP    ?? window._ipDef.macdSigP;
+                                    const macdFastF   = _ip.macdFastF   ?? window._ipDef.macdFastF;
+                                    const macdSlowF   = _ip.macdSlowF   ?? window._ipDef.macdSlowF;
+                                    const macdSigPF   = _ip.macdSigPF   ?? window._ipDef.macdSigPF;
                                     const stochKP     = _ip.stochKP     ?? window._ipDef.stochKP;
                                     const stochDP     = _ip.stochDP     ?? window._ipDef.stochDP;
                                     const stochOS     = _ip.stochOS     ?? window._ipDef.stochOS;
@@ -20320,7 +20410,9 @@ async function runOpt() {
                                     const stDir      = (useSupertrend||useStExit) ? (()=>{const k=stAtrP+'_'+stMult;return stDirCache[k]||(stDirCache[k]=calcSupertrend(stAtrP,stMult));})() : null;
                                     const matMA      = useMaT ? (()=>{const k=$v('e_matt')+'_'+matPeriod;return matMACache[k]||(matMACache[k]=calcMA(closes,matPeriod,$v('e_matt')));})() : null;
                                     let macdLine=null,macdSignal=null;
-                                    if(useMacd||useMacdFilter){const mk=macdFast+'_'+macdSlow+'_'+macdSigP;if(!macdNewCache[mk]){const m=calcMACD(macdFast,macdSlow,macdSigP);macdNewCache[mk]=m;}macdLine=macdNewCache[mk].line;macdSignal=macdNewCache[mk].signal;}
+                                    if(useMacd){const mk=macdFast+'_'+macdSlow+'_'+macdSigP;if(!macdNewCache[mk])macdNewCache[mk]=calcMACD(macdFast,macdSlow,macdSigP);macdLine=macdNewCache[mk].line;macdSignal=macdNewCache[mk].signal;}
+                                    let macdFLine=null,macdFSignal=null;
+                                    if(useMacdFilter){const mfk='F_'+macdFastF+'_'+macdSlowF+'_'+macdSigPF+'_htf'+macdHtfF;if(!macdNewCache[mfk])macdNewCache[mfk]=macdHtfF>1?calcHTFMACD(DATA,macdHtfF,macdFastF,macdSlowF,macdSigPF):calcMACD(macdFastF,macdSlowF,macdSigPF);macdFLine=macdNewCache[mfk].line;macdFSignal=macdNewCache[mfk].signal;}
                                     let stochD=null;
                                     if(useStochExit){const sk=stochKP+'_'+stochDP;if(!stochNewCache[sk])stochNewCache[sk]=calcStochastic(stochKP,stochDP);stochD=stochNewCache[sk].dArr;}
                                     let erArrEx=null;
@@ -20411,7 +20503,7 @@ async function runOpt() {
                                       useWT:useWT&&wtT>0,wtScores,wtThresh:wtT,
                                       useFat,fatConsec,fatVolDrop,
                                       useKalmanMA,kalmanArr,kalmanLen, // ##KALMAN_MA##
-                                      useMacdFilter,useER,erArr:erArrEx,erPeriod:erPArr[0]||10,erThresh,
+                                      useMacdFilter,macdFLine,macdFSignal,macdFastF,macdSlowF,macdSigPF,macdFHtfRatio:macdHtfF,useER,erArr:erArrEx,erPeriod:erPArr[0]||10,erThresh,
                                       useMLFilter,mlThreshold,mlScoresArr:_precompMlScores, // ##ML_FILTER##
               useMLHighFilter,mlHighThreshold,mlHighScoresArr:_precompMlHighScores, // ##ML_FILTER_HIGH## горячий цикл IS
         useMLHighFilter,mlHighThreshold,mlHighScoresArr:_precompMlHighScores, // ##ML_FILTER_HIGH##
@@ -20536,7 +20628,7 @@ async function runOpt() {
                                           useWT:useWT&&wtT>0, wtThresh:wtT, wtN, wtVolW, wtBodyW, wtUseDist,
                                           useFat, fatConsec, fatVolDrop,
                                           useKalmanMA, kalmanLen, // ##KALMAN_MA##
-                                          useMacdFilter, useER, erPeriod:erPArr[0]||10, erThresh,
+                                          useMacdFilter, macdFastF, macdSlowF, macdSigPF, macdFHtfRatio:macdHtfF, useER, erPeriod:erPArr[0]||10, erThresh,
                                           useMLFilter, mlThreshold, mlScoresArr:_precompMlScores, // ##ML_FILTER##
                                           useMLHighFilter, mlHighThreshold, mlHighScoresArr:_precompMlHighScores, // ##ML_FILTER_HIGH##
                                           atrPeriod:atrP, commission:commTotal, baseComm:comm, spreadVal:spread*2,
@@ -20565,6 +20657,7 @@ async function runOpt() {
                                       } // tlPvR
                                     } // tlPvL
                                   } // _ip combo
+                                  } // macdHtfF ##MACD_FILTER_HTF##
                                   } // eqMALen ##EQ_MA_FILTER##
                                   } // wickMult
                                 } // trDist
@@ -20905,12 +20998,26 @@ function _calcIndicators(cfg) {
     ? calcSupertrend(cfg.stAtrP || 10, cfg.stMult || 3.0)
     : null;
 
-  // ── MACD ──────────────────────────────────────────────────
+  // ── MACD (entry) ──────────────────────────────────────────
   let macdLine = null, macdSignal = null;
-  if (cfg.useMacd || cfg.useMacdFilter) {
+  if (cfg.useMacd) {
     const _macd = calcMACD(cfg.macdFast || 12, cfg.macdSlow || 26, cfg.macdSignalP || 9);
     macdLine   = _macd.line;
     macdSignal = _macd.signal;
+  }
+
+  // ── MACD (filter — независимые параметры) ─────────────────
+  let macdFLine = null, macdFSignal = null;
+  if (cfg.useMacdFilter) {
+    const _fFast = cfg.macdFastF || 12;
+    const _fSlow = cfg.macdSlowF || 26;
+    const _fSig  = cfg.macdSigPF || 9;
+    const _fHtf  = cfg.macdFHtfRatio || 1;
+    const _mf = _fHtf > 1
+      ? calcHTFMACD(DATA, _fHtf, _fFast, _fSlow, _fSig)
+      : calcMACD(_fFast, _fSlow, _fSig);
+    macdFLine   = _mf.line;
+    macdFSignal = _mf.signal;
   }
 
   // ── Elder Impulse System ──────────────────────────────────
@@ -21054,6 +21161,7 @@ function _calcIndicators(cfg) {
     tfSigL, tfSigS,
     rsiExitArr, maCrossArr,
     macdLine, macdSignal,
+    macdFLine, macdFSignal,
     stochD,
     stDir,
     eisEMAArr, eisHistArr,
@@ -21159,6 +21267,12 @@ function buildBtCfg(cfg, ind) {
     macdSlow:      cfg.macdSlow      || 26,
     macdSignalP:   cfg.macdSignalP   || 9,
     useMacdFilter: cfg.useMacdFilter || false,
+    macdFLine:     ind.macdFLine,
+    macdFSignal:   ind.macdFSignal,
+    macdFastF:     cfg.macdFastF     || 12,
+    macdSlowF:     cfg.macdSlowF     || 26,
+    macdSigPF:     cfg.macdSigPF     || 9,
+    macdFHtfRatio: cfg.macdFHtfRatio || 1,
     useEIS:        cfg.useEIS        || false,
     eisEMAArr:     ind.eisEMAArr,
     eisHistArr:    ind.eisHistArr,
@@ -32652,81 +32766,54 @@ async function _runResearchAnalysisManually() {
 
 const ARCHIVE_KEY = 'archived_filter_options';
 
-/**
- * Получить список архивированных опций из localStorage
- * @returns {Object} { fieldId: {label, timestamp}, ... }
- */
 function getArchivedOptions() {
   return JSON.parse(localStorage.getItem(ARCHIVE_KEY) || '{}');
 }
 
-/**
- * Архивировать опцию (скрыть из основного списка)
- * @param {string} fieldId - ID элемента (например, 'f_ma', 'f_rsi')
- * @param {string} fieldLabel - Название опции для отображения в архиве
- */
 function archiveOption(fieldId, fieldLabel) {
   const archived = getArchivedOptions();
-  archived[fieldId] = {
-    label: fieldLabel || fieldId,
-    timestamp: Date.now()
-  };
+  archived[fieldId] = { label: fieldLabel || fieldId, timestamp: Date.now() };
   localStorage.setItem(ARCHIVE_KEY, JSON.stringify(archived));
   updateArchiveUI();
 
-  // Скрыть элемент из основного интерфейса
-  const element = document.getElementById(fieldId);
-  if (element) {
-    element.style.display = 'none';
+  // Скрываем родительский блок (.cb или .field), а не только input
+  const el = document.getElementById(fieldId);
+  if (el) {
+    const block = el.closest('.cb, .field') || el;
+    block.style.display = 'none';
   }
 }
 
-/**
- * Восстановить опцию из архива (показать в основном списке)
- * @param {string} fieldId - ID элемента
- */
 function unarchiveOption(fieldId) {
   const archived = getArchivedOptions();
   delete archived[fieldId];
   localStorage.setItem(ARCHIVE_KEY, JSON.stringify(archived));
   updateArchiveUI();
 
-  // Показать элемент в основном интерфейсе
-  const element = document.getElementById(fieldId);
-  if (element) {
-    element.style.display = '';
+  const el = document.getElementById(fieldId);
+  if (el) {
+    const block = el.closest('.cb, .field') || el;
+    block.style.display = '';
   }
 }
 
-/**
- * Обновить UI: счётчик архива и список архивированных опций
- */
 function updateArchiveUI() {
   const archived = getArchivedOptions();
   const count = Object.keys(archived).length;
 
-  // Обновить счётчик в кнопке
   const countEl = document.getElementById('archive-count');
   if (countEl) countEl.textContent = count;
 
-  // Скрыть/показать кнопку если есть архивированные опции
   const btnArchive = document.getElementById('btn-archive-tab');
-  if (btnArchive) {
-    btnArchive.style.opacity = count > 0 ? '1' : '0.5';
-  }
+  if (btnArchive) btnArchive.style.opacity = count > 0 ? '1' : '0.5';
 
-  // Отрендерить список архивированных опций
   renderArchivedOptions();
 }
 
-/**
- * Отрендерить список архивированных опций
- */
 function renderArchivedOptions() {
   const archived = getArchivedOptions();
   const container = document.getElementById('archived-options-list');
-  const emptyMsg = document.getElementById('archived-empty');
-
+  const emptyMsg  = document.getElementById('archived-empty');
   if (!container) return;
 
   container.innerHTML = '';
@@ -32735,7 +32822,6 @@ function renderArchivedOptions() {
     if (emptyMsg) emptyMsg.style.display = 'block';
     return;
   }
-
   if (emptyMsg) emptyMsg.style.display = 'none';
 
   Object.entries(archived).forEach(([fieldId, data]) => {
@@ -32749,169 +32835,126 @@ function renderArchivedOptions() {
 
     const date = document.createElement('span');
     date.className = 'archived-option-date';
-    const dateObj = new Date(data.timestamp);
-    date.textContent = dateObj.toLocaleDateString('ru-RU');
+    date.textContent = new Date(data.timestamp).toLocaleDateString('ru-RU');
 
     item.appendChild(name);
     item.appendChild(date);
 
-    // Контекстное меню при правом клике
-    item.addEventListener('contextmenu', (e) => {
-      e.preventDefault();
-      showArchiveContextMenu(e, fieldId);
-    });
-
-    // Двойной клик для быстрого восстановления
-    item.addEventListener('dblclick', () => {
-      unarchiveOption(fieldId);
-    });
+    // Двойной клик — быстрое восстановление
+    item.addEventListener('dblclick', () => unarchiveOption(fieldId));
 
     container.appendChild(item);
   });
 }
 
-/**
- * Показать контекстное меню для архивированной опции
- */
-function showArchiveContextMenu(event, fieldId) {
-  const menu = document.createElement('div');
-  menu.className = 'context-menu';
-  menu.innerHTML = `
-    <button onclick="unarchiveOption('${fieldId}'); document.querySelector('.context-menu').remove()">
-      ↩️ Восстановить
-    </button>
-  `;
-
-  menu.style.left = event.pageX + 'px';
-  menu.style.top = event.pageY + 'px';
-  document.body.appendChild(menu);
-
-  // Удалить меню при клике в другое место
-  const removeMenu = () => {
-    if (menu.parentNode) menu.remove();
-    document.removeEventListener('click', removeMenu);
-  };
-  document.addEventListener('click', removeMenu);
-}
-
-/**
- * Переключить видимость панели архива
- */
 function toggleArchiveTab() {
   const panel = document.getElementById('archived-options-panel');
-  if (panel) {
-    panel.classList.toggle('active');
-  }
+  if (panel) panel.classList.toggle('active');
 }
 
-/**
- * Инициализировать архив при загрузке страницы
- */
-document.addEventListener('DOMContentLoaded', () => {
-  // Скрыть архивированные опции при загрузке
-  const archived = getArchivedOptions();
-  Object.keys(archived).forEach(fieldId => {
-    const element = document.getElementById(fieldId);
-    if (element) {
-      element.style.display = 'none';
-    }
-  });
+// ── Единое делегированное контекстное меню ──────────────────────────────────
+// Один обработчик на document (capture) вместо тысячи на каждый элемент.
+// capture=true гарантирует срабатывание ДО того как браузер успевает показать своё меню.
 
-  // Обновить UI архива
-  updateArchiveUI();
+document.addEventListener('contextmenu', (e) => {
+  _handlePanelsContextMenu(e);
+  _handleArchivedPanelContextMenu(e);
+}, true);
 
-  // Привязать контекстные меню ко всем элементам опций
-  attachContextMenusToAllOptions();
-});
+function _handlePanelsContextMenu(e) {
+  const panels = document.getElementById('panels');
+  if (!panels || !panels.contains(e.target)) return;
 
-/**
- * Добавить контекстное меню ко всем элементам в панелях (label, checkbox, input и т.д.)
- * Вызывается динамически при создании новых элементов
- */
-function attachArchiveContextMenu(element, label) {
-  if (!element || !element.id) return;
+  // Ищем ближайший блок опции
+  const block = e.target.closest('.cb, .field');
+  if (!block) return;
 
-  element.addEventListener('contextmenu', (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    showOptionContextMenu(e, element.id, label || element.textContent);
-    return false;
-  }, true); // Используем capture phase для раннего перехвата события
+  // Ищем основной input/select с архивируемым ID
+  const input = block.querySelector(
+    'input[id^="e_"], input[id^="f_"], input[id^="x_"], ' +
+    'select[id^="e_"], select[id^="f_"], select[id^="x_"]'
+  );
+  if (!input) return;
+
+  e.preventDefault();
+  e.stopPropagation();
+
+  const label = block.querySelector('label')?.textContent?.trim() || input.id;
+  _showOptionContextMenu(e, input.id, label);
 }
 
-/**
- * Показать контекстное меню для опции в основном списке
- */
-function showOptionContextMenu(event, fieldId, fieldLabel) {
+function _handleArchivedPanelContextMenu(e) {
+  const archList = document.getElementById('archived-options-list');
+  if (!archList || !archList.contains(e.target)) return;
+
+  const item = e.target.closest('.archived-option');
+  if (!item) return;
+
+  const fieldId = item.id.replace('arch-', '');
+  if (!fieldId) return;
+
+  e.preventDefault();
+  e.stopPropagation();
+
+  _showArchiveContextMenu(e, fieldId);
+}
+
+function _showOptionContextMenu(event, fieldId, fieldLabel) {
+  _removeContextMenu();
   const menu = document.createElement('div');
   menu.className = 'context-menu';
-  menu.innerHTML = `
-    <button onclick="archiveOption('${fieldId}', '${fieldLabel.replace(/'/g, "\\'")}'); document.querySelector('.context-menu').remove()">
-      💾 Архивировать
-    </button>
-  `;
+  const safeName = fieldLabel.replace(/'/g, "\\'");
+  menu.innerHTML = `<button onclick="archiveOption('${fieldId}', '${safeName}'); _removeContextMenu()">💾 Архивировать</button>`;
+  _positionAndShow(menu, event);
+}
 
-  menu.style.left = event.pageX + 'px';
-  menu.style.top = event.pageY + 'px';
+function _showArchiveContextMenu(event, fieldId) {
+  _removeContextMenu();
+  const menu = document.createElement('div');
+  menu.className = 'context-menu';
+  menu.innerHTML = `<button onclick="unarchiveOption('${fieldId}'); _removeContextMenu()">↩️ Восстановить</button>`;
+  _positionAndShow(menu, event);
+}
+
+function _positionAndShow(menu, event) {
+  // clientX/clientY корректны для position:fixed (не зависят от скролла)
+  menu.style.left = event.clientX + 'px';
+  menu.style.top  = event.clientY + 'px';
   document.body.appendChild(menu);
 
-  // Удалить меню при клике в другое место
-  const removeMenu = () => {
-    if (menu.parentNode) menu.remove();
-    document.removeEventListener('click', removeMenu);
+  const removeOnClick = (ev) => {
+    if (!menu.contains(ev.target)) {
+      _removeContextMenu();
+      document.removeEventListener('mousedown', removeOnClick, true);
+    }
   };
-  document.addEventListener('click', removeMenu);
+  // mousedown вместо click — срабатывает быстрее и не конфликтует с кнопками меню
+  document.addEventListener('mousedown', removeOnClick, true);
 }
 
-/**
- * Привязать контекстные меню ко всем элементам опций в панелях
- */
-function attachContextMenusToAllOptions() {
-  // Ищем все input и select элементы с ID начинающимся с e_, f_, x_, c_
-  const optionElements = document.querySelectorAll('input[id^="e_"], input[id^="f_"], input[id^="x_"], input[id^="c_"], select[id^="e_"], select[id^="f_"], select[id^="x_"], select[id^="c_"]');
+function _removeContextMenu() {
+  document.querySelectorAll('.context-menu').forEach(m => m.remove());
+}
 
-  optionElements.forEach(element => {
-    if (!element.id) return;
+// ── Инициализация ────────────────────────────────────────────────────────────
 
-    // Получить label если он есть
-    let label = element.id;
-    let labelEl = null;
-
-    // Ищем label в нескольких местах
-    if (element.parentElement) {
-      labelEl = element.parentElement.querySelector('label');
-      if (!labelEl && element.nextElementSibling?.tagName === 'LABEL') {
-        labelEl = element.nextElementSibling;
-      }
-    }
-
-    if (labelEl) {
-      label = labelEl.textContent.trim() || element.id;
-    }
-
-    // Привязать контекстное меню к самому input/select
-    attachArchiveContextMenu(element, label);
-
-    // Привязать контекстное меню и к label элементу
-    if (labelEl) {
-      attachArchiveContextMenu(labelEl, label);
-    }
-
-    // Привязать также к родительскому div (если это .cb или .field)
-    const parent = element.parentElement;
-    if (parent && (parent.classList.contains('cb') || parent.classList.contains('field'))) {
-      attachArchiveContextMenu(parent, label);
+document.addEventListener('DOMContentLoaded', () => {
+  const archived = getArchivedOptions();
+  Object.keys(archived).forEach(fieldId => {
+    const el = document.getElementById(fieldId);
+    if (el) {
+      const block = el.closest('.cb, .field') || el;
+      block.style.display = 'none';
     }
   });
-}
+  updateArchiveUI();
+});
 
-// Экспорт для использования в других модулях
 window.archiveOptions = {
-  archive: archiveOption,
-  unarchive: unarchiveOption,
-  attachContextMenu: attachArchiveContextMenu,
+  archive:    archiveOption,
+  unarchive:  unarchiveOption,
   getArchived: getArchivedOptions,
-  updateUI: updateArchiveUI
+  updateUI:   updateArchiveUI
 };
 
 
@@ -33687,7 +33730,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1775226488503;
+window._BUILD_TS = 1775227108670;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;

@@ -276,12 +276,14 @@ const FILTER_REGISTRY = [
   // ── MACD Direction ───────────────────────────────────────
   // Лонг: MACD line > signal line (бычий импульс)
   // Шорт: MACD line < signal line (медвежий импульс)
+  // Собственные периоды (f_macd_f/s/sg) и HTF ratio (f_macd_htf), не зависят от MACD Entry.
+  // Warmup: calcEMA стартует с r[0]=data[0] (нет 0-зон), guard — !cfg.macdFLine.
   {
     id:       'macdfilter',
     flag:     'useMacdFilter',
-    blocksL:  (cfg, i) => cfg.macdLine && cfg.macdSignal && cfg.macdLine[i-1] <= cfg.macdSignal[i-1],
-    blocksS:  (cfg, i) => cfg.macdLine && cfg.macdSignal && cfg.macdLine[i-1] >= cfg.macdSignal[i-1],
-    nameLabel: () => 'MACDf',
+    blocksL:  (cfg, i) => !cfg.macdFLine || !cfg.macdFSignal || cfg.macdFLine[i-1] <= cfg.macdFSignal[i-1],
+    blocksS:  (cfg, i) => !cfg.macdFLine || !cfg.macdFSignal || cfg.macdFLine[i-1] >= cfg.macdFSignal[i-1],
+    nameLabel: (cfg) => cfg.macdFHtfRatio > 1 ? `MACDf(${cfg.macdFastF||12}/${cfg.macdSlowF||26}/${cfg.macdSigPF||9})×${cfg.macdFHtfRatio}` : `MACDf(${cfg.macdFastF||12}/${cfg.macdSlowF||26}/${cfg.macdSigPF||9})`,
   },
 
   // ── Efficiency Ratio (Kaufman) ────────────────────────────

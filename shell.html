@@ -1468,8 +1468,13 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
   <div class="field"><label>Мин ATR/сред ×</label><input id="f_atrexpm" value="0.8,1.0,1.2" data-tip="Минимальное отношение текущего ATR к среднему. 1.0 = ATR выше среднего. 0.8 = допускает умеренный флет"></div>
 
   <div class="sep"></div>
-  <div class="cb"><input type="checkbox" id="f_macd"><label data-tip="MACD Direction: лонг только когда MACD line &gt; signal (бычий импульс), шорт — наоборот. Параметры берутся из MACD Entry">MACD Direction</label></div>
-  <div class="hint">Параметры: Fast/Slow/Signal из блока MACD Entry выше</div>
+  <div class="cb"><input type="checkbox" id="f_macd"><label data-tip="MACD Direction: лонг только когда MACD line &gt; signal (бычий импульс), шорт — наоборот. Собственные периоды и HTF — независимо от MACD Entry">MACD Direction</label></div>
+  <div class="g2">
+    <div class="field"><label>Fast</label><input id="f_macd_f" value="12" data-tip="Период быстрой EMA для MACD Direction. Поддерживает диапазоны: 8:16:4 → [8,12,16]"></div>
+    <div class="field"><label>Slow</label><input id="f_macd_s" value="26" data-tip="Период медленной EMA для MACD Direction. Поддерживает диапазоны: 20:30:5"></div>
+    <div class="field"><label>Signal</label><input id="f_macd_sg" value="9" data-tip="Период сигнальной EMA для MACD Direction. Поддерживает диапазоны: 7:11:2"></div>
+    <div class="field"><label>HTF ratio</label><input id="f_macd_htf" value="1" data-tip="Старший ТФ для MACD Direction. 1=текущий ТФ, 4=4x, 9=9x. Несколько: 1,4 → оба варианта"></div>
+  </div>
 
   <div class="cb"><input type="checkbox" id="f_er"><label data-tip="Efficiency Ratio (Perry Kaufman): ER = |net_change_N| / sum(|bar_changes|). ER→1 = чистый тренд, ER→0 = хаос. Блокирует вход при ER ниже порога">Efficiency Ratio (тренд)</label></div>
   <div class="g2">
