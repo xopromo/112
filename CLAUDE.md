@@ -55,6 +55,17 @@ git add -A && git commit -m "..."
 git push -u origin claude/ваша-ветка
 ```
 
+### Тестирование перед пушем
+
+```bash
+# Запустить все автоматические тесты регрессий
+node .claude/scripts/regression-detector.js --runs=20 --verbose
+# Ищет: MOVEMENT_CHANGE (critical), DATA_REFERENCE_REUSE (warning)
+# Статус: ✅ должен показать Total issues: 0
+```
+
+Если issues > 0, откатить — есть баг в коде.
+
 ### Критичные правила
 
 | Правило | Файл | Штраф |
@@ -62,6 +73,7 @@ git push -u origin claude/ваша-ветка
 | 3 версии _cfg (_cfg, _cfg_tpe, _cfg_ex) одновременно | opt.js:1909,2265,2847 | OOS скалывается |
 | Все фильтры WITH warmup проверка (indicator <= 0) | filter_registry.js | JS ≠ TV |
 | Новый фильтр в 4 местах (ui, opt, filter_registry, buildBtCfg) | Сеч. 🚫 | Баг |
+| **Float32Array ВСЕГДА копировать** | opt.js, ui_oos.js | Corruption |
 | Запрещены: console.log, hardcoded цвета, вложенные ternary | .claude/rules/ | Pre-push блокирует |
 
 ---
@@ -70,8 +82,20 @@ git push -u origin claude/ваша-ветка
 
 - **`.claude/memory/architecture-decisions.md`** — какие решения приняты и почему
 - **`.claude/memory/integration-contracts.md`** — контракты между модулями (backtest, cfg, result)
+- **`.claude/memory/eq-reference-bug-analysis.md`** — анализ Float32Array corruption bug + fix
 - **`.claude/memory/tasks-completed.md`** — архив решённых задач
 - **`.claude/rules/forbidden-patterns.md`** — запрещённые паттерны (dumb-checks.sh их блокирует)
+- **`.claude/rules/regression-testing-policy.md`** — VERIFICATION-FIRST: только правила с 0 issues
+
+## 🧪 Инструменты Регрессионного Тестирования
+
+| Инструмент | Что проверяет | Команда |
+|-----------|---------------|---------|
+| **regression-detector.js** | MOVEMENT_CHANGE + DATA_REFERENCE_REUSE (100+ прогонов) | `node .claude/scripts/regression-detector.js --runs=50` |
+| **oos-mutation-test.js** | Corruption при переиспользовании Float32Array | `node .claude/scripts/oos-mutation-test.js` |
+| **validate-fix.js** | Валидация что Array.from() защищает данные | `node .claude/scripts/validate-fix.js` |
+
+**Статус правил**: Правило сохраняется в audit-patterns.md ТОЛЬКО если regression-detector = 0 issues
 
 ---
 
