@@ -224,11 +224,10 @@ function _drawOOSGraphicForResult(r) {
     }
   }
 
-  // Пропускаем пересекающиеся бары из eq_new
-  // ВАЖНО: warmup должен быть применен ДО пересечения, не ПОСЛЕ
-  // иначе данные смещаются дважды и синхронизируются неправильно
-  let newEqClean = eq_new.slice(overlapIdx);
-  let newBaselineClean = baseline_new ? baseline_new.slice(overlapIdx) : null; // ##EQ_MA_FILTER##
+  // new_eq уже очищена в ui_oos.js (без пересечения)
+  // Не обрезаем её снова - это нарушит warmup синхронизацию!
+  let newEqClean = eq_new;  // Уже очищена на стороне ui_oos.js
+  let newBaselineClean = baseline_new;  // Тоже очищена ##EQ_MA_FILTER##
 
   // Рассчитаем прогрев для новых данных (игнорируем первые N баров)
   // КРИТИЧНО: warmupEndIdx применяется на eq_new ПЕРЕД пересечением
