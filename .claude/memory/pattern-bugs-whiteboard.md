@@ -103,10 +103,10 @@ Next: User testing → if graph stable → STATUS: CLOSED
 
 **STATUS: PARTIAL** 🟡  
 **Last Updated:** 2026-04-03  
-**Total Cases:** 1 (OOS equity warmup)  
-**Confidence:** 90% (новый паттерн, требует регрессион-тестирования)  
-**Last Wave:** 1  
-**Regression Status:** ⏳ Ожидаем regression-detector (PARTIAL до тестирования)
+**Total Cases:** 2 (OOS equity warmup - 2 iterations)  
+**Confidence:** 70% (исправления применены но регрессия показала MAX PASSES)  
+**Last Wave:** 2 (уточнение решения)  
+**Regression Status:** ⚠️ FAILED - MAX PASSES EXCEEDED (требует доследования)
 
 **Определение:**
 Когда данные очищаются/трансформируются в ДВУХ МЕСТАХ (создание + рисование), индексы могут рассинхронизироваться.
@@ -114,26 +114,41 @@ Next: User testing → if graph stable → STATUS: CLOSED
 
 **Правило:** Single-Source-Of-Truth для трансформации  
 **Уровень:** CRITICAL  
-**Статус:** 🟡 PARTIAL (исправления сделаны, ждём регрессии)
+**Статус:** 🟡 PARTIAL (исправления итерированы, регрессия неудачна)
 
 ### Cases этого паттерна:
 
-#### Case 2.1: OOS Equity Warmup Sync (новый)
+#### Case 2.1: OOS Equity Warmup Sync (волна 1 - НЕПОЛНОЕ)
 ```
 ФАЙЛЫ: ui_oos.js:1446, ui_equity.js:230
-ПРОБЛЕМА: new_eq сохранялась ПОЛНОЙ (включая пересечение)
-          Потом обрезалась в _drawOOSGraphicForResult на overlapIdx + warmupEndIdx
-          = двойная обработка → warmup рассинхронизирован → ДИВЕРГЕНЦИЯ
-ИСПРАВЛЕНО: new_eq теперь сохраняется уже ОЧИЩЕННОЙ (от _overlapIdx)
-          _drawOOSGraphicForResult больше не обрезает
-СТАТУС: ✅ исправлено волна 1 (ждём регрессии)
+ПРОБЛЕМА: new_eq обрезалась по overlapIdx (только время)
+          но warmup остаётся рассинхронизированным
+ИСПРАВЛЕНО (волна 1): Сохранять new_eq ПОЛНОЙ, обрезать в _drawOOSGraphicForResult
+СТАТУС: ❌ исправление неполное (симптом остался)
+NEXT: Требуется волна 2 - пересмотр логики warmup/overlap синхронизации
+```
+
+#### Case 2.2: OOS Equity Warmup Sync (волна 2 - уточнение)
+```
+ФАЙЛЫ: ui_oos.js, ui_equity.js
+ПРОБЛЕМА (из волны 1): Обрезание по overlapIdx не учитывает warmup
+          overlapIdx это TIME пересечение, а не warmup
+ИСПРАВЛЕНО (волна 2): Обрезать по MAX(overlapIdx, warmup)
+          гарантировать что оба удалены одновременно
+СТАТУС: ⚠️ исправлено (волна 2) но регрессия показала MAX PASSES
+NEXT: Требуется диагностика - либо регрессион-детектор найденный старый баг,
+      либо исправление требует доработки
 ```
 
 ### Verification:
 ```
-Code audit: ✅ PASSED (no double-processing found in eq fields)
-Regression-detector: ⏳ PENDING
-Expected result: OOS graphs properly aligned, no divergence over time
+Wave 1: ❌ FAILED (симптом остался - растущее расстояние)
+Wave 2: ⚠️ PARTIAL (регрессор: MAX PASSES EXCEEDED)
+        = либо infinite loop в коде
+        = либо regression-detector нашёл старый баг
+        = либо исправление всё ещё неполное
+
+Требуется: Глубокое исследование причины MAX PASSES
 ```
 
 ## ПАТТЕРН #3: (Будущие паттерны по мере их обнаружения)

@@ -501,16 +501,34 @@ async function main() {
 
     logger.save();
 
+    // Сохраняем статус регрессии в .regression-results (для pre-push hook)
+    const resultsPath = path.join(process.cwd(), '.regression-results');
+    const status = issues.length === 0 ? 'VERIFIED' : 'FAILED';
+    const resultsContent = `STATUS: ${status}
+TIMESTAMP: ${new Date().toISOString()}
+ISSUES: ${issues.length}
+RUNS: ${totalRuns}
+CONFIG: regression-detector v1.0
+
+${issues.length === 0 ? '✅ No anomalies detected' : `❌ Found ${issues.length} issues`}
+`;
+
+    fs.writeFileSync(resultsPath, resultsContent);
+    console.log(`\n📝 Regression results saved to: ${resultsPath}`);
+
     // Если найдены проблемы - создаем отчет
     if (issues.length > 0) {
       const reportPath = path.join(__dirname, '..', 'regression-report.json');
       fs.writeFileSync(reportPath, JSON.stringify(issues, null, 2));
-      console.log(`\n📄 Full report saved to: ${reportPath}`);
+      console.log(`📄 Full report saved to: ${reportPath}`);
       console.log(`📊 Errors logged for analysis`);
       process.exit(1);  // Exit с ошибкой если найдены проблемы
     }
   } catch (err) {
     console.error('❌ Error:', err.message);
+    // Всё равно сохраняем статус ошибки
+    const resultsPath = path.join(process.cwd(), '.regression-results');
+    fs.writeFileSync(resultsPath, `STATUS: ERROR\nERROR: ${err.message}\nTIMESTAMP: ${new Date().toISOString()}\n`);
     process.exit(1);
   }
 }

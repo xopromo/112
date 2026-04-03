@@ -224,38 +224,41 @@ function _drawOOSGraphicForResult(r) {
     }
   }
 
-  // new_eq уже очищена в ui_oos.js (без пересечения)
-  // Не обрезаем её снова - это нарушит warmup синхронизацию!
-  let newEqClean = eq_new;  // Уже очищена на стороне ui_oos.js
-  let newBaselineClean = baseline_new;  // Тоже очищена ##EQ_MA_FILTER##
+  // КРИТИЧНО: eq_new это ПОЛНЫЙ eq (включая пересечение и warmup)
+  // Обрезаем одновременно по overlapIdx (время) и warmup (индикаторы)
+  // чтобы гарантировать что eq_old и eq_new выравнены по warmup
 
-  // Рассчитаем прогрев для новых данных (игнорируем первые N баров)
-  // КРИТИЧНО: warmupEndIdx применяется на eq_new ПЕРЕД пересечением
-  // чтобы правильно выровнять с eq_old
+  let newEqClean = eq_new;
+  let newBaselineClean = baseline_new;
+
   if (newEqClean && newEqClean.length > 0) {
     const cfg = r.cfg || {};
-    // Минимальный прогрев: макс из MA, pivot, ATR периодов
+
+    // Рассчитываем warmup
     const maWarmup = cfg.useMA ? (cfg.maP || 20) : 0;
     const pivotWarmup = cfg.usePivot ? ((cfg.pvL || 5) + (cfg.pvR || 2) + 5) : 0;
     const atrWarmup = cfg.useATR ? (cfg.atrPeriod || 14) * 3 : 0;
-    // ##EQ_MA_FILTER## Добавляем warmup для EqMA (нужна история equity для MA расчёта)
     const eqMAWarmup = cfg.useEqMA ? (cfg.eqMALen || 20) : 0;
     const warmup = Math.max(maWarmup, pivotWarmup, atrWarmup, eqMAWarmup, 1);
 
-    // Смещаем новые данные на warmup ТОЛЬКО если он меньше длины
-    // Это убирает "прогрев" индикаторов из видимой части графика
-    // но при этом newEqClean остается выровнен с eq_old по времени
-    if (warmup < newEqClean.length) {
-      const warmupValue = newEqClean[warmup];
-      // Вычитаем warmupValue из ВСЕХ новых данных (включая перед warmup)
-      // чтобы убрать прогрев БЕЗ смещения индексов
+    // ГЛАВНОЕ: обрезаем по МАКСИМУМУ из (overlapIdx, warmup)
+    // Это гарантирует что оба удалены и warmup совпадает
+    const minCleanIdx = Math.max(overlapIdx, warmup);
+
+    if (minCleanIdx < newEqClean.length) {
+      // Вычитаем значение при окончании warmup из ВСЕХ данных
+      const warmupValue = newEqClean[minCleanIdx];
       newEqClean = newEqClean.map(v => v - warmupValue);
-      // Аналогично для baseline ##EQ_MA_FILTER##
-      if (newBaselineClean && newBaselineClean.length > warmup) {
-        const warmupValueBL = newBaselineClean[warmup];
+
+      if (newBaselineClean && newBaselineClean.length > minCleanIdx) {
+        const warmupValueBL = newBaselineClean[minCleanIdx];
         newBaselineClean = newBaselineClean.map(v => v - warmupValueBL);
       }
     }
+
+    // Теперь обрезаем ОБЕ по minCleanIdx чтобы убрать overlap и warmup
+    newEqClean = newEqClean.slice(minCleanIdx);
+    if (newBaselineClean) newBaselineClean = newBaselineClean.slice(minCleanIdx);
   }
 
   // Concatenate: новый сегмент продолжает с последнего значения истории (без пересечения)
