@@ -343,8 +343,9 @@ async function runRegressionTests(options = {}) {
   // ============================================================
   const START_TIME = Date.now();
   const MAX_TIMEOUT_MS = 5 * 60 * 1000;  // 5 minutes
-  const MAX_PASSES = 50;  // Maximum passes allowed
-  let passCount = 0;
+  const MAX_PASSES_PER_CONFIG = 50;  // Maximum passes per config allowed
+  let totalPassCount = 0;  // Global counter for timeout
+  let passCountPerConfig = 0;  // Reset per config
   let lastIssueCount = null;
   let convergenceCount = 0;
 
@@ -355,10 +356,13 @@ async function runRegressionTests(options = {}) {
       process.exit(1);
     }
 
-    if (passCount > MAX_PASSES) {
-      console.error(`\n❌ MAX PASSES EXCEEDED! Ran ${passCount} passes (limit: ${MAX_PASSES})`);
+    // Per-config pass limit (prevents infinite loops within single config)
+    if (passCountPerConfig > MAX_PASSES_PER_CONFIG) {
+      console.error(`\n❌ MAX PASSES EXCEEDED! Ran ${passCountPerConfig} passes on current config (limit: ${MAX_PASSES_PER_CONFIG})`);
       process.exit(1);
     }
+
+    totalPassCount++;
   };
 
   const checkConvergence = (currentIssueCount) => {
@@ -385,15 +389,16 @@ async function runRegressionTests(options = {}) {
   console.log(`Runs per config: ${runsPerConfig}`);
   console.log(`Total iterations: ${TEST_CONFIGS.length * runsPerConfig}`);
   console.log(`Detailed mode: ${detailed ? '✅ ON' : '⭕ OFF'}`);
-  console.log(`\n⚙️  Protection: Timeout=5min, MaxPasses=${MAX_PASSES}, Convergence=enabled\n`);
+  console.log(`\n⚙️  Protection: Timeout=5min, MaxPasses=${MAX_PASSES_PER_CONFIG} per config, Convergence=enabled\n`);
 
   for (const testConfig of TEST_CONFIGS) {
     console.log(`📊 Testing: ${testConfig.name}`);
+    passCountPerConfig = 0;  // Reset per-config counter
 
     for (let run = 0; run < runsPerConfig; run++) {
       // PROTECTION: Check for infinite loops (RULE 13)
       checkTimeoutAndConvergence();
-      passCount++;
+      passCountPerConfig++;
       // Генерируем данные
       const data = generateSyntheticData(300 + Math.random() * 200);
       const eqBefore = generateMockEquity(data.length);
@@ -454,7 +459,7 @@ async function runRegressionTests(options = {}) {
   }
 
   const elapsedSeconds = ((Date.now() - START_TIME) / 1000).toFixed(1);
-  console.log(`\n⏱️  Total time: ${elapsedSeconds}s | Passes: ${passCount} | Issues: ${detector.issues.length}`);
+  console.log(`\n⏱️  Total time: ${elapsedSeconds}s | Total passes: ${totalPassCount} | Issues: ${detector.issues.length}`);
 
   return detector.issues;
 }
@@ -507,7 +512,7 @@ async function main() {
     const resultsContent = `STATUS: ${status}
 TIMESTAMP: ${new Date().toISOString()}
 ISSUES: ${issues.length}
-RUNS: ${totalRuns}
+RUNS: ${totalPassCount}
 CONFIG: regression-detector v1.0
 
 ${issues.length === 0 ? '✅ No anomalies detected' : `❌ Found ${issues.length} issues`}
