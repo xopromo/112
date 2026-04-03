@@ -223,16 +223,35 @@ function attachContextMenusToAllOptions() {
   optionElements.forEach(element => {
     if (!element.id) return;
 
-    // Получить label если он есть (обычно идет после input)
-    let label = element.textContent;
-    const labelEl = element.parentElement?.querySelector('label') ||
-                    element.nextElementSibling?.tagName === 'LABEL' ? element.nextElementSibling : null;
-    if (labelEl) {
-      label = labelEl.textContent || element.id;
+    // Получить label если он есть
+    let label = element.id;
+    let labelEl = null;
+
+    // Ищем label в нескольких местах
+    if (element.parentElement) {
+      labelEl = element.parentElement.querySelector('label');
+      if (!labelEl && element.nextElementSibling?.tagName === 'LABEL') {
+        labelEl = element.nextElementSibling;
+      }
     }
 
-    // Привязать контекстное меню
+    if (labelEl) {
+      label = labelEl.textContent.trim() || element.id;
+    }
+
+    // Привязать контекстное меню к самому input/select
     attachArchiveContextMenu(element, label);
+
+    // Привязать контекстное меню и к label элементу
+    if (labelEl) {
+      attachArchiveContextMenu(labelEl, label);
+    }
+
+    // Привязать также к родительскому div (если это .cb или .field)
+    const parent = element.parentElement;
+    if (parent && (parent.classList.contains('cb') || parent.classList.contains('field'))) {
+      attachArchiveContextMenu(parent, label);
+    }
   });
 }
 
