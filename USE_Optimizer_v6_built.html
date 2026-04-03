@@ -24714,13 +24714,12 @@ function drawEquityForResult(r) {
   if (!r) return;
 
   // ##EQ_MA_FILTER## Если результат из OOS (имеет old_eq и new_eq), рисуем полный OOS график
-  // CRITICAL: Проверяем ЯВНЫЙ признак OOS результата, не просто наличие полей!
-  // (Обычные результаты могут случайно получить эти поля через Object.assign копирование)
-  const isExplicitOOSResult = r._isOOSResult === true;
+  // WAVE 8 FIX: Достаточно проверить наличие OOS данных, флаг не обязателен
+  // (Некоторые результаты могут иметь old_eq/new_eq через копирование без флага)
   const hasOOSData = r.old_eq && r.old_eq.length && r.new_eq && r.new_eq.length;
 
-  if (hasOOSData && isExplicitOOSResult) {
-    _drawOOSGraphicForResult(r);
+  if (hasOOSData) {
+    _drawOOSGraphicForResult(r);  // WAVE 8: используем OOS рисование если есть OOS данные
     return;
   }
 
@@ -33820,7 +33819,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1775259035194;
+window._BUILD_TS = 1775260010106;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
