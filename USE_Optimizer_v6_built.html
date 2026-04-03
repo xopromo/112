@@ -28369,7 +28369,8 @@ function _hcOpenDetail(idx) {
       x.cfg._oos = _oosData._oos;
       // ⚠️ ВАЖНО: Сохраняем полный eq в отдельное поле, НЕ перезаписываем x.r.eq!
       // x.r.eq это оригинальный результат HC, он должен остаться без изменений.
-      if (_oosData.eq) x.r._fullEq = _oosData.eq;
+      // КРИТИЧНО: Копируем массив! Иначе _oosData.eq может мутироваться при пересчёте OOS
+      if (_oosData.eq) x.r._fullEq = Array.from(_oosData.eq);
     }
   }
   const raw = x.r;
@@ -30027,7 +30028,7 @@ async function runOOSOnNewData() {
         const isEndIdx = Math.round(0.70 * rOld.eqCalcBaselineArr.length) || 0;
         return rOld.eqCalcBaselineArr.slice(0, Math.min(isEndIdx + 1, rOld.eqCalcBaselineArr.length));
       })(),
-      new_eqCalcBaselineArr: rNew ? rNew.eqCalcBaselineArr : null, // baseline (без MA фильтра) на новых данных ##EQ_MA_FILTER##
+      new_eqCalcBaselineArr: (rNew && rNew.eqCalcBaselineArr) ? Array.from(rNew.eqCalcBaselineArr) : null, // baseline (без MA фильтра) на новых данных ##EQ_MA_FILTER## — КРИТИЧНО копируем!
     });
   }
 
@@ -33730,7 +33731,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1775227656789;
+window._BUILD_TS = 1775248512349;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
