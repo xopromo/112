@@ -155,6 +155,7 @@ window.onerror = function(msg, src, line, col, err) {
 let dropZone, fileInput;
 document.addEventListener('DOMContentLoaded', () => {
   _loadPrfCutoff(); // restore cutoff fields from localStorage
+  loadBaselineColorFromStorage(); // restore theoretical equity color from localStorage
   _checkMSCConfig(); // apply Market Structure Comparator config if present
 
   dropZone = document.getElementById('drop');

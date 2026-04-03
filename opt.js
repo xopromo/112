@@ -1060,7 +1060,7 @@ async function runOpt() {
       const btCfg = buildBtCfg(cfg, ind);
       // ##EQ_MA_FILTER## Сохраняем MA из IS режима для OOS прогона (фильтр должен использовать ту же MA)
       if (cfg.eqCalcMAArr) btCfg.eqCalcMAArr = cfg.eqCalcMAArr;
-      if (cfg.eqCalcBaselineArr) btCfg.eqCalcBaselineArr = cfg.eqCalcBaselineArr;
+      if (cfg.eqCalcBaselineArr) btCfg.eqCalcBaselineArr = Array.from(cfg.eqCalcBaselineArr);
       return backtest(ind.pvLo, ind.pvHi, ind.atrArr, btCfg);
     } catch(e) { console.error('[_runOOS] exception:', e, cfg); return null; }
     finally { DATA = origDATA; }

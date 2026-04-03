@@ -1391,7 +1391,7 @@ async function runOOSOnNewData() {
       // ##EQ_MA_FILTER## Копируем baseline данные в результат если они есть
       if (rNew && r.cfg.useEqMA) {
         if (_btCfg.eqCalcBaselineArr && !rNew.eqCalcBaselineArr) {
-          rNew.eqCalcBaselineArr = _btCfg.eqCalcBaselineArr;
+          rNew.eqCalcBaselineArr = Array.from(_btCfg.eqCalcBaselineArr);
         }
         if (_btCfg.eqCalcMAArr && !rNew.eqCalcMAArr) {
           rNew.eqCalcMAArr = _btCfg.eqCalcMAArr;

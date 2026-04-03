@@ -721,6 +721,7 @@ function updateBaselineColor() {
   const picker = $('baseline-color-picker');
   if (!picker) return;
   _eqMAFilterBaselineColor = picker.value;
+  saveBaselineColorToStorage(picker.value);
   if (_selectedIdx >= 0 && _visibleResults[_selectedIdx]) {
     drawEquityForResult(_visibleResults[_selectedIdx]);
   }
@@ -730,6 +731,7 @@ function setBaselineColorPreset(value) {
   const picker = $('baseline-color-picker');
   if (picker) picker.value = value;
   _eqMAFilterBaselineColor = value;
+  saveBaselineColorToStorage(value);
   if (_selectedIdx >= 0 && _visibleResults[_selectedIdx]) {
     drawEquityForResult(_visibleResults[_selectedIdx]);
   }
