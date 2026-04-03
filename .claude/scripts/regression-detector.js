@@ -8,6 +8,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { ErrorLogger } = require('./error-logger');
 
 // ============================================================
 // TEST CONFIGS - Конфиги которые скидывал пользователь
@@ -422,11 +423,40 @@ async function main() {
   try {
     const issues = await runRegressionTests(options);
 
+    // Логирование найденных проблем
+    const logger = new ErrorLogger();
+
+    // Логировать каждую найденную ошибку
+    issues.forEach(issue => {
+      logger.logError(
+        issue.type,
+        issue.test,
+        issue.severity,
+        {
+          message: issue.message,
+          divergence: issue.divergence,
+          isOOS: issue.isOOS
+        }
+      );
+
+      // Связать с возможными причинами
+      if (issue.type === 'MOVEMENT_CHANGE') {
+        logger.linkCause('MOVEMENT_CHANGE', 'Float32Array reuse without copying', 0.9);
+        logger.linkCause('MOVEMENT_CHANGE', 'Direct reference in equities dictionary', 0.8);
+      } else if (issue.type === 'DATA_REFERENCE_REUSE') {
+        logger.linkCause('DATA_REFERENCE_REUSE', 'eq stored as direct reference, not Array.from()', 0.85);
+        logger.linkCause('DATA_REFERENCE_REUSE', 'equities[name] = rFull.eq without copy', 0.9);
+      }
+    });
+
+    logger.save();
+
     // Если найдены проблемы - создаем отчет
     if (issues.length > 0) {
       const reportPath = path.join(__dirname, '..', 'regression-report.json');
       fs.writeFileSync(reportPath, JSON.stringify(issues, null, 2));
       console.log(`\n📄 Full report saved to: ${reportPath}`);
+      console.log(`📊 Errors logged for analysis`);
       process.exit(1);  // Exit с ошибкой если найдены проблемы
     }
   } catch (err) {

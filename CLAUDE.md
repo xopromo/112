@@ -73,7 +73,8 @@ node .claude/scripts/regression-detector.js --runs=20 --verbose
 | 3 версии _cfg (_cfg, _cfg_tpe, _cfg_ex) одновременно | opt.js:1909,2265,2847 | OOS скалывается |
 | Все фильтры WITH warmup проверка (indicator <= 0) | filter_registry.js | JS ≠ TV |
 | Новый фильтр в 4 местах (ui, opt, filter_registry, buildBtCfg) | Сеч. 🚫 | Баг |
-| **Float32Array ВСЕГДА копировать** | opt.js, ui_oos.js | Corruption |
+| **Float32Array ВСЕГДА копировать** | opt.js, ui_oos.js, ui_hc.js | Corruption |
+| **FULL SEARCH перед фиксом паттерна** | dumb-checks.sh (критично 8) | Pre-push блокирует |
 | Запрещены: console.log, hardcoded цвета, вложенные ternary | .claude/rules/ | Pre-push блокирует |
 
 ---
@@ -83,6 +84,7 @@ node .claude/scripts/regression-detector.js --runs=20 --verbose
 - **`.claude/memory/architecture-decisions.md`** — какие решения приняты и почему
 - **`.claude/memory/integration-contracts.md`** — контракты между модулями (backtest, cfg, result)
 - **`.claude/memory/eq-reference-bug-analysis.md`** — анализ Float32Array corruption bug + fix
+- **`.claude/memory/investigation-methodology.md`** — FULL SEARCH правило (сохранено как напоминание)
 - **`.claude/memory/tasks-completed.md`** — архив решённых задач
 - **`.claude/rules/forbidden-patterns.md`** — запрещённые паттерны (dumb-checks.sh их блокирует)
 - **`.claude/rules/regression-testing-policy.md`** — VERIFICATION-FIRST: только правила с 0 issues
@@ -94,8 +96,52 @@ node .claude/scripts/regression-detector.js --runs=20 --verbose
 | **regression-detector.js** | MOVEMENT_CHANGE + DATA_REFERENCE_REUSE (100+ прогонов) | `node .claude/scripts/regression-detector.js --runs=50` |
 | **oos-mutation-test.js** | Corruption при переиспользовании Float32Array | `node .claude/scripts/oos-mutation-test.js` |
 | **validate-fix.js** | Валидация что Array.from() защищает данные | `node .claude/scripts/validate-fix.js` |
+| **run-all-tests.sh** | Запускает все тесты + анализ ошибок | `bash .claude/scripts/run-all-tests.sh` |
 
 **Статус правил**: Правило сохраняется в audit-patterns.md ТОЛЬКО если regression-detector = 0 issues
+
+## 📊 Автоматическое Логирование Ошибок & Синтез Правил
+
+### Pipeline Накопления Знаний
+
+```
+Ошибка найдена → regression-detector → error-logger → rule-synthesizer
+    ↓                                       ↓                  ↓
+Код имеет баг    Логирует в JSON     Анализирует      Предлагает гипотезы
+                  + Причины           паттерны         + Код для теста
+```
+
+### Инструменты
+
+- **error-logger.js** — Логирует ошибки с timestamp + возможные причины
+  - `.claude/logs/error-log.json` — полная история всех ошибок
+  - `.claude/logs/error-patterns.json` — группировка по типам и тренды
+  
+- **rule-synthesizer.js** — Анализирует накопленные ошибки и создаёт гипотезы
+  - Читает error-patterns.json
+  - Предлагает новые правила с confidence уровнем
+  - Выводит в `.claude/rules/rule-hypotheses.md`
+  - **Только гипотезы!** Не добавляет в audit-patterns.md автоматически
+
+### Workflow Создания Новых Правил
+
+```bash
+# 1. Ошибки логируются автоматически (regression-detector делает это)
+# 2. После тестов run-all-tests.sh вызывает rule-synthesizer
+
+bash .claude/scripts/run-all-tests.sh
+# ↓ Создаёт rule-hypotheses.md с предложениями
+
+# 3. Прочитать rule-hypotheses.md, выбрать гипотезу, реализовать фикс
+
+# 4. Валидировать что фикс работает
+node .claude/scripts/regression-detector.js --runs=50
+# ↓ Если issues = 0, фикс работает!
+
+# 5. Добавить проверенное правило в .claude/rules/audit-patterns.md
+```
+
+**КРИТИЧНО**: Правило добавляется в аудит ТОЛЬКО если regression-detector показал 0 issues!
 
 ---
 

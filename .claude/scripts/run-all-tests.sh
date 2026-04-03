@@ -69,6 +69,16 @@ else
 fi
 
 echo ""
+
+# Анализ накопленных ошибок (если они есть)
+if [ "$REGRESSION_PASSED" -eq 0 ] || [ "$MUTATION_PASSED" -eq 0 ]; then
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo "📊 Error Analysis & Rule Synthesis"
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  node "$SCRIPT_DIR/rule-synthesizer.js" 2>&1 || true
+  echo ""
+fi
+
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "SUMMARY"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -83,10 +93,14 @@ if [ "$REGRESSION_PASSED" -eq 1 ] && [ "$MUTATION_PASSED" -eq 1 ] && [ "$VALIDAT
 else
   echo "❌ SOME TESTS FAILED"
   echo ""
-  echo "Fix issues before pushing:"
+  echo "Issues found:"
   [ "$REGRESSION_PASSED" -eq 0 ] && echo "  • Regression Detector found issues"
   [ "$MUTATION_PASSED" -eq 0 ] && echo "  • Mutation Test failed"
   [ "$VALIDATE_PASSED" -eq 0 ] && echo "  • Validate Fix failed"
+  echo ""
+  echo "Error analysis and rule hypotheses saved to:"
+  echo "  .claude/logs/error-log.json"
+  echo "  .claude/rules/rule-hypotheses.md"
   echo ""
   exit 1
 fi

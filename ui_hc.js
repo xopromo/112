@@ -331,6 +331,12 @@ function _hcRunBacktest(cfg) {
       if (btCfg.eqCalcMAArr) _hcRes.eqCalcMAArr = btCfg.eqCalcMAArr;
     }
 
+    // КРИТИЧНО: Копируем eq перед сохранением в кэш - иначе все пользователи кэша
+    // будут использовать один и тот же Float32Array и повредят друг другу данные
+    if (_hcRes && _hcRes.eq) {
+      _hcRes.eq = Array.from(_hcRes.eq);
+    }
+
     _robSliceCacheSet(_hcsk, _hcRes);
     return _hcRes;
   } catch(e) { return null; }

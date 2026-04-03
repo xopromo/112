@@ -174,8 +174,9 @@ function drawEquityForResult(r) {
     // Для fav и hc результатов без eq — запускаем лёгкий бэктест
     const raw = _hcRunBacktest(r.cfg);
     if (raw && raw.eq) {
-      r.eq = raw.eq; // кэшируем
-      drawEquityData(raw.eq, r.name, splitPct, baselineEq);
+      // КРИТИЧНО: Копируем eq - иначе кэш может быть переиспользован и результат повреждён
+      r.eq = Array.from(raw.eq);
+      drawEquityData(r.eq, r.name, splitPct, baselineEq);
     }
   }
 }

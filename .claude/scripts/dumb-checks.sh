@@ -131,6 +131,45 @@ else
 fi
 
 # ======================================================================
+# 🔴 Критично 8: Investigation Methodology Rule
+# При исправлении паттерн-ошибки (не одиночный баг) ДОЛЖЕН быть FULL SEARCH
+# ======================================================================
+echo "  Проверка Investigation Methodology Rule..."
+
+# Проверяем если последний коммит упоминает паттерн-ошибку
+LAST_MSG=$(git log -1 --pretty=%B 2>/dev/null || echo "")
+
+# Паттерн-ошибки которые требуют FULL SEARCH
+PATTERN_ERRORS="Float32Array.*copy\|Data.*Reference.*Reuse\|corruption\|mutation"
+
+if echo "$LAST_MSG" | grep -iE "$PATTERN_ERRORS" > /dev/null 2>&1; then
+  # Это паттерн-ошибка, проверяем что правило соблюдено
+
+  # ПРАВИЛО 1: Должна быть ссылка на investigation-methodology.md
+  if ! echo "$LAST_MSG" | grep -q "investigation-methodology\|FULL SEARCH"; then
+    echo "  ⚠️  WARNING: Pattern-bug найден, но нет ссылки на investigation-methodology"
+    echo "     Commit message должен включать 'investigation-methodology.md'"
+  fi
+
+  # ПРАВИЛО 2: Для Float32Array corruption - проверяем что все места исправлены
+  if echo "$LAST_MSG" | grep -iq "Float32Array\|eq.*copy\|Array.from"; then
+    # Ищем в диффе скольких файлов внесены изменения
+    FILES_CHANGED=$(git diff-tree --no-commit-id --name-only -r HEAD 2>/dev/null | wc -l)
+
+    if [ "$FILES_CHANGED" -lt 2 ]; then
+      echo "  ❌ ОШИБКА: Float32Array fix в $FILES_CHANGED файле(s)"
+      echo "     Float32Array corruption - это ПАТТЕРН, должны быть исправления в:"
+      echo "     - opt.js, ui_oos.js, ui_hc.js, ui_equity.js (минимум)"
+      echo "     Запусти FULL SEARCH перед фиксом:"
+      echo "     grep -r '\\.eq\\s*=' opt.js ui*.js"
+      ERRORS=$((ERRORS + 1))
+    else
+      echo "  ✓ Pattern-bug исправлен в нескольких файлах ($FILES_CHANGED файлов)"
+    fi
+  fi
+fi
+
+# ======================================================================
 # Результаты
 # ======================================================================
 echo ""
