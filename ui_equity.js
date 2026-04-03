@@ -209,7 +209,9 @@ function _drawOOSGraphicForResult(r) {
     const maWarmup = cfg.useMA ? (cfg.maP || 20) : 0;
     const pivotWarmup = cfg.usePivot ? ((cfg.pvL || 5) + (cfg.pvR || 2) + 5) : 0;
     const atrWarmup = cfg.useATR ? (cfg.atrPeriod || 14) * 3 : 0;
-    const warmup = Math.max(maWarmup, pivotWarmup, atrWarmup, 1);
+    // ##EQ_MA_FILTER## Добавляем warmup для EqMA (нужна история equity для MA расчёта)
+    const eqMAWarmup = cfg.useEqMA ? (cfg.eqMALen || 20) : 0;
+    const warmup = Math.max(maWarmup, pivotWarmup, atrWarmup, eqMAWarmup, 1);
 
     // Пропускаем первые warmup баров из equity кривой (убираем прогрев)
     const warmupEndIdx = Math.min(warmup, newEqClean.length - 1);
