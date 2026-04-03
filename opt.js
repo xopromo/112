@@ -2644,7 +2644,7 @@ async function runOpt() {
           const maType = eqMAType || 'SMA'; // ##EQ_MA_FILTER## выбор типа MA
           btCfg.eqCalcMAArr = calcMA(Array.from(_shadowEq), maLen, maType);
           btCfg.eqCalcBaselineArr = Array.from(_shadowEq); // ##EQ_MA_FILTER## сохраняем саму baseline (не MA)
-          _eqCalc = _shadowEq;  // сохраняем для последующего использования
+          _eqCalc = Array.from(_shadowEq);  // Копируем для безопасного сохранения в результаты
         }
       }
 
@@ -3362,7 +3362,7 @@ async function runOpt() {
                                         const maType = eqMAType || 'SMA'; // ##EQ_MA_FILTER## выбор типа MA
                                         btCfg.eqCalcMAArr = calcMA(Array.from(_shadowEq), maLen, maType);
                                         btCfg.eqCalcBaselineArr = Array.from(_shadowEq); // ##EQ_MA_FILTER## сохраняем саму baseline (не MA)
-                                        _eqCalc = _shadowEq;  // сохраняем для последующего использования
+                                        _eqCalc = Array.from(_shadowEq);  // Копируем для безопасного сохранения в результаты
                                       }
                                     }
 

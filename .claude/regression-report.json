@@ -1,0 +1,209 @@
+[
+  {
+    "type": "DATA_REFERENCE_REUSE",
+    "test": "EqMA(85) - TLtch pv10/3z0.30 [run 1]",
+    "severity": "WARNING",
+    "message": "eq выглядит как идентичные ссылки (не копии)",
+    "isOOS": true
+  },
+  {
+    "type": "DATA_REFERENCE_REUSE",
+    "test": "EqMA(85) - TLtch pv10/3z0.30 [run 2]",
+    "severity": "WARNING",
+    "message": "eq выглядит как идентичные ссылки (не копии)",
+    "isOOS": true
+  },
+  {
+    "type": "DATA_REFERENCE_REUSE",
+    "test": "EqMA(85) - TLtch pv10/3z0.30 [run 3]",
+    "severity": "WARNING",
+    "message": "eq выглядит как идентичные ссылки (не копии)",
+    "isOOS": true
+  },
+  {
+    "type": "DATA_REFERENCE_REUSE",
+    "test": "EqMA(85) - TLtch pv10/3z0.30 [run 4]",
+    "severity": "WARNING",
+    "message": "eq выглядит как идентичные ссылки (не копии)",
+    "isOOS": true
+  },
+  {
+    "type": "DATA_REFERENCE_REUSE",
+    "test": "EqMA(85) - TLtch pv10/3z0.30 [run 5]",
+    "severity": "WARNING",
+    "message": "eq выглядит как идентичные ссылки (не копии)",
+    "isOOS": true
+  },
+  {
+    "type": "DATA_REFERENCE_REUSE",
+    "test": "EqMA(55) - variant [run 1]",
+    "severity": "WARNING",
+    "message": "eq выглядит как идентичные ссылки (не копии)",
+    "isOOS": true
+  },
+  {
+    "type": "DATA_REFERENCE_REUSE",
+    "test": "EqMA(55) - variant [run 2]",
+    "severity": "WARNING",
+    "message": "eq выглядит как идентичные ссылки (не копии)",
+    "isOOS": true
+  },
+  {
+    "type": "DATA_REFERENCE_REUSE",
+    "test": "EqMA(55) - variant [run 3]",
+    "severity": "WARNING",
+    "message": "eq выглядит как идентичные ссылки (не копии)",
+    "isOOS": true
+  },
+  {
+    "type": "DATA_REFERENCE_REUSE",
+    "test": "EqMA(55) - variant [run 4]",
+    "severity": "WARNING",
+    "message": "eq выглядит как идентичные ссылки (не копии)",
+    "isOOS": true
+  },
+  {
+    "type": "DATA_REFERENCE_REUSE",
+    "test": "EqMA(55) - variant [run 5]",
+    "severity": "WARNING",
+    "message": "eq выглядит как идентичные ссылки (не копии)",
+    "isOOS": true
+  },
+  {
+    "type": "DATA_REFERENCE_REUSE",
+    "test": "EqMA(100) - aggressive [run 1]",
+    "severity": "WARNING",
+    "message": "eq выглядит как идентичные ссылки (не копии)",
+    "isOOS": true
+  },
+  {
+    "type": "DATA_REFERENCE_REUSE",
+    "test": "EqMA(100) - aggressive [run 2]",
+    "severity": "WARNING",
+    "message": "eq выглядит как идентичные ссылки (не копии)",
+    "isOOS": true
+  },
+  {
+    "type": "DATA_REFERENCE_REUSE",
+    "test": "EqMA(100) - aggressive [run 3]",
+    "severity": "WARNING",
+    "message": "eq выглядит как идентичные ссылки (не копии)",
+    "isOOS": true
+  },
+  {
+    "type": "DATA_REFERENCE_REUSE",
+    "test": "EqMA(100) - aggressive [run 4]",
+    "severity": "WARNING",
+    "message": "eq выглядит как идентичные ссылки (не копии)",
+    "isOOS": true
+  },
+  {
+    "type": "DATA_REFERENCE_REUSE",
+    "test": "EqMA(100) - aggressive [run 5]",
+    "severity": "WARNING",
+    "message": "eq выглядит как идентичные ссылки (не копии)",
+    "isOOS": true
+  },
+  {
+    "type": "MOVEMENT_CHANGE",
+    "test": "No EqMA - baseline [run 1]",
+    "severity": "WARNING",
+    "divergence": "0.268",
+    "isOOS": true,
+    "pattern": {
+      "before": [
+        1,
+        -1,
+        1,
+        -1,
+        1
+      ],
+      "after": [
+        1,
+        -1,
+        1,
+        -1,
+        1
+      ]
+    }
+  },
+  {
+    "type": "DATA_REFERENCE_REUSE",
+    "test": "No EqMA - baseline [run 2]",
+    "severity": "WARNING",
+    "message": "eq выглядит как идентичные ссылки (не копии)",
+    "isOOS": true
+  },
+  {
+    "type": "DATA_REFERENCE_REUSE",
+    "test": "No EqMA - baseline [run 3]",
+    "severity": "WARNING",
+    "message": "eq выглядит как идентичные ссылки (не копии)",
+    "isOOS": true
+  },
+  {
+    "type": "MOVEMENT_CHANGE",
+    "test": "No EqMA - baseline [run 4]",
+    "severity": "WARNING",
+    "divergence": "0.242",
+    "isOOS": true,
+    "pattern": {
+      "before": [
+        1,
+        -1,
+        1,
+        -1,
+        -1
+      ],
+      "after": [
+        1,
+        -1,
+        1,
+        -1,
+        -1
+      ]
+    }
+  },
+  {
+    "type": "DATA_REFERENCE_REUSE",
+    "test": "No EqMA - baseline [run 5]",
+    "severity": "WARNING",
+    "message": "eq выглядит как идентичные ссылки (не копии)",
+    "isOOS": true
+  },
+  {
+    "type": "DATA_REFERENCE_REUSE",
+    "test": "EqMA(30) - light [run 1]",
+    "severity": "WARNING",
+    "message": "eq выглядит как идентичные ссылки (не копии)",
+    "isOOS": true
+  },
+  {
+    "type": "DATA_REFERENCE_REUSE",
+    "test": "EqMA(30) - light [run 2]",
+    "severity": "WARNING",
+    "message": "eq выглядит как идентичные ссылки (не копии)",
+    "isOOS": true
+  },
+  {
+    "type": "DATA_REFERENCE_REUSE",
+    "test": "EqMA(30) - light [run 3]",
+    "severity": "WARNING",
+    "message": "eq выглядит как идентичные ссылки (не копии)",
+    "isOOS": true
+  },
+  {
+    "type": "DATA_REFERENCE_REUSE",
+    "test": "EqMA(30) - light [run 4]",
+    "severity": "WARNING",
+    "message": "eq выглядит как идентичные ссылки (не копии)",
+    "isOOS": true
+  },
+  {
+    "type": "DATA_REFERENCE_REUSE",
+    "test": "EqMA(30) - light [run 5]",
+    "severity": "WARNING",
+    "message": "eq выглядит как идентичные ссылки (не копии)",
+    "isOOS": true
+  }
+]
