@@ -5,3 +5,7 @@ __pycache__/
 *.db
 *.log
 vk_sales/config.json
+
+# Testing & Regression Logs (accumulated over time, not committed)
+.claude/logs/
+.claude/regression-report.json
