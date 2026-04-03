@@ -1480,6 +1480,7 @@ async function runOOSOnNewData() {
       })(),
       new_eqCalcBaselineArr: rNew ? rNew.eqCalcBaselineArr : null, // baseline (без MA фильтра) на новых данных ##EQ_MA_FILTER##
     });
+  }
 
   if (progressEl) progressEl.textContent = `✅ ${_oosTableResults.length} стратегий`;
   if (btnEl) btnEl.disabled = false;

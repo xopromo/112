@@ -202,6 +202,56 @@ const warmupEndIdx = Math.min(warmup, newEqClean.length - 1);
 
 ---
 
+## 🔴 Запрещено: Незакрытые скобки и синтаксические ошибки при редактировании
+
+**Проблема**: Одна незакрытая скобка ломает весь проект — проекты не открываются, данные не загружаются
+**Частая причина**: При редактировании многострочных структур (объектов, циклов) забывается закрывающая скобка
+**Где**: Любые JS файлы (ui*.js, opt.js, core.js)
+
+**❌ Неправильно** (пример с циклом for):
+```javascript
+for (let i = 0; i < items.length; i++) {
+  const item = items[i];
+  _oosTableResults.push({
+    name: item.name,
+    value: item.value
+  });
+  // ЗАБЫТА СКОБКА! Цикл не закрыт
+  
+// Потом идёт код который должен быть после цикла
+if (progressEl) progressEl.textContent = '✅ Готово';
+```
+
+**✅ Правильно**:
+```javascript
+for (let i = 0; i < items.length; i++) {
+  const item = items[i];
+  _oosTableResults.push({
+    name: item.name,
+    value: item.value
+  });
+}  // ← закрывающая скобка для цикла
+
+// Теперь код после цикла
+if (progressEl) progressEl.textContent = '✅ Готово';
+```
+
+**Как найти ошибку**:
+```bash
+# Проверить синтаксис
+node -c ui_oos.js
+
+# Если ошибка — посчитать скобки
+grep -o "{" ui_oos.js | wc -l  # открывающих
+grep -o "}" ui_oos.js | wc -l  # закрывающих
+
+# Числа должны быть равны!
+```
+
+**Правило**: Каждой открывающей `{` должна соответствовать закрывающая `}`
+
+---
+
 ## Как это проверяется
 
 **Pre-push hook** (`.git/hooks/pre-push`):
