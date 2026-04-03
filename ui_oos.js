@@ -1394,7 +1394,7 @@ async function runOOSOnNewData() {
           rNew.eqCalcBaselineArr = Array.from(_btCfg.eqCalcBaselineArr);
         }
         if (_btCfg.eqCalcMAArr && !rNew.eqCalcMAArr) {
-          rNew.eqCalcMAArr = _btCfg.eqCalcMAArr;
+          rNew.eqCalcMAArr = Array.from(_btCfg.eqCalcMAArr);
         }
       }
     } catch(e) { }

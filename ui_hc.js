@@ -328,7 +328,7 @@ function _hcRunBacktest(cfg) {
     // ##EQ_MA_FILTER## Сохраняем baseline в результат если он был рассчитан
     if (cfg.useEqMA && _hcRes) {
       if (btCfg.eqCalcBaselineArr) _hcRes.eqCalcBaselineArr = Array.from(btCfg.eqCalcBaselineArr);
-      if (btCfg.eqCalcMAArr) _hcRes.eqCalcMAArr = btCfg.eqCalcMAArr;
+      if (btCfg.eqCalcMAArr) _hcRes.eqCalcMAArr = Array.from(btCfg.eqCalcMAArr);
     }
 
     // КРИТИЧНО: Копируем eq перед сохранением в кэш - иначе все пользователи кэша
@@ -379,7 +379,7 @@ function _hcBuildOOS(cfg) {
       // ##EQ_MA_FILTER## Сохраняем baseline в результат если он был рассчитан
       if (cfg.useEqMA && r) {
         if (btCfg.eqCalcBaselineArr) r.eqCalcBaselineArr = Array.from(btCfg.eqCalcBaselineArr);
-        if (btCfg.eqCalcMAArr) r.eqCalcMAArr = btCfg.eqCalcMAArr;
+        if (btCfg.eqCalcMAArr) r.eqCalcMAArr = Array.from(btCfg.eqCalcMAArr);
       }
 
       return r;
@@ -451,7 +451,7 @@ function _hcBuildOOS(cfg) {
     pain:    _calcPainRatio(rIS.eq) // ##PAIN
   } : null;
 
-  return { _oos, isStats, eq: rFull.eq, eqCalcMAArr: rFull.eqCalcMAArr }; // ##EQ_MA_FILTER##
+  return { _oos, isStats, eq: Array.from(rFull.eq), eqCalcMAArr: rFull.eqCalcMAArr ? Array.from(rFull.eqCalcMAArr) : undefined }; // ##EQ_MA_FILTER##
 }
 
 // ── MULTI-START: генерирует N случайных стартовых точек ──────────────────────
@@ -1122,7 +1122,7 @@ async function runHillClimbing() {
       // ⚠️ ВАЖНО: Сохраняем полный eq в отдельное поле, НЕ перезаписываем x.r.eq!
       // x.r.eq это оригинальный результат HC, он должен остаться без изменений.
       // Используем _fullEq для OOS отрисовки, если график с OOS-расчетом.
-      if (_oosData.eq) x.r._fullEq = _oosData.eq;
+      if (_oosData.eq) x.r._fullEq = Array.from(_oosData.eq);
     }
     // IS-статы: из IS-прогона (70%) если доступны, иначе из HC full-data прогона
     const _is = _oosData?.isStats || null;
@@ -1151,7 +1151,7 @@ async function runHillClimbing() {
       omega:   _isR.omega   != null ? _isR.omega   : _calcOmega(_isR.eq),   // ##OMG
       pain:    _isR.pain    != null ? _isR.pain    : _calcPainRatio(_isR.eq), // ##PAIN
       robScore: x.robScore, robMax: x.robMax, robDetails: x.robDetails,
-      eq: x.r.eq,
+      eq: Array.from(x.r.eq),
       nL: _isR.nL||0, pL: _isR.pL||0, wrL: _isR.wrL,
       nS: _isR.nS||0, pS: _isR.pS||0, wrS: _isR.wrS, dwrLS: _isR.dwrLS,
       _hcScore: x.score, _hcDelta: x.delta
@@ -1500,7 +1500,7 @@ function _hcAddToFav(idx, btn) {
       sortino: r.sortino, kRatio: r.kRatio, sqn: r.sqn,
       omega: r.omega, pain: r.pain, burke: r.burke, serenity: r.serenity, ir: r.ir,
       cpcvScore: r.cpcvScore,
-      eq: r.eq,
+      eq: Array.from(r.eq),
       robScore: x.robScore, robMax: x.robMax, robDetails: x.robDetails
     }});
     btn.textContent = '⭐ В избр.';
