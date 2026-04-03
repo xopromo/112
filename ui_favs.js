@@ -37,8 +37,8 @@ function toggleFav(idx, event, startLevel) {
       sortino:r.sortino, kRatio:r.kRatio, sqn:r.sqn,
       omega:r.omega, pain:r.pain, burke:r.burke, serenity:r.serenity, ir:r.ir,
       cpcvScore:r.cpcvScore,
-      eq:r.eq,
-      old_eq:r.old_eq, new_eq:r.new_eq, // для полного OOS графика в режиме Избранное
+      eq:Array.from(r.eq),
+      old_eq:r.old_eq ? Array.from(r.old_eq) : undefined, new_eq:r.new_eq ? Array.from(r.new_eq) : undefined, // для полного OOS графика в режиме Избранное
       robScore:r.robScore, robMax:r.robMax, robDetails:r.robDetails
     }, cfg:r.cfg, ts:Date.now() };
     favourites.push(favEntry);
