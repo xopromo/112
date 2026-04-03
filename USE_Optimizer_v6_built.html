@@ -24832,62 +24832,6 @@ function _drawOOSGraphicForResult(r) {
   const lastOld = oldEqClean[oldEqClean.length - 1];
   const combined = [...oldEqClean, ...newEqClean.map(v => v + lastOld)];
 
-  // 🔍 ДИАГНОСТИКА: Отследить расхождение eq_old vs eq_new
-  if (typeof window !== 'undefined' && window.__DEBUG_OOS) {
-    console.log('\n╔════════════════════════════════════════════════════════════════════╗');
-    console.log('║ OOS EQUITY DIVERGENCE TRACE                                          ║');
-    console.log('╚════════════════════════════════════════════════════════════════════╝');
-    console.log('Result:', r.name || 'unknown');
-    console.log('');
-
-    console.log('📊 ORIGINAL (r.old_eq, r.new_eq):');
-    console.log('  old_eq[0-10]:', (r.old_eq || []).slice(0, 10).map(v => v.toFixed(1)).join(', '));
-    console.log('  new_eq[0-10]:', (r.new_eq || []).slice(0, 10).map(v => v.toFixed(1)).join(', '));
-    console.log('  old_eq.length:', r.old_eq?.length, '| new_eq.length:', r.new_eq?.length);
-    console.log('');
-
-    console.log('🧹 AFTER CLEANING (oldEqClean, newEqClean):');
-    console.log('  oldEqClean[0-10]:', oldEqClean.slice(0, 10).map(v => v.toFixed(1)).join(', '));
-    console.log('  newEqClean[0-10]:', newEqClean.slice(0, 10).map(v => v.toFixed(1)).join(', '));
-    console.log('  oldEqClean.length:', oldEqClean.length, '| newEqClean.length:', newEqClean.length);
-    console.log('');
-
-    console.log('🔗 CONNECTION (lastOld):');
-    console.log('  lastOld:', lastOld.toFixed(2));
-    console.log('  oldEqClean[-5]:', oldEqClean.slice(-5).map(v => v.toFixed(1)).join(', '));
-    console.log('  newEqClean[-5]:', newEqClean.slice(-5).map(v => v.toFixed(1)).join(', '));
-    console.log('');
-
-    console.log('📈 COMBINED (final):');
-    console.log('  combined[0-10]:', combined.slice(0, 10).map(v => v.toFixed(1)).join(', '));
-    console.log('  combined[-5]:', combined.slice(-5).map(v => v.toFixed(1)).join(', '));
-    console.log('  combined.length:', combined.length);
-    console.log('');
-
-    // Поиск расхождения
-    console.log('🔎 DIVERGENCE ANALYSIS:');
-    const minLen = Math.min(r.old_eq?.length || 0, r.new_eq?.length || 0);
-    let maxRatioDiff = 0;
-    let maxRatioDiffIdx = 0;
-    for (let i = 1; i < Math.min(minLen, 100); i++) {
-      const oldVal = r.old_eq[i] || 0.001;
-      const newVal = r.new_eq[i] || 0.001;
-      const ratio = newVal / oldVal;
-      const ratioDiff = Math.abs(ratio - 1);
-      if (ratioDiff > maxRatioDiff) {
-        maxRatioDiff = ratioDiff;
-        maxRatioDiffIdx = i;
-      }
-    }
-    console.log('  First major divergence at bar:', maxRatioDiffIdx);
-    console.log('  old_eq[' + maxRatioDiffIdx + ']:', r.old_eq?.[maxRatioDiffIdx]?.toFixed(2));
-    console.log('  new_eq[' + maxRatioDiffIdx + ']:', r.new_eq?.[maxRatioDiffIdx]?.toFixed(2));
-    console.log('  Ratio (new/old):', (r.new_eq?.[maxRatioDiffIdx] / (r.old_eq?.[maxRatioDiffIdx] || 1))?.toFixed(3));
-    console.log('');
-    console.log('💡 TIP: Откройте DevTools (F12) чтобы увидеть эту информацию!');
-    console.log('    Установите: window.__DEBUG_OOS = true перед открытием результата');
-  }
-
   // Аналогично для baseline ##EQ_MA_FILTER##
   let combined_baseline = null;
   if (_eqMAFilterShowBaseline && oldBaselineClean && newBaselineClean) {
@@ -33820,7 +33764,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1775258555778;
+window._BUILD_TS = 1775258017315;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
