@@ -7,6 +7,22 @@ let _eqChartParams = null;
 let _eqMAFilterShowBaseline = true;
 let _eqMAFilterBaselineColor = '#00b4d8'; // голубой по умолчанию (вместо красного)
 
+// Загружаем сохранённый цвет из localStorage
+function loadBaselineColorFromStorage() {
+  const saved = localStorage.getItem('eqMAFilterBaselineColor');
+  if (saved) {
+    _eqMAFilterBaselineColor = saved;
+    // Обновляем value в color picker если он существует
+    const picker = document.getElementById('baseline-color-picker');
+    if (picker) picker.value = saved;
+  }
+}
+
+// Сохраняем цвет в localStorage
+function saveBaselineColorToStorage(color) {
+  localStorage.setItem('eqMAFilterBaselineColor', color);
+}
+
 function drawEquityData(eq, label, splitPct, baselineEq=null) {
   if (!eq || !eq.length) return;
   const wrap = document.getElementById('eq-wrap');

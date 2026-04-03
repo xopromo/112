@@ -14595,6 +14595,7 @@ window.onerror = function(msg, src, line, col, err) {
 let dropZone, fileInput;
 document.addEventListener('DOMContentLoaded', () => {
   _loadPrfCutoff(); // restore cutoff fields from localStorage
+  loadBaselineColorFromStorage(); // restore theoretical equity color from localStorage
   _checkMSCConfig(); // apply Market Structure Comparator config if present
 
   dropZone = document.getElementById('drop');
@@ -22893,6 +22894,7 @@ function updateBaselineColor() {
   const picker = $('baseline-color-picker');
   if (!picker) return;
   _eqMAFilterBaselineColor = picker.value;
+  saveBaselineColorToStorage(picker.value);
   if (_selectedIdx >= 0 && _visibleResults[_selectedIdx]) {
     drawEquityForResult(_visibleResults[_selectedIdx]);
   }
@@ -22902,6 +22904,7 @@ function setBaselineColorPreset(value) {
   const picker = $('baseline-color-picker');
   if (picker) picker.value = value;
   _eqMAFilterBaselineColor = value;
+  saveBaselineColorToStorage(value);
   if (_selectedIdx >= 0 && _visibleResults[_selectedIdx]) {
     drawEquityForResult(_visibleResults[_selectedIdx]);
   }
@@ -24439,6 +24442,22 @@ let _eqChartParams = null;
 // Настройки отображения MA Equity Filter
 let _eqMAFilterShowBaseline = true;
 let _eqMAFilterBaselineColor = '#00b4d8'; // голубой по умолчанию (вместо красного)
+
+// Загружаем сохранённый цвет из localStorage
+function loadBaselineColorFromStorage() {
+  const saved = localStorage.getItem('eqMAFilterBaselineColor');
+  if (saved) {
+    _eqMAFilterBaselineColor = saved;
+    // Обновляем value в color picker если он существует
+    const picker = document.getElementById('baseline-color-picker');
+    if (picker) picker.value = saved;
+  }
+}
+
+// Сохраняем цвет в localStorage
+function saveBaselineColorToStorage(color) {
+  localStorage.setItem('eqMAFilterBaselineColor', color);
+}
 
 function drawEquityData(eq, label, splitPct, baselineEq=null) {
   if (!eq || !eq.length) return;
@@ -33668,7 +33687,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1775221784578;
+window._BUILD_TS = 1775222476326;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
