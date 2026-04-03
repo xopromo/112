@@ -55,13 +55,17 @@ node .claude/scripts/regression-detector.js --runs=50 --verbose
 ## Текущий статус проблемы "Graph Movement Change"
 
 ```
-Status: ❌ FAILED
+Status: 🟡 PARTIAL (Root cause found, fixes applied)
 Description: Графики меняют движение после OOS расчета
-Last check: regression-detector found 25 MOVEMENT_CHANGE + 75 DATA_REFERENCE_REUSE
-Attempted fixes: 
-  - HC eq corruption (x.r._fullEq) ← incomplete
-  - Float32Array copying (Array.from) ← incomplete
-Next: Deep dive on where eq actually gets corrupted
+Root cause: _eqCalc хранилась как прямая ссылка на Float32Array без копирования
+Location: opt.js lines 2647 (TPE) и 3365 (Exhaustive)
+
+Исправления:
+  ✅ _eqCalc = Array.from(_shadowEq) в обоих режимах
+  ✅ validate-fix.js подтвердил что Array.from() защищает от corruption
+  🟡 regression-detector.js ещё показывает warnings (может быть из-за synthetic test)
+  
+Next: Проверить на реальных данных проекта и подтвердить что graphs больше не меняют movement
 ```
 
 ## Инструменты
