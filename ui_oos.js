@@ -1348,15 +1348,12 @@ async function runOOSOnNewData() {
           // Baseline НОВАЯ от new данных
           _btCfg.eqCalcBaselineArr = Array.from(_shadowRes.eq);
 
-          // MA берём от old если доступна (для консистентности с IS режимом)
-          // иначе рассчитываем от new baseline
-          if (rOld && rOld.eqCalcMAArr) {
-            _btCfg.eqCalcMAArr = rOld.eqCalcMAArr;
-          } else {
-            const maLen = r.cfg.eqMALen || 20;
-            const maType = r.cfg.eqMAType || 'SMA';
-            _btCfg.eqCalcMAArr = calcMA(Array.from(_shadowRes.eq), maLen, maType);
-          }
+          // MA ВСЕГДА пересчитываем от new baseline (не переиспользуем old)
+          // Если переиспользовать старую MA на новых данных, фильтр может работать неправильно
+          // когда рыночные условия кардинально отличаются между IS и OOS
+          const maLen = r.cfg.eqMALen || 20;
+          const maType = r.cfg.eqMAType || 'SMA';
+          _btCfg.eqCalcMAArr = calcMA(Array.from(_shadowRes.eq), maLen, maType);
         }
       }
 
