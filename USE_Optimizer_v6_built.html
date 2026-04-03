@@ -24579,8 +24579,13 @@ function drawEquity(name) {
 function drawEquityForResult(r) {
   if (!r) return;
 
-  // Если результат из OOS (имеет old_eq и new_eq), рисуем полный OOS график
-  if (r.old_eq && r.old_eq.length && r.new_eq && r.new_eq.length) {
+  // ##EQ_MA_FILTER## Если результат из OOS (имеет old_eq и new_eq), рисуем полный OOS график
+  // CRITICAL: Проверяем ЯВНЫЙ признак OOS результата, не просто наличие полей!
+  // (Обычные результаты могут случайно получить эти поля через Object.assign копирование)
+  const isExplicitOOSResult = r._isOOSResult === true;
+  const hasOOSData = r.old_eq && r.old_eq.length && r.new_eq && r.new_eq.length;
+
+  if (hasOOSData && isExplicitOOSResult) {
     _drawOOSGraphicForResult(r);
     return;
   }
@@ -29812,6 +29817,7 @@ async function runOOSOnNewData() {
     }
 
     _oosTableResults.push({
+      _isOOSResult: true,  // ##EQ_MA_FILTER## КРИТИЧНЫЙ флаг для drawEquityForResult!
       name:      r.name,
       cfg:       r.cfg,  // ВАЖНО: это создает НОВЫЙ объект, не ссылку на r
       // Поля для стандартного рендера (pnl = old_pnl для детали/избранного)
@@ -33644,7 +33650,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1775215275825;
+window._BUILD_TS = 1775215717401;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
