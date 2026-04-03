@@ -225,10 +225,14 @@ function _drawOOSGraphicForResult(r) {
   }
 
   // Пропускаем пересекающиеся бары из eq_new
+  // ВАЖНО: warmup должен быть применен ДО пересечения, не ПОСЛЕ
+  // иначе данные смещаются дважды и синхронизируются неправильно
   let newEqClean = eq_new.slice(overlapIdx);
   let newBaselineClean = baseline_new ? baseline_new.slice(overlapIdx) : null; // ##EQ_MA_FILTER##
 
   // Рассчитаем прогрев для новых данных (игнорируем первые N баров)
+  // КРИТИЧНО: warmupEndIdx применяется на eq_new ПЕРЕД пересечением
+  // чтобы правильно выровнять с eq_old
   if (newEqClean && newEqClean.length > 0) {
     const cfg = r.cfg || {};
     // Минимальный прогрев: макс из MA, pivot, ATR периодов
@@ -239,16 +243,18 @@ function _drawOOSGraphicForResult(r) {
     const eqMAWarmup = cfg.useEqMA ? (cfg.eqMALen || 20) : 0;
     const warmup = Math.max(maWarmup, pivotWarmup, atrWarmup, eqMAWarmup, 1);
 
-    // Пропускаем первые warmup баров из equity кривой (убираем прогрев)
-    const warmupEndIdx = Math.min(warmup, newEqClean.length - 1);
-    if (warmupEndIdx > 0 && warmupEndIdx < newEqClean.length) {
-      // Берём значение при окончании прогрева и смещаем
-      const warmupValue = newEqClean[warmupEndIdx];
-      newEqClean = newEqClean.slice(warmupEndIdx).map(v => v - warmupValue);
+    // Смещаем новые данные на warmup ТОЛЬКО если он меньше длины
+    // Это убирает "прогрев" индикаторов из видимой части графика
+    // но при этом newEqClean остается выровнен с eq_old по времени
+    if (warmup < newEqClean.length) {
+      const warmupValue = newEqClean[warmup];
+      // Вычитаем warmupValue из ВСЕХ новых данных (включая перед warmup)
+      // чтобы убрать прогрев БЕЗ смещения индексов
+      newEqClean = newEqClean.map(v => v - warmupValue);
       // Аналогично для baseline ##EQ_MA_FILTER##
-      if (newBaselineClean && newBaselineClean.length > warmupEndIdx) {
-        const warmupValueBL = newBaselineClean[warmupEndIdx];
-        newBaselineClean = newBaselineClean.slice(warmupEndIdx).map(v => v - warmupValueBL);
+      if (newBaselineClean && newBaselineClean.length > warmup) {
+        const warmupValueBL = newBaselineClean[warmup];
+        newBaselineClean = newBaselineClean.map(v => v - warmupValueBL);
       }
     }
   }
