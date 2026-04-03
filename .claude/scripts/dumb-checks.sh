@@ -271,6 +271,51 @@ else
 fi
 
 # ======================================================================
+# 🔴 Критично 14: Pattern-First Workflow Verification
+# БЛОКИРУЕТ пуш если код изменён но Pattern-First процесс не завершён
+# ======================================================================
+echo "  Проверка Pattern-First Workflow..."
+
+# Проверяем какие файлы изменены в этом коммите
+CHANGED_CODE_FILES=$(git diff --name-only HEAD~1 2>/dev/null | \
+  grep -E "opt.js|core.js|ui_.*\.js|filter_registry\.js" | wc -l)
+
+if [ "$CHANGED_CODE_FILES" -gt 0 ]; then
+  # Код был изменён - нужна ОДНА из этих проверок в commit message:
+  LAST_MSG=$(git log -1 --pretty=%B 2>/dev/null || echo "")
+
+  # Проверяем что этап выполнен:
+  # - regression-detector (означает что запустили проверку)
+  # - VERIFIED (означает что регрессия прошла)
+  # - PARTIAL (означает ожидание регрессии, но это документировано)
+  # - verification pending (явно说明 что ждём регрессии)
+  # - no regression needed (для очень малых changes)
+
+  HAS_VERIFICATION=$(echo "$LAST_MSG" | grep -iE \
+    "regression-detector|VERIFIED|PARTIAL|verification pending|no regression needed" \
+    || true)
+
+  if [ -z "$HAS_VERIFICATION" ]; then
+    echo "  ❌ ОШИБКА WORKFLOW: Код изменён БЕЗ Pattern-First проверки!"
+    echo ""
+    echo "     Обязательно ДО пуша:"
+    echo "     1. Запустить: node .claude/scripts/regression-detector.js --runs=50"
+    echo "     2. Добавить в commit message ОДНО ИЗ:"
+    echo "        - 'regression-detector VERIFIED' (если 0 issues)"
+    echo "        - 'PARTIAL' (если ожидание итогов)"
+    echo "        - 'verification pending' (если не запускал ещё)"
+    echo "        - 'no regression needed' (только для очень малых changes)"
+    echo ""
+    echo "     Затем git commit --amend и попробовать пуш снова"
+    ERRORS=$((ERRORS + 1))
+  else
+    echo "  ✓ Pattern-First проверка присутствует в commit message"
+  fi
+else
+  echo "  ✓ Код не изменён - проверка регрессии не требуется"
+fi
+
+# ======================================================================
 # Результаты
 # ======================================================================
 echo ""
