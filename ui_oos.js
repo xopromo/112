@@ -1446,10 +1446,11 @@ async function runOOSOnNewData() {
         return Array.from(rOld.eq.slice(0, Math.min(isEndIdx + 1, rOld.eq.length)));
       })(),
       new_eq:    (() => {
-        // КРИТИЧНО: Отрезаем пересечение ЗДЕСЬ, чтобы warmup был синхронизирован с eq_old
+        // КРИТИЧНО: Сохраняем ПОЛНЫЙ eq (без обрезки по overlapIdx)
+        // Обрезка будет в _drawOOSGraphicForResult по warmup + overlapIdx одновременно
+        // чтобы гарантировать warmup синхронизация между eq_old и eq_new
         if (!rNew || !rNew.eq || !rNew.eq.length) return null;
-        // Сохраняем только часть ПОСЛЕ пересечения (от _overlapIdx)
-        return Array.from(rNew.eq.slice(Math.min(_overlapIdx, rNew.eq.length)));
+        return Array.from(rNew.eq);  // ПОЛНЫЙ eq
       })(),
       // OOS-специфичные поля — история (только IS часть 70%)
       old_pnl:    rOld_IS ? rOld_IS.pnl : null,
