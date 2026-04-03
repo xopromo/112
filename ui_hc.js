@@ -392,7 +392,10 @@ function _hcBuildOOS(cfg) {
   // Делим equity-кривую по splitIdx (аналогично _attachOOS в opt.js)
   const eq = rFull.eq;
   const N_eq = eq.length;
-  const splitIdx = Math.min(isN - 1, N_eq - 2);
+  // КРИТИЧНО: isN это индекс в DATA, но eq может быть короче из-за warmup!
+  // Пересчитываем splitIdx как пропорцию от длины equity кривой, не data
+  // splitIdx должен быть 70% от N_eq, аналогично тому как isN это 70% от N
+  const splitIdx = Math.min(Math.round(0.70 * N_eq), N_eq - 2);
   const isGain  = eq[splitIdx];
   const oosGain = eq[N_eq - 1] - isGain;
   const isRate  = splitIdx > 0 ? isGain / (splitIdx + 1) : 0;
