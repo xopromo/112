@@ -925,7 +925,8 @@ function drawOOSChart(idx, rowEl) {
     const maWarmup = cfg.useMA ? (cfg.maP || 20) : 0;
     const pivotWarmup = cfg.usePivot ? ((cfg.pvL || 5) + (cfg.pvR || 2) + 5) : 0;
     const atrWarmup = cfg.useATR ? (cfg.atrPeriod || 14) * 3 : 0;
-    const warmup = Math.max(maWarmup, pivotWarmup, atrWarmup, 1);
+    const eqMAWarmup = cfg.useEqMA ? (cfg.eqMALen || 20) : 0;
+    const warmup = Math.max(maWarmup, pivotWarmup, atrWarmup, eqMAWarmup, 1);
 
     // Пропускаем первые warmup баров из equity кривой (убираем прогрев)
     const warmupEndIdx = Math.min(warmup, newEqClean.length - 1);
@@ -1014,7 +1015,8 @@ function drawOOSChart(idx, rowEl) {
       const maWarmup = cfg.useMA ? (cfg.maP || 20) : 0;
       const pivotWarmup = cfg.usePivot ? ((cfg.pvL || 5) + (cfg.pvR || 2) + 5) : 0;
       const atrWarmup = cfg.useATR ? (cfg.atrPeriod || 14) * 3 : 0;
-      const warmup = Math.max(maWarmup, pivotWarmup, atrWarmup, 1);
+      const eqMAWarmup = cfg.useEqMA ? (cfg.eqMALen || 20) : 0;
+      const warmup = Math.max(maWarmup, pivotWarmup, atrWarmup, eqMAWarmup, 1);
       const warmupEndIdx = Math.min(warmup, newBaselineClean.length - 1);
       if (warmupEndIdx > 0 && warmupEndIdx < newBaselineClean.length) {
         const warmupValue = newBaselineClean[warmupEndIdx];
@@ -1332,6 +1334,28 @@ async function runOOSOnNewData() {
       }
     } catch(e) { }
 
+    // ##EQ_MA_FILTER## Рассчитаем метрики ТОЛЬКО для IS части (70%) от старых данных
+    // Это нужно чтобы соответствовать old_eq которая это 70% от полной кривой
+    let rOld_IS = null;
+    if (rOld && rOld.eq && origDATA && origDATA.length > 0) {
+      const _isN = Math.round(origDATA.length * 0.70);
+      const _isEq = rOld.eq.slice(0, _isN);
+
+      // Старые трейды - только те что заканчиваются до 70%
+      const _isTrades = (rOld.tradePnl || []).filter(t => t.exitBar != null && t.exitBar < _isN);
+
+      rOld_IS = {
+        pnl: _isEq.length > 0 ? _isEq[_isEq.length - 1] : 0,
+        wr: _isTrades.length > 0 ? _isTrades.filter(t => t.pnl > 0).length / _isTrades.length * 100 : null,
+        n: _isTrades.length,
+        dd: _calcDDFromEq(_isEq),
+        eq: _isEq
+      };
+      if (rOld_IS.dd > 0) {
+        rOld_IS.pdd = rOld_IS.pnl / rOld_IS.dd;
+      }
+    }
+
     // Для new результата: прямой запуск с tradeLog на полном NEW_DATA.
     // Полный датасет нужен для прогрева индикаторов (MA, ATR, Pivot).
     // Чистые метрики без пересечения вычисляются ниже через _overlapIdx.
@@ -1399,22 +1423,23 @@ async function runOOSOnNewData() {
       name:      r.name,
       cfg:       r.cfg,
       // Поля для стандартного рендера (pnl = old_pnl для детали/избранного)
-      pnl:       rOld ? rOld.pnl : null,
-      wr:        rOld ? rOld.wr  : null,
-      n:         rOld ? rOld.n   : null,
-      dd:        rOld ? rOld.dd  : null,
-      pdd:       rOld && rOld.dd > 0 ? rOld.pnl / rOld.dd : null,
-      avg:       rOld ? rOld.avg : null,
+      // ##EQ_MA_FILTER## Используем IS метрики (rOld_IS) чтобы соответствовать old_eq (70%)
+      pnl:       rOld_IS ? rOld_IS.pnl : (rOld ? rOld.pnl : null),
+      wr:        rOld_IS ? rOld_IS.wr  : (rOld ? rOld.wr  : null),
+      n:         rOld_IS ? rOld_IS.n   : (rOld ? rOld.n   : null),
+      dd:        rOld_IS ? rOld_IS.dd  : (rOld ? rOld.dd  : null),
+      pdd:       rOld_IS ? rOld_IS.pdd : (rOld && rOld.dd > 0 ? rOld.pnl / rOld.dd : null),
+      avg:       rOld && rOld_IS ? rOld_IS.pnl / Math.max(rOld_IS.n, 1) : (rOld ? rOld.avg : null),
       dwr:       rOld ? rOld.dwr : null,
       p1:        rOld ? rOld.p1  : 0,
       p2:        rOld ? rOld.p2  : 0,
-      // OOS-специфичные поля — история
-      old_pnl:    rOld ? rOld.pnl : null,
-      old_wr:     rOld ? rOld.wr  : null,
-      old_n:      rOld ? rOld.n   : null,
-      old_dd:     rOld ? rOld.dd  : null,
-      old_pdd:    rOld && rOld.dd > 0 ? rOld.pnl / rOld.dd : null,
-      old_kRatio: rOld && rOld.eq ? _calcKRatio(rOld.eq) : null,
+      // OOS-специфичные поля — история (только IS часть 70%)
+      old_pnl:    rOld_IS ? rOld_IS.pnl : null,
+      old_wr:     rOld_IS ? rOld_IS.wr  : null,
+      old_n:      rOld_IS ? rOld_IS.n   : null,
+      old_dd:     rOld_IS ? rOld_IS.dd  : null,
+      old_pdd:    rOld_IS ? rOld_IS.pdd : null,
+      old_kRatio: rOld_IS && rOld_IS.eq ? _calcKRatio(rOld_IS.eq) : null,
       // OOS-специфичные поля — новый период (чистые, без пересечения)
       new_pnl,
       new_wr,
@@ -1422,20 +1447,20 @@ async function runOOSOnNewData() {
       new_dd,
       new_pdd,
       new_kRatio,
-      // Дельты из чистых значений
-      delta_pnl:    (rOld && new_pnl != null) ? new_pnl    - rOld.pnl : null,
-      delta_wr:     (rOld && new_wr  != null) ? new_wr     - rOld.wr  : null,
-      delta_dd:     (rOld && new_dd  != null) ? new_dd     - rOld.dd  : null,
-      delta_pdd:    (rOld && rOld.dd > 0 && new_pdd != null) ? new_pdd - (rOld.pnl / rOld.dd) : null,
-      delta_kRatio: (rOld && rOld.eq && new_kRatio != null) ? new_kRatio - (_calcKRatio(rOld.eq) ?? 0) : null,
-      old_bars:  DATA ? DATA.length : null,
+      // Дельты из чистых значений (используем IS метрики)
+      delta_pnl:    (rOld_IS && new_pnl != null) ? new_pnl    - rOld_IS.pnl : null,
+      delta_wr:     (rOld_IS && new_wr  != null) ? new_wr     - rOld_IS.wr  : null,
+      delta_dd:     (rOld_IS && new_dd  != null) ? new_dd     - rOld_IS.dd  : null,
+      delta_pdd:    (rOld_IS && rOld_IS.dd > 0 && new_pdd != null) ? new_pdd - (rOld_IS.pnl / rOld_IS.dd) : null,
+      delta_kRatio: (rOld_IS && rOld_IS.eq && new_kRatio != null) ? new_kRatio - (_calcKRatio(rOld_IS.eq) ?? 0) : null,
+      old_bars:  DATA ? Math.round(DATA.length * 0.70) : null,    // IS часть (70%)
       new_bars:  NEW_DATA ? NEW_DATA.length : null,
       _overlapBars: _overlapIdx,               // для отладки: сколько баров пересечения
       rate: (() => {
-        const _ob = DATA ? DATA.length : 0;
+        const _ob = DATA ? Math.round(DATA.length * 0.70) : 0;    // IS часть (70%)
         const _nb = NEW_DATA ? (NEW_DATA.length - _overlapIdx) : 0;
-        if (_ob > 0 && _nb > 0 && rOld && rOld.pnl > 0 && new_pnl != null) {
-          return (new_pnl / _nb) / (rOld.pnl / _ob) * 100;
+        if (_ob > 0 && _nb > 0 && rOld_IS && rOld_IS.pnl > 0 && new_pnl != null) {
+          return (new_pnl / _nb) / (rOld_IS.pnl / _ob) * 100;
         }
         return null;
       })(),
@@ -1460,6 +1485,9 @@ async function runOOSOnNewData() {
 
   if (progressEl) progressEl.textContent = `✅ ${_oosTableResults.length} стратегий`;
   if (btnEl) btnEl.disabled = false;
+
+  // ##EQ_MA_FILTER## Заполняем _oosCompareData результатами для модального окна сравнения
+  _oosCompareData = _oosTableResults;
 
   _updateTableModeCounts();
   switchTableMode('oos');
