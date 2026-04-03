@@ -325,12 +325,10 @@ function _hcRunBacktest(cfg) {
 
     const _hcRes = backtest(ind.pvLo, ind.pvHi, ind.atrArr, btCfg);
 
-    // ##EQ_MA_FILTER## Fallback: если baseline не был установлен, используем filtered equity
-    if (cfg.useEqMA && _hcRes && (!btCfg.eqCalcBaselineArr || !btCfg.eqCalcMAArr)) {
-      if (!btCfg.eqCalcBaselineArr) btCfg.eqCalcBaselineArr = _hcRes.eq || [];
-      if (!btCfg.eqCalcMAArr) btCfg.eqCalcMAArr = _hcRes.eq ? calcMA(Array.from(_hcRes.eq), cfg.eqMALen || 20, cfg.eqMAType || 'SMA') : [];
-      _hcRes.eqCalcBaselineArr = btCfg.eqCalcBaselineArr;
-      _hcRes.eqCalcMAArr = btCfg.eqCalcMAArr;
+    // ##EQ_MA_FILTER## Сохраняем baseline в результат если он был рассчитан
+    if (cfg.useEqMA && _hcRes) {
+      if (btCfg.eqCalcBaselineArr) _hcRes.eqCalcBaselineArr = btCfg.eqCalcBaselineArr;
+      if (btCfg.eqCalcMAArr) _hcRes.eqCalcMAArr = btCfg.eqCalcMAArr;
     }
 
     _robSliceCacheSet(_hcsk, _hcRes);
@@ -372,12 +370,10 @@ function _hcBuildOOS(cfg) {
 
       const r = backtest(ind.pvLo, ind.pvHi, ind.atrArr, btCfg);
 
-      // ##EQ_MA_FILTER## Fallback: если baseline не был установлен, используем filtered equity
-      if (cfg.useEqMA && r && (!btCfg.eqCalcBaselineArr || !btCfg.eqCalcMAArr)) {
-        if (!btCfg.eqCalcBaselineArr) btCfg.eqCalcBaselineArr = r.eq || [];
-        if (!btCfg.eqCalcMAArr) btCfg.eqCalcMAArr = r.eq ? calcMA(Array.from(r.eq), cfg.eqMALen || 20, cfg.eqMAType || 'SMA') : [];
-        r.eqCalcBaselineArr = btCfg.eqCalcBaselineArr;
-        r.eqCalcMAArr = btCfg.eqCalcMAArr;
+      // ##EQ_MA_FILTER## Сохраняем baseline в результат если он был рассчитан
+      if (cfg.useEqMA && r) {
+        if (btCfg.eqCalcBaselineArr) r.eqCalcBaselineArr = btCfg.eqCalcBaselineArr;
+        if (btCfg.eqCalcMAArr) r.eqCalcMAArr = btCfg.eqCalcMAArr;
       }
 
       return r;
