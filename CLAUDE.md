@@ -74,7 +74,7 @@ node .claude/scripts/regression-detector.js --runs=20 --verbose
 | Все фильтры WITH warmup проверка (indicator <= 0) | filter_registry.js | JS ≠ TV |
 | Новый фильтр в 4 местах (ui, opt, filter_registry, buildBtCfg) | Сеч. 🚫 | Баг |
 | **Float32Array ВСЕГДА копировать** | opt.js, ui_oos.js, ui_hc.js | Corruption |
-| **FULL SEARCH перед фиксом паттерна** | .claude/rules/investigation-methodology.md | Incomplete fix |
+| **FULL SEARCH перед фиксом паттерна** | dumb-checks.sh (критично 8) | Pre-push блокирует |
 | Запрещены: console.log, hardcoded цвета, вложенные ternary | .claude/rules/ | Pre-push блокирует |
 
 ---
@@ -84,6 +84,7 @@ node .claude/scripts/regression-detector.js --runs=20 --verbose
 - **`.claude/memory/architecture-decisions.md`** — какие решения приняты и почему
 - **`.claude/memory/integration-contracts.md`** — контракты между модулями (backtest, cfg, result)
 - **`.claude/memory/eq-reference-bug-analysis.md`** — анализ Float32Array corruption bug + fix
+- **`.claude/memory/investigation-methodology.md`** — FULL SEARCH правило (сохранено как напоминание)
 - **`.claude/memory/tasks-completed.md`** — архив решённых задач
 - **`.claude/rules/forbidden-patterns.md`** — запрещённые паттерны (dumb-checks.sh их блокирует)
 - **`.claude/rules/regression-testing-policy.md`** — VERIFICATION-FIRST: только правила с 0 issues
