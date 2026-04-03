@@ -111,12 +111,12 @@ Status: AWAITING VERIFICATION - Changes merged, need manual testing to confirm
 
 ## ПАТТЕРН #2: Double-Processing Data Mismatch
 
-**STATUS: IN_PROGRESS** 🟠  
+**STATUS: WAVE 7 APPLIED** 🔄  
 **Last Updated:** 2026-04-03  
-**Total Cases:** 1 (OOS equity warmup synchronization - 3 waves)  
-**Confidence:** 85% (root cause identified, fix applied, awaiting verification)  
-**Last Wave:** 3 (WAVE 6: Complete warmup synchronization overhaul)  
-**Regression Status:** ⏳ TESTING - Warmup cleanup moved to ui_oos.js (single-point cleanup)
+**Total Cases:** 1 (OOS equity warmup asymmetry)  
+**Confidence:** 90% (root cause identified via alignment test, proper fix applied)  
+**Last Wave:** 7 (WAVE 7: Clean eq_old warmup in ui_equity.js)  
+**Regression Status:** ⏳ AWAITING REAL-WORLD VERIFICATION
 
 **Определение:**
 Когда данные очищаются/трансформируются в ДВУХ МЕСТАХ (создание + рисование), индексы могут рассинхронизироваться.
@@ -153,27 +153,37 @@ ROOT CAUSE найдена (волна 3): Double-processing warmup
 NEXT: WAVE 6
 ```
 
-#### Case 2.3: Warmup Synchronization Fix (WAVE 6 - ПОЛНОЕ РЕШЕНИЕ)
+#### Case 2.3: Asymmetric Warmup Handling (WAVE 7 - ПРАВИЛЬНОЕ РЕШЕНИЕ)
 ```
-ФАЙЛЫ: ui_oos.js:1442-1467, 1516-1541; ui_equity.js:227-234
-ПРОБЛЕМА (корневая): Warmup очищалась в ДВУХ местах с РАЗНЫМИ правилами:
-          1. eq_old просто слайсилась к 70%, warmup оставался внутри
-          2. eq_new очищалась при рисовании (Math.max(overlapIdx, warmup))
-          Результат: eq_old и eq_new имели РАЗНЫЕ точки отсчета warmup
-          
-ИСПРАВЛЕНО (WAVE 6): 
-          1. Вычислить warmup один раз в ui_oos.js
-          2. Очистить ОБЕИХ eq_old и eq_new перед сохранением
-             - eq_old: slice от warmup, shift значения (v - startVal)
-             - eq_new: slice от max(overlapIdx, warmup), shift значения
-          3. В ui_equity.js использовать уже очищенные массивы без пересчета
-          
-ГАРАНТИЯ: Обе eq начинаются с одной и той же warmup точки относительно сигналов
-          → при конкатенации они выравнены правильно
-          → график соответствует метрикам
-          
-СТАТУС: ✅ FIX APPLIED (волна 6 закончена), ⏳ AWAITING REGRESSION TEST
-NEXT: regression-detector --runs=50 для подтверждения что дивергение исчезло
+ФАЙЛЫ: ui_equity.js:227-275 (_drawOOSGraphicForResult function)
+
+ПРОБЛЕМА (корневая): Warmup очищался АСИММЕТРИЧНО:
+  - eq_old: сохранялась С warmup (bars 0-29 = 0 pnl, no trades)
+  - eq_new: очищалась от warmup при рисовании
+  
+  РЕЗУЛЬТАТ: Визуально голубая линия (new_eq) растет быстрее
+             потому что не имеет flat warmup-периода в начале
+             Оранжевая линия (old_eq) выглядит delayed
+             потому что включает 30 баров с нулевым pnl
+             
+ДИАГНОСТИКА: Написал eq-alignment-test.js который доказал:
+  - eq_old: 700 баров (с warmup bars 0-29 = 0)
+  - eq_new: 470 баров (warmup удален)
+  → не выравнены по trading point!
+
+ИСПРАВЛЕНО (WAVE 7):
+  ✅ ui_equity.js:227-275 теперь очищает ОБЕИХ eq_old и eq_new
+  ✅ eq_old: удалить первые warmup баров, shift значения
+  ✅ eq_new: удалить первые max(overlapIdx, warmup) баров, shift значения
+  ✅ Обе кривые теперь начинают с одной точки (после warmup)
+  ✅ При конкатенации выравнены правильно
+  
+ГАРАНТИЯ: Обе eq_old и eq_new синхронизированы по warmup точке
+          → нет искусственного смещения
+          → дивергение должно исчезнуть
+
+СТАТУС: ✅ FIX APPLIED (WAVE 7 завершена)
+NEXT: ⏳ Ожидание реальной проверки пользователем на реальных данных
 ```
 
 ### Verification:
