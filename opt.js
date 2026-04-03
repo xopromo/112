@@ -2242,8 +2242,11 @@ async function runOpt() {
       finally { if (_useOOS) DATA = _fullDATA; }
       // ##EQ_MA_FILTER## Гарантируем что eqCalcBaselineArr и eqCalcMAArr установлены если фильтр включен
       if (_effUseEqMA && (!btCfg.eqCalcBaselineArr || !btCfg.eqCalcMAArr)) {
+        // Fallback: используем filtered equity как базовую (не идеально, но лучше чем ничего)
+        // В норме baseline должен быть рассчитан в первом проходе выше
         if (!btCfg.eqCalcBaselineArr) btCfg.eqCalcBaselineArr = r?.eq || [];
-        if (!btCfg.eqCalcMAArr) btCfg.eqCalcMAArr = r?.eq ? calcMA(Array.from(r.eq), eqMALen || 20, eqMAType || 'SMA') : [];
+        // ВАЖНО: MA рассчитываем от baseline, а не от filtered equity!
+        if (!btCfg.eqCalcMAArr) btCfg.eqCalcMAArr = btCfg.eqCalcBaselineArr?.length ? calcMA(Array.from(btCfg.eqCalcBaselineArr), eqMALen || 20, eqMAType || 'SMA') : [];
       }
       done++;
       if (r && r.n >= minTrades && r.dd <= maxDD) {
@@ -2660,7 +2663,8 @@ async function runOpt() {
       // ##EQ_MA_FILTER## Гарантируем что eqCalcBaselineArr и eqCalcMAArr установлены если фильтр включен
       if (_effUseEqMA && r && (!btCfg.eqCalcBaselineArr || !btCfg.eqCalcMAArr)) {
         if (!btCfg.eqCalcBaselineArr) btCfg.eqCalcBaselineArr = r.eq || [];
-        if (!btCfg.eqCalcMAArr) btCfg.eqCalcMAArr = r.eq ? calcMA(Array.from(r.eq), eqMALen || 20, eqMAType || 'SMA') : [];
+        // ВАЖНО: MA рассчитываем от baseline, а не от filtered equity!
+        if (!btCfg.eqCalcMAArr) btCfg.eqCalcMAArr = btCfg.eqCalcBaselineArr?.length ? calcMA(Array.from(btCfg.eqCalcBaselineArr), eqMALen || 20, eqMAType || 'SMA') : [];
       }
       done++;
       // Мягкий score: градация для всех результатов, не только прошедших фильтр
@@ -3382,7 +3386,8 @@ async function runOpt() {
                                     // ##EQ_MA_FILTER## Гарантируем что eqCalcBaselineArr и eqCalcMAArr установлены если фильтр включен
                                     if (_effUseEqMA && r && (!btCfg.eqCalcBaselineArr || !btCfg.eqCalcMAArr)) {
                                       if (!btCfg.eqCalcBaselineArr) btCfg.eqCalcBaselineArr = r.eq || [];
-                                      if (!btCfg.eqCalcMAArr) btCfg.eqCalcMAArr = r.eq ? calcMA(Array.from(r.eq), eqMALen || 20, eqMAType || 'SMA') : [];
+                                      // ВАЖНО: MA рассчитываем от baseline, а не от filtered equity!
+                                      if (!btCfg.eqCalcMAArr) btCfg.eqCalcMAArr = btCfg.eqCalcBaselineArr?.length ? calcMA(Array.from(btCfg.eqCalcBaselineArr), eqMALen || 20, eqMAType || 'SMA') : [];
                                     }
                                     done++;
 
