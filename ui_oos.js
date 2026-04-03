@@ -1437,13 +1437,20 @@ async function runOOSOnNewData() {
       p2:        rOld ? rOld.p2  : 0,
       // КРИТИЧНО: OOS результаты должны ВСЕГДА иметь old_eq и new_eq чтобы отличаться от обычных результатов
       // Это гарантирует что drawEquityForResult покажет правильный график для каждого режима
+      // ВАЖНО: new_eq уже должна быть ОЧИЩЕНА (без пересечения) чтобы синхронизировать warmup
+      // иначе when мы обрезаем overlapIdx в _drawOOSGraphicForResult, мы нарушаем warmup синхронизацию
       old_eq:    (() => {
         if (!rOld || !rOld.eq || !rOld.eq.length) return null;
         const isEndIdx = Math.round(0.70 * rOld.eq.length) || 0;
         // Копируем для безопасности - если rOld.eq переиспользуется, old_eq не пострадает
         return Array.from(rOld.eq.slice(0, Math.min(isEndIdx + 1, rOld.eq.length)));
       })(),
-      new_eq:    rNew ? Array.from(rNew.eq) : null,  // Копируем массив, не ссылку
+      new_eq:    (() => {
+        // КРИТИЧНО: Отрезаем пересечение ЗДЕСЬ, чтобы warmup был синхронизирован с eq_old
+        if (!rNew || !rNew.eq || !rNew.eq.length) return null;
+        // Сохраняем только часть ПОСЛЕ пересечения (от _overlapIdx)
+        return Array.from(rNew.eq.slice(Math.min(_overlapIdx, rNew.eq.length)));
+      })(),
       // OOS-специфичные поля — история (только IS часть 70%)
       old_pnl:    rOld_IS ? rOld_IS.pnl : null,
       old_wr:     rOld_IS ? rOld_IS.wr  : null,

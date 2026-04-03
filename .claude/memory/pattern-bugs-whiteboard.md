@@ -99,7 +99,44 @@ Next: User testing → if graph stable → STATUS: CLOSED
 
 ---
 
-## ПАТТЕРН #2: (Будущие паттерны по мере их обнаружения)
+## ПАТТЕРН #2: Double-Processing Data Mismatch
+
+**STATUS: PARTIAL** 🟡  
+**Last Updated:** 2026-04-03  
+**Total Cases:** 1 (OOS equity warmup)  
+**Confidence:** 90% (новый паттерн, требует регрессион-тестирования)  
+**Last Wave:** 1  
+**Regression Status:** ⏳ Ожидаем regression-detector (PARTIAL до тестирования)
+
+**Определение:**
+Когда данные очищаются/трансформируются в ДВУХ МЕСТАХ (создание + рисование), индексы могут рассинхронизироваться.
+Особенно опасно если первая трансформация не явно документирована.
+
+**Правило:** Single-Source-Of-Truth для трансформации  
+**Уровень:** CRITICAL  
+**Статус:** 🟡 PARTIAL (исправления сделаны, ждём регрессии)
+
+### Cases этого паттерна:
+
+#### Case 2.1: OOS Equity Warmup Sync (новый)
+```
+ФАЙЛЫ: ui_oos.js:1446, ui_equity.js:230
+ПРОБЛЕМА: new_eq сохранялась ПОЛНОЙ (включая пересечение)
+          Потом обрезалась в _drawOOSGraphicForResult на overlapIdx + warmupEndIdx
+          = двойная обработка → warmup рассинхронизирован → ДИВЕРГЕНЦИЯ
+ИСПРАВЛЕНО: new_eq теперь сохраняется уже ОЧИЩЕННОЙ (от _overlapIdx)
+          _drawOOSGraphicForResult больше не обрезает
+СТАТУС: ✅ исправлено волна 1 (ждём регрессии)
+```
+
+### Verification:
+```
+Code audit: ✅ PASSED (no double-processing found in eq fields)
+Regression-detector: ⏳ PENDING
+Expected result: OOS graphs properly aligned, no divergence over time
+```
+
+## ПАТТЕРН #3: (Будущие паттерны по мере их обнаружения)
 
 ```
 НАЗВАНИЕ:
