@@ -1308,8 +1308,9 @@ async function runOOSOnNewData() {
       DATA = origDATA;
       rOld = _hcRunBacktest(r.cfg);
 
-      // ##EQ_MA_FILTER## Добавляем двухпроходный цикл для rOld (старых данных)
-      if (rOld && r.cfg.useEqMA) {
+      // ##EQ_MA_FILTER## ВСЕГДА пересчитываем baseline для rOld если фильтр включен
+      // Даже если rOld из кеша, он может не иметь baseline, что вызывает асимметрию
+      if (rOld && r.cfg.useEqMA && (!rOld.eqCalcBaselineArr || !rOld.eqCalcMAArr)) {
         const _ind_old = _calcIndicators(r.cfg);
         const _btCfg_old = buildBtCfg(r.cfg, _ind_old);
 
