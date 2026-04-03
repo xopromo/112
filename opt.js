@@ -1086,7 +1086,9 @@ async function runOpt() {
     }
     const eq       = rFull.eq;
     const N_eq     = eq.length;
-    const splitIdx = Math.min(_isN - 1, N_eq - 2);
+    // ##EQ_MA_FILTER## КРИТИЧНО: _isN это индекс в DATA, но eq может быть короче из-за warmup!
+    // Пересчитываем splitIdx как 70% от длины equity кривой
+    const splitIdx = Math.min(Math.round(0.70 * N_eq), N_eq - 2);
     const isGain   = eq[splitIdx];                       // IS PnL (0..splitIdx bars)
     const oosGain  = eq[N_eq - 1] - isGain;             // OOS PnL (splitIdx..end bars)
     const isRate   = splitIdx > 0 ? isGain / (splitIdx + 1) : 0;  // PnL per bar (IS)
