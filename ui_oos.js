@@ -1437,49 +1437,20 @@ async function runOOSOnNewData() {
       p2:        rOld ? rOld.p2  : 0,
       // КРИТИЧНО: OOS результаты должны ВСЕГДА иметь old_eq и new_eq чтобы отличаться от обычных результатов
       // Это гарантирует что drawEquityForResult покажет правильный график для каждого режима
-      // WAVE 6 (WARMUP SYNC FIX): Очищаем ОБЕИХ eq_old и eq_new в ui_oos.js ДО сохранения
-      // чтобы гарантировать что они синхронизированы по warmup точке (не во время рисования)
-      // Проблема: warmup рассчитывалась во время рисования → eq_old и eq_new очищались по разным правилам
-      // Решение: calculate warmup здесь, очистить обе, pass cleanIdx в result чтобы ui_equity.js не пересчитывал
+      // ВАЖНО: new_eq уже должна быть ОЧИЩЕНА (без пересечения) чтобы синхронизировать warmup
+      // иначе when мы обрезаем overlapIdx в _drawOOSGraphicForResult, мы нарушаем warmup синхронизацию
       old_eq:    (() => {
         if (!rOld || !rOld.eq || !rOld.eq.length) return null;
         const isEndIdx = Math.round(0.70 * rOld.eq.length) || 0;
-        const fullEq = Array.from(rOld.eq.slice(0, Math.min(isEndIdx + 1, rOld.eq.length)));
-
-        // WAVE 6: Вычисляем warmup ОДИН РАЗ для обеих
-        const cfg = r.cfg || {};
-        const maWarmup = cfg.useMA ? (cfg.maP || 20) : 0;
-        const pivotWarmup = cfg.usePivot ? ((cfg.pvL || 5) + (cfg.pvR || 2) + 5) : 0;
-        const atrWarmup = cfg.useATR ? (cfg.atrPeriod || 14) * 3 : 0;
-        const eqMAWarmup = cfg.useEqMA ? (cfg.eqMALen || 20) : 0;
-        const warmup = Math.max(maWarmup, pivotWarmup, atrWarmup, eqMAWarmup, 1);
-
-        // Очищаем old_eq по warmup (чтобы совпадало с eq_new)
-        if (warmup < fullEq.length) {
-          const startVal = fullEq[warmup];
-          return fullEq.slice(warmup).map(v => v - startVal);
-        }
-        return fullEq;
+        // Копируем для безопасности - если rOld.eq переиспользуется, old_eq не пострадает
+        return Array.from(rOld.eq.slice(0, Math.min(isEndIdx + 1, rOld.eq.length)));
       })(),
       new_eq:    (() => {
+        // КРИТИЧНО: Сохраняем ПОЛНЫЙ eq (без обрезки по overlapIdx)
+        // Обрезка будет в _drawOOSGraphicForResult по warmup + overlapIdx одновременно
+        // чтобы гарантировать warmup синхронизация между eq_old и eq_new
         if (!rNew || !rNew.eq || !rNew.eq.length) return null;
-        const fullEq = Array.from(rNew.eq);
-
-        // Вычисляем warmup ОДИН РАЗ для обеих (то же что выше)
-        const cfg = r.cfg || {};
-        const maWarmup = cfg.useMA ? (cfg.maP || 20) : 0;
-        const pivotWarmup = cfg.usePivot ? ((cfg.pvL || 5) + (cfg.pvR || 2) + 5) : 0;
-        const atrWarmup = cfg.useATR ? (cfg.atrPeriod || 14) * 3 : 0;
-        const eqMAWarmup = cfg.useEqMA ? (cfg.eqMALen || 20) : 0;
-        const warmup = Math.max(maWarmup, pivotWarmup, atrWarmup, eqMAWarmup, 1);
-
-        // Очищаем new_eq по warmup + overlapIdx (чтобы синхронизировать оба разреза)
-        const cleanIdx = Math.max(_overlapIdx, warmup);
-        if (cleanIdx < fullEq.length) {
-          const startVal = fullEq[cleanIdx];
-          return fullEq.slice(cleanIdx).map(v => v - startVal);
-        }
-        return fullEq;
+        return Array.from(rNew.eq);  // ПОЛНЫЙ eq
       })(),
       // OOS-специфичные поля — история (только IS часть 70%)
       old_pnl:    rOld_IS ? rOld_IS.pnl : null,
@@ -1513,45 +1484,12 @@ async function runOOSOnNewData() {
         return null;
       })(),
       // Baseline данные для EqMA фильтра
-      // WAVE 6: Also clean baseline arrays with same warmup logic as eq
       old_eqCalcBaselineArr: (() => {
         if (!rOld || !rOld.eqCalcBaselineArr || !rOld.eqCalcBaselineArr.length) return null;
         const isEndIdx = Math.round(0.70 * rOld.eqCalcBaselineArr.length) || 0;
-        const fullBaseline = rOld.eqCalcBaselineArr.slice(0, Math.min(isEndIdx + 1, rOld.eqCalcBaselineArr.length));
-
-        // WAVE 6: Clean baseline with same warmup as eq (for consistency)
-        const cfg = r.cfg || {};
-        const maWarmup = cfg.useMA ? (cfg.maP || 20) : 0;
-        const pivotWarmup = cfg.usePivot ? ((cfg.pvL || 5) + (cfg.pvR || 2) + 5) : 0;
-        const atrWarmup = cfg.useATR ? (cfg.atrPeriod || 14) * 3 : 0;
-        const eqMAWarmup = cfg.useEqMA ? (cfg.eqMALen || 20) : 0;
-        const warmup = Math.max(maWarmup, pivotWarmup, atrWarmup, eqMAWarmup, 1);
-
-        if (warmup < fullBaseline.length) {
-          const startVal = fullBaseline[warmup];
-          return fullBaseline.slice(warmup).map(v => v - startVal);
-        }
-        return fullBaseline;
+        return rOld.eqCalcBaselineArr.slice(0, Math.min(isEndIdx + 1, rOld.eqCalcBaselineArr.length));
       })(),
-      new_eqCalcBaselineArr: (() => {
-        if (!rNew || !rNew.eqCalcBaselineArr || !rNew.eqCalcBaselineArr.length) return null;
-        const fullBaseline = Array.from(rNew.eqCalcBaselineArr);
-
-        // WAVE 6: Clean baseline with same warmup + overlapIdx as eq
-        const cfg = r.cfg || {};
-        const maWarmup = cfg.useMA ? (cfg.maP || 20) : 0;
-        const pivotWarmup = cfg.usePivot ? ((cfg.pvL || 5) + (cfg.pvR || 2) + 5) : 0;
-        const atrWarmup = cfg.useATR ? (cfg.atrPeriod || 14) * 3 : 0;
-        const eqMAWarmup = cfg.useEqMA ? (cfg.eqMALen || 20) : 0;
-        const warmup = Math.max(maWarmup, pivotWarmup, atrWarmup, eqMAWarmup, 1);
-
-        const cleanIdx = Math.max(_overlapIdx, warmup);
-        if (cleanIdx < fullBaseline.length) {
-          const startVal = fullBaseline[cleanIdx];
-          return fullBaseline.slice(cleanIdx).map(v => v - startVal);
-        }
-        return fullBaseline;
-      })(),
+      new_eqCalcBaselineArr: (rNew && rNew.eqCalcBaselineArr) ? Array.from(rNew.eqCalcBaselineArr) : null, // baseline (без MA фильтра) на новых данных ##EQ_MA_FILTER## — КРИТИЧНО копируем!
     });
   }
 

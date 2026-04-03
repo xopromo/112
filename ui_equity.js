@@ -224,16 +224,42 @@ function _drawOOSGraphicForResult(r) {
     }
   }
 
-  // WAVE 6 (WARMUP SYNC FIX): eq_new и eq_old уже очищены в ui_oos.js!
-  // Здесь просто используем их как есть. ui_oos.js уже:
-  // 1. Рассчитал warmup один раз
-  // 2. Очистил eq_old по warmup (removed first warmup bars, shifted to 0)
-  // 3. Очистил eq_new по max(overlapIdx, warmup) (same treatment)
-  // Результат: обе начинаются с одной и той же "точки отсчета" относительно warmup
-  // и поэтому синхронизированы для конкатенации
+  // КРИТИЧНО: eq_new это ПОЛНЫЙ eq (включая пересечение и warmup)
+  // Обрезаем одновременно по overlapIdx (время) и warmup (индикаторы)
+  // чтобы гарантировать что eq_old и eq_new выравнены по warmup
 
-  let newEqClean = eq_new;  // WAVE 6: уже очищена, не трогаем
-  let newBaselineClean = baseline_new;  // WAVE 6: уже очищена если была
+  let newEqClean = eq_new;
+  let newBaselineClean = baseline_new;
+
+  if (newEqClean && newEqClean.length > 0) {
+    const cfg = r.cfg || {};
+
+    // Рассчитываем warmup
+    const maWarmup = cfg.useMA ? (cfg.maP || 20) : 0;
+    const pivotWarmup = cfg.usePivot ? ((cfg.pvL || 5) + (cfg.pvR || 2) + 5) : 0;
+    const atrWarmup = cfg.useATR ? (cfg.atrPeriod || 14) * 3 : 0;
+    const eqMAWarmup = cfg.useEqMA ? (cfg.eqMALen || 20) : 0;
+    const warmup = Math.max(maWarmup, pivotWarmup, atrWarmup, eqMAWarmup, 1);
+
+    // ГЛАВНОЕ: обрезаем по МАКСИМУМУ из (overlapIdx, warmup)
+    // Это гарантирует что оба удалены и warmup совпадает
+    const minCleanIdx = Math.max(overlapIdx, warmup);
+
+    if (minCleanIdx < newEqClean.length) {
+      // Вычитаем значение при окончании warmup из ВСЕХ данных
+      const warmupValue = newEqClean[minCleanIdx];
+      newEqClean = newEqClean.map(v => v - warmupValue);
+
+      if (newBaselineClean && newBaselineClean.length > minCleanIdx) {
+        const warmupValueBL = newBaselineClean[minCleanIdx];
+        newBaselineClean = newBaselineClean.map(v => v - warmupValueBL);
+      }
+    }
+
+    // Теперь обрезаем ОБЕ по minCleanIdx чтобы убрать overlap и warmup
+    newEqClean = newEqClean.slice(minCleanIdx);
+    if (newBaselineClean) newBaselineClean = newBaselineClean.slice(minCleanIdx);
+  }
 
   // Concatenate: новый сегмент продолжает с последнего значения истории (без пересечения)
   const lastOld = eq_old[eq_old.length - 1];
