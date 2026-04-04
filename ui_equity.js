@@ -276,7 +276,8 @@ function drawEquityForResult(r) {
     console.log('  │    equities[r.name]:', equities[r.name] ? `array[${equities[r.name].length}]` : 'NULL ← возможно, 100%?');
     console.log('  │  ');
     console.log('  │  ❓ Какой из 🟠 это ПОЛНАЯ Strategy Equity? Используем этот для оранжевой!');
-    console.log('  │    shouldUseBaseline:', shouldUseBaseline);
+    const _shouldUseBaseline = baselineEq && baselineEq.length === eq.length && _eqMAFilterShowBaseline;
+    console.log('  │    shouldUseBaseline:', _shouldUseBaseline);
   }
 
   // Проверяем доступные источники equity
