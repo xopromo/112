@@ -472,3 +472,75 @@ bundle.min.js
 Конфликты бандлов невозможно разрешить вручную (это бинарный код).
 Если забыть пересобрать → потребуется merge conflict resolution, что замедляет delivery.
 
+---
+
+## 🔴 Запрещено: Module Load Order Dependencies в build.py
+
+**Проблема**: Когда один модуль использует глобальные переменные из другого модуля,
+но подставляется **ДО** этого модуля в build.py → переменные undefined при выполнении.
+
+**Класс бага**: CLASS A (ПАТТЕРН) - архитектурная проблема, может повториться при добавлении новых модулей.
+
+**Где**: build.py линии 102-125 (порядок подстановки модулей)
+
+**Пример CLASS A:**
+```
+Баг #1: ui_detail.js использует _eqMAFilterShowBaseline, но подставляется ПЕРЕД ui_equity.js
+Баг #2: (будущий) Новый модуль ui_future.js использует переменные из ui_feature.js, 
+        но разработчик забыл поменять порядок в build.py
+```
+
+**Сценарий ошибки:**
+```
+build.py подставляет:
+  1. /* ##DETAIL## */ → ui_detail.js выполняется
+       ↓ пытается использовать _eqMAFilterShowBaseline
+       ❌ ReferenceError: _eqMAFilterShowBaseline is not defined
+       
+  2. /* ##EQUITY## */ → ui_equity.js выполняется
+       ↓ ТУТ определяется переменная (уже поздно!)
+```
+
+**❌ Неправильно:**
+```python
+# build.py порядок подстановки
+for ph, content in [
+    # ...
+    ('/* ##DETAIL## */',   ui_detail),   # ← ПЕРЕД equity
+    ('/* ##EQUITY## */',   ui_equity),   # ← ПОСЛЕ detail ← НЕПРАВИЛЬНО!
+    # ...
+]
+```
+
+**✅ Правильно:**
+```python
+# build.py порядок подстановки
+for ph, content in [
+    # ...
+    ('/* ##EQUITY## */',   ui_equity),   # ← ПЕРЕД detail (определяет переменные)
+    ('/* ##DETAIL## */',   ui_detail),   # ← ПОСЛЕ equity (использует переменные)
+    # ...
+]
+```
+
+**Правило**: Если модуль использует глобальные переменные из другого модуля,
+то модуль-ИСТОЧНИК переменных ДОЛЖЕН быть подставлен **ПЕРВЫМ** в build.py.
+
+**Проверка**: Перед пушем запустить:
+```bash
+bash .claude/scripts/dumb-checks.sh  # RULE 18: проверка зависимостей модулей
+```
+
+**Документация зависимостей** (обновить при добавлении нового модуля):
+```
+ui_equity.js:
+  DEFINES: _eqMAFilterShowBaseline, _eqMAFilterShowBaseline, _eqMAFilterBaselineColor
+  REQUIRED_BEFORE: ui_detail.js, ui_oos.js (используют эти переменные)
+
+ui_oos.js:
+  USES: _eqMAFilterShowBaseline (из ui_equity.js)
+  REQUIRED_AFTER: ui_equity.js
+```
+
+**Результат нарушения**: ReferenceError при открытии экранов, которые зависят от этих переменных.
+

@@ -295,3 +295,43 @@ grep ...
 | Reference Sharing Corruption | 5 cases (22 мест) | ✅ VERIFIED | 2026-04-03 |
 | (pending) | 0 | - | - |
 
+
+---
+
+## ПАТТЕРН #3: Module Load Order Dependencies
+
+**STATUS: CLOSED** (исправлены все случаи, добавлено RULE 18)
+- Last Updated: 2026-04-04
+- Total Cases: 1
+- Confidence: 95%
+- Last Fix: ui_equity перемещена ДО ui_detail в build.py
+
+### Cases (все ✅ исправлены):
+- ✅ Case 3.1: ui_detail использует _eqMAFilterShowBaseline из ui_equity (build.py порядок)
+
+### ROOT CAUSE (Найденная причина):
+В build.py (линии 102-125) порядок подстановки модулей:
+```
+Было (неправильно):
+  /* ##DETAIL## */    ← подставляется первым, использует переменные из ui_equity
+  /* ##EQUITY## */    ← подставляется вторым, ОПРЕДЕЛЯЕТ эти переменные
+
+Стало (правильно):
+  /* ##EQUITY## */    ← подставляется первым, ОПРЕДЕЛЯЕТ переменные
+  /* ##DETAIL## */    ← подставляется вторым, использует переменные
+```
+
+### RULE 18 (дumb-checks.sh):
+Проверка что модули с зависимостями подставлены в правильном порядке.
+```bash
+# Проверяет что если модуль A использует переменные из модуля B,
+# то B подставляется ПЕРЕД A в build.py
+```
+
+### Verification:
+- build.py: ui_equity теперь перед ui_detail ✓
+- dumb-checks.sh: RULE 18 добавлен ✓
+- forbidden-patterns.md: Документировано ✓
+
+**Confidence Level: VERIFIED** (закрыт навечно, защищен RULE 18)
+

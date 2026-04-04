@@ -406,6 +406,53 @@ else
 fi
 
 # ======================================================================
+# 🔴 Критично 18: Module Load Order Dependencies (ПАТТЕРН #3)
+# Проблема: Если модуль A использует переменные из модуля B,
+# то B ДОЛЖЕН быть подставлен ПЕРЕД A в build.py
+# ======================================================================
+echo "  Проверка Module Load Order Dependencies..."
+
+if [ -f "build.py" ]; then
+  # Найти позиции подстановок в build.py
+  EQUITY_LINE=$(grep -n "'/\* ##EQUITY## \*/'," build.py | cut -d: -f1 | head -1)
+  DETAIL_LINE=$(grep -n "'/\* ##DETAIL## \*/'," build.py | cut -d: -f1 | head -1)
+  OOS_LINE=$(grep -n "'/\* ##OOS## \*/'," build.py | cut -d: -f1 | head -1)
+
+  MODULE_ORDER_ERROR=0
+
+  # Проверить что EQUITY перед DETAIL
+  if [ -n "$EQUITY_LINE" ] && [ -n "$DETAIL_LINE" ]; then
+    if [ "$EQUITY_LINE" -gt "$DETAIL_LINE" ]; then
+      echo "  ❌ ОШИБКА: ui_equity подставляется ПОСЛЕ ui_detail"
+      echo "     Line $DETAIL_LINE: /* ##DETAIL## */  (uses _eqMAFilterShowBaseline)"
+      echo "     Line $EQUITY_LINE: /* ##EQUITY## */  (defines _eqMAFilterShowBaseline)"
+      MODULE_ORDER_ERROR=1
+    fi
+  fi
+
+  # Проверить что EQUITY перед OOS
+  if [ -n "$EQUITY_LINE" ] && [ -n "$OOS_LINE" ]; then
+    if [ "$EQUITY_LINE" -gt "$OOS_LINE" ]; then
+      echo "  ❌ ОШИБКА: ui_equity подставляется ПОСЛЕ ui_oos"
+      echo "     Line $OOS_LINE: /* ##OOS## */  (uses _eqMAFilterShowBaseline)"
+      echo "     Line $EQUITY_LINE: /* ##EQUITY## */  (defines _eqMAFilterShowBaseline)"
+      MODULE_ORDER_ERROR=1
+    fi
+  fi
+
+  if [ $MODULE_ORDER_ERROR -eq 0 ]; then
+    echo "  ✓ Module Load Order: OK (ui_equity перед модулями которые её используют)"
+  else
+    echo ""
+    echo "     РЕШЕНИЕ:"
+    echo "     Перейти в build.py и переместить /* ##EQUITY## */ ПЕРЕД /* ##DETAIL## */"
+    ERRORS=$((ERRORS + 1))
+  fi
+else
+  echo "  ⚠️  build.py не найден - пропускаем RULE 18"
+fi
+
+# ======================================================================
 # Результаты
 # ======================================================================
 echo ""
