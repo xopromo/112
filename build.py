@@ -107,11 +107,11 @@ for ph, content in [
     ('/* ##OPT_C## */', opt_C),
     ('/* ##OPT_D## */', opt_D),
     ('/* ##TABLE## */',    ui_table),
-    ('/* ##DETAIL## */',   ui_detail),
+    ('/* ##EQUITY## */',   ui_equity),  # MOVED BEFORE DETAIL (was line 114, now 110)
+    ('/* ##DETAIL## */',   ui_detail),  # MOVED AFTER EQUITY (was line 110, now 111)
     ('/* ##ROBUST## */',   ui_robust),
     ('/* ##PARSE## */',    ui_parse),
     ('/* ##FAVS## */',     ui_favs),
-    ('/* ##EQUITY## */',   ui_equity),
     ('/* ##TVCOMPARE## */', ui_tvcompare),
     ('/* ##QUEUE## */',    ui_queue),
     ('/* ##HC## */',       ui_hc),
