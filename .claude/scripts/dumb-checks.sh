@@ -365,6 +365,47 @@ else
 fi
 
 # ======================================================================
+# 🔴 Критично 17: Защита критичных файлов (инцидент 2026-04-04)
+# GitHub Pages упал когда удалили USE_Optimizer_v6_built.html
+# ======================================================================
+echo "  Проверка защиты критичных файлов..."
+
+CRITICAL_FILES=(
+  "USE_Optimizer_v6_built.html"
+  "shell.html"
+  "opt.js"
+  "core.js"
+)
+
+DELETION_ATTEMPT=0
+for file in "${CRITICAL_FILES[@]}"; do
+  if git diff --cached --name-status 2>/dev/null | grep -q "^D.*$file$"; then
+    if [ $DELETION_ATTEMPT -eq 0 ]; then
+      echo "  ❌ ОШИБКА: Попытка удалить критичные файлы!"
+      echo ""
+      DELETION_ATTEMPT=1
+    fi
+    echo "     - $file"
+  fi
+done
+
+if [ $DELETION_ATTEMPT -eq 1 ]; then
+  echo ""
+  echo "     Эти файлы КРИТИЧНЫ для работы приложения!"
+  echo "     Это может СЛОМАТЬ GitHub Pages и основной функционал."
+  echo ""
+  echo "     Если удаление намеренно:"
+  echo "     1. Создай backup tag: git tag backup-\$(date +%Y%m%d) && git push --tags"
+  echo "     2. Убедись что есть способ пересоздать файл (CI/CD или build скрипт)"
+  echo "     3. Добавь файл в .gitignore если он генерируется"
+  echo "     4. Обнови .claude/rules/deployment-safety-policy.md"
+  echo ""
+  ERRORS=$((ERRORS + 1))
+else
+  echo "  ✓ Критичные файлы безопасны"
+fi
+
+# ======================================================================
 # Результаты
 # ======================================================================
 echo ""
