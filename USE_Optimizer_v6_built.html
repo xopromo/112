@@ -30215,9 +30215,8 @@ async function runOOSOnNewData() {
 
       rNew = backtest(_ind.pvLo, _ind.pvHi, _ind.atrArr, _btCfg);
       _newTradeLog = _btCfg.tradeLog || [];
-      // ##EQ_MA_FILTER## Копируем baseline данные в результат ВСЕГДА (нужны для оранжевой линии!)
-      // КРИТИЧНО: baseline должны быть даже если useEqMA=false, для отрисовки Strategy Equity
-      if (rNew) {
+      // ##EQ_MA_FILTER## Копируем baseline данные в результат если они есть
+      if (rNew && r.cfg.useEqMA) {
         if (_btCfg.eqCalcBaselineArr && !rNew.eqCalcBaselineArr) {
           rNew.eqCalcBaselineArr = Array.from(_btCfg.eqCalcBaselineArr);
         }
@@ -34054,7 +34053,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1775320603565;
+window._BUILD_TS = 1775320649934;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
