@@ -10,3 +10,7 @@ vk_sales/config.json
 .claude/logs/
 .claude/regression-report.json
 .regression-results
+
+# Generated bundle files - regenerate via: python build.py
+USE_Optimizer_v6_built.html
+
