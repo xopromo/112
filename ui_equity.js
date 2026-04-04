@@ -86,7 +86,7 @@ function drawEquityData(eq, label, splitPct, baselineEq=null) {
   // 🔧 WAVE 10 FINAL: Baseline должна быть из того же периода (100% данных)
   // Если baselineEq короче - это старая базовая линия от IS периода (70%)
   // НЕ использовать её вообще (ни для рендера, ни для масштабирования)
-  const shouldUseBaseline = baselineEq && baselineEq.length === eqToDisplay.length && _eqMAFilterShowBaseline;
+  const shouldUseBaseline = baselineEq && baselineEq.length === eq.length && _eqMAFilterShowBaseline;
   if (shouldUseBaseline) {
     for(let i=0;i<baselineEq.length;i++) {if(baselineEq[i]<mn)mn=baselineEq[i];if(baselineEq[i]>mx)mx=baselineEq[i];}
   }
