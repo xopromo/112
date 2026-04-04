@@ -25,6 +25,16 @@ function saveBaselineColorToStorage(color) {
 
 function drawEquityData(eq, label, splitPct, baselineEq=null) {
   if (!eq || !eq.length) return;
+
+  // 🔍 ДИАГНОСТИКА: что рисуется в drawEquityData
+  if (window.__DEBUG_EQUITY) {
+    console.log('  📊 drawEquityData called:');
+    console.log('    eq.length:', eq.length);
+    console.log('    label:', label);
+    console.log('    splitPct:', splitPct);
+    console.log('    baselineEq:', baselineEq ? `array[${baselineEq.length}]` : 'null');
+  }
+
   const wrap = document.getElementById('eq-wrap');
   const canvas=$('eqc');
   if (!canvas) return;
@@ -168,16 +178,16 @@ function drawEquityForResult(r) {
   // (Некоторые результаты могут иметь old_eq/new_eq через копирование без флага)
   const hasOOSData = r.old_eq && r.old_eq.length && r.new_eq && r.new_eq.length;
 
-  // 🔍 ДИАГНОСТИКА: понять почему нет OOS данных
+  // 🔍 ДИАГНОСТИКА: понять откуда рисуется оранжевая линия
   if (window.__DEBUG_EQUITY) {
-    console.log('drawEquityForResult diagnostics:');
+    console.log('🎨 drawEquityForResult CALL:');
     console.log('  r.name:', r.name);
     console.log('  r.old_eq:', r.old_eq ? `array[${r.old_eq.length}]` : 'NULL');
     console.log('  r.new_eq:', r.new_eq ? `array[${r.new_eq.length}]` : 'NULL');
-    console.log('  r._isOOSResult:', r._isOOSResult);
     console.log('  hasOOSData:', hasOOSData);
-    console.log('  equities[r.name]:', equities[r.name] ? `array[${equities[r.name].length}]` : 'NULL');
     console.log('  r.eq:', r.eq ? `array[${r.eq.length}]` : 'NULL');
+    console.log('  equities[r.name]:', equities[r.name] ? `array[${equities[r.name].length}]` : 'NULL');
+    console.log('  → Будет использовано:', hasOOSData ? '_drawOOSGraphicForResult' : 'drawEquityData');
   }
 
   if (hasOOSData) {
