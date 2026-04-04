@@ -485,11 +485,28 @@ function _drawOOSGraphicForResult(r) {
   }
 
   // ##EQ_MA_FILTER## Аналогично для baseline (оранжевая линия)
-  // Baseline ДОЛЖНА быть из без-фильтрованных данных (r.old_eqCalcBaselineArr, r.new_eqCalcBaselineArr)
+  // КРИТИЧНО: Baseline ДОЛЖНА быть из без-фильтрованных данных (r.old_eqCalcBaselineArr, r.new_eqCalcBaselineArr)
+  if (window.__DEBUG_EQUITY) {
+    console.log('  🟠 BASELINE CHECK:');
+    console.log('    _eqMAFilterShowBaseline:', _eqMAFilterShowBaseline);
+    console.log('    baseline_old:', baseline_old ? `array[${baseline_old.length}]` : 'NULL ❌');
+    console.log('    baseline_new:', baseline_new ? `array[${baseline_new.length}]` : 'NULL ❌');
+    console.log('    oldBaselineClean:', oldBaselineClean ? `array[${oldBaselineClean.length}]` : 'NULL');
+    console.log('    newBaselineClean:', newBaselineClean ? `array[${newBaselineClean.length}]` : 'NULL');
+  }
+
   let combined_baseline = null;
   if (_eqMAFilterShowBaseline && baseline_old && baseline_new && oldBaselineClean && newBaselineClean) {
     const lastOldBL = oldBaselineClean[oldBaselineClean.length - 1];
     combined_baseline = [...oldBaselineClean, ...newBaselineClean.map(v => v + lastOldBL)];
+    if (window.__DEBUG_EQUITY) {
+      console.log('    ✅ combined_baseline created: length=' + combined_baseline.length);
+    }
+  } else if (_eqMAFilterShowBaseline && (!baseline_old || !baseline_new)) {
+    if (window.__DEBUG_EQUITY) {
+      console.log('    ⚠️  BASELINE NOT CREATED: baseline_old or baseline_new is NULL!');
+      console.log('    This is why ORANGE LINE is not visible!');
+    }
   }
 
   const splitIdx  = oldEqClean.length;  // ВОЛНА 7: использовать очищенную длину
