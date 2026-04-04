@@ -1313,9 +1313,9 @@ async function runOOSOnNewData() {
       DATA = origDATA;
       rOld = _hcRunBacktest(r.cfg);
 
-      // ##EQ_MA_FILTER## ВСЕГДА пересчитываем baseline для rOld если фильтр включен
-      // Даже если rOld из кеша, он может не иметь baseline, что вызывает асимметрию
-      if (rOld && r.cfg.useEqMA && (!rOld.eqCalcBaselineArr || !rOld.eqCalcMAArr)) {
+      // ##EQ_MA_FILTER## ВСЕГДА рассчитываем baseline для rOld (нужна для оранжевой линии!)
+      // КРИТИЧНО: baseline должна быть даже если useEqMA=false
+      if (rOld && !rOld.eqCalcBaselineArr) {
         const _ind_old = _calcIndicators(r.cfg);
         const _btCfg_old = buildBtCfg(r.cfg, _ind_old);
 
@@ -1325,11 +1325,15 @@ async function runOOSOnNewData() {
         const _shadowRes_old = backtest(_ind_old.pvLo, _ind_old.pvHi, _ind_old.atrArr, _btCfg_old);
 
         if (_shadowRes_old && _shadowRes_old.eq && _shadowRes_old.eq.length > 0) {
-          // Сохраняем baseline и рассчитываем MA
-          const maLen = r.cfg.eqMALen || 20;
+          // Сохраняем baseline (ВСЕГДА, не только если useEqMA)
           rOld.eqCalcBaselineArr = Array.from(_shadowRes_old.eq);
-          const maType = r.cfg.eqMAType || 'SMA';
-          rOld.eqCalcMAArr = calcMA(Array.from(_shadowRes_old.eq), maLen, maType);
+
+          // Рассчитываем MA только если включен фильтр
+          if (r.cfg.useEqMA) {
+            const maLen = r.cfg.eqMALen || 20;
+            const maType = r.cfg.eqMAType || 'SMA';
+            rOld.eqCalcMAArr = calcMA(Array.from(_shadowRes_old.eq), maLen, maType);
+          }
         }
       }
     } catch(e) { }

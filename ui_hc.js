@@ -310,23 +310,29 @@ function _hcRunBacktest(cfg) {
     const ind    = _calcIndicators(cfg);
     const btCfg  = buildBtCfg(cfg, ind);
 
-    // ##EQ_MA_FILTER## Двупроходный цикл для базовой линии, если фильтр включен
-    if (cfg.useEqMA) {
-      const _shadowCfg = JSON.parse(JSON.stringify(btCfg));
-      _shadowCfg.useEqMA = false;
-      const _shadowRes = backtest(ind.pvLo, ind.pvHi, ind.atrArr, _shadowCfg);
-      if (_shadowRes && _shadowRes.eq && _shadowRes.eq.length > 0) {
+    // ##EQ_MA_FILTER## Двухпроходный цикл для базовой линии
+    // КРИТИЧНО: ВСЕГДА рассчитываем baseline (нужна для оранжевой линии в графике OOS)
+    // даже если useEqMA=false
+    const _shadowCfg = JSON.parse(JSON.stringify(btCfg));
+    _shadowCfg.useEqMA = false;
+    const _shadowRes = backtest(ind.pvLo, ind.pvHi, ind.atrArr, _shadowCfg);
+    if (_shadowRes && _shadowRes.eq && _shadowRes.eq.length > 0) {
+      // ВСЕГДА сохраняем baseline
+      btCfg.eqCalcBaselineArr = Array.from(_shadowRes.eq);
+
+      // MA рассчитываем ТОЛЬКО если включен фильтр
+      if (cfg.useEqMA) {
         const maLen = cfg.eqMALen || 20;
         const maType = cfg.eqMAType || 'SMA';
         btCfg.eqCalcMAArr = calcMA(Array.from(_shadowRes.eq), maLen, maType);
-        btCfg.eqCalcBaselineArr = Array.from(_shadowRes.eq);
       }
     }
 
     const _hcRes = backtest(ind.pvLo, ind.pvHi, ind.atrArr, btCfg);
 
-    // ##EQ_MA_FILTER## Сохраняем baseline в результат если он был рассчитан
-    if (cfg.useEqMA && _hcRes) {
+    // ##EQ_MA_FILTER## ВСЕГДА копируем baseline в результат
+    // (была ошибка: копировалась ТОЛЬКО если useEqMA=true, но baseline нужна всегда!)
+    if (_hcRes) {
       if (btCfg.eqCalcBaselineArr) _hcRes.eqCalcBaselineArr = Array.from(btCfg.eqCalcBaselineArr);
       if (btCfg.eqCalcMAArr) _hcRes.eqCalcMAArr = Array.from(btCfg.eqCalcMAArr);
     }
