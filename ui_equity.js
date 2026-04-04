@@ -24,10 +24,30 @@ function saveBaselineColorToStorage(color) {
 }
 
 function drawEquityData(eq, label, splitPct, baselineEq=null) {
-  if (!eq || !eq.length) return;
+  if (!eq || !eq.length) {
+    if (window.__DEBUG_EQUITY) console.log('  ❌ drawEquityData REJECTED: no eq data');
+    return;
+  }
+
+  if (window.__DEBUG_EQUITY) {
+    console.log('');
+    console.log('📊 drawEquityData() CALLED:');
+    console.log('  eq.length:', eq.length, '← 🔴 ORANGE LINE WILL BE THIS LENGTH');
+    console.log('  label:', label);
+    console.log('  splitPct:', splitPct, '← will draw split at', splitPct ? (splitPct + '% position') : '50% (default)');
+    console.log('  baselineEq:', baselineEq ? `array[${baselineEq.length}]` : 'null');
+    console.log('  eq[0..5]:', eq.slice(0, 5).map(v => v.toFixed(1)).join(', '));
+    console.log('  eq[-5..-1]:', eq.slice(-5).map(v => v.toFixed(1)).join(', '));
+  }
+
   const wrap = document.getElementById('eq-wrap');
   const canvas=$('eqc');
-  if (!canvas) return;
+  if (!canvas) {
+    if (window.__DEBUG_EQUITY) console.log('  ❌ Canvas element not found');
+    return;
+  }
+
+  if (window.__DEBUG_EQUITY) console.log('  ✅ Canvas found, clearing and resizing...');
   // Сохраняем позицию скролла — браузер может прыгнуть к canvas при display:none→block
   const _scrollEl = document.querySelector('.tbl-scroll') || document.documentElement;
   const _scrollY = window.scrollY;
@@ -39,9 +59,24 @@ function drawEquityData(eq, label, splitPct, baselineEq=null) {
   window.scrollTo({top: _scrollY, behavior: 'instant'});
   _scrollEl.scrollTop = _scrollT;
   const ctx=canvas.getContext('2d');
+
+  if (window.__DEBUG_EQUITY) {
+    console.log('  📐 Canvas dimensions:');
+    console.log('    canvas.offsetWidth:', canvas.offsetWidth);
+    console.log('    Setting canvas.width to:', canvas.offsetWidth * 2);
+  }
+
   canvas.width=canvas.offsetWidth*2; canvas.height=300;
   ctx.scale(2,2);
   const W=canvas.offsetWidth,H=150;
+
+  if (window.__DEBUG_EQUITY) {
+    console.log('    ctx.scale(2, 2) applied');
+    console.log('    W (working width):', W);
+    console.log('    H (working height):', H);
+    console.log('  🧹 Clearing canvas with black background...');
+  }
+
   ctx.fillStyle='#080b10'; ctx.fillRect(0,0,W,H);
 
   // Рассчитываем min/max для обеих линий
@@ -152,6 +187,11 @@ function drawEquityData(eq, label, splitPct, baselineEq=null) {
   // Синхронизируем размер crosshair-canvas
   const ch = document.getElementById('eq-crosshair');
   if (ch) { ch.width = canvas.width; ch.height = canvas.height; ch.style.width = canvas.style.width || canvas.offsetWidth+'px'; ch.style.height = '150px'; }
+
+  if (window.__DEBUG_EQUITY) {
+    console.log('  ✅ drawEquityData COMPLETE - Chart rendered to canvas');
+    console.log('═══════════════════════════════════════════════════════');
+  }
 }
 
 function drawEquity(name) {
@@ -163,24 +203,31 @@ function drawEquity(name) {
 function drawEquityForResult(r) {
   if (!r) return;
 
+  if (window.__DEBUG_EQUITY) {
+    console.log('');
+    console.log('🎨 drawEquityForResult() ENTRY:');
+    console.log('  r.name:', r.name);
+    console.log('  r._isOOSResult:', r._isOOSResult ?? 'undefined');
+  }
+
   // ##EQ_MA_FILTER## Если результат из OOS (имеет old_eq и new_eq), рисуем полный OOS график
   // WAVE 8 FIX: Достаточно проверить наличие OOS данных, флаг не обязателен
   // (Некоторые результаты могут иметь old_eq/new_eq через копирование без флага)
   const hasOOSData = r.old_eq && r.old_eq.length && r.new_eq && r.new_eq.length;
 
-  // 🔍 ДИАГНОСТИКА: понять почему нет OOS данных
   if (window.__DEBUG_EQUITY) {
-    console.log('drawEquityForResult diagnostics:');
-    console.log('  r.name:', r.name);
-    console.log('  r.old_eq:', r.old_eq ? `array[${r.old_eq.length}]` : 'NULL');
-    console.log('  r.new_eq:', r.new_eq ? `array[${r.new_eq.length}]` : 'NULL');
-    console.log('  r._isOOSResult:', r._isOOSResult);
-    console.log('  hasOOSData:', hasOOSData);
-    console.log('  equities[r.name]:', equities[r.name] ? `array[${equities[r.name].length}]` : 'NULL');
-    console.log('  r.eq:', r.eq ? `array[${r.eq.length}]` : 'NULL');
+    console.log('  ┌─ OOS DATA CHECK:');
+    console.log('  │  r.old_eq:', r.old_eq ? `array[${r.old_eq.length}]` : 'NULL');
+    console.log('  │  r.new_eq:', r.new_eq ? `array[${r.new_eq.length}]` : 'NULL');
+    console.log('  │  hasOOSData:', hasOOSData);
+    console.log('  └─');
+    if (hasOOSData) {
+      console.log('  ✅ PATH: _drawOOSGraphicForResult() - OOS split rendering');
+    }
   }
 
   if (hasOOSData) {
+    if (window.__DEBUG_EQUITY) console.log('  → CALLING _drawOOSGraphicForResult()');
     _drawOOSGraphicForResult(r);  // WAVE 8: используем OOS рисование если есть OOS данные
     return;
   }
@@ -192,31 +239,74 @@ function drawEquityForResult(r) {
   // Это полный backtest(100%), а не оригинальный HC результат
   let eqToDisplay = r._fullEq || r.eq;
 
+  if (window.__DEBUG_EQUITY) {
+    console.log('  ┌─ FALLBACK RENDERING (no OOS data):');
+    console.log('  │  splitPct:', splitPct);
+    console.log('  │  r._fullEq:', r._fullEq ? `array[${r._fullEq.length}]` : 'NULL');
+    console.log('  │  r.eq:', r.eq ? `array[${r.eq.length}]` : 'NULL');
+    console.log('  │  eqToDisplay:', eqToDisplay ? `array[${eqToDisplay.length}]` : 'NULL');
+    console.log('  │  equities[r.name]:', equities[r.name] ? `array[${equities[r.name].length}]` : 'NULL');
+    console.log('  │  baselineEq:', baselineEq ? `array[${baselineEq.length}]` : 'NULL');
+  }
+
   // Проверяем доступные источники equity
   if (eqToDisplay && eqToDisplay.length) {
+    if (window.__DEBUG_EQUITY) console.log('  │  ✅ Using r._fullEq/r.eq');
+    console.log('  └─');
+    console.log('  → CALLING drawEquityData(eqToDisplay, splitPct=' + splitPct + ')');
     drawEquityData(eqToDisplay, r.name, splitPct, baselineEq);
   } else if (equities[r.name]) {
+    if (window.__DEBUG_EQUITY) console.log('  │  ✅ Using equities[r.name] FALLBACK');
+    console.log('  └─');
+    console.log('  → CALLING drawEquityData(equities[r.name], splitPct=' + splitPct + ')');
     drawEquityData(equities[r.name], r.name, splitPct, baselineEq);
   } else if (r.cfg) {
+    if (window.__DEBUG_EQUITY) console.log('  │  ✅ Running _hcRunBacktest()');
+    console.log('  └─');
     // Для fav и hc результатов без eq — запускаем лёгкий бэктест
     const raw = _hcRunBacktest(r.cfg);
     if (raw && raw.eq) {
+      if (window.__DEBUG_EQUITY) console.log('  → CALLING drawEquityData(backtest result, splitPct=' + splitPct + ')');
       // КРИТИЧНО: Копируем eq - иначе кэш может быть переиспользован и результат повреждён
       r.eq = Array.from(raw.eq);
       drawEquityData(r.eq, r.name, splitPct, baselineEq);
+    }
+  } else {
+    if (window.__DEBUG_EQUITY) {
+      console.log('  └─');
+      console.log('  ❌ NO EQUITY DATA FOUND - Cannot render!');
     }
   }
 }
 
 // Рисует полный OOS график (история + новые данные) для избранных результатов
 function _drawOOSGraphicForResult(r) {
+  if (window.__DEBUG_EQUITY) {
+    console.log('');
+    console.log('🔷 _drawOOSGraphicForResult() CALLED - OOS SPLIT RENDERING:');
+    console.log('  r.name:', r.name);
+  }
+
   const canvas = document.getElementById('eqc');
-  if (!canvas) return;
+  if (!canvas) {
+    if (window.__DEBUG_EQUITY) console.log('  ❌ Canvas not found');
+    return;
+  }
+
+  if (window.__DEBUG_EQUITY) console.log('  ✅ Canvas found');
 
   const eq_old = r.old_eq;
   const eq_new = r.new_eq;
   const baseline_old = r.old_eqCalcBaselineArr; // baseline на истории ##EQ_MA_FILTER##
   const baseline_new = r.new_eqCalcBaselineArr; // baseline на новых данных ##EQ_MA_FILTER##
+
+  if (window.__DEBUG_EQUITY) {
+    console.log('  📊 Data sources:');
+    console.log('    eq_old (BLUE/IS):', eq_old ? `array[${eq_old.length}]` : 'NULL');
+    console.log('    eq_new (ORANGE/OOS):', eq_new ? `array[${eq_new.length}]` : 'NULL');
+    console.log('    baseline_old:', baseline_old ? `array[${baseline_old.length}]` : 'NULL');
+    console.log('    baseline_new:', baseline_new ? `array[${baseline_new.length}]` : 'NULL');
+  }
 
   // Определяем пересечение данных по timestamps
   let overlapIdx = 0; // индекс в NEW_DATA где начинаются новые бары без пересечения
@@ -292,6 +382,14 @@ function _drawOOSGraphicForResult(r) {
   // Concatenate: новый сегмент продолжает с последнего значения истории (без пересечения)
   const lastOld = oldEqClean[oldEqClean.length - 1];
   const combined = [...oldEqClean, ...newEqClean.map(v => v + lastOld)];
+
+  if (window.__DEBUG_EQUITY) {
+    console.log('  🔗 After cleaning & concatenation:');
+    console.log('    oldEqClean.length:', oldEqClean.length, '← BLUE will draw this many points');
+    console.log('    newEqClean.length:', newEqClean.length, '← ORANGE will add this many points');
+    console.log('    combined.length:', combined.length, '← TOTAL points to render');
+    console.log('    lastOld:', lastOld, '← transition point value');
+  }
 
   // 🔍 ДИАГНОСТИКА: Отследить расхождение eq_old vs eq_new
   if (typeof window !== 'undefined' && window.__DEBUG_OOS) {
@@ -421,13 +519,20 @@ function _drawOOSGraphicForResult(r) {
   ctx.lineTo(W - pad, zy); ctx.lineTo(pad + pxSp, zy); ctx.closePath();
   ctx.fillStyle = 'rgba(255,160,40,0.06)'; ctx.fill();
 
-  // Линия — история
+  // Линия — история (BLUE/CYAN)
+  if (window.__DEBUG_EQUITY) {
+    console.log('  🎨 Drawing lines:');
+    console.log('    BLUE line (IS/History): from pixel 0 to', pxSp);
+  }
   pathSeg(0, pxSp);
   const gOld = ctx.createLinearGradient(pad, 0, pad + pxSp, 0);
   gOld.addColorStop(0, 'rgba(0,212,255,0.7)'); gOld.addColorStop(1, 'rgba(0,212,255,0.9)');
   ctx.strokeStyle = gOld; ctx.lineWidth = 1.5; ctx.stroke();
 
-  // Линия — новые данные
+  // Линия — новые данные (ORANGE)
+  if (window.__DEBUG_EQUITY) {
+    console.log('    ORANGE line (OOS): from pixel', pxSp, 'to', nPx - 1);
+  }
   pathSeg(pxSp, nPx - 1);
   const gNew = ctx.createLinearGradient(pad + pxSp, 0, W - pad, 0);
   gNew.addColorStop(0, 'rgba(255,160,40,0.9)'); gNew.addColorStop(1, 'rgba(255,100,20,0.8)');
@@ -452,5 +557,10 @@ function _drawOOSGraphicForResult(r) {
     pathSegBL(0, nPx - 1);
     ctx.stroke();
     ctx.globalAlpha = 1;
+  }
+
+  if (window.__DEBUG_EQUITY) {
+    console.log('  ✅ _drawOOSGraphicForResult COMPLETE - OOS split chart rendered');
+    console.log('═══════════════════════════════════════════════════════');
   }
 }

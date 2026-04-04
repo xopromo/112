@@ -1100,6 +1100,19 @@ function selectRow(idx) {
 
   const r = _visibleResults[idx];
   if (!r) return;
+
+  // 🔍 ДИАГНОСТИКА: что происходит при выборе строки
+  if (window.__DEBUG_EQUITY) {
+    console.log('═══════════════════════════════════════════════════════');
+    console.log('🖱️  selectRow() CALLED - User selected result:');
+    console.log('  _tableMode:', _tableMode);
+    console.log('  idx:', idx);
+    console.log('  _visibleResults.length:', _visibleResults.length);
+    console.log('  r.name:', r.name);
+    console.log('  r._isOOSResult:', r._isOOSResult);
+    console.log('  typeof r:', typeof r);
+  }
+
   // Используем drawEquityForResult для обоих режимов, чтобы baseline всегда отображался
   drawEquityForResult(r);
 
