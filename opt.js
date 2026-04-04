@@ -2259,6 +2259,11 @@ async function runOpt() {
       try { r = backtest(pvCache[pk].lo, pvCache[pk].hi, atrCache[atrP], btCfg); }
       finally { if (_useOOS) DATA = _fullDATA; }
       done++;
+      // ##ZERO_EQUITY_FIX## КРИТИЧНО: eqCalc ВСЕГДА должна быть defined, не null!
+      // Если useEqMA=false, _eqCalc остался null — присвоим baseline (результат second pass)
+      if (!_eqCalc && r && r.eq && r.eq.length > 0) {
+        _eqCalc = Array.from(r.eq);  // Используем сам результат как baseline
+      }
       if (r && r.n >= minTrades && r.dd <= maxDD) {
         const pdd = r.dd>0 ? r.pnl/r.dd : 0;
         const sig = _calcStatSig(r);
@@ -2677,6 +2682,11 @@ async function runOpt() {
       catch(_btErr) { console.error('[TPE] backtest ошибка:', _btErr); r = null; }
       finally { if (_useOOS) DATA = _fullDATA; }
       done++;
+      // ##ZERO_EQUITY_FIX## КРИТИЧНО: eqCalc ВСЕГДА должна быть defined, не null!
+      // Если useEqMA=false, _eqCalc остался null — присвоим результат second pass
+      if (!_eqCalc && r && r.eq && r.eq.length > 0) {
+        _eqCalc = Array.from(r.eq);  // Используем сам результат как baseline
+      }
       // Мягкий score: градация для всех результатов, не только прошедших фильтр
       // Прошёл фильтр: P/DD или GT-Score (зависит от c_use_gt)
       // Не прошёл: небольшой отрицательный score пропорционально насколько близко
@@ -3400,6 +3410,11 @@ async function runOpt() {
                                     try { r=backtest(pvCache[pk].lo,pvCache[pk].hi,atrCache[atrP],btCfg); }
                                     finally { if (_useOOS) DATA = _fullDATA; }
                                     done++;
+                                    // ##ZERO_EQUITY_FIX## КРИТИЧНО: eqCalc ВСЕГДА должна быть defined, не null!
+                                    // Если useEqMA=false, _eqCalc остался null — присвоим результат second pass
+                                    if (!_eqCalc && r && r.eq && r.eq.length > 0) {
+                                      _eqCalc = Array.from(r.eq);  // Используем сам результат как baseline
+                                    }
 
                                     if(r && r.n>=minTrades && r.dd<=maxDD) {
                                       const pdd=r.dd>0?r.pnl/r.dd:0;

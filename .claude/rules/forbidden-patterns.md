@@ -616,3 +616,82 @@ ui_oos.js:
 
 **Результат нарушения**: ReferenceError при открытии экранов, которые зависят от этих переменных.
 
+
+---
+
+## 🔴 Запрещено: eqCalc может быть null в результатах (ПАТТЕРН #4: Zero-Equity Bug)
+
+**Проблема**: Когда `useEqMA=false`, переменная `_eqCalc` остаётся `null` и сохраняется в результаты.
+Это приводит к:
+- Нулевым значениям equity в таблице (eq[0..5]: 0.0, 0.0, 0.0...)
+- Невозможности рисовать графики (null данные)
+- Путанице между `r.eq` (baseline) и `r.eqCalc` (filtered)
+
+**Где**: opt.js (3 места: MC, TPE, Exhaustive)
+
+**Класс**: CLASS A (ПАТТЕРН) - архитектурная ошибка, может повториться в новом коде
+
+**Сценарий ошибки:**
+```javascript
+// opt.js (MC режим, линия 2234)
+let _eqCalc = null;                    // инициализирована null
+
+if (_effUseEqMA) {                      // ЕСЛИ useEqMA=true
+  // ... рассчитываем baseline и MA
+  _eqCalc = Array.from(_shadowEq);     // _eqCalc = данные
+}
+
+// ВТОРОЙ ПРОХОД
+let r = backtest(...);
+done++;
+
+// ❌ ПРОБЛЕМА: Если useEqMA=false → _eqCalc остался null!
+results.push({..., eqCalc:_eqCalc, ...});  // eqCalc: null ❌
+```
+
+**РЕЗУЛЬТАТ:**
+```javascript
+// В ui_oos.js при создании OOS результатов
+new_eqCalc: (rNew && rNew.eqCalc) ? Array.from(rNew.eqCalc) : null
+
+// Если rNew.eqCalc === null → new_eqCalc === null
+// При рисовании графика в ui_equity.js:
+const eqToDisplay = r.eqCalc || r._fullEq || r.eq;
+// Если r.eqCalc === null → использует fallback (r.eq)
+// Но это может привести к несинхронизированным данным!
+```
+
+**✅ РЕШЕНИЕ:**
+```javascript
+// После второго прохода: ВСЕГДА назначить _eqCalc
+let _eqCalc = null;
+
+if (_effUseEqMA) {
+  // ... рассчитываем baseline
+  _eqCalc = Array.from(_shadowEq);
+}
+
+let r = backtest(...);
+done++;
+
+// ##ZERO_EQUITY_FIX## КРИТИЧНО: eqCalc НИКОГДА не null!
+if (!_eqCalc && r && r.eq && r.eq.length > 0) {
+  _eqCalc = Array.from(r.eq);  // Используем результат second pass
+}
+
+// Теперь eqCalc ВСЕГДА defined ✓
+results.push({..., eqCalc:_eqCalc, ...});
+```
+
+**Правило**: `_eqCalc` ДОЛЖНА быть инициализирована результатом `backtest()`, даже если `useEqMA=false`.
+Нельзя оставлять `null` в сохраняемых результатах.
+
+**Проверка**: RULE 19 в dumb-checks.sh ищет `##ZERO_EQUITY_FIX##` комментарий в opt.js (3 места).
+
+**Статус ПАТТЕРНА #4:**
+- **Название**: Zero-Equity Bug
+- **STATUS**: CLOSED
+- **Волны**: 1 (все 3 места исправлены одновременно)
+- **Confidence**: 95%
+- **Cases**: 3 (MC, TPE, Exhaustive)
+- **Verification**: dumb-checks.sh RULE 19
