@@ -24633,12 +24633,11 @@ function drawEquityData(eq, label, splitPct, baselineEq=null) {
   let mn=0,mx=0;
   for(let i=0;i<eq.length;i++) {if(eq[i]<mn)mn=eq[i];if(eq[i]>mx)mx=eq[i];}
 
-  // 🔧 WAVE 10 FINAL: Baseline должна быть из того же периода (100% данных)
-  // Если baselineEq короче - это старая базовая линия от IS периода (70%)
-  // НЕ использовать её вообще (ни для рендера, ни для масштабирования)
-  const shouldUseBaseline = baselineEq && baselineEq.length === eq.length && _eqMAFilterShowBaseline;
+  // 🔧 WAVE 11: Использовать пересчитанную baseline если она есть и включена
+  // baselineEqExtended это Strategy Equity для полного 100% периода
+  const shouldUseBaseline = baselineEqExtended && baselineEqExtended.length === eq.length && _eqMAFilterShowBaseline;
   if (shouldUseBaseline) {
-    for(let i=0;i<baselineEq.length;i++) {if(baselineEq[i]<mn)mn=baselineEq[i];if(baselineEq[i]>mx)mx=baselineEq[i];}
+    for(let i=0;i<baselineEqExtended.length;i++) {if(baselineEqExtended[i]<mn)mn=baselineEqExtended[i];if(baselineEqExtended[i]>mx)mx=baselineEqExtended[i];}
   }
   const range=mx-mn||1, pad=14;
 
@@ -24711,7 +24710,7 @@ function drawEquityData(eq, label, splitPct, baselineEq=null) {
       console.log('    color:', _eqMAFilterBaselineColor);
       console.log('    This baseline line may appear as orange if enabled!');
     }
-    const baselineNLast = Math.max(baselineEq.length - 1, 1);
+    const baselineNLast = Math.max(baselineEqExtended.length - 1, 1);
     ctx.strokeStyle = _eqMAFilterBaselineColor;
     ctx.globalAlpha = 0.6;
     ctx.lineWidth = 1.2;
@@ -24719,7 +24718,7 @@ function drawEquityData(eq, label, splitPct, baselineEq=null) {
     for(let px=0;px<nPx;px++) {
       const x=pad+px;
       const i=Math.round(px*(baselineNLast)/(nPx-1));
-      const y=H-pad-((baselineEq[i]-mn)/range*(H-2*pad));
+      const y=H-pad-((baselineEqExtended[i]-mn)/range*(H-2*pad));
       if(px===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
     }
     ctx.stroke();
@@ -24811,6 +24810,25 @@ function drawEquityForResult(r) {
   // Это полный backtest(100%), а не оригинальный HC результат
   let eqToDisplay = r._fullEq || r.eq;
 
+  // 🔧 WAVE 11: Если baselineEq короче чем основная eq - пересчитать для полных данных
+  // Baseline создана на 70% IS периода, а нам нужна для 100% полного периода
+  let baselineEqExtended = baselineEq;
+  if (baselineEq && baselineEq.length < (eqToDisplay?.length || 10000) && r.cfg && r.cfg.useEqMA) {
+    if (window.__DEBUG_EQUITY) console.log('  │  🔄 Recalculating baseline for full 100% period...');
+    try {
+      // Пересчитать Strategy Equity (без MA фильтра) для полных данных
+      const cfgNoFilter = JSON.parse(JSON.stringify(r.cfg));
+      cfgNoFilter.useEqMA = false;  // Отключаем MA фильтр чтобы получить чистую Strategy Equity
+      const rawBacktest = _hcRunBacktest(cfgNoFilter);
+      if (rawBacktest && rawBacktest.eq && rawBacktest.eq.length >= (eqToDisplay?.length || 10000)) {
+        baselineEqExtended = Array.from(rawBacktest.eq);
+        if (window.__DEBUG_EQUITY) console.log('  │  ✅ Baseline recalculated:', baselineEqExtended.length, 'bars');
+      }
+    } catch(e) {
+      if (window.__DEBUG_EQUITY) console.log('  │  ❌ Baseline recalc failed:', e.message);
+    }
+  }
+
   if (window.__DEBUG_EQUITY) {
     console.log('  ┌─ FALLBACK RENDERING (no OOS data):');
     console.log('  │  splitPct:', splitPct);
@@ -24818,8 +24836,8 @@ function drawEquityForResult(r) {
     console.log('  │  r.eq:', r.eq ? `array[${r.eq.length}]` : 'NULL');
     console.log('  │  eqToDisplay:', eqToDisplay ? `array[${eqToDisplay.length}]` : 'NULL');
     console.log('  │  equities[r.name]:', equities[r.name] ? `array[${equities[r.name].length}]` : 'NULL');
-    console.log('  │  baselineEq (raw):', baselineEq ? `array[${baselineEq.length}]` : 'NULL');
-    console.log('  │  shouldRenderBaseline (WAVE 10 FIX):', shouldRenderBaseline);
+    console.log('  │  baselineEq (original):', baselineEq ? `array[${baselineEq.length}]` : 'NULL');
+    console.log('  │  baselineEqExtended (WAVE 11 FIX):', baselineEqExtended ? `array[${baselineEqExtended.length}]` : 'NULL');
   }
 
   // Проверяем доступные источники equity
@@ -24827,7 +24845,7 @@ function drawEquityForResult(r) {
     if (window.__DEBUG_EQUITY) console.log('  │  ✅ Using r._fullEq/r.eq');
     console.log('  └─');
     console.log('  → CALLING drawEquityData(eqToDisplay, splitPct=' + splitPct + ')');
-    drawEquityData(eqToDisplay, r.name, splitPct, baselineEq);
+    drawEquityData(eqToDisplay, r.name, splitPct, baselineEqExtended);
   } else if (equities[r.name]) {
     if (window.__DEBUG_EQUITY) console.log('  │  ✅ Using equities[r.name] FALLBACK');
     console.log('  └─');
@@ -34004,7 +34022,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1775316912947;
+window._BUILD_TS = 1775317104540;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
