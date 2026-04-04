@@ -262,27 +262,36 @@ function drawEquityForResult(r) {
   let eqToDisplay = r._fullEq || r.eq;
 
   if (window.__DEBUG_EQUITY) {
-    console.log('  ┌─ FALLBACK RENDERING (no OOS data):');
-    console.log('  │  splitPct:', splitPct);
-    console.log('  │  r._fullEq:', r._fullEq ? `array[${r._fullEq.length}]` : 'NULL');
-    console.log('  │  r.eq:', r.eq ? `array[${r.eq.length}]` : 'NULL');
-    console.log('  │  eqToDisplay:', eqToDisplay ? `array[${eqToDisplay.length}]` : 'NULL');
-    console.log('  │  equities[r.name]:', equities[r.name] ? `array[${equities[r.name].length}]` : 'NULL');
-    console.log('  │  baselineEq (raw):', baselineEq ? `array[${baselineEq.length}]` : 'NULL');
-    console.log('  │  shouldRenderBaseline (WAVE 10 FIX):', shouldRenderBaseline);
+    console.log('  ┌─ DATA SOURCES (найти полную Strategy Equity 100%):');
+    console.log('  │  ');
+    console.log('  │  🟢 TRADED EQUITY (Зелёная - с MA фильтром):');
+    console.log('  │    r._fullEq:', r._fullEq ? `array[${r._fullEq.length}]` : 'NULL');
+    console.log('  │    r.eq:', r.eq ? `array[${r.eq.length}]` : 'NULL ← используется для Зелёной');
+    console.log('  │    eqToDisplay:', eqToDisplay ? `array[${eqToDisplay.length}]` : 'NULL');
+    console.log('  │  ');
+    console.log('  │  🟠 STRATEGY EQUITY (Оранжевая - без MA фильтра):');
+    console.log('  │    baselineEq:', baselineEq ? `array[${baselineEq.length}]` : 'NULL ← только 70%!');
+    console.log('  │    equities[r.name]:', equities[r.name] ? `array[${equities[r.name].length}]` : 'NULL ← возможно, 100%?');
+    console.log('  │  ');
+    console.log('  │  ❓ Какой из 🟠 это ПОЛНАЯ Strategy Equity? Используем этот для оранжевой!');
+    console.log('  │    shouldUseBaseline:', shouldUseBaseline);
   }
 
   // Проверяем доступные источники equity
+  // КРИТИЧНО: Для оранжевой линии (Strategy Equity) используем полную эквити из equities[r.name]
+  // вместо baselineEq (7000), чтобы показать 100% вместо 70%
+  const strategyEq = equities[r.name];  // Полная Strategy Equity (10000 баров)
+
   if (eqToDisplay && eqToDisplay.length) {
     if (window.__DEBUG_EQUITY) console.log('  │  ✅ Using r._fullEq/r.eq');
     console.log('  └─');
-    console.log('  → CALLING drawEquityData(eqToDisplay, splitPct=' + splitPct + ')');
-    drawEquityData(eqToDisplay, r.name, splitPct, baselineEq);
+    console.log('  → CALLING drawEquityData(eqToDisplay, splitPct=' + splitPct + ', strategyEq=' + (strategyEq ? strategyEq.length : 'null') + ')');
+    drawEquityData(eqToDisplay, r.name, splitPct, strategyEq);
   } else if (equities[r.name]) {
     if (window.__DEBUG_EQUITY) console.log('  │  ✅ Using equities[r.name] FALLBACK');
     console.log('  └─');
-    console.log('  → CALLING drawEquityData(equities[r.name], splitPct=' + splitPct + ')');
-    drawEquityData(equities[r.name], r.name, splitPct, baselineEqToUse);
+    console.log('  → CALLING drawEquityData(equities[r.name], splitPct=' + splitPct + ', strategyEq=' + (strategyEq ? strategyEq.length : 'null') + ')');
+    drawEquityData(equities[r.name], r.name, splitPct, strategyEq);
   } else if (r.cfg) {
     if (window.__DEBUG_EQUITY) console.log('  │  ✅ Running _hcRunBacktest()');
     console.log('  └─');
@@ -292,7 +301,9 @@ function drawEquityForResult(r) {
       if (window.__DEBUG_EQUITY) console.log('  → CALLING drawEquityData(backtest result, splitPct=' + splitPct + ')');
       // КРИТИЧНО: Копируем eq - иначе кэш может быть переиспользован и результат повреждён
       r.eq = Array.from(raw.eq);
-      drawEquityData(r.eq, r.name, splitPct, baselineEq);
+      // Также используем полную Strategy Equity вместо baselineEq
+      const strategyEqHC = equities[r.name] || r.eq;  // Предпочитаем полную эквити
+      drawEquityData(r.eq, r.name, splitPct, strategyEqHC);
     }
   } else {
     if (window.__DEBUG_EQUITY) {
