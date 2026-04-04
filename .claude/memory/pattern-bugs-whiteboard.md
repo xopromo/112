@@ -234,8 +234,12 @@ ROOT CAUSE: При рисовании передавалась не та Strateg
   - Оранжевая (Strategy Equity без MA): strategyEq (10000)
   → Синхронизированы по времени, no more 70% truncation
 
-СТАТУС: ✅ FIX APPLIED (WAVE 10 завершена, PR #299)
-NEXT: ⏳ Real-world testing - verify both lines show 100%
+СТАТУС: ✅ FIX VERIFIED (WAVE 10 завершена и подтверждена на реальных данных)
+VERIFIED: User tested on real project data
+  ✅ Both lines now synchronized by time (both show 100% period)
+  ✅ Lines correctly diverge by values (green < orange due to MA filter blocking trades)
+  ✅ Green (Traded Equity) skips trades when below MA of orange (Strategy Equity)
+  ✅ This is CORRECT behavior - filter working as designed
 ```
 
 ### Verification:
@@ -247,12 +251,13 @@ Wave 8: ⚠️ DIAGNOSTIC (определили что проблема MODE-DEP
         - В OOS-mode: работает правильно (_drawOOSGraphicForResult)
         - В normal-mode: неправильный источник данных (baselineEq вместо полной)
 Wave 9: ⚠️ PARTIAL (сохранили данные, но не использовали при рисовании)
-Wave 10: ✅ SOLUTION APPLIED (use equities[r.name] instead of baselineEq)
+Wave 10: ✅ VERIFIED on real data (use equities[r.name] instead of baselineEq)
          - regression-detector: 250 runs, expected synthetic warnings
-         - No NEW critical issues introduced
-         - Ready for real-world testing
+         - No new critical issues introduced
+         - USER VERIFIED: Both lines synchronized by time, correctly diverge by values
+         - Green line properly lags due to MA filter blocking trades
 
-Status: AWAITING USER VERIFICATION on real data
+Status: ✅ CLOSED - Pattern fixed and verified
 ```
 
 ## ПАТТЕРН #3: (Будущие паттерны по мере их обнаружения)
