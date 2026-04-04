@@ -24826,7 +24826,8 @@ function drawEquityForResult(r) {
     console.log('  │    equities[r.name]:', equities[r.name] ? `array[${equities[r.name].length}]` : 'NULL ← возможно, 100%?');
     console.log('  │  ');
     console.log('  │  ❓ Какой из 🟠 это ПОЛНАЯ Strategy Equity? Используем этот для оранжевой!');
-    console.log('  │    shouldUseBaseline:', shouldUseBaseline);
+    const _shouldUseBaseline = baselineEq && baselineEq.length === eq.length && _eqMAFilterShowBaseline;
+    console.log('  │    shouldUseBaseline:', _shouldUseBaseline);
   }
 
   // Проверяем доступные источники equity
@@ -34266,7 +34267,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1775322316928;
+window._BUILD_TS = 1775322486408;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
