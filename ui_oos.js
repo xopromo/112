@@ -1449,17 +1449,35 @@ async function runOOSOnNewData() {
       // ВАЖНО: new_eq уже должна быть ОЧИЩЕНА (без пересечения) чтобы синхронизировать warmup
       // иначе when мы обрезаем overlapIdx в _drawOOSGraphicForResult, мы нарушаем warmup синхронизацию
       old_eq:    (() => {
-        if (!rOld || !rOld.eq || !rOld.eq.length) return null;
+        if (!rOld || !rOld.eq || !rOld.eq.length) {
+          if (window.__DEBUG_OOS_CREATION) {
+            console.log('  old_eq FAILED: rOld=', !!rOld, rOld?.eq?.length ?? 'NO EQ');
+          }
+          return null;
+        }
         const isEndIdx = Math.round(0.70 * rOld.eq.length) || 0;
         // Копируем для безопасности - если rOld.eq переиспользуется, old_eq не пострадает
-        return Array.from(rOld.eq.slice(0, Math.min(isEndIdx + 1, rOld.eq.length)));
+        const result = Array.from(rOld.eq.slice(0, Math.min(isEndIdx + 1, rOld.eq.length)));
+        if (window.__DEBUG_OOS_CREATION) {
+          console.log('  old_eq SUCCESS: created array[', result.length, ']');
+        }
+        return result;
       })(),
       new_eq:    (() => {
         // КРИТИЧНО: Сохраняем ПОЛНЫЙ eq (без обрезки по overlapIdx)
         // Обрезка будет в _drawOOSGraphicForResult по warmup + overlapIdx одновременно
         // чтобы гарантировать warmup синхронизация между eq_old и eq_new
-        if (!rNew || !rNew.eq || !rNew.eq.length) return null;
-        return Array.from(rNew.eq);  // ПОЛНЫЙ eq
+        if (!rNew || !rNew.eq || !rNew.eq.length) {
+          if (window.__DEBUG_OOS_CREATION) {
+            console.log('  new_eq FAILED: rNew=', !!rNew, rNew?.eq?.length ?? 'NO EQ');
+          }
+          return null;
+        }
+        const result = Array.from(rNew.eq);  // ПОЛНЫЙ eq
+        if (window.__DEBUG_OOS_CREATION) {
+          console.log('  new_eq SUCCESS: created array[', result.length, ']');
+        }
+        return result;
       })(),
       // OOS-специфичные поля — история (только IS часть 70%)
       old_pnl:    rOld_IS ? rOld_IS.pnl : null,
