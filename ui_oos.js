@@ -1479,6 +1479,13 @@ async function runOOSOnNewData() {
         }
         return result;
       })(),
+      // ##EQ_MA_FILTER## Отфильтрованные данные эквити (с MA фильтром)
+      old_eqCalc: (() => {
+        if (!rOld || !rOld.eqCalc || !rOld.eqCalc.length) return null;
+        const isEndIdx = Math.round(0.70 * rOld.eqCalc.length) || 0;
+        return Array.from(rOld.eqCalc.slice(0, Math.min(isEndIdx + 1, rOld.eqCalc.length)));
+      })(),
+      new_eqCalc: (rNew && rNew.eqCalc) ? Array.from(rNew.eqCalc) : null,  // ##EQ_MA_FILTER## отфильтрованная на новых данных
       // OOS-специфичные поля — история (только IS часть 70%)
       old_pnl:    rOld_IS ? rOld_IS.pnl : null,
       old_wr:     rOld_IS ? rOld_IS.wr  : null,
