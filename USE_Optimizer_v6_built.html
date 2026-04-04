@@ -30059,6 +30059,15 @@ async function runOOSOnNewData() {
       new_kRatio = _calcKRatio(_eqS);
     }
 
+    // 🔍 ДИАГНОСТИКА: Почему old_eq и new_eq не заполняются?
+    if (window.__DEBUG_OOS_CREATION) {
+      console.log('OOS Result Creation Diagnostics:');
+      console.log('  Result name:', r.name);
+      console.log('  rOld exists:', !!rOld, rOld ? `eq.length=${rOld.eq?.length}` : 'NULL');
+      console.log('  rNew exists:', !!rNew, rNew ? `eq.length=${rNew.eq?.length}` : 'NULL');
+      console.log('  rOld_IS exists:', !!rOld_IS);
+    }
+
     _oosTableResults.push({
       _isOOSResult: true,  // ##EQ_MA_FILTER## КРИТИЧНЫЙ флаг для drawEquityForResult!
       name:      r.name,
@@ -33831,7 +33840,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1775311587387;
+window._BUILD_TS = 1775312657487;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
