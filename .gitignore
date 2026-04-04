@@ -11,6 +11,8 @@ vk_sales/config.json
 .claude/regression-report.json
 .regression-results
 
-# Generated bundle files - regenerate via: python build.py
-USE_Optimizer_v6_built.html
+# NOTE: USE_Optimizer_v6_built.html MUST remain in git for GitHub Pages!
+# Until CI/CD is setup to regenerate it, keep it committed.
+# TODO: Setup GitHub Actions workflow to auto-rebuild on source changes
+# (Do NOT add to .gitignore until CI/CD is ready)
 
