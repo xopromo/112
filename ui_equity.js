@@ -259,7 +259,9 @@ function drawEquityForResult(r) {
 
   // ⚠️ Для HC результатов: используем _fullEq если доступен (полный eq с OOS split)
   // Это полный backtest(100%), а не оригинальный HC результат
-  let eqToDisplay = r._fullEq || r.eq;
+  // КРИТИЧНО: Используем r.eqCalc если доступен (отфильтрованная эквити с MA)
+  // r.eqCalc это Traded Equity с MA фильтром (зелёная линия)
+  let eqToDisplay = r.eqCalc || r._fullEq || r.eq;
 
   if (window.__DEBUG_EQUITY) {
     console.log('  ┌─ DATA SOURCES (найти полную Strategy Equity 100%):');
