@@ -168,6 +168,18 @@ function drawEquityForResult(r) {
   // (Некоторые результаты могут иметь old_eq/new_eq через копирование без флага)
   const hasOOSData = r.old_eq && r.old_eq.length && r.new_eq && r.new_eq.length;
 
+  // 🔍 ДИАГНОСТИКА: понять почему нет OOS данных
+  if (window.__DEBUG_EQUITY) {
+    console.log('drawEquityForResult diagnostics:');
+    console.log('  r.name:', r.name);
+    console.log('  r.old_eq:', r.old_eq ? `array[${r.old_eq.length}]` : 'NULL');
+    console.log('  r.new_eq:', r.new_eq ? `array[${r.new_eq.length}]` : 'NULL');
+    console.log('  r._isOOSResult:', r._isOOSResult);
+    console.log('  hasOOSData:', hasOOSData);
+    console.log('  equities[r.name]:', equities[r.name] ? `array[${equities[r.name].length}]` : 'NULL');
+    console.log('  r.eq:', r.eq ? `array[${r.eq.length}]` : 'NULL');
+  }
+
   if (hasOOSData) {
     _drawOOSGraphicForResult(r);  // WAVE 8: используем OOS рисование если есть OOS данные
     return;

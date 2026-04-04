@@ -1424,9 +1424,6 @@ async function runOOSOnNewData() {
       _isOOSResult: true,  // ##EQ_MA_FILTER## КРИТИЧНЫЙ флаг для drawEquityForResult!
       name:      r.name,
       cfg:       r.cfg,  // ВАЖНО: это создает НОВЫЙ объект, не ссылку на r
-      // WAVE 9: Сохраняем ПОЛНУЮ эквити (100% OOS+IS) для обычного режима рисования
-      // Это гарантирует что в обычном режиме графики показывают правильное (100%) вместо падбэка на 70%
-      eq:        rNew && rNew.eq ? Array.from(rNew.eq) : null,  // WAVE 9: полная эквити для fallback
       // Поля для стандартного рендера (pnl = old_pnl для детали/избранного)
       // ##EQ_MA_FILTER## Используем IS метрики (rOld_IS) чтобы соответствовать old_eq (70%)
       pnl:       rOld_IS ? rOld_IS.pnl : (rOld ? rOld.pnl : null),

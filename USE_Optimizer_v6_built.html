@@ -24718,6 +24718,18 @@ function drawEquityForResult(r) {
   // (Некоторые результаты могут иметь old_eq/new_eq через копирование без флага)
   const hasOOSData = r.old_eq && r.old_eq.length && r.new_eq && r.new_eq.length;
 
+  // 🔍 ДИАГНОСТИКА: понять почему нет OOS данных
+  if (window.__DEBUG_EQUITY) {
+    console.log('drawEquityForResult diagnostics:');
+    console.log('  r.name:', r.name);
+    console.log('  r.old_eq:', r.old_eq ? `array[${r.old_eq.length}]` : 'NULL');
+    console.log('  r.new_eq:', r.new_eq ? `array[${r.new_eq.length}]` : 'NULL');
+    console.log('  r._isOOSResult:', r._isOOSResult);
+    console.log('  hasOOSData:', hasOOSData);
+    console.log('  equities[r.name]:', equities[r.name] ? `array[${equities[r.name].length}]` : 'NULL');
+    console.log('  r.eq:', r.eq ? `array[${r.eq.length}]` : 'NULL');
+  }
+
   if (hasOOSData) {
     _drawOOSGraphicForResult(r);  // WAVE 8: используем OOS рисование если есть OOS данные
     return;
@@ -30051,9 +30063,6 @@ async function runOOSOnNewData() {
       _isOOSResult: true,  // ##EQ_MA_FILTER## КРИТИЧНЫЙ флаг для drawEquityForResult!
       name:      r.name,
       cfg:       r.cfg,  // ВАЖНО: это создает НОВЫЙ объект, не ссылку на r
-      // WAVE 9: Сохраняем ПОЛНУЮ эквити (100% OOS+IS) для обычного режима рисования
-      // Это гарантирует что в обычном режиме графики показывают правильное (100%) вместо падбэка на 70%
-      eq:        rNew && rNew.eq ? Array.from(rNew.eq) : null,  // WAVE 9: полная эквити для fallback
       // Поля для стандартного рендера (pnl = old_pnl для детали/избранного)
       // ##EQ_MA_FILTER## Используем IS метрики (rOld_IS) чтобы соответствовать old_eq (70%)
       pnl:       rOld_IS ? rOld_IS.pnl : (rOld ? rOld.pnl : null),
@@ -33822,7 +33831,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1775260932342;
+window._BUILD_TS = 1775261791313;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
