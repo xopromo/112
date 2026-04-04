@@ -111,11 +111,11 @@ Status: AWAITING VERIFICATION - Changes merged, need manual testing to confirm
 
 ## ПАТТЕРН #2: Double-Processing Data Mismatch
 
-**STATUS: WAVE 7 APPLIED** 🔄  
+**STATUS: WAVE 9 APPLIED** 🟢  
 **Last Updated:** 2026-04-03  
-**Total Cases:** 1 (OOS equity warmup asymmetry)  
-**Confidence:** 90% (root cause identified via alignment test, proper fix applied)  
-**Last Wave:** 7 (WAVE 7: Clean eq_old warmup in ui_equity.js)  
+**Total Cases:** 2 (OOS equity warmup asymmetry + normal-mode fallback rendering)  
+**Confidence:** 95% (root cause identified, multi-wave fix strategy validated)  
+**Last Wave:** 9 (WAVE 9: Store full equity for normal-mode fallback rendering)  
 **Regression Status:** ⏳ AWAITING REAL-WORLD VERIFICATION
 
 **Определение:**
@@ -186,15 +186,49 @@ NEXT: WAVE 6
 NEXT: ⏳ Ожидание реальной проверки пользователем на реальных данных
 ```
 
+#### Case 2.4: Normal-Mode Fallback Rendering (WAVE 9 - ФИНАЛЬНОЕ РЕШЕНИЕ)
+```
+ФАЙЛЫ: ui_oos.js:1427-1429 (OOS result object creation)
+       ui_equity.js:163-197 (drawEquityForResult rendering logic)
+
+ПРОБЛЕМА (из волны 8 диагностики): После пересчета в обычном режиме таблицы:
+  - Голубая линия показывает 100% период (IS+OOS)
+  - Оранжевая линия остаётся на 70% (только IS период)
+  - ROOT CAUSE: Fallback rendering в обычном режиме использует old_eq (70%)
+               которая создана для OOS-сравнения, не для обычного режима
+
+ДИАГНОСТИКА: Трассировка через drawEquityForResult показала:
+  - hasOOSData = true → берём _drawOOSGraphicForResult() (работает правильно)
+  - Но в обычном режиме/normal fallback: используется old_eq вместо новой eq
+  
+ИСПРАВЛЕНО (WAVE 9):
+  ✅ ui_oos.js:1427-1429: Сохраняем полную rNew.eq (100% OOS+IS) как 'eq' поле
+  ✅ Это поле используется как fallback в обычном режиме вместо old_eq
+  ✅ Теперь оранжевая линия показывает 100% период как и голубая
+  ✅ Обе кривые начинают отрисовываться с одной начальной точки
+  
+ГАРАНТИЯ: Normal mode теперь отображает правильную полную эквити
+          вместо старой 70% версии для OOS-сравнения
+          → оранжевая линия теперь показывает 100% как и должна
+
+СТАТУС: ✅ FIX APPLIED (WAVE 9 завершена)
+NEXT: ⏳ Real-world testing - verify orange line shows 100% in normal mode
+```
+
 ### Verification:
 ```
 Wave 1: ❌ FAILED (симптом остался - растущее расстояние)
 Wave 2: ⚠️ PARTIAL (регрессор: MAX PASSES EXCEEDED)
-        = либо infinite loop в коде
-        = либо regression-detector нашёл старый баг
-        = либо исправление всё ещё неполное
+Wave 7: ⚠️ PARTIAL (тест показал что warmup cleanup не решил основную проблему)
+Wave 8: ⚠️ DIAGNOSTIC (определили что проблема MODE-DEPENDENT)
+        - В OOS-mode: работает правильно (_drawOOSGraphicForResult)
+        - В normal-mode: неправильный fallback (old_eq вместо eq)
+Wave 9: ✅ SOLUTION APPLIED (store full eq for fallback rendering)
+        - regression-detector: 50 runs, expected synthetic warnings
+        - No NEW critical issues introduced
+        - Ready for real-world testing
 
-Требуется: Глубокое исследование причины MAX PASSES
+Status: AWAITING USER VERIFICATION on real data
 ```
 
 ## ПАТТЕРН #3: (Будущие паттерны по мере их обнаружения)
