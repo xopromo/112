@@ -326,6 +326,45 @@ bash .claude/scripts/pre-push-regression-check.sh || {
 }
 
 # ======================================================================
+# 🔴 Критично 16: Bundle rebuild check (из Rule в forbidden-patterns.md)
+# Если изменены .js файлы — ДОЛЖЕН быть обновлён USE_Optimizer_v6_built.html
+# ======================================================================
+echo "  Проверка пересборки бандла..."
+
+# Получить список файлов которые будут закоммичены
+CHANGED_FILES=$(git diff --cached --name-only 2>/dev/null || true)
+
+# Проверить есть ли изменения в исходниках
+JS_CHANGED=$(echo "$CHANGED_FILES" | grep -E "\.js$|\.html$" | grep -v "USE_Optimizer_v6_built.html" || true)
+
+# Если есть изменения в исходниках
+if [ -n "$JS_CHANGED" ]; then
+  # Проверить был ли обновлён бандл
+  BUNDLE_UPDATED=$(echo "$CHANGED_FILES" | grep "USE_Optimizer_v6_built.html" || true)
+
+  if [ -z "$BUNDLE_UPDATED" ]; then
+    echo "  ❌ ОШИБКА: Исходники изменены но бандл НЕ пересобран!"
+    echo ""
+    echo "     Изменённые файлы:"
+    echo "$JS_CHANGED" | sed 's/^/       /'
+    echo ""
+    echo "     РЕШЕНИЕ:"
+    echo "     1. Пересобрать бандл: python build.py"
+    echo "     2. Добавить обновлённый бандл: git add USE_Optimizer_v6_built.html"
+    echo "     3. Закоммитить: git commit --amend"
+    echo "     4. Попробовать пуш снова"
+    echo ""
+    echo "     Почему: Бандл это генерируемый файл. Если забыть обновить"
+    echo "     → при мерже две версии бандла встречаются → конфликт"
+    ERRORS=$((ERRORS + 1))
+  else
+    echo "  ✓ Исходники и бандл синхронизированы"
+  fi
+else
+  echo "  ✓ Только документация изменена - бандл не требуется"
+fi
+
+# ======================================================================
 # Результаты
 # ======================================================================
 echo ""

@@ -331,10 +331,11 @@ function _drawOOSGraphicForResult(r) {
 
   if (window.__DEBUG_EQUITY) console.log('  ✅ Canvas found');
 
-  const eq_old = r.old_eq;
-  const eq_new = r.new_eq;
-  const baseline_old = r.old_eqCalcBaselineArr; // baseline на истории ##EQ_MA_FILTER##
-  const baseline_new = r.new_eqCalcBaselineArr; // baseline на новых данных ##EQ_MA_FILTER##
+  // ##EQ_MA_FILTER## Используем отфильтрованные данные (eqCalc) если доступны, иначе базовые (eq)
+  const eq_old = r.old_eqCalc || r.old_eq;  // отфильтрованная история или базовая
+  const eq_new = r.new_eqCalc || r.new_eq;  // отфильтрованная OOS или базовая
+  const baseline_old = r.old_eqCalcBaselineArr; // baseline на истории (оранжевая) ##EQ_MA_FILTER##
+  const baseline_new = r.new_eqCalcBaselineArr; // baseline на новых данных (оранжевая) ##EQ_MA_FILTER##
 
   if (window.__DEBUG_EQUITY) {
     console.log('  📊 Data sources:');
@@ -483,9 +484,10 @@ function _drawOOSGraphicForResult(r) {
     console.log('    Установите: window.__DEBUG_OOS = true перед открытием результата');
   }
 
-  // Аналогично для baseline ##EQ_MA_FILTER##
+  // ##EQ_MA_FILTER## Аналогично для baseline (оранжевая линия)
+  // Baseline ДОЛЖНА быть из без-фильтрованных данных (r.old_eqCalcBaselineArr, r.new_eqCalcBaselineArr)
   let combined_baseline = null;
-  if (_eqMAFilterShowBaseline && oldBaselineClean && newBaselineClean) {
+  if (_eqMAFilterShowBaseline && baseline_old && baseline_new && oldBaselineClean && newBaselineClean) {
     const lastOldBL = oldBaselineClean[oldBaselineClean.length - 1];
     combined_baseline = [...oldBaselineClean, ...newBaselineClean.map(v => v + lastOldBL)];
   }

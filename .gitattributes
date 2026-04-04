@@ -1,0 +1,3 @@
+# Auto-merge strategy for generated files
+USE_Optimizer_v6_built.html merge=ours
+
