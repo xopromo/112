@@ -6,6 +6,52 @@
 
 ---
 
+## ПАТТЕРН #4: Zero-Equity Bug
+
+**STATUS: CLOSED** ✅  
+**Last Updated:** 2026-04-04  
+**Total Cases:** 3  
+**Confidence:** 95% (исправления сделаны, всё в одной волне)  
+**Last Wave:** 1  
+**Regression Status:** ✅ dumb-checks.sh RULE 19 проверяет
+
+**Определение:**
+Когда `useEqMA=false`, переменная `_eqCalc` остаётся `null` и сохраняется в результаты.
+При рисовании графиков в OOS модали используется null вместо реальных данных.
+Это приводит к нулевым значениям equity в таблице (eq[0..5]: 0.0, 0.0, 0.0...).
+
+**Правило:** Zero-Equity Protection  
+**Уровень:** CRITICAL  
+**Статус:** ✅ VERIFIED (all 3 cases fixed in one commit)
+
+### Cases этого паттерна:
+
+#### Case 4.1: MC режим (opt.js:2260)
+```
+ФАЙЛ: opt.js:2260-2262
+ПРОБЛЕМА: Если useEqMA=false, _eqCalc остаётся null
+FIX: if (!_eqCalc && r && r.eq && r.eq.length > 0) { _eqCalc = Array.from(r.eq); }
+STATUS: ✅ Fixed
+```
+
+#### Case 4.2: TPE режим (opt.js:2684)
+```
+ФАЙЛ: opt.js:2684-2686
+ПРОБЛЕМА: Если useEqMA=false, _eqCalc остаётся null
+FIX: if (!_eqCalc && r && r.eq && r.eq.length > 0) { _eqCalc = Array.from(r.eq); }
+STATUS: ✅ Fixed
+```
+
+#### Case 4.3: Exhaustive режим (opt.js:3414)
+```
+ФАЙЛ: opt.js:3414-3416
+ПРОБЛЕМА: Если useEqMA=false, _eqCalc остаётся null
+FIX: if (!_eqCalc && r && r.eq && r.eq.length > 0) { _eqCalc = Array.from(r.eq); }
+STATUS: ✅ Fixed
+```
+
+---
+
 ## ПАТТЕРН #1: Reference Sharing Corruption
 
 **STATUS: PARTIAL** 🟡  

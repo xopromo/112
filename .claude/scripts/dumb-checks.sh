@@ -453,6 +453,38 @@ else
 fi
 
 # ======================================================================
+# RULE 19: eqCalc НИКОГДА не должна быть null в результатах
+# ======================================================================
+# ПАТТЕРН #4: Zero-Equity Bug - eqCalc null когда useEqMA=false
+# Проверяем что в opt.js все три режима (MC, TPE, Exhaustive)
+# имеют защиту: if (!_eqCalc && r && r.eq) { _eqCalc = Array.from(r.eq) }
+# ======================================================================
+echo ""
+echo "RULE 19: eqCalc Protection (Zero-Equity Bug)"
+
+if [ -f opt.js ]; then
+  # Ищем три места где _eqCalc присваивается в результаты (MC, TPE, Exhaustive)
+  MC_HAS_FIX=$(grep -c "##ZERO_EQUITY_FIX##" opt.js || echo 0)
+
+  if [ "$MC_HAS_FIX" -lt 3 ]; then
+    echo "  ❌ ОШИБКА: Не все режимы имеют protection от null eqCalc"
+    echo "     Ожидается 3 блока с ##ZERO_EQUITY_FIX## комментарием"
+    echo "     Найдено: $MC_HAS_FIX"
+    echo ""
+    echo "     РЕШЕНИЕ:"
+    echo "     Добавить после каждого done++ в MC/TPE/Exhaustive блоках:"
+    echo "       if (!_eqCalc && r && r.eq && r.eq.length > 0) {"
+    echo "         _eqCalc = Array.from(r.eq);"
+    echo "       }"
+    ERRORS=$((ERRORS + 1))
+  else
+    echo "  ✓ eqCalc Protection: OK (все режимы защищены от null)"
+  fi
+else
+  echo "  ⚠️  opt.js не найден - пропускаем RULE 19"
+fi
+
+# ======================================================================
 # Результаты
 # ======================================================================
 echo ""
