@@ -82,7 +82,12 @@ function drawEquityData(eq, label, splitPct, baselineEq=null) {
   // Рассчитываем min/max для обеих линий
   let mn=0,mx=0;
   for(let i=0;i<eq.length;i++) {if(eq[i]<mn)mn=eq[i];if(eq[i]>mx)mx=eq[i];}
+
+  // 🔧 WAVE 10 FIX: Baseline используется для расчёта диапазона (min/max)
+  // но рисуется только если длины совпадают (из одного периода)
+  const shouldRenderBaseline = baselineEq && baselineEq.length === eq.length;
   if (_eqMAFilterShowBaseline && baselineEq && baselineEq.length) {
+    // Всегда используем baseline для диапазона (визуально корректнее)
     for(let i=0;i<baselineEq.length;i++) {if(baselineEq[i]<mn)mn=baselineEq[i];if(baselineEq[i]>mx)mx=baselineEq[i];}
   }
   const range=mx-mn||1, pad=14;
@@ -148,8 +153,8 @@ function drawEquityData(eq, label, splitPct, baselineEq=null) {
   }
   ctx.stroke();
 
-  // Рисуем baseline (без фильтра) если доступен и включен
-  if (_eqMAFilterShowBaseline && baselineEq && baselineEq.length) {
+  // Рисуем baseline (без фильтра) если доступен, включен И длины совпадают
+  if (_eqMAFilterShowBaseline && shouldRenderBaseline) {
     if (window.__DEBUG_EQUITY) {
       console.log('  🟠 Drawing BASELINE (secondary line):');
       console.log('    baselineEq.length:', baselineEq.length);
@@ -256,11 +261,6 @@ function drawEquityForResult(r) {
   // Это полный backtest(100%), а не оригинальный HC результат
   let eqToDisplay = r._fullEq || r.eq;
 
-  // 🔧 WAVE 10 FIX: Если baselineEq короче чем eq, они из разных периодов (IS vs полный)
-  // Baseline была рассчитана на 70% IS данных, а eq это полные 100% данные
-  // Показывать baseline только если оба из одного периода (одинаковой длины)
-  const baselineEqToUse = (baselineEq && eqToDisplay && baselineEq.length === eqToDisplay.length) ? baselineEq : null;
-
   if (window.__DEBUG_EQUITY) {
     console.log('  ┌─ FALLBACK RENDERING (no OOS data):');
     console.log('  │  splitPct:', splitPct);
@@ -269,7 +269,7 @@ function drawEquityForResult(r) {
     console.log('  │  eqToDisplay:', eqToDisplay ? `array[${eqToDisplay.length}]` : 'NULL');
     console.log('  │  equities[r.name]:', equities[r.name] ? `array[${equities[r.name].length}]` : 'NULL');
     console.log('  │  baselineEq (raw):', baselineEq ? `array[${baselineEq.length}]` : 'NULL');
-    console.log('  │  baselineEqToUse (WAVE 10 FIX):', baselineEqToUse ? `array[${baselineEqToUse.length}]` : 'NULL (mismatched lengths)');
+    console.log('  │  shouldRenderBaseline (WAVE 10 FIX):', shouldRenderBaseline);
   }
 
   // Проверяем доступные источники equity
@@ -277,12 +277,12 @@ function drawEquityForResult(r) {
     if (window.__DEBUG_EQUITY) console.log('  │  ✅ Using r._fullEq/r.eq');
     console.log('  └─');
     console.log('  → CALLING drawEquityData(eqToDisplay, splitPct=' + splitPct + ')');
-    drawEquityData(eqToDisplay, r.name, splitPct, baselineEqToUse);
+    drawEquityData(eqToDisplay, r.name, splitPct, baselineEq);
   } else if (equities[r.name]) {
     if (window.__DEBUG_EQUITY) console.log('  │  ✅ Using equities[r.name] FALLBACK');
     console.log('  └─');
     console.log('  → CALLING drawEquityData(equities[r.name], splitPct=' + splitPct + ')');
-    drawEquityData(equities[r.name], r.name, splitPct, baselineEq);
+    drawEquityData(equities[r.name], r.name, splitPct, baselineEqToUse);
   } else if (r.cfg) {
     if (window.__DEBUG_EQUITY) console.log('  │  ✅ Running _hcRunBacktest()');
     console.log('  └─');
