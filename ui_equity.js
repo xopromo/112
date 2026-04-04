@@ -87,6 +87,17 @@ function drawEquityData(eq, label, splitPct, baselineEq=null) {
   }
   const range=mx-mn||1, pad=14;
 
+  if (window.__DEBUG_EQUITY) {
+    console.log('  📈 Line drawing setup:');
+    console.log('    _eqMAFilterShowBaseline:', _eqMAFilterShowBaseline);
+    console.log('    Will draw MAIN line (eq['+eq.length+']):', _eqMAFilterShowBaseline ? 'YES (with baseline overlay)' : 'YES (main only)');
+    if (_eqMAFilterShowBaseline && baselineEq && baselineEq.length) {
+      console.log('    Will ALSO draw BASELINE line (baselineEq['+baselineEq.length+']): YES');
+      console.log('    ⚠️  BASELINE IS SHORTER:', baselineEq.length, 'vs EQ:', eq.length);
+    }
+    console.log('    Data range: min='+mn.toFixed(2)+', max='+mx.toFixed(2)+', range='+range.toFixed(2));
+  }
+
   ctx.strokeStyle='rgba(30,42,56,0.8)'; ctx.lineWidth=0.5;
   for(let v=-3;v<=3;v++) {
     const y=H-pad-((v*(range/4)+(mn+range/2)-mn)/range*(H-2*pad));
@@ -139,6 +150,12 @@ function drawEquityData(eq, label, splitPct, baselineEq=null) {
 
   // Рисуем baseline (без фильтра) если доступен и включен
   if (_eqMAFilterShowBaseline && baselineEq && baselineEq.length) {
+    if (window.__DEBUG_EQUITY) {
+      console.log('  🟠 Drawing BASELINE (secondary line):');
+      console.log('    baselineEq.length:', baselineEq.length);
+      console.log('    color:', _eqMAFilterBaselineColor);
+      console.log('    This baseline line may appear as orange if enabled!');
+    }
     const baselineNLast = Math.max(baselineEq.length - 1, 1);
     ctx.strokeStyle = _eqMAFilterBaselineColor;
     ctx.globalAlpha = 0.6;
