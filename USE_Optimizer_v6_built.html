@@ -24888,11 +24888,22 @@ function _drawOOSGraphicForResult(r) {
   const baseline_new = r.new_eqCalcBaselineArr; // baseline на новых данных (оранжевая) ##EQ_MA_FILTER##
 
   if (window.__DEBUG_EQUITY) {
-    console.log('  📊 Data sources:');
-    console.log('    eq_old (BLUE/IS):', eq_old ? `array[${eq_old.length}]` : 'NULL');
-    console.log('    eq_new (ORANGE/OOS):', eq_new ? `array[${eq_new.length}]` : 'NULL');
-    console.log('    baseline_old:', baseline_old ? `array[${baseline_old.length}]` : 'NULL');
-    console.log('    baseline_new:', baseline_new ? `array[${baseline_new.length}]` : 'NULL');
+    console.log('═══════════════════════════════════════════════════════');
+    console.log('_drawOOSGraphicForResult: НАЧАЛО диагностики');
+    console.log('═══════════════════════════════════════════════════════');
+    console.log('  🔍 STEP 1: Проверка исходных данных в объекте результата:');
+    console.log('    r.old_eq:', r.old_eq ? `array[${r.old_eq.length}]` : 'NULL');
+    console.log('    r.new_eq:', r.new_eq ? `array[${r.new_eq.length}]` : 'NULL');
+    console.log('    r.old_eqCalc:', r.old_eqCalc ? `array[${r.old_eqCalc.length}]` : 'NULL');
+    console.log('    r.new_eqCalc:', r.new_eqCalc ? `array[${r.new_eqCalc.length}]` : 'NULL');
+    console.log('    r.old_eqCalcBaselineArr:', r.old_eqCalcBaselineArr ? `array[${r.old_eqCalcBaselineArr.length}]` : 'NULL ❌ CRITICAL!');
+    console.log('    r.new_eqCalcBaselineArr:', r.new_eqCalcBaselineArr ? `array[${r.new_eqCalcBaselineArr.length}]` : 'NULL ❌ CRITICAL!');
+    console.log('');
+    console.log('  🔍 STEP 2: После fallback логики (||):');
+    console.log('    eq_old (используется для BLUE):', eq_old ? `array[${eq_old.length}]` : 'NULL');
+    console.log('    eq_new (используется для ORANGE):', eq_new ? `array[${eq_new.length}]` : 'NULL');
+    console.log('    baseline_old (для overlay):', baseline_old ? `array[${baseline_old.length}]` : 'NULL ❌ CRITICAL!');
+    console.log('    baseline_new (для overlay):', baseline_new ? `array[${baseline_new.length}]` : 'NULL ❌ CRITICAL!');
   }
 
   // Определяем пересечение данных по timestamps
@@ -25037,25 +25048,50 @@ function _drawOOSGraphicForResult(r) {
   // ##EQ_MA_FILTER## Аналогично для baseline (оранжевая линия)
   // КРИТИЧНО: Baseline ДОЛЖНА быть из без-фильтрованных данных (r.old_eqCalcBaselineArr, r.new_eqCalcBaselineArr)
   if (window.__DEBUG_EQUITY) {
-    console.log('  🟠 BASELINE CHECK:');
+    console.log('');
+    console.log('  🔍 STEP 3: Cleaning & Normalization для baseline:');
     console.log('    _eqMAFilterShowBaseline:', _eqMAFilterShowBaseline);
-    console.log('    baseline_old:', baseline_old ? `array[${baseline_old.length}]` : 'NULL ❌');
-    console.log('    baseline_new:', baseline_new ? `array[${baseline_new.length}]` : 'NULL ❌');
-    console.log('    oldBaselineClean:', oldBaselineClean ? `array[${oldBaselineClean.length}]` : 'NULL');
-    console.log('    newBaselineClean:', newBaselineClean ? `array[${newBaselineClean.length}]` : 'NULL');
+    console.log('    baseline_old (before clean):', baseline_old ? `array[${baseline_old.length}]` : 'NULL ❌');
+    console.log('    baseline_new (before clean):', baseline_new ? `array[${baseline_new.length}]` : 'NULL ❌');
+    console.log('    oldBaselineClean (after clean):', oldBaselineClean ? `array[${oldBaselineClean.length}]` : 'NULL');
+    console.log('    newBaselineClean (after clean):', newBaselineClean ? `array[${newBaselineClean.length}]` : 'NULL');
   }
 
   let combined_baseline = null;
+  if (window.__DEBUG_EQUITY) {
+    console.log('');
+    console.log('  🔍 STEP 4: Concatenation logic:');
+    console.log('    _eqMAFilterShowBaseline:', _eqMAFilterShowBaseline);
+    console.log('    All conditions present?');
+    console.log('      baseline_old && baseline_new:', (baseline_old && baseline_new) ? '✅ YES' : '❌ NO');
+    console.log('      oldBaselineClean && newBaselineClean:', (oldBaselineClean && newBaselineClean) ? '✅ YES' : '❌ NO');
+    console.log('      Can concatenate?:', (_eqMAFilterShowBaseline && baseline_old && baseline_new && oldBaselineClean && newBaselineClean) ? '✅ YES' : '❌ NO');
+  }
+
   if (_eqMAFilterShowBaseline && baseline_old && baseline_new && oldBaselineClean && newBaselineClean) {
     const lastOldBL = oldBaselineClean[oldBaselineClean.length - 1];
     combined_baseline = [...oldBaselineClean, ...newBaselineClean.map(v => v + lastOldBL)];
     if (window.__DEBUG_EQUITY) {
-      console.log('    ✅ combined_baseline created: length=' + combined_baseline.length);
+      console.log('    ✅ combined_baseline CREATED:');
+      console.log('      oldBaselineClean.length:', oldBaselineClean.length);
+      console.log('      newBaselineClean.length:', newBaselineClean.length);
+      console.log('      combined_baseline.length:', combined_baseline.length);
+      console.log('      lastOldBL:', lastOldBL);
     }
   } else if (_eqMAFilterShowBaseline && (!baseline_old || !baseline_new)) {
     if (window.__DEBUG_EQUITY) {
-      console.log('    ⚠️  BASELINE NOT CREATED: baseline_old or baseline_new is NULL!');
-      console.log('    This is why ORANGE LINE is not visible!');
+      console.log('    ❌ BASELINE NOT CREATED - ROOT CAUSE FOUND:');
+      console.log('      baseline_old is NULL?', !baseline_old ? '✅ YES - PROBLEM!' : '❌ NO');
+      console.log('      baseline_new is NULL?', !baseline_new ? '✅ YES - PROBLEM!' : '❌ NO');
+      console.log('');
+      console.log('      This means old_eqCalcBaselineArr or new_eqCalcBaselineArr');
+      console.log('      was NOT properly copied to the OOS result object!');
+      console.log('');
+      console.log('      ORANGE LINE WILL NOT BE VISIBLE ⚠️');
+    }
+  } else if (!_eqMAFilterShowBaseline) {
+    if (window.__DEBUG_EQUITY) {
+      console.log('    ⚠️  Baseline disabled by _eqMAFilterShowBaseline=false');
     }
   }
 
@@ -25144,7 +25180,22 @@ function _drawOOSGraphicForResult(r) {
   ctx.strokeStyle = gNew; ctx.lineWidth = 1.5; ctx.stroke();
 
   // Рисуем baseline (без фильтра) если доступен и включен ##EQ_MA_FILTER##
+  if (window.__DEBUG_EQUITY) {
+    console.log('');
+    console.log('  🔍 STEP 5: Final rendering:');
+    console.log('    _eqMAFilterShowBaseline:', _eqMAFilterShowBaseline);
+    console.log('    combined_baseline exists?', combined_baseline ? '✅ YES' : '❌ NO');
+    console.log('    combined_baseline.length:', combined_baseline?.length ?? 'N/A');
+    console.log('    combined.length:', combined.length);
+    console.log('    Lengths match?', (combined_baseline?.length === combined.length) ? '✅ YES' : '❌ NO');
+    console.log('');
+    console.log('    Will ORANGE baseline be drawn?', (_eqMAFilterShowBaseline && combined_baseline && combined_baseline.length === combined.length) ? '✅ YES' : '❌ NO');
+  }
+
   if (_eqMAFilterShowBaseline && combined_baseline && combined_baseline.length === combined.length) {
+    if (window.__DEBUG_EQUITY) {
+      console.log('    → Drawing baseline overlay...');
+    }
     const toYBL = v => H - pad - ((v - mn) / range * (H - 2 * pad));
 
     function pathSegBL(pxA, pxB) {
@@ -25162,10 +25213,20 @@ function _drawOOSGraphicForResult(r) {
     pathSegBL(0, nPx - 1);
     ctx.stroke();
     ctx.globalAlpha = 1;
+    if (window.__DEBUG_EQUITY) {
+      console.log('    ✅ Baseline drawn successfully');
+    }
+  } else if (_eqMAFilterShowBaseline && combined_baseline && combined_baseline.length !== combined.length) {
+    if (window.__DEBUG_EQUITY) {
+      console.log('    ❌ BASELINE NOT DRAWN: Length mismatch!');
+      console.log('      combined_baseline.length (', combined_baseline.length, ') !== combined.length (', combined.length, ')');
+    }
   }
 
   if (window.__DEBUG_EQUITY) {
-    console.log('  ✅ _drawOOSGraphicForResult COMPLETE - OOS split chart rendered');
+    console.log('');
+    console.log('═══════════════════════════════════════════════════════');
+    console.log('✅ _drawOOSGraphicForResult COMPLETE');
     console.log('═══════════════════════════════════════════════════════');
   }
 }
@@ -27505,15 +27566,37 @@ function _hcRunBacktest(cfg) {
     const _shadowCfg = JSON.parse(JSON.stringify(btCfg));
     _shadowCfg.useEqMA = false;
     const _shadowRes = backtest(ind.pvLo, ind.pvHi, ind.atrArr, _shadowCfg);
+
+    if (window.__DEBUG_HC_BASELINE) {
+      console.log('[_hcRunBacktest] Baseline calculation:');
+      console.log('  cfg.useEqMA:', cfg.useEqMA);
+      console.log('  _shadowRes:', _shadowRes ? 'OK' : 'NULL');
+      console.log('  _shadowRes.eq:', _shadowRes?.eq ? `array[${_shadowRes.eq.length}]` : 'NULL');
+    }
+
     if (_shadowRes && _shadowRes.eq && _shadowRes.eq.length > 0) {
       // ВСЕГДА сохраняем baseline
       btCfg.eqCalcBaselineArr = Array.from(_shadowRes.eq);
+      if (window.__DEBUG_HC_BASELINE) {
+        console.log('  ✅ btCfg.eqCalcBaselineArr created:', `array[${btCfg.eqCalcBaselineArr.length}]`);
+      }
 
       // MA рассчитываем ТОЛЬКО если включен фильтр
       if (cfg.useEqMA) {
         const maLen = cfg.eqMALen || 20;
         const maType = cfg.eqMAType || 'SMA';
         btCfg.eqCalcMAArr = calcMA(Array.from(_shadowRes.eq), maLen, maType);
+        if (window.__DEBUG_HC_BASELINE) {
+          console.log('  ✅ btCfg.eqCalcMAArr created:', `array[${btCfg.eqCalcMAArr.length}]`);
+        }
+      } else {
+        if (window.__DEBUG_HC_BASELINE) {
+          console.log('  ⚠️  useEqMA=false, MA не создаётся');
+        }
+      }
+    } else {
+      if (window.__DEBUG_HC_BASELINE) {
+        console.log('  ❌ BASELINE NOT CREATED: _shadowRes or eq is NULL');
       }
     }
 
@@ -27522,8 +27605,27 @@ function _hcRunBacktest(cfg) {
     // ##EQ_MA_FILTER## ВСЕГДА копируем baseline в результат
     // (была ошибка: копировалась ТОЛЬКО если useEqMA=true, но baseline нужна всегда!)
     if (_hcRes) {
-      if (btCfg.eqCalcBaselineArr) _hcRes.eqCalcBaselineArr = Array.from(btCfg.eqCalcBaselineArr);
-      if (btCfg.eqCalcMAArr) _hcRes.eqCalcMAArr = Array.from(btCfg.eqCalcMAArr);
+      if (window.__DEBUG_HC_BASELINE) {
+        console.log('  Copying to _hcRes:');
+        console.log('    btCfg.eqCalcBaselineArr:', btCfg.eqCalcBaselineArr ? `array[${btCfg.eqCalcBaselineArr.length}]` : 'NULL');
+        console.log('    btCfg.eqCalcMAArr:', btCfg.eqCalcMAArr ? `array[${btCfg.eqCalcMAArr.length}]` : 'NULL');
+      }
+      if (btCfg.eqCalcBaselineArr) {
+        _hcRes.eqCalcBaselineArr = Array.from(btCfg.eqCalcBaselineArr);
+        if (window.__DEBUG_HC_BASELINE) {
+          console.log('    ✅ _hcRes.eqCalcBaselineArr set:', `array[${_hcRes.eqCalcBaselineArr.length}]`);
+        }
+      }
+      if (btCfg.eqCalcMAArr) {
+        _hcRes.eqCalcMAArr = Array.from(btCfg.eqCalcMAArr);
+        if (window.__DEBUG_HC_BASELINE) {
+          console.log('    ✅ _hcRes.eqCalcMAArr set:', `array[${_hcRes.eqCalcMAArr.length}]`);
+        }
+      }
+    } else {
+      if (window.__DEBUG_HC_BASELINE) {
+        console.log('  ❌ _hcRes is NULL');
+      }
     }
 
     // КРИТИЧНО: Копируем eq перед сохранением в кэш - иначе все пользователи кэша
@@ -30138,7 +30240,16 @@ async function runOOSOnNewData() {
 
       // ##EQ_MA_FILTER## ВСЕГДА рассчитываем baseline для rOld (нужна для оранжевой линии!)
       // КРИТИЧНО: baseline должна быть даже если useEqMA=false
+      if (window.__DEBUG_OOS_BASELINE) {
+        console.log('[runOOSScan] rOld baseline check:');
+        console.log('  rOld:', rOld ? 'OK' : 'NULL ❌');
+        console.log('  rOld.eqCalcBaselineArr:', rOld?.eqCalcBaselineArr ? `array[${rOld.eqCalcBaselineArr.length}]` : 'NULL');
+      }
+
       if (rOld && !rOld.eqCalcBaselineArr) {
+        if (window.__DEBUG_OOS_BASELINE) {
+          console.log('  → Need to calculate baseline for rOld');
+        }
         const _ind_old = _calcIndicators(r.cfg);
         const _btCfg_old = buildBtCfg(r.cfg, _ind_old);
 
@@ -30147,17 +30258,38 @@ async function runOOSOnNewData() {
         // ##EQ_MA_FILTER## baseline использует ТЕ ЖЕ параметры входа (waitBars, waitRetrace)
         const _shadowRes_old = backtest(_ind_old.pvLo, _ind_old.pvHi, _ind_old.atrArr, _btCfg_old);
 
+        if (window.__DEBUG_OOS_BASELINE) {
+          console.log('  _shadowRes_old:', _shadowRes_old ? 'OK' : 'NULL');
+          console.log('  _shadowRes_old.eq:', _shadowRes_old?.eq ? `array[${_shadowRes_old.eq.length}]` : 'NULL');
+        }
+
         if (_shadowRes_old && _shadowRes_old.eq && _shadowRes_old.eq.length > 0) {
           // Сохраняем baseline (ВСЕГДА, не только если useEqMA)
           rOld.eqCalcBaselineArr = Array.from(_shadowRes_old.eq);
+          if (window.__DEBUG_OOS_BASELINE) {
+            console.log('  ✅ rOld.eqCalcBaselineArr created:', `array[${rOld.eqCalcBaselineArr.length}]`);
+          }
 
           // Рассчитываем MA только если включен фильтр
           if (r.cfg.useEqMA) {
             const maLen = r.cfg.eqMALen || 20;
             const maType = r.cfg.eqMAType || 'SMA';
             rOld.eqCalcMAArr = calcMA(Array.from(_shadowRes_old.eq), maLen, maType);
+            if (window.__DEBUG_OOS_BASELINE) {
+              console.log('  ✅ rOld.eqCalcMAArr created:', `array[${rOld.eqCalcMAArr.length}]`);
+            }
+          } else {
+            if (window.__DEBUG_OOS_BASELINE) {
+              console.log('  ⚠️  useEqMA=false, MA не создаётся');
+            }
+          }
+        } else {
+          if (window.__DEBUG_OOS_BASELINE) {
+            console.log('  ❌ FAILED to create baseline: _shadowRes_old or eq is NULL');
           }
         }
+      } else if (window.__DEBUG_OOS_BASELINE && rOld && rOld.eqCalcBaselineArr) {
+        console.log('  ✅ rOld already has baseline:', `array[${rOld.eqCalcBaselineArr.length}]`);
       }
     } catch(e) { }
 
@@ -30194,34 +30326,84 @@ async function runOOSOnNewData() {
       _btCfg.tradeLog = [];
 
       // ##EQ_MA_FILTER## Двухпроходный цикл для OOS новых данных
-      if (r.cfg.useEqMA) {
-        // Рассчитываем baseline ДЛЯ NEW ДАННЫХ (всегда нужна свежая, не от old)
-        const _shadowCfg = JSON.parse(JSON.stringify(_btCfg));
-        _shadowCfg.useEqMA = false;
-        // ##EQ_MA_FILTER## baseline использует ТЕ ЖЕ параметры входа (waitBars, waitRetrace)
-        const _shadowRes = backtest(_ind.pvLo, _ind.pvHi, _ind.atrArr, _shadowCfg);
-        if (_shadowRes && _shadowRes.eq && _shadowRes.eq.length > 0) {
-          // Baseline НОВАЯ от new данных
-          _btCfg.eqCalcBaselineArr = Array.from(_shadowRes.eq);
+      // КРИТИЧНО: ВСЕГДА рассчитываем baseline (нужна для оранжевой линии OOS графика)
+      // даже если useEqMA=false
+      if (window.__DEBUG_OOS_BASELINE) {
+        console.log('[runOOSScan] rNew baseline calculation:');
+        console.log('  r.cfg.useEqMA:', r.cfg.useEqMA);
+      }
 
-          // MA ВСЕГДА пересчитываем от new baseline (не переиспользуем old)
-          // Если переиспользовать старую MA на новых данных, фильтр может работать неправильно
-          // когда рыночные условия кардинально отличаются между IS и OOS
+      const _shadowCfg = JSON.parse(JSON.stringify(_btCfg));
+      _shadowCfg.useEqMA = false;
+      // ##EQ_MA_FILTER## baseline использует ТЕ ЖЕ параметры входа (waitBars, waitRetrace)
+      const _shadowRes = backtest(_ind.pvLo, _ind.pvHi, _ind.atrArr, _shadowCfg);
+
+      if (window.__DEBUG_OOS_BASELINE) {
+        console.log('  _shadowRes:', _shadowRes ? 'OK' : 'NULL');
+        console.log('  _shadowRes.eq:', _shadowRes?.eq ? `array[${_shadowRes.eq.length}]` : 'NULL');
+      }
+
+      if (_shadowRes && _shadowRes.eq && _shadowRes.eq.length > 0) {
+        // Baseline НОВАЯ от new данных (ВСЕГДА, не только если useEqMA)
+        _btCfg.eqCalcBaselineArr = Array.from(_shadowRes.eq);
+        if (window.__DEBUG_OOS_BASELINE) {
+          console.log('  ✅ _btCfg.eqCalcBaselineArr created for NEW:', `array[${_btCfg.eqCalcBaselineArr.length}]`);
+        }
+
+        // MA ВСЕГДА пересчитываем от new baseline ЕСЛИ useEqMA включен
+        // (не переиспользуем old)
+        // Если переиспользовать старую MA на новых данных, фильтр может работать неправильно
+        // когда рыночные условия кардинально отличаются между IS и OOS
+        if (r.cfg.useEqMA) {
           const maLen = r.cfg.eqMALen || 20;
           const maType = r.cfg.eqMAType || 'SMA';
           _btCfg.eqCalcMAArr = calcMA(Array.from(_shadowRes.eq), maLen, maType);
+          if (window.__DEBUG_OOS_BASELINE) {
+            console.log('  ✅ _btCfg.eqCalcMAArr created for NEW:', `array[${_btCfg.eqCalcMAArr.length}]`);
+          }
+        } else {
+          if (window.__DEBUG_OOS_BASELINE) {
+            console.log('  ⚠️  useEqMA=false, MA не создаётся');
+          }
+        }
+      } else {
+        if (window.__DEBUG_OOS_BASELINE) {
+          console.log('  ❌ FAILED to create baseline for NEW: _shadowRes or eq is NULL');
         }
       }
 
       rNew = backtest(_ind.pvLo, _ind.pvHi, _ind.atrArr, _btCfg);
       _newTradeLog = _btCfg.tradeLog || [];
-      // ##EQ_MA_FILTER## Копируем baseline данные в результат если они есть
-      if (rNew && r.cfg.useEqMA) {
+
+      // ##EQ_MA_FILTER## Копируем baseline данные в результат ВСЕГДА
+      // (нужна для OOS графика, не только для MA фильтра!)
+      if (window.__DEBUG_OOS_BASELINE) {
+        console.log('  Copying to rNew:');
+        console.log('    rNew:', rNew ? 'OK' : 'NULL');
+        console.log('    _btCfg.eqCalcBaselineArr:', _btCfg.eqCalcBaselineArr ? `array[${_btCfg.eqCalcBaselineArr.length}]` : 'NULL');
+        console.log('    _btCfg.eqCalcMAArr:', _btCfg.eqCalcMAArr ? `array[${_btCfg.eqCalcMAArr.length}]` : 'NULL');
+      }
+
+      if (rNew) {
         if (_btCfg.eqCalcBaselineArr && !rNew.eqCalcBaselineArr) {
           rNew.eqCalcBaselineArr = Array.from(_btCfg.eqCalcBaselineArr);
+          if (window.__DEBUG_OOS_BASELINE) {
+            console.log('    ✅ rNew.eqCalcBaselineArr set:', `array[${rNew.eqCalcBaselineArr.length}]`);
+          }
+        } else if (!_btCfg.eqCalcBaselineArr) {
+          if (window.__DEBUG_OOS_BASELINE) {
+            console.log('    ❌ _btCfg.eqCalcBaselineArr is NULL!');
+          }
         }
         if (_btCfg.eqCalcMAArr && !rNew.eqCalcMAArr) {
           rNew.eqCalcMAArr = Array.from(_btCfg.eqCalcMAArr);
+          if (window.__DEBUG_OOS_BASELINE) {
+            console.log('    ✅ rNew.eqCalcMAArr set:', `array[${rNew.eqCalcMAArr.length}]`);
+          }
+        }
+      } else {
+        if (window.__DEBUG_OOS_BASELINE) {
+          console.log('    ❌ rNew is NULL!');
         }
       }
     } catch(e) { }
@@ -30344,13 +30526,44 @@ async function runOOSOnNewData() {
         }
         return null;
       })(),
-      // Baseline данные для EqMA фильтра
+      // Baseline данные для рисования оранжевой линии в OOS графике
       old_eqCalcBaselineArr: (() => {
-        if (!rOld || !rOld.eqCalcBaselineArr || !rOld.eqCalcBaselineArr.length) return null;
+        if (window.__DEBUG_OOS_CREATION) {
+          console.log('  old_eqCalcBaselineArr:');
+          console.log('    rOld:', rOld ? 'OK' : 'NULL');
+          console.log('    rOld.eqCalcBaselineArr:', rOld?.eqCalcBaselineArr ? `array[${rOld.eqCalcBaselineArr.length}]` : 'NULL ❌');
+        }
+        if (!rOld || !rOld.eqCalcBaselineArr || !rOld.eqCalcBaselineArr.length) {
+          if (window.__DEBUG_OOS_CREATION) {
+            console.log('    → Result: NULL (cannot create old_eqCalcBaselineArr)');
+          }
+          return null;
+        }
         const isEndIdx = Math.round(0.70 * rOld.eqCalcBaselineArr.length) || 0;
-        return rOld.eqCalcBaselineArr.slice(0, Math.min(isEndIdx + 1, rOld.eqCalcBaselineArr.length));
+        const result = rOld.eqCalcBaselineArr.slice(0, Math.min(isEndIdx + 1, rOld.eqCalcBaselineArr.length));
+        if (window.__DEBUG_OOS_CREATION) {
+          console.log('    → Result: array[' + result.length + '] (70% of ' + rOld.eqCalcBaselineArr.length + ')');
+        }
+        return result;
       })(),
-      new_eqCalcBaselineArr: (rNew && rNew.eqCalcBaselineArr) ? Array.from(rNew.eqCalcBaselineArr) : null, // baseline (без MA фильтра) на новых данных ##EQ_MA_FILTER## — КРИТИЧНО копируем!
+      new_eqCalcBaselineArr: (() => {
+        if (window.__DEBUG_OOS_CREATION) {
+          console.log('  new_eqCalcBaselineArr:');
+          console.log('    rNew:', rNew ? 'OK' : 'NULL');
+          console.log('    rNew.eqCalcBaselineArr:', rNew?.eqCalcBaselineArr ? `array[${rNew.eqCalcBaselineArr.length}]` : 'NULL ❌');
+        }
+        if (rNew && rNew.eqCalcBaselineArr) {
+          if (window.__DEBUG_OOS_CREATION) {
+            console.log('    → Result: array[' + rNew.eqCalcBaselineArr.length + '] (copied)');
+          }
+          return Array.from(rNew.eqCalcBaselineArr);
+        } else {
+          if (window.__DEBUG_OOS_CREATION) {
+            console.log('    → Result: NULL (rNew or eqCalcBaselineArr missing)');
+          }
+          return null;
+        }
+      })(), // baseline (без MA фильтра) на новых данных ##EQ_MA_FILTER## — КРИТИЧНО копируем!
     });
   }
 
@@ -34053,7 +34266,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1775320649934;
+window._BUILD_TS = 1775320903193;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;

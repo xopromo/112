@@ -338,11 +338,22 @@ function _drawOOSGraphicForResult(r) {
   const baseline_new = r.new_eqCalcBaselineArr; // baseline на новых данных (оранжевая) ##EQ_MA_FILTER##
 
   if (window.__DEBUG_EQUITY) {
-    console.log('  📊 Data sources:');
-    console.log('    eq_old (BLUE/IS):', eq_old ? `array[${eq_old.length}]` : 'NULL');
-    console.log('    eq_new (ORANGE/OOS):', eq_new ? `array[${eq_new.length}]` : 'NULL');
-    console.log('    baseline_old:', baseline_old ? `array[${baseline_old.length}]` : 'NULL');
-    console.log('    baseline_new:', baseline_new ? `array[${baseline_new.length}]` : 'NULL');
+    console.log('═══════════════════════════════════════════════════════');
+    console.log('_drawOOSGraphicForResult: НАЧАЛО диагностики');
+    console.log('═══════════════════════════════════════════════════════');
+    console.log('  🔍 STEP 1: Проверка исходных данных в объекте результата:');
+    console.log('    r.old_eq:', r.old_eq ? `array[${r.old_eq.length}]` : 'NULL');
+    console.log('    r.new_eq:', r.new_eq ? `array[${r.new_eq.length}]` : 'NULL');
+    console.log('    r.old_eqCalc:', r.old_eqCalc ? `array[${r.old_eqCalc.length}]` : 'NULL');
+    console.log('    r.new_eqCalc:', r.new_eqCalc ? `array[${r.new_eqCalc.length}]` : 'NULL');
+    console.log('    r.old_eqCalcBaselineArr:', r.old_eqCalcBaselineArr ? `array[${r.old_eqCalcBaselineArr.length}]` : 'NULL ❌ CRITICAL!');
+    console.log('    r.new_eqCalcBaselineArr:', r.new_eqCalcBaselineArr ? `array[${r.new_eqCalcBaselineArr.length}]` : 'NULL ❌ CRITICAL!');
+    console.log('');
+    console.log('  🔍 STEP 2: После fallback логики (||):');
+    console.log('    eq_old (используется для BLUE):', eq_old ? `array[${eq_old.length}]` : 'NULL');
+    console.log('    eq_new (используется для ORANGE):', eq_new ? `array[${eq_new.length}]` : 'NULL');
+    console.log('    baseline_old (для overlay):', baseline_old ? `array[${baseline_old.length}]` : 'NULL ❌ CRITICAL!');
+    console.log('    baseline_new (для overlay):', baseline_new ? `array[${baseline_new.length}]` : 'NULL ❌ CRITICAL!');
   }
 
   // Определяем пересечение данных по timestamps
@@ -487,25 +498,50 @@ function _drawOOSGraphicForResult(r) {
   // ##EQ_MA_FILTER## Аналогично для baseline (оранжевая линия)
   // КРИТИЧНО: Baseline ДОЛЖНА быть из без-фильтрованных данных (r.old_eqCalcBaselineArr, r.new_eqCalcBaselineArr)
   if (window.__DEBUG_EQUITY) {
-    console.log('  🟠 BASELINE CHECK:');
+    console.log('');
+    console.log('  🔍 STEP 3: Cleaning & Normalization для baseline:');
     console.log('    _eqMAFilterShowBaseline:', _eqMAFilterShowBaseline);
-    console.log('    baseline_old:', baseline_old ? `array[${baseline_old.length}]` : 'NULL ❌');
-    console.log('    baseline_new:', baseline_new ? `array[${baseline_new.length}]` : 'NULL ❌');
-    console.log('    oldBaselineClean:', oldBaselineClean ? `array[${oldBaselineClean.length}]` : 'NULL');
-    console.log('    newBaselineClean:', newBaselineClean ? `array[${newBaselineClean.length}]` : 'NULL');
+    console.log('    baseline_old (before clean):', baseline_old ? `array[${baseline_old.length}]` : 'NULL ❌');
+    console.log('    baseline_new (before clean):', baseline_new ? `array[${baseline_new.length}]` : 'NULL ❌');
+    console.log('    oldBaselineClean (after clean):', oldBaselineClean ? `array[${oldBaselineClean.length}]` : 'NULL');
+    console.log('    newBaselineClean (after clean):', newBaselineClean ? `array[${newBaselineClean.length}]` : 'NULL');
   }
 
   let combined_baseline = null;
+  if (window.__DEBUG_EQUITY) {
+    console.log('');
+    console.log('  🔍 STEP 4: Concatenation logic:');
+    console.log('    _eqMAFilterShowBaseline:', _eqMAFilterShowBaseline);
+    console.log('    All conditions present?');
+    console.log('      baseline_old && baseline_new:', (baseline_old && baseline_new) ? '✅ YES' : '❌ NO');
+    console.log('      oldBaselineClean && newBaselineClean:', (oldBaselineClean && newBaselineClean) ? '✅ YES' : '❌ NO');
+    console.log('      Can concatenate?:', (_eqMAFilterShowBaseline && baseline_old && baseline_new && oldBaselineClean && newBaselineClean) ? '✅ YES' : '❌ NO');
+  }
+
   if (_eqMAFilterShowBaseline && baseline_old && baseline_new && oldBaselineClean && newBaselineClean) {
     const lastOldBL = oldBaselineClean[oldBaselineClean.length - 1];
     combined_baseline = [...oldBaselineClean, ...newBaselineClean.map(v => v + lastOldBL)];
     if (window.__DEBUG_EQUITY) {
-      console.log('    ✅ combined_baseline created: length=' + combined_baseline.length);
+      console.log('    ✅ combined_baseline CREATED:');
+      console.log('      oldBaselineClean.length:', oldBaselineClean.length);
+      console.log('      newBaselineClean.length:', newBaselineClean.length);
+      console.log('      combined_baseline.length:', combined_baseline.length);
+      console.log('      lastOldBL:', lastOldBL);
     }
   } else if (_eqMAFilterShowBaseline && (!baseline_old || !baseline_new)) {
     if (window.__DEBUG_EQUITY) {
-      console.log('    ⚠️  BASELINE NOT CREATED: baseline_old or baseline_new is NULL!');
-      console.log('    This is why ORANGE LINE is not visible!');
+      console.log('    ❌ BASELINE NOT CREATED - ROOT CAUSE FOUND:');
+      console.log('      baseline_old is NULL?', !baseline_old ? '✅ YES - PROBLEM!' : '❌ NO');
+      console.log('      baseline_new is NULL?', !baseline_new ? '✅ YES - PROBLEM!' : '❌ NO');
+      console.log('');
+      console.log('      This means old_eqCalcBaselineArr or new_eqCalcBaselineArr');
+      console.log('      was NOT properly copied to the OOS result object!');
+      console.log('');
+      console.log('      ORANGE LINE WILL NOT BE VISIBLE ⚠️');
+    }
+  } else if (!_eqMAFilterShowBaseline) {
+    if (window.__DEBUG_EQUITY) {
+      console.log('    ⚠️  Baseline disabled by _eqMAFilterShowBaseline=false');
     }
   }
 
@@ -594,7 +630,22 @@ function _drawOOSGraphicForResult(r) {
   ctx.strokeStyle = gNew; ctx.lineWidth = 1.5; ctx.stroke();
 
   // Рисуем baseline (без фильтра) если доступен и включен ##EQ_MA_FILTER##
+  if (window.__DEBUG_EQUITY) {
+    console.log('');
+    console.log('  🔍 STEP 5: Final rendering:');
+    console.log('    _eqMAFilterShowBaseline:', _eqMAFilterShowBaseline);
+    console.log('    combined_baseline exists?', combined_baseline ? '✅ YES' : '❌ NO');
+    console.log('    combined_baseline.length:', combined_baseline?.length ?? 'N/A');
+    console.log('    combined.length:', combined.length);
+    console.log('    Lengths match?', (combined_baseline?.length === combined.length) ? '✅ YES' : '❌ NO');
+    console.log('');
+    console.log('    Will ORANGE baseline be drawn?', (_eqMAFilterShowBaseline && combined_baseline && combined_baseline.length === combined.length) ? '✅ YES' : '❌ NO');
+  }
+
   if (_eqMAFilterShowBaseline && combined_baseline && combined_baseline.length === combined.length) {
+    if (window.__DEBUG_EQUITY) {
+      console.log('    → Drawing baseline overlay...');
+    }
     const toYBL = v => H - pad - ((v - mn) / range * (H - 2 * pad));
 
     function pathSegBL(pxA, pxB) {
@@ -612,10 +663,20 @@ function _drawOOSGraphicForResult(r) {
     pathSegBL(0, nPx - 1);
     ctx.stroke();
     ctx.globalAlpha = 1;
+    if (window.__DEBUG_EQUITY) {
+      console.log('    ✅ Baseline drawn successfully');
+    }
+  } else if (_eqMAFilterShowBaseline && combined_baseline && combined_baseline.length !== combined.length) {
+    if (window.__DEBUG_EQUITY) {
+      console.log('    ❌ BASELINE NOT DRAWN: Length mismatch!');
+      console.log('      combined_baseline.length (', combined_baseline.length, ') !== combined.length (', combined.length, ')');
+    }
   }
 
   if (window.__DEBUG_EQUITY) {
-    console.log('  ✅ _drawOOSGraphicForResult COMPLETE - OOS split chart rendered');
+    console.log('');
+    console.log('═══════════════════════════════════════════════════════');
+    console.log('✅ _drawOOSGraphicForResult COMPLETE');
     console.log('═══════════════════════════════════════════════════════');
   }
 }

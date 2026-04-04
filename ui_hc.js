@@ -316,15 +316,37 @@ function _hcRunBacktest(cfg) {
     const _shadowCfg = JSON.parse(JSON.stringify(btCfg));
     _shadowCfg.useEqMA = false;
     const _shadowRes = backtest(ind.pvLo, ind.pvHi, ind.atrArr, _shadowCfg);
+
+    if (window.__DEBUG_HC_BASELINE) {
+      console.log('[_hcRunBacktest] Baseline calculation:');
+      console.log('  cfg.useEqMA:', cfg.useEqMA);
+      console.log('  _shadowRes:', _shadowRes ? 'OK' : 'NULL');
+      console.log('  _shadowRes.eq:', _shadowRes?.eq ? `array[${_shadowRes.eq.length}]` : 'NULL');
+    }
+
     if (_shadowRes && _shadowRes.eq && _shadowRes.eq.length > 0) {
       // ВСЕГДА сохраняем baseline
       btCfg.eqCalcBaselineArr = Array.from(_shadowRes.eq);
+      if (window.__DEBUG_HC_BASELINE) {
+        console.log('  ✅ btCfg.eqCalcBaselineArr created:', `array[${btCfg.eqCalcBaselineArr.length}]`);
+      }
 
       // MA рассчитываем ТОЛЬКО если включен фильтр
       if (cfg.useEqMA) {
         const maLen = cfg.eqMALen || 20;
         const maType = cfg.eqMAType || 'SMA';
         btCfg.eqCalcMAArr = calcMA(Array.from(_shadowRes.eq), maLen, maType);
+        if (window.__DEBUG_HC_BASELINE) {
+          console.log('  ✅ btCfg.eqCalcMAArr created:', `array[${btCfg.eqCalcMAArr.length}]`);
+        }
+      } else {
+        if (window.__DEBUG_HC_BASELINE) {
+          console.log('  ⚠️  useEqMA=false, MA не создаётся');
+        }
+      }
+    } else {
+      if (window.__DEBUG_HC_BASELINE) {
+        console.log('  ❌ BASELINE NOT CREATED: _shadowRes or eq is NULL');
       }
     }
 
@@ -333,8 +355,27 @@ function _hcRunBacktest(cfg) {
     // ##EQ_MA_FILTER## ВСЕГДА копируем baseline в результат
     // (была ошибка: копировалась ТОЛЬКО если useEqMA=true, но baseline нужна всегда!)
     if (_hcRes) {
-      if (btCfg.eqCalcBaselineArr) _hcRes.eqCalcBaselineArr = Array.from(btCfg.eqCalcBaselineArr);
-      if (btCfg.eqCalcMAArr) _hcRes.eqCalcMAArr = Array.from(btCfg.eqCalcMAArr);
+      if (window.__DEBUG_HC_BASELINE) {
+        console.log('  Copying to _hcRes:');
+        console.log('    btCfg.eqCalcBaselineArr:', btCfg.eqCalcBaselineArr ? `array[${btCfg.eqCalcBaselineArr.length}]` : 'NULL');
+        console.log('    btCfg.eqCalcMAArr:', btCfg.eqCalcMAArr ? `array[${btCfg.eqCalcMAArr.length}]` : 'NULL');
+      }
+      if (btCfg.eqCalcBaselineArr) {
+        _hcRes.eqCalcBaselineArr = Array.from(btCfg.eqCalcBaselineArr);
+        if (window.__DEBUG_HC_BASELINE) {
+          console.log('    ✅ _hcRes.eqCalcBaselineArr set:', `array[${_hcRes.eqCalcBaselineArr.length}]`);
+        }
+      }
+      if (btCfg.eqCalcMAArr) {
+        _hcRes.eqCalcMAArr = Array.from(btCfg.eqCalcMAArr);
+        if (window.__DEBUG_HC_BASELINE) {
+          console.log('    ✅ _hcRes.eqCalcMAArr set:', `array[${_hcRes.eqCalcMAArr.length}]`);
+        }
+      }
+    } else {
+      if (window.__DEBUG_HC_BASELINE) {
+        console.log('  ❌ _hcRes is NULL');
+      }
     }
 
     // КРИТИЧНО: Копируем eq перед сохранением в кэш - иначе все пользователи кэша
