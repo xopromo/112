@@ -1420,6 +1420,15 @@ async function runOOSOnNewData() {
       new_kRatio = _calcKRatio(_eqS);
     }
 
+    // 🔍 ДИАГНОСТИКА: Почему old_eq и new_eq не заполняются?
+    if (window.__DEBUG_OOS_CREATION) {
+      console.log('OOS Result Creation Diagnostics:');
+      console.log('  Result name:', r.name);
+      console.log('  rOld exists:', !!rOld, rOld ? `eq.length=${rOld.eq?.length}` : 'NULL');
+      console.log('  rNew exists:', !!rNew, rNew ? `eq.length=${rNew.eq?.length}` : 'NULL');
+      console.log('  rOld_IS exists:', !!rOld_IS);
+    }
+
     _oosTableResults.push({
       _isOOSResult: true,  // ##EQ_MA_FILTER## КРИТИЧНЫЙ флаг для drawEquityForResult!
       name:      r.name,
