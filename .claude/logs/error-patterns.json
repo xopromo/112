@@ -1,0 +1,52 @@
+{
+  "DATA_REFERENCE_REUSE": {
+    "count": 1322,
+    "firstSeen": "2026-04-03T20:38:48.858Z",
+    "lastSeen": "2026-04-04T19:42:32.634Z",
+    "severity": "WARNING",
+    "examples": [
+      "EqMA(30) - light [run 25]",
+      "EqMA(30) - light [run 26]",
+      "EqMA(30) - light [run 28]",
+      "EqMA(30) - light [run 29]",
+      "EqMA(30) - light [run 30]"
+    ],
+    "possibleCauses": [
+      {
+        "cause": "eq stored as direct reference, not Array.from()",
+        "confidence": 0.85,
+        "seen": 1322
+      },
+      {
+        "cause": "equities[name] = rFull.eq without copy",
+        "confidence": 0.9,
+        "seen": 1322
+      }
+    ]
+  },
+  "MOVEMENT_CHANGE": {
+    "count": 128,
+    "firstSeen": "2026-04-03T20:38:48.858Z",
+    "lastSeen": "2026-04-04T19:42:32.634Z",
+    "severity": "WARNING",
+    "examples": [
+      "EqMA(100) - aggressive [run 18]",
+      "EqMA(100) - aggressive [run 19]",
+      "EqMA(100) - aggressive [run 24]",
+      "No EqMA - baseline [run 18]",
+      "EqMA(30) - light [run 27]"
+    ],
+    "possibleCauses": [
+      {
+        "cause": "Float32Array reuse without copying",
+        "confidence": 0.9,
+        "seen": 128
+      },
+      {
+        "cause": "Direct reference in equities dictionary",
+        "confidence": 0.8,
+        "seen": 128
+      }
+    ]
+  }
+}
