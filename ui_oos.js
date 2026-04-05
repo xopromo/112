@@ -1590,7 +1590,7 @@ async function runOOSOnNewData() {
       delta_dd:     (rOld_IS && new_dd  != null) ? new_dd     - rOld_IS.dd  : null,
       delta_pdd:    (rOld_IS && rOld_IS.dd > 0 && new_pdd != null) ? new_pdd - (rOld_IS.pnl / rOld_IS.dd) : null,
       delta_kRatio: (rOld_IS && rOld_IS.eq && new_kRatio != null) ? new_kRatio - (_calcKRatio(rOld_IS.eq) ?? 0) : null,
-      old_bars:  DATA ? Math.round(DATA.length * 0.70) : null,    // IS часть (70%)
+      old_bars:  DATA ? DATA.length : null,    // ПОЛНАЯ длина старых данных (не 70%!) - для графика нужны все 10000 баров
       new_bars:  NEW_DATA ? NEW_DATA.length : null,
       _overlapBars: _overlapIdx,               // для отладки: сколько баров пересечения
       rate: (() => {
