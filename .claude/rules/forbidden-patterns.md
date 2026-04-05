@@ -695,3 +695,41 @@ results.push({..., eqCalc:_eqCalc, ...});
 - **Confidence**: 95%
 - **Cases**: 3 (MC, TPE, Exhaustive)
 - **Verification**: dumb-checks.sh RULE 19
+
+---
+
+## 🔴 Запрещено: 70% Data Truncation в OOS результатах (ПАТТЕРН #5)
+
+**Проблема**: Когда сохраняются OOS результаты, данные обрезаются на 70% вместо полных 100%.
+Это приводит к:
+- Графикам которые показывают только 7000 баров вместо 10000
+- Потере данных для рендеринга
+- Несинхронизированным линиям на графике
+
+**Где**: ui_oos.js (3+ места где создаются old_eq, old_eqCalc, old_eqCalcBaselineArr)
+
+**Класс**: CLASS A (ПАТТЕРН) - архитектурная ошибка в логике OOS обработки
+
+**Правильное разделение**:
+```javascript
+// ❌ НЕПРАВИЛЬНО: Обрезать в результатах
+old_eq: Array.from(rOld.eq.slice(0, Math.round(0.70 * rOld.eq.length)))
+
+// ✅ ПРАВИЛЬНО: Полные данные в результатах
+old_eq: Array.from(rOld.eq)  // 100% данных!
+
+// ✅ ПРАВИЛЬНО: 70% используется ТОЛЬКО для метрик
+old_pnl: rOld_IS ? rOld_IS.pnl : null  // IS часть для PnL расчёта
+old_bars: DATA ? DATA.length : null    // ПОЛНАЯ длина для шкалы графика
+```
+
+**Правило**: Сохраняемые данные (old_eq, old_eqCalc, baseline) должны быть ПОЛНЫЕ (100%).
+Обрезка по warmup/overlap происходит в _drawOOSGraphicForResult при РЕНДЕРИНГЕ, не при создании результата.
+
+**Проверка**: RULE 20 в dumb-checks.sh ищет `.slice(0, 0.70*)` без `##OOS_FULL_DATA_FIX##` маркера.
+
+**Статус ПАТТЕРНА #5**:
+- **Название**: 70% Data Truncation Pattern
+- **STATUS**: OPEN (требуется обобщение и универсальное решение)
+- **Cases**: 3+ (old_eq, old_eqCalc, old_eqCalcBaselineArr и возможно другие)
+- **Protection**: RULE 20 (dumb-checks.sh)
