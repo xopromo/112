@@ -1539,11 +1539,12 @@ async function runOOSOnNewData() {
           }
           return null;
         }
-        const isEndIdx = Math.round(0.70 * rOld.eq.length) || 0;
+        // ##OOS_FULL_DATA_FIX## КРИТИЧНО: Сохраняем ПОЛНЫЙ eq (все 10000 баров, 100%)
+        // НЕ обрезаем по 70%! Обрезка происходит только при рендеринге в _drawOOSGraphicForResult
         // Копируем для безопасности - если rOld.eq переиспользуется, old_eq не пострадает
-        const result = Array.from(rOld.eq.slice(0, Math.min(isEndIdx + 1, rOld.eq.length)));
+        const result = Array.from(rOld.eq);  // ПОЛНЫЕ данные!
         if (window.__DEBUG_OOS_CREATION) {
-          console.log('  old_eq SUCCESS: created array[', result.length, ']');
+          console.log('  old_eq SUCCESS: created array[', result.length, '] ← ПОЛНЫЕ 10000 баров');
         }
         return result;
       })(),
@@ -1564,11 +1565,8 @@ async function runOOSOnNewData() {
         return result;
       })(),
       // ##EQ_MA_FILTER## Отфильтрованные данные эквити (с MA фильтром)
-      old_eqCalc: (() => {
-        if (!rOld || !rOld.eqCalc || !rOld.eqCalc.length) return null;
-        const isEndIdx = Math.round(0.70 * rOld.eqCalc.length) || 0;
-        return Array.from(rOld.eqCalc.slice(0, Math.min(isEndIdx + 1, rOld.eqCalc.length)));
-      })(),
+      // ##OOS_FULL_DATA_FIX## КРИТИЧНО: Сохраняем ПОЛНЫЙ eqCalc, не обрезаем по 70%!
+      old_eqCalc: (rOld && rOld.eqCalc) ? Array.from(rOld.eqCalc) : null,  // ПОЛНЫЕ фильтрованные данные
       new_eqCalc: (rNew && rNew.eqCalc) ? Array.from(rNew.eqCalc) : null,  // ##EQ_MA_FILTER## отфильтрованная на новых данных
       // OOS-специфичные поля — история (только IS часть 70%)
       old_pnl:    rOld_IS ? rOld_IS.pnl : null,
@@ -1602,6 +1600,7 @@ async function runOOSOnNewData() {
         return null;
       })(),
       // Baseline данные для рисования оранжевой линии в OOS графике
+      // ##OOS_FULL_DATA_FIX## КРИТИЧНО: Сохраняем ПОЛНЫЙ baseline, не обрезаем по 70%!
       old_eqCalcBaselineArr: (() => {
         if (window.__DEBUG_OOS_CREATION) {
           console.log('  old_eqCalcBaselineArr:');
@@ -1614,10 +1613,9 @@ async function runOOSOnNewData() {
           }
           return null;
         }
-        const isEndIdx = Math.round(0.70 * rOld.eqCalcBaselineArr.length) || 0;
-        const result = rOld.eqCalcBaselineArr.slice(0, Math.min(isEndIdx + 1, rOld.eqCalcBaselineArr.length));
+        const result = Array.from(rOld.eqCalcBaselineArr);  // ПОЛНЫЕ данные, не обрезаем!
         if (window.__DEBUG_OOS_CREATION) {
-          console.log('    → Result: array[' + result.length + '] (70% of ' + rOld.eqCalcBaselineArr.length + ')');
+          console.log('    → Result: array[' + result.length + '] ← ПОЛНЫЕ 10000 баров');
         }
         return result;
       })(),
