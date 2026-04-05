@@ -5,3 +5,5 @@ __pycache__/
 *.db
 *.log
 vk_sales/config.json
+.claude/logs/
+.regression-results
