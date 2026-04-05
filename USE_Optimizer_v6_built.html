@@ -24648,10 +24648,10 @@ function drawEquityData(eq, label, splitPct, baselineEq=null) {
   let mn=0,mx=0;
   for(let i=0;i<eq.length;i++) {if(eq[i]<mn)mn=eq[i];if(eq[i]>mx)mx=eq[i];}
 
-  // 🔧 WAVE 10 FINAL: Baseline должна быть из того же периода (100% данных)
-  // Если baselineEq короче - это старая базовая линия от IS периода (70%)
-  // НЕ использовать её вообще (ни для рендера, ни для масштабирования)
-  const shouldUseBaseline = baselineEq && baselineEq.length === eq.length && _eqMAFilterShowBaseline;
+  // 🔧 ВАЖНО: Baseline может быть другой длины (особенно с fallback к old_eq)
+  // Это нормально - рисуем её как есть, без проверки длины
+  // Масштабирование будет по обеим линиям автоматически
+  const shouldUseBaseline = baselineEq && _eqMAFilterShowBaseline;
   if (shouldUseBaseline) {
     for(let i=0;i<baselineEq.length;i++) {if(baselineEq[i]<mn)mn=baselineEq[i];if(baselineEq[i]>mx)mx=baselineEq[i];}
   }
@@ -24901,8 +24901,8 @@ function _drawOOSGraphicForResult(r) {
   // ##EQ_MA_FILTER## Используем отфильтрованные данные (eqCalc) если доступны, иначе базовые (eq)
   const eq_old = r.old_eqCalc || r.old_eq;  // отфильтрованная история или базовая
   const eq_new = r.new_eqCalc || r.new_eq;  // отфильтрованная OOS или базовая
-  const baseline_old = r.old_eqCalcBaselineArr; // baseline на истории (оранжевая) ##EQ_MA_FILTER##
-  const baseline_new = r.new_eqCalcBaselineArr; // baseline на новых данных (оранжевая) ##EQ_MA_FILTER##
+  const baseline_old = r.old_eqCalcBaselineArr || r.old_eq; // baseline на истории (оранжевая) ##EQ_MA_FILTER## + fallback
+  const baseline_new = r.new_eqCalcBaselineArr || r.new_eq; // baseline на новых данных (оранжевая) ##EQ_MA_FILTER## + fallback
 
   if (window.__DEBUG_EQUITY) {
     console.log('═══════════════════════════════════════════════════════');
@@ -34283,7 +34283,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1775332394180;
+window._BUILD_TS = 1775352538422;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
