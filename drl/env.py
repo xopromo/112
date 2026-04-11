@@ -1,92 +1,84 @@
 """
-drl/env.py — торговая среда с поддержкой LONG и SHORT
+drl/env.py — минимальная торговая среда (v2, бинарные действия)
 
-Наблюдение (25 признаков):
-  [0-19]  z-score нормализованные лог-доходности последних 20 баров
-  [20]    ATR / close (режим волатильности)
-  [21]    RSI(14) / 100
-  [22]    Направление позиции: +1=лонг, 0=флэт, -1=шорт
-  [23]    Нереализованный P&L / ATR (0 если флэт)
-  [24]    Баров в сделке / 50 (нормализовано)
+ДИЗАЙН:
+  Действия всего 2:
+    0 = FLAT  (не в рынке; если были в позиции — выходим)
+    1 = LONG  (в рынке; если не были — входим)
 
-Действия:
-  0 = HOLD   (оставить как есть)
-  1 = LONG   (войти в лонг; если в шорте — закрыть и войти в лонг)
-  2 = SHORT  (войти в шорт; если в лонге — закрыть и войти в шорт)
-  3 = EXIT   (закрыть любую позицию)
+  Нет EXIT, нет SHORT, нет MIN_HOLD.
+  Агент решает каждый бар: быть в рынке или нет.
+  Комиссия платится при СМЕНЕ позиции (0→1 или 1→0).
 
-Награда:
-  % доходность за бар (mark-to-market, знак зависит от направления)
-  штраф за вход = комиссия × COMMISSION_SCALE (борьба с over-trading)
-  штраф при просадке > 15%
+НАБЛЮДЕНИЕ (22 признака):
+  [0-18]  z-score лог-доходности последних 19 баров
+  [19]    ATR / close  (волатильность)
+  [20]    RSI(14) / 100
+  [21]    Текущая позиция (0 или 1)
+
+НАГРАДА:
+  Когда LONG:  log(c_cur / c_prev)  — лог-доходность бара
+  Когда FLAT:  0
+  При смене:  −commission  (платится один раз при переходе)
 """
 
 import numpy as np
 import gymnasium as gym
 from gymnasium import spaces
 
-MIN_HOLD_BARS    = 5  # нельзя выйти раньше чем через N баров после входа
-COMMISSION_SCALE = 5  # агент "чувствует" комиссию в 5 раз сильнее
-
 
 class TradingEnv(gym.Env):
     metadata = {'render_modes': []}
 
-    def __init__(self, df, commission=0.001, window=20):
+    def __init__(self, df, commission=0.001, window=19):
         super().__init__()
 
         self.closes = df['close'].values.astype(np.float64)
         self.highs  = df['high'].values.astype(np.float64)
         self.lows   = df['low'].values.astype(np.float64)
         self.commission = commission
-        self.window  = window
-        self.n       = len(self.closes)
+        self.window = window
+        self.n      = len(self.closes)
 
         self._atr = self._calc_atr(14)
         self._rsi = self._calc_rsi(14)
-        self._start = max(window + 1, 30)
+        self._start = max(window + 2, 30)
 
+        # 2 действия: 0=flat, 1=long
+        self.action_space      = spaces.Discrete(2)
         self.observation_space = spaces.Box(
-            low=-5.0, high=5.0, shape=(25,), dtype=np.float32
+            low=-5.0, high=5.0, shape=(22,), dtype=np.float32
         )
-        # 4 действия: 0=hold, 1=long, 2=short, 3=exit
-        self.action_space = spaces.Discrete(4)
 
     # ── Индикаторы ────────────────────────────────────────────────
 
     def _calc_atr(self, period=14):
-        n   = self.n
-        tr  = np.zeros(n)
-        atr = np.zeros(n)
+        n, tr, atr = self.n, np.zeros(self.n), np.zeros(self.n)
         for i in range(1, n):
-            tr[i] = max(
-                self.highs[i]  - self.lows[i],
-                abs(self.highs[i]  - self.closes[i - 1]),
-                abs(self.lows[i]   - self.closes[i - 1]),
-            )
+            tr[i] = max(self.highs[i] - self.lows[i],
+                        abs(self.highs[i] - self.closes[i-1]),
+                        abs(self.lows[i]  - self.closes[i-1]))
         if n > period:
-            atr[period] = tr[1:period + 1].mean()
-        alpha = 1.0 / period
+            atr[period] = tr[1:period+1].mean()
+        a = 1.0 / period
         for i in range(period + 1, n):
-            atr[i] = alpha * tr[i] + (1.0 - alpha) * atr[i - 1]
+            atr[i] = a * tr[i] + (1-a) * atr[i-1]
         return atr
 
     def _calc_rsi(self, period=14):
-        n   = self.n
-        rsi = np.full(n, 50.0)
+        n, rsi = self.n, np.full(self.n, 50.0)
         avg_u = avg_d = 0.0
         for i in range(1, n):
-            chg = self.closes[i] - self.closes[i - 1]
+            chg = self.closes[i] - self.closes[i-1]
             u, d = max(chg, 0.0), max(-chg, 0.0)
             if i <= period:
-                avg_u += u / period
-                avg_d += d / period
+                avg_u += u / period; avg_d += d / period
                 if i == period and avg_d > 0:
-                    rsi[i] = 100.0 - 100.0 / (1.0 + avg_u / avg_d)
+                    rsi[i] = 100 - 100 / (1 + avg_u / avg_d)
             else:
-                avg_u = (avg_u * (period - 1) + u) / period
-                avg_d = (avg_d * (period - 1) + d) / period
-                rsi[i] = 100.0 - 100.0 / (1.0 + avg_u / avg_d) if avg_d > 0 else 100.0
+                avg_u = (avg_u*(period-1) + u) / period
+                avg_d = (avg_d*(period-1) + d) / period
+                rsi[i] = 100 - 100 / (1 + avg_u / avg_d) if avg_d > 0 else 100.0
         return rsi
 
     # ── Наблюдение ────────────────────────────────────────────────
@@ -96,77 +88,38 @@ class TradingEnv(gym.Env):
         c0 = self.closes[i - 1]
         a0 = max(self._atr[i - 1], 1e-8)
 
-        lr = np.zeros(self.window, dtype=np.float64)
-        for k in range(self.window):
-            bi = i - self.window + k
-            if bi >= 1:
-                ca = self.closes[bi - 1]
-                cb = self.closes[bi]
-                if ca > 0 and cb > 0:
-                    lr[k] = np.log(cb / ca)
+        # z-score лог-доходности (window баров)
+        lr = np.array([
+            np.log(max(self.closes[i - self.window + k], 1e-10) /
+                   max(self.closes[i - self.window + k - 1], 1e-10))
+            for k in range(self.window)
+        ])
         std = lr.std() + 1e-8
-        lr_norm = np.clip((lr - lr.mean()) / std, -5.0, 5.0)
-
-        unreal = 0.0
-        if self.direction != 0 and self.entry_price > 0:
-            # Для лонга: прибыль когда цена растёт
-            # Для шорта: прибыль когда цена падает
-            raw = (c0 - self.entry_price) / a0 * self.direction
-            unreal = np.clip(raw, -5.0, 5.0)
-        bars_n = np.clip(self.bars_in / 50.0, 0.0, 1.0)
+        lr_n = np.clip((lr - lr.mean()) / std, -5.0, 5.0)
 
         return np.concatenate([
-            lr_norm,
-            [
-                np.clip(a0 / max(c0, 1e-8), 0.0, 5.0),
-                self._rsi[i - 1] / 100.0,
-                float(self.direction),   # -1, 0, или +1
-                unreal,
-                bars_n,
-            ],
+            lr_n,
+            [np.clip(a0 / max(c0, 1e-8), 0, 5),   # ATR-режим
+             self._rsi[i-1] / 100.0,                # RSI
+             float(self.in_long)],                   # позиция
         ]).astype(np.float32)
-
-    # ── Вспомогательный: открытие новой позиции ───────────────────
-
-    def _open_position(self, direction, price):
-        """direction: +1 (лонг) или -1 (шорт)"""
-        self.direction   = direction
-        self.entry_price = price
-        self.bars_in     = 0
-        self.equity     *= (1.0 - self.commission)
-        self.trades     += 1
-        return -self.commission * COMMISSION_SCALE
-
-    def _close_position(self, price):
-        """Закрыть текущую позицию. Вернуть P&L reward."""
-        if self.direction == 0:
-            return 0.0
-        # Реализованный P&L с учётом направления
-        raw_ret = (price - self.entry_price) / max(self.entry_price, 1e-8)
-        trade_ret = raw_ret * self.direction - 2.0 * self.commission
-        if trade_ret > 0:
-            self.wins += 1
-        self.equity     *= (1.0 - self.commission)
-        self.direction   = 0
-        self.entry_price = 0.0
-        self.bars_in     = 0
-        return -self.commission * COMMISSION_SCALE
 
     # ── Gymnasium API ─────────────────────────────────────────────
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
-        self.bar          = self._start
-        self.direction    = 0       # 0=флэт, +1=лонг, -1=шорт
-        self.entry_price  = 0.0
-        self.bars_in      = 0
-        self.equity       = 1.0
-        self.max_equity   = 1.0
-        self.eq_curve     = [1.0]
-        self.trades       = 0
-        self.wins         = 0
-        # для совместимости с логером в test_hypothesis.py
-        self.in_trade     = False
+        self.bar        = self._start
+        self.in_long    = False
+        self.entry_bar  = 0
+        self.entry_price = 0.0
+        self.equity     = 1.0
+        self.max_equity = 1.0
+        self.eq_curve   = [1.0]
+        self.trades     = 0
+        self.wins       = 0
+        # для совместимости с evaluate()
+        self.in_trade   = False
+        self.direction  = 0
         return self._obs(), {}
 
     def step(self, action):
@@ -174,64 +127,55 @@ class TradingEnv(gym.Env):
         c   = self.closes[i]
         c_p = self.closes[i - 1]
 
-        reward      = 0.0
-        can_exit    = self.bars_in >= MIN_HOLD_BARS
-        step_ret_l  = (c - c_p) / max(c_p, 1e-8)   # доходность бара для лонга
-        step_ret_s  = -step_ret_l                    # доходность бара для шорта
+        reward = 0.0
+        want_long = bool(action == 1)
 
-        # ── Mark-to-market ДО действия ──
-        if self.direction == 1:
-            self.equity *= (1.0 + step_ret_l)
-            reward      += step_ret_l
-            self.bars_in += 1
-        elif self.direction == -1:
-            self.equity *= (1.0 + step_ret_s)
-            reward      += step_ret_s
-            self.bars_in += 1
+        # ── Смена позиции → комиссия ──
+        if want_long and not self.in_long:        # FLAT → LONG
+            self.equity    *= (1.0 - self.commission)
+            reward         -= self.commission
+            self.in_long    = True
+            self.entry_bar  = i
+            self.entry_price = c
+            self.trades    += 1
 
-        # ── Исполнение действия ──
-        if action == 1 and self.direction != 1:        # GO LONG
-            if self.direction == -1 and can_exit:      # закрыть шорт
-                reward += self._close_position(c)
-            if self.direction == 0:                    # открыть лонг
-                reward += self._open_position(1, c)
+        elif not want_long and self.in_long:      # LONG → FLAT
+            self.equity    *= (1.0 - self.commission)
+            reward         -= self.commission
+            trade_ret = c / self.entry_price - 1.0 - 2*self.commission
+            if trade_ret > 0:
+                self.wins += 1
+            self.in_long = False
 
-        elif action == 2 and self.direction != -1:     # GO SHORT
-            if self.direction == 1 and can_exit:       # закрыть лонг
-                reward += self._close_position(c)
-            if self.direction == 0:                    # открыть шорт
-                reward += self._open_position(-1, c)
+        # ── Mark-to-market ──
+        if self.in_long:
+            log_ret = np.log(max(c, 1e-10) / max(c_p, 1e-10))
+            self.equity *= np.exp(log_ret)
+            reward      += log_ret          # лог-доходность бара
 
-        elif action == 3 and self.direction != 0 and can_exit:  # EXIT
-            reward += self._close_position(c)
-
-        # ── Обновляем in_trade для совместимости ──
-        self.in_trade = (self.direction != 0)
-
-        # ── Штраф за просадку > 15% ──
+        # ── Штраф за просадку > 20% ──
         self.max_equity = max(self.max_equity, self.equity)
         dd = (self.max_equity - self.equity) / max(self.max_equity, 1e-8)
-        if dd > 0.15:
-            reward -= dd * 0.1
+        if dd > 0.20:
+            reward -= 0.005                 # фиксированный штраф per bar
 
         self.eq_curve.append(self.equity)
-        self.bar  += 1
+        # для совместимости
+        self.in_trade = self.in_long
+        self.direction = 1 if self.in_long else 0
+
+        self.bar += 1
         terminated = self.bar >= self.n - 1
 
-        # Принудительное закрытие в конце эпизода
-        if terminated and self.direction != 0:
+        if terminated and self.in_long:
             c_last = self.closes[-1]
-            raw    = (c_last - self.entry_price) / max(self.entry_price, 1e-8)
-            if raw * self.direction - 2.0 * self.commission > 0:
+            trade_ret = c_last / self.entry_price - 1.0 - 2*self.commission
+            if trade_ret > 0:
                 self.wins += 1
             self.equity  *= (1.0 - self.commission)
-            self.direction = 0
-            self.in_trade  = False
+            self.in_long  = False
 
-        obs = self._obs() if not terminated else np.zeros(25, dtype=np.float32)
+        obs = self._obs() if not terminated else np.zeros(22, dtype=np.float32)
         return obs, float(reward), terminated, False, {
-            'equity':    self.equity,
-            'trades':    self.trades,
-            'wins':      self.wins,
-            'direction': self.direction,
+            'equity': self.equity, 'trades': self.trades, 'wins': self.wins,
         }
