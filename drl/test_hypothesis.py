@@ -241,12 +241,12 @@ def plot_results(df_is, df_oos,
 
     # IS — кривая капитала
     _plot_equity(axes[0, 0], df_is, eq_is, trades_is, start_is, bh_ret_is,
-                 '📚 IS — Обучение (агент ЭТО ВИДЕЛ)', C_IS)
+                 '[IS] Training data — agent SAW this', C_IS)
 
     # OOS — кривая капитала
     _plot_equity(axes[0, 1], df_oos, eq_oos, trades_oos, start_oos, bh_ret_oos,
-                 f'🔍 OOS — Тест на новых данных (НЕ ВИДЕЛ)\n'
-                 f'Sharpe: {sharpe_oos:+.2f}  Доходность: {ret_oos:+.1f}%', C_OOS)
+                 f'[OOS] NEW data — agent did NOT see this\n'
+                 f'Sharpe: {sharpe_oos:+.2f}  Return: {ret_oos:+.1f}%', C_OOS)
 
     # IS — сделки
     _plot_trades(axes[1, 0], trades_is, 'Сделки IS (обучение)', C_IS)
