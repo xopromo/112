@@ -119,7 +119,7 @@ def train_agent(df_train, steps, commission, prefix=''):
         gae_lambda    = 0.95,
         clip_range    = 0.2,
         ent_coef      = 0.01,
-        policy_kwargs = dict(net_arch=[256, 128, 64]),
+        policy_kwargs = dict(net_arch=[256, 128, 64]),  # 30 фич → 3 слоя
         verbose       = 0,
     )
     model.learn(total_timesteps=steps, callback=CB(steps, prefix))
