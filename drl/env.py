@@ -25,8 +25,8 @@ import numpy as np
 import gymnasium as gym
 from gymnasium import spaces
 
-MIN_HOLD_BARS    = 5   # нельзя выйти раньше чем через N баров после входа
-COMMISSION_SCALE = 15  # агент "чувствует" комиссию в 15 раз сильнее
+MIN_HOLD_BARS    = 5  # нельзя выйти раньше чем через N баров после входа
+COMMISSION_SCALE = 5  # агент "чувствует" комиссию в 5 раз сильнее
 
 
 class TradingEnv(gym.Env):
