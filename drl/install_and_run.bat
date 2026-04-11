@@ -1,65 +1,79 @@
 @echo off
-chcp 65001 >nul
-title DRL Агент — Установка и запуск
+title DRL Agent - Setup and Run
+
+:: Get the folder where this bat file lives (the drl\ folder)
+set DRL_DIR=%~dp0
+:: Go up one level to the project root
+cd /d "%DRL_DIR%.."
 
 echo.
-echo ╔══════════════════════════════════════════╗
-echo ║   DRL Торговый Агент — Тест гипотезы    ║
-echo ╚══════════════════════════════════════════╝
+echo ==========================================
+echo   DRL Trading Agent - Hypothesis Test
+echo ==========================================
 echo.
 
-:: ── Проверка Python ──────────────────────────────────────────────
+:: Check Python
 python --version >nul 2>&1
 if errorlevel 1 (
-    echo  ОШИБКА: Python не установлен!
+    echo ERROR: Python not found!
     echo.
-    echo  Что сделать:
-    echo  1. Открой браузер
-    echo  2. Зайди на: https://python.org/downloads
-    echo  3. Нажми большую жёлтую кнопку Download Python
-    echo  4. Запусти скачанный файл
-    echo  5. ВАЖНО: поставь галочку "Add Python to PATH"
-    echo  6. После установки снова запусти этот файл
+    echo Steps to fix:
+    echo 1. Open browser
+    echo 2. Go to: https://python.org/downloads
+    echo 3. Click the big Download Python button
+    echo 4. Run the installer
+    echo 5. IMPORTANT: check the box "Add Python to PATH"
+    echo 6. After install, run this file again
     echo.
     pause
     exit /b 1
 )
-echo  [OK] Python найден
 
-:: ── Проверяем что запускаем из корня проекта ─────────────────────
+echo [OK] Python found
+python --version
+
+:: Check we are in the right folder
 if not exist "drl\test_hypothesis.py" (
     echo.
-    echo  ОШИБКА: Запускай этот файл из папки проекта 112
-    echo  Правильно: дважды кликни install_and_run.bat находясь в папке 112\drl\
+    echo ERROR: Wrong folder.
+    echo This file must be inside the 112 project folder.
     echo.
     pause
     exit /b 1
 )
 
-:: ── Установка библиотек (один раз, ~5 минут) ─────────────────────
+echo [OK] Project folder found
 echo.
-echo  [1/2] Устанавливаю библиотеки (подожди 3-5 минут)...
-echo        gymnasium, stable-baselines3, pytorch...
+
+:: Install libraries (~5 minutes, needs internet)
+echo [1/2] Installing libraries (wait 3-5 min)...
+echo       gymnasium, stable-baselines3, matplotlib...
 echo.
-pip install gymnasium stable-baselines3 numpy pandas matplotlib --quiet
+pip install gymnasium stable-baselines3 numpy pandas matplotlib
 
 if errorlevel 1 (
     echo.
-    echo  ОШИБКА при установке. Попробуй запустить от имени администратора.
+    echo ERROR during install.
+    echo Try: right-click this file, Run as Administrator
+    echo.
     pause
     exit /b 1
 )
-echo  [OK] Библиотеки установлены
 
-:: ── Запуск теста ─────────────────────────────────────────────────
 echo.
-echo  [2/2] Запускаю тест (3-7 минут обучения)...
-echo  ─────────────────────────────────────────────
+echo [OK] Libraries installed
+echo.
+
+:: Run the test
+echo [2/2] Running test (3-7 min training)...
+echo ------------------------------------------
 echo.
 
 python drl\test_hypothesis.py test_data\ohlcv.csv
 
 echo.
-echo  ─────────────────────────────────────────────
-echo  Готово! Нажми любую клавишу чтобы закрыть.
-pause >nul
+echo ------------------------------------------
+echo Done! The chart is saved in: drl\result.png
+echo Open that file to see the results.
+echo.
+pause
