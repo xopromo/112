@@ -62,9 +62,9 @@ def evaluate(model, df, label, commission=0.001):
     env = TradingEnv(df, commission=commission)
     obs, _ = env.reset()
 
-    # Запись сделок для лога
+    # Запись сделок для лога (теперь с направлением LONG/SHORT)
     trades_log = []
-    in_trade   = False
+    cur_dir    = 0    # 0=флэт, 1=лонг, -1=шорт
     entry_bar  = 0
     entry_px   = 0.0
 
@@ -73,42 +73,55 @@ def evaluate(model, df, label, commission=0.001):
     while not done:
         action, _ = model.predict(obs, deterministic=True)
         action = int(action)
+        px = df['close'].iloc[min(bar, len(df) - 1)]
 
-        # Логируем сделки
-        if action == 1 and not in_trade:
-            in_trade  = True
-            entry_bar = bar
-            entry_px  = df['close'].iloc[min(bar, len(df) - 1)]
-        elif action == 2 and in_trade:
-            exit_px  = df['close'].iloc[min(bar, len(df) - 1)]
-            pnl_pct  = (exit_px / entry_px - 1.0) * 100.0
-            duration = bar - entry_bar
+        # Открытие новой позиции
+        new_dir = 0
+        if action == 1 and cur_dir != 1:
+            new_dir = 1
+        elif action == 2 and cur_dir != -1:
+            new_dir = -1
+
+        # Закрытие текущей
+        close_now = (action == 3 and cur_dir != 0) or \
+                    (new_dir != 0 and cur_dir != 0 and new_dir != cur_dir)
+        if close_now and cur_dir != 0:
+            raw_pnl = (px - entry_px) / max(entry_px, 1e-8) * cur_dir * 100.0
+            tag = 'L' if cur_dir == 1 else 'S'
             trades_log.append({
                 'вход_бар':   entry_bar,
                 'выход_бар':  bar,
-                'баров':      duration,
+                'баров':      bar - entry_bar,
                 'вход_цена':  round(entry_px, 6),
-                'выход_цена': round(exit_px, 6),
-                'P&L%':       round(pnl_pct, 2),
-                'результат':  '✅ прибыль' if pnl_pct > 0 else '❌ убыток',
+                'выход_цена': round(px, 6),
+                'тип':        tag,
+                'P&L%':       round(raw_pnl, 2),
+                'результат':  '✅ прибыль' if raw_pnl > 0 else '❌ убыток',
             })
-            in_trade = False
+            cur_dir = 0
+
+        if new_dir != 0 and cur_dir == 0:
+            cur_dir   = new_dir
+            entry_bar = bar
+            entry_px  = px
 
         obs, _, done, _, _ = env.step(action)
         bar += 1
 
     # Закрыть незакрытую позицию
-    if in_trade:
-        exit_px = df['close'].iloc[-1]
-        pnl_pct = (exit_px / entry_px - 1.0) * 100.0
+    if cur_dir != 0:
+        px = df['close'].iloc[-1]
+        raw_pnl = (px - entry_px) / max(entry_px, 1e-8) * cur_dir * 100.0
+        tag = 'L' if cur_dir == 1 else 'S'
         trades_log.append({
             'вход_бар':   entry_bar,
             'выход_бар':  bar,
             'баров':      bar - entry_bar,
             'вход_цена':  round(entry_px, 6),
-            'выход_цена': round(exit_px, 6),
-            'P&L%':       round(pnl_pct, 2),
-            'результат':  '✅ прибыль' if pnl_pct > 0 else '❌ убыток',
+            'выход_цена': round(px, 6),
+            'тип':        tag,
+            'P&L%':       round(raw_pnl, 2),
+            'результат':  '✅ прибыль' if raw_pnl > 0 else '❌ убыток',
         })
 
     sharpe, ret, dd = calc_metrics(env.eq_curve)
@@ -129,9 +142,14 @@ def evaluate(model, df, label, commission=0.001):
     print(f'  Buy & Hold:     {bh_ret:+.1f}%')
 
     if trades_log:
+        longs  = sum(1 for t in trades_log if t.get('тип') == 'L')
+        shorts = sum(1 for t in trades_log if t.get('тип') == 'S')
+        if shorts > 0:
+            print(f'  Лонгов/Шортов:  {longs}/{shorts}')
         print(f'\n  Последние сделки:')
         for t in trades_log[-5:]:
-            print(f'    бар {t["вход_бар"]:>5} → {t["выход_бар"]:>5} '
+            tag = f'[{t.get("тип","L")}]'
+            print(f'    {tag} бар {t["вход_бар"]:>5} → {t["выход_бар"]:>5} '
                   f'({t["баров"]:>3} баров)  {t["P&L%"]:>+7.2f}%  {t["результат"]}')
         if len(trades_log) > 5:
             print(f'    ... и ещё {len(trades_log) - 5} сделок')
