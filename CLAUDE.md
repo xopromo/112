@@ -124,7 +124,7 @@ git push -u origin claude/ваша-ветка
 
 **core.js**:
 - `_calcAdaptiveMultipliers` (520) — расчет адаптивных множителей TP/SL
-- `backtest` (564) — основной бэктест (принимает pvLo,pvHi,atrArr,cfg)
+- `backtest` (566) — основной бэктест (принимает pvLo,pvHi,atrArr,cfg)
 - `calcHTFADX` (231) — ADX на HTF через группировку баров
 
 **pine_export.js**:
