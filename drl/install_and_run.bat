@@ -41,7 +41,7 @@ echo.
 echo  [1/2] Устанавливаю библиотеки (подожди 3-5 минут)...
 echo        gymnasium, stable-baselines3, pytorch...
 echo.
-pip install gymnasium stable-baselines3 numpy pandas --quiet
+pip install gymnasium stable-baselines3 numpy pandas matplotlib --quiet
 
 if errorlevel 1 (
     echo.
