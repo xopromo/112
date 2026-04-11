@@ -349,13 +349,15 @@ function _rmaFromFirstNonZero(data, period) {
 function calcRMA_ATR(period) {
   const N = DATA.length;
   const tr = new Float64Array(N), rma = new Float64Array(N);
+  // tr[0] = H-L (ta.tr(true) в Pine: первый бар не имеет prevClose → H-L)
+  if (N > 0) tr[0] = DATA[0].h - DATA[0].l;
   for (let i = 1; i < N; i++)
     tr[i] = Math.max(DATA[i].h - DATA[i].l, Math.abs(DATA[i].h - DATA[i-1].c), Math.abs(DATA[i].l - DATA[i-1].c));
   let s = 0;
-  for (let i = 1; i <= Math.min(period, N-1); i++) s += tr[i];
-  if (N > period) rma[period] = s / period;
+  for (let i = 0; i < Math.min(period, N); i++) s += tr[i];
+  if (N >= period) rma[period - 1] = s / period;
   const alpha = 1 / period;
-  for (let i = period + 1; i < N; i++) rma[i] = alpha * tr[i] + (1 - alpha) * rma[i-1];
+  for (let i = period; i < N; i++) rma[i] = alpha * tr[i] + (1 - alpha) * rma[i-1];
   return rma;
 }
 function calcPivotLow(left, right) {
@@ -878,19 +880,8 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
             (pendingDir === 1  && bar.c < pendingSigClose) ||
             (pendingDir === -1 && bar.c > pendingSigClose);
           if (barsOk && retraceOk) {
-            // Пересчитываем фильтры на баре входа (как в TradingView)
-            let _pendingFilterOk = true;
-            for (let _fi = 0; _fi < activeFilters.length && _pendingFilterOk; _fi++) {
-              const _f = activeFilters[_fi];
-              if (pendingDir === 1  && _f.blocksL(cfg, i, ac)) _pendingFilterOk = false;
-              if (pendingDir === -1 && _f.blocksS(cfg, i, ac)) _pendingFilterOk = false;
-            }
-            if (_pendingFilterOk) {
-              doDir = pendingDir;
-              pendingDir = 0; // вход сработал — сбрасываем pending
-            }
-            // Если фильтры заблокировали — pending остаётся активным.
-            // Вход будет повторён на следующем баре отката (до maxBars / cancelAtr).
+            doDir = pendingDir;
+            pendingDir = 0;
           }
         }
       }
