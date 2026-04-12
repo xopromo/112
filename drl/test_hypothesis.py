@@ -240,24 +240,33 @@ def main():
     if not results:
         print('Not enough data.'); sys.exit(1)
 
-    avg_sh  = np.mean([r['sh_oos']  for r in results])
-    avg_ret = np.mean([r['ret_oos'] for r in results])
-    avg_dd  = np.mean([r['dd_oos']  for r in results])
-    pos_oos = sum(1 for r in results if r['ret_oos'] > 0)
+    avg_sh    = np.mean([r['sh_oos']  for r in results])
+    avg_ret   = np.mean([r['ret_oos'] for r in results])
+    avg_dd    = np.mean([r['dd_oos']  for r in results])
+    avg_bh    = np.mean([r['bh_test'] for r in results])
+    avg_alpha = avg_ret - avg_bh           # outperformance vs buy-and-hold
+    pos_oos   = sum(1 for r in results if r['ret_oos'] > 0)
+    beats_bh  = sum(1 for r in results if r['ret_oos'] > r['bh_test'])
 
     print(f'  {"=" * 50}')
     print(f'  WALK-FORWARD SUMMARY ({len(results)} windows)')
     print(f'  {"=" * 50}')
     print(f'  Avg Sharpe OOS:   {avg_sh:+.2f}')
     print(f'  Avg Return OOS:   {avg_ret:+.1f}%')
+    print(f'  Avg B&H OOS:      {avg_bh:+.1f}%')
+    print(f'  Avg Alpha (vs BH):{avg_alpha:+.1f}%')
     print(f'  Avg Drawdown OOS: {avg_dd:.1f}%')
     print(f'  Profitable OOS:   {pos_oos}/{len(results)} windows')
+    print(f'  Beats B&H OOS:    {beats_bh}/{len(results)} windows')
     print(f'  {"=" * 50}')
 
-    if avg_sh >= 0.5 and pos_oos >= len(results) * 0.6:
+    n = len(results)
+    if avg_sh >= 0.5 and beats_bh >= n * 0.6:
         verdict = 'YES — hypothesis confirmed'
-    elif avg_ret > 0 or pos_oos >= len(results) * 0.5:
-        verdict = 'WEAK — some profit but inconsistent'
+    elif avg_alpha > 5 or (beats_bh >= n * 0.5 and avg_ret > avg_bh):
+        verdict = 'WEAK — agent shows alpha vs B&H but inconsistent'
+    elif avg_alpha > 0:
+        verdict = 'MARGINAL — slight alpha vs B&H'
     else:
         verdict = 'NO — agent did not generalize'
 
