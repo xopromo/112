@@ -65,11 +65,13 @@ echo [OK] Libraries installed
 echo.
 
 :: Run the test
-echo [2/2] Running test (3-7 min training)...
+echo [2/2] Running test...
+echo   3 windows x 150K steps = ~15-20 min
+echo   Watch the progress below.
 echo ------------------------------------------
 echo.
 
-python drl\test_hypothesis.py test_data\ohlcv.csv
+python drl\test_hypothesis.py test_data\ohlcv.csv --steps 150000 --windows 3
 
 echo.
 echo ------------------------------------------
