@@ -36,7 +36,8 @@ from gymnasium import spaces
 class TradingEnv(gym.Env):
     metadata = {'render_modes': []}
 
-    def __init__(self, df, commission=0.001, window=19, reward_comm_scale=10):
+    def __init__(self, df, commission=0.001, window=19, reward_comm_scale=10,
+                 random_start=False):
         super().__init__()
 
         self.closes = df['close'].values.astype(np.float64)
@@ -44,6 +45,7 @@ class TradingEnv(gym.Env):
         self.lows   = df['low'].values.astype(np.float64)
         self.commission = commission
         self.reward_comm_scale = reward_comm_scale  # RL чувствует комиссию сильнее
+        self.random_start = random_start  # случайный старт эпизода при обучении
         self.window = window
         self.n      = len(self.closes)
 
@@ -245,7 +247,12 @@ class TradingEnv(gym.Env):
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
-        self.bar         = self._start
+        # Случайный старт эпизода при обучении: агент видит разные участки
+        if self.random_start and self.n - self._start > 400:
+            max_start = self.n - 200
+            self.bar = int(self.np_random.integers(self._start, max_start))
+        else:
+            self.bar = self._start
         self.in_long     = False
         self.entry_bar   = 0
         self.entry_price = 0.0

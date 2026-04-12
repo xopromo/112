@@ -110,8 +110,9 @@ def train_agent(df_train, steps, commission, prefix=''):
             return True
 
     # reward_comm_scale=10: агент в RL чувствует 1% комиссию (не 0.1%)
-    # → резко снижает overtrading, equity остаётся с реальной 0.1%
-    env   = TradingEnv(df_train, commission=commission, reward_comm_scale=10)
+    # random_start=True: каждый эпизод начинается с разного бара → больше разнообразия
+    env   = TradingEnv(df_train, commission=commission, reward_comm_scale=10,
+                       random_start=True)
     model = PPO(
         'MlpPolicy', env,
         learning_rate = 1e-4,
