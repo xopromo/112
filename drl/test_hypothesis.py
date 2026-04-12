@@ -110,9 +110,9 @@ def train_agent(df_train, steps, commission, prefix=''):
             return True
 
     # reward_comm_scale=10: агент в RL чувствует 1% комиссию (не 0.1%)
-    # random_start=True: каждый эпизод начинается с разного бара → больше разнообразия
+    # random_start + episode_len=500: каждый эпизод — 500-барное случайное окно
     env   = TradingEnv(df_train, commission=commission, reward_comm_scale=10,
-                       random_start=True)
+                       random_start=True, episode_len=500)
     model = PPO(
         'MlpPolicy', env,
         learning_rate = 1e-4,
