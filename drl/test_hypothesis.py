@@ -108,18 +108,20 @@ def train_agent(df_train, steps, commission, prefix=''):
                 print(f'    {self.pfx}{self.num_timesteps:,} / {self.total:,}'); self.ni += 1
             return True
 
-    env   = TradingEnv(df_train, commission=commission)
+    # reward_comm_scale=10: агент в RL чувствует 1% комиссию (не 0.1%)
+    # → резко снижает overtrading, equity остаётся с реальной 0.1%
+    env   = TradingEnv(df_train, commission=commission, reward_comm_scale=10)
     model = PPO(
         'MlpPolicy', env,
         learning_rate = 1e-4,
         n_steps       = 2048,
-        batch_size    = 64,
+        batch_size    = 128,
         n_epochs      = 10,
-        gamma         = 0.99,
+        gamma         = 0.9995,
         gae_lambda    = 0.95,
         clip_range    = 0.2,
-        ent_coef      = 0.01,
-        policy_kwargs = dict(net_arch=[256, 128, 64]),  # 30 фич → 3 слоя
+        ent_coef      = 0.05,
+        policy_kwargs = dict(net_arch=[128, 64]),
         verbose       = 0,
     )
     model.learn(total_timesteps=steps, callback=CB(steps, prefix))
@@ -214,7 +216,7 @@ def plot_results(results, out_path):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('csv',          nargs='?',  default='test_data/ohlcv.csv')
-    parser.add_argument('--steps',      type=int,   default=150_000)
+    parser.add_argument('--steps',      type=int,   default=300_000)
     parser.add_argument('--windows',    type=int,   default=5)
     parser.add_argument('--train-frac', type=float, default=0.60)
     parser.add_argument('--commission', type=float, default=0.001)

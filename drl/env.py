@@ -36,13 +36,14 @@ from gymnasium import spaces
 class TradingEnv(gym.Env):
     metadata = {'render_modes': []}
 
-    def __init__(self, df, commission=0.001, window=19):
+    def __init__(self, df, commission=0.001, window=19, reward_comm_scale=10):
         super().__init__()
 
         self.closes = df['close'].values.astype(np.float64)
         self.highs  = df['high'].values.astype(np.float64)
         self.lows   = df['low'].values.astype(np.float64)
         self.commission = commission
+        self.reward_comm_scale = reward_comm_scale  # RL чувствует комиссию сильнее
         self.window = window
         self.n      = len(self.closes)
 
@@ -267,7 +268,7 @@ class TradingEnv(gym.Env):
 
         if want_long and not self.in_long:          # FLAT → LONG
             self.equity     *= (1.0 - self.commission)
-            reward          -= self.commission
+            reward          -= self.commission * self.reward_comm_scale
             self.in_long     = True
             self.entry_bar   = i
             self.entry_price = c
@@ -275,7 +276,7 @@ class TradingEnv(gym.Env):
 
         elif not want_long and self.in_long:         # LONG → FLAT
             self.equity    *= (1.0 - self.commission)
-            reward         -= self.commission
+            reward         -= self.commission * self.reward_comm_scale
             if c / self.entry_price - 1.0 - 2*self.commission > 0:
                 self.wins += 1
             self.in_long = False
