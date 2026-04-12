@@ -43,7 +43,8 @@ def calc_metrics(eq_curve):
 
 def run_episode(model, df, commission):
     """Прогнать модель, вернуть метрики + лог сделок."""
-    env = TradingEnv(df, commission=commission)
+    # reward_comm_scale=1 при оценке: используем реальную комиссию для equity
+    env = TradingEnv(df, commission=commission, reward_comm_scale=1)
     obs, _ = env.reset()
     done = False
 
