@@ -1,22 +1,30 @@
 """
-drl/env.py — торговая среда с трендовыми и паттерн фичами (v3)
+drl/env.py — торговая среда с трендовыми и паттерн фичами (v4)
 
 ДИЗАЙН:
   Действия: 0 = FLAT, 1 = LONG
-  Комиссия платится при смене позиции.
+  Комиссия платится при смене позиции (реально = commission, в reward = ×scale).
+
+ПАРАМЕТРЫ:
+  commission        = 0.001  реальная комиссия (0.1%), вычитается из equity
+  reward_comm_scale = 10     во сколько раз комиссия увеличивается в reward-сигнале
+                             (не влияет на equity, только на обучение)
+                             → предотвращает overtrading
+  random_start      = False  случайный старт эпизода при обучении (True)
+                             → агент видит разные рыночные условия
 
 НАБЛЮДЕНИЕ (30 признаков):
   [0-18]   z-score лог-доходности последних 19 баров
   [19]     ATR / close  (волатильность)
   [20]     RSI(14) / 100
   [21]     Текущая позиция (0 или 1)
-  ── Трендовые фичи (новые) ──
+  ── Трендовые фичи ──
   [22]     (close - EMA20) / ATR      ← насколько цена выше/ниже быстрой МА
   [23]     (close - EMA50) / ATR      ← насколько цена выше/ниже медленной МА
   [24]     sign(EMA20 - EMA50)        ← тренд вверх (+1) или вниз (-1)
   [25]     ADX(14) / 100              ← сила тренда (0=боковик, 1=сильный тренд)
   [26]     Bollinger %B               ← где цена в BB(20): 0=нижняя, 1=верхняя
-  ── Паттерн сигналы (новые) ──
+  ── Паттерн сигналы ──
   [27]     Pivot Low в последних 8 барах (0/1)
   [28]     Pivot High в последних 8 барах (0/1)
   [29]     Momentum: (close - close[10]) / ATR  ← скорость движения
@@ -24,7 +32,7 @@ drl/env.py — торговая среда с трендовыми и патте
 НАГРАДА:
   Когда LONG:  log(c_cur / c_prev) — лог-доходность бара
   Когда FLAT:  0
-  При смене:   −commission
+  При смене:   −commission × reward_comm_scale
   При DD>20%:  −0.005 per bar
 """
 
@@ -37,7 +45,7 @@ class TradingEnv(gym.Env):
     metadata = {'render_modes': []}
 
     def __init__(self, df, commission=0.001, window=19, reward_comm_scale=10,
-                 random_start=False):
+                 random_start=False, episode_len=None):
         super().__init__()
 
         self.closes = df['close'].values.astype(np.float64)
@@ -46,6 +54,7 @@ class TradingEnv(gym.Env):
         self.commission = commission
         self.reward_comm_scale = reward_comm_scale  # RL чувствует комиссию сильнее
         self.random_start = random_start  # случайный старт эпизода при обучении
+        self.episode_len  = episode_len   # длина эпизода (None = до конца данных)
         self.window = window
         self.n      = len(self.closes)
 
@@ -247,12 +256,14 @@ class TradingEnv(gym.Env):
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
-        # Случайный старт эпизода при обучении: агент видит разные участки
-        if self.random_start and self.n - self._start > 400:
-            max_start = self.n - 200
-            self.bar = int(self.np_random.integers(self._start, max_start))
+        # Случайный старт: если episode_len задан, стартуем так чтобы влезло episode_len
+        min_end = self._start + (self.episode_len or 200)
+        if self.random_start and self.n > min_end:
+            max_start = self.n - (self.episode_len or 200)
+            self.bar = int(self.np_random.integers(self._start, max(self._start + 1, max_start)))
         else:
             self.bar = self._start
+        self._episode_end = (self.bar + self.episode_len) if self.episode_len else (self.n - 1)
         self.in_long     = False
         self.entry_bar   = 0
         self.entry_price = 0.0
@@ -302,10 +313,10 @@ class TradingEnv(gym.Env):
         self.in_trade  = self.in_long
         self.direction = 1 if self.in_long else 0
         self.bar      += 1
-        terminated     = self.bar >= self.n - 1
+        terminated     = self.bar >= min(self._episode_end, self.n - 1)
 
         if terminated and self.in_long:
-            c_last = self.closes[-1]
+            c_last = self.closes[min(self.bar, self.n - 1)]
             if c_last / self.entry_price - 1.0 - 2*self.commission > 0:
                 self.wins += 1
             self.equity  *= (1.0 - self.commission)
