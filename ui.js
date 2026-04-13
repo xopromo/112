@@ -474,11 +474,18 @@ async function storeSave(key, data) {
   const _write = () => {
     if (data === null || data === undefined) {
       // Удаляем ключ если данные null/undefined
+      console.log(`[storeSave] удаляем ключ: ${key}`);
       if (window.storage) return window.storage.remove(key);
       localStorage.removeItem(key);
     } else {
-      if (window.storage) return window.storage.set(key, JSON.stringify(data));
-      localStorage.setItem(key, JSON.stringify(data));
+      try {
+        const serialized = JSON.stringify(data);
+        console.log(`[storeSave] сохраняем в ключ ${key}, размер: ${serialized.length} байт`);
+        if (window.storage) return window.storage.set(key, serialized);
+        localStorage.setItem(key, serialized);
+      } catch(e) {
+        console.error(`[storeSave] ошибка при сохранении в ${key}:`, e.message);
+      }
     }
   };
   const _isQuota = e => e.name === 'QuotaExceededError' || (e.code && (e.code === 22 || e.code === 1014));
