@@ -21493,7 +21493,7 @@ function applyFilters(_force = false) {
     if (now - _applyFiltersLastMs < 100) return;
     _applyFiltersLastMs = now;
   }
-  const fName  = $('f_name').value.trim().toLowerCase();
+  const fName  = $('f_name').value.trim().toLowerCase().normalize('NFKD');
   const fFav   = $('f_fav').value;
   const fPnl   = parseFloat($('f_pnl').value);
   const fWr    = parseFloat($('f_wr').value);
@@ -21525,7 +21525,7 @@ function applyFilters(_force = false) {
                    _tableMode === 'oos' ? _oosTableResults : results;
 
   _visibleResults = _srcData.filter(r => {
-    if (fName && !r.name.toLowerCase().includes(fName)) return false;
+    if (fName && !r.name.toLowerCase().normalize('NFKD').includes(fName)) return false;
     // Фильтр Избранного работает во всех режимах
     if (fFav === 'fav' && !isFav(r.name)) return false;
     if (fFav === 'no'  &&  isFav(r.name)) return false;
@@ -28635,7 +28635,7 @@ function applyOOSFilters() {
   const oosTbl = document.getElementById('oos-tbl-wrap');
   if (oosTbl) oosTbl.style.display = '';
 
-  const fname  = document.getElementById('oof_name')?.value.trim().toLowerCase() || '';
+  const fname  = (document.getElementById('oof_name')?.value.trim().toLowerCase() || '').normalize('NFKD');
   const ffav   = document.getElementById('oof_fav')?.value || '';
   const fopnl  = parseFloat(document.getElementById('oof_opnl')?.value);
   const fnpnl  = parseFloat(document.getElementById('oof_npnl')?.value);
@@ -28653,7 +28653,7 @@ function applyOOSFilters() {
   const frate_max = parseFloat(document.getElementById('oof_rate_max')?.value);
 
   const src = _oosTableResults.filter(r => {
-    if (fname && !r.name.toLowerCase().includes(fname)) return false;
+    if (fname && !r.name.toLowerCase().normalize('NFKD').includes(fname)) return false;
     if (ffav) {
       const oosLvl = getFavLevel(r.name);
       if (ffav === 'fav' && oosLvl === 0) return false;
@@ -32978,7 +32978,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1775910013475;
+window._BUILD_TS = 1776098389048;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
