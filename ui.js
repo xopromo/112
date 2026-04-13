@@ -472,8 +472,14 @@ function _favKey() {
 
 async function storeSave(key, data) {
   const _write = () => {
-    if (window.storage) return window.storage.set(key, JSON.stringify(data));
-    localStorage.setItem(key, JSON.stringify(data));
+    if (data === null || data === undefined) {
+      // Удаляем ключ если данные null/undefined
+      if (window.storage) return window.storage.remove(key);
+      localStorage.removeItem(key);
+    } else {
+      if (window.storage) return window.storage.set(key, JSON.stringify(data));
+      localStorage.setItem(key, JSON.stringify(data));
+    }
   };
   const _isQuota = e => e.name === 'QuotaExceededError' || (e.code && (e.code === 22 || e.code === 1014));
   try {

@@ -22,11 +22,23 @@ async function setProject(id) {
 
   // 🔄 Миграция старых избранных (без ID проекта) в новый проект
   if (favourites.length === 0) {
-    const oldFavs = await storeLoad('use6_fav'); // старый ключ без ID
-    if (oldFavs && oldFavs.length > 0) {
-      favourites = oldFavs;
-      await storeSave(_favKey(), favourites); // сохраняем в новый ключ
-      await storeSave('use6_fav', null); // очищаем старый ключ чтобы не дублировать
+    // Пробуем восстановить из всех возможных ключей (на случай потери currentId)
+    const possibleKeys = [
+      'use6_fav',           // старый формат без ID
+      'use6_fav_' + id,     // текущий проект (на случай сохранения до инициализации)
+    ];
+
+    for (const tryKey of possibleKeys) {
+      const tryFavs = await storeLoad(tryKey);
+      if (tryFavs && tryFavs.length > 0) {
+        favourites = tryFavs;
+        // Если загрузили из другого ключа, сохраняем в правильный
+        if (tryKey !== _favKey()) {
+          await storeSave(_favKey(), favourites);
+          await storeSave(tryKey, null); // очищаем старый ключ
+        }
+        break;
+      }
     }
   }
 
