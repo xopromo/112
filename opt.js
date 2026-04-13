@@ -3292,6 +3292,7 @@ async function runOpt() {
                                     };
 
                                     // ##EQ_MA_FILTER## Двупроходный цикл: сначала расчётная equity, потом с фильтром
+                                    const _effUseEqMA = useEqMA; // В Exhaustive режиме используем глобальное значение
                                     let _eqCalc = null;
                                     if (_effUseEqMA) {
                                       const _shadowCfg = JSON.parse(JSON.stringify(btCfg));
