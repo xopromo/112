@@ -524,7 +524,12 @@ window.addEventListener('load', async () => {
   const projs = ProjectManager.getAll();
   if (projs.length === 0) {
     // Первый запуск — мигрируем старые избранные, показываем диалог создания
-    favourites = (await storeLoad(_favKey())) || [];
+    // Сначала пытаемся загрузить старые избранные (без ID проекта)
+    favourites = (await storeLoad('use6_fav')) || [];
+    // Если старых нет, загружаем из текущего ID (на случай восстановления)
+    if (favourites.length === 0) {
+      favourites = (await storeLoad(_favKey())) || [];
+    }
     _favNs = localStorage.getItem('use6_fav_ns') || '';
     openCreateProject(true); // true = первый запуск, нельзя закрыть
   } else {
