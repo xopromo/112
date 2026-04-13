@@ -23130,8 +23130,16 @@ function toast(msg, duration) { showTplToast(msg, duration); }
 // (используется вместо storeSave для гарантированного сохранения)
 function _saveFavsSync() {
   const key = _favKey();
+
+  // Защита: если ключ 'use6_fav' (без ID) и есть текущий проект, сохраняем в оба места
+  // Это предотвращает потерю избранных при неправильной инициализации ProjectManager
+  const currentId = typeof ProjectManager !== 'undefined' ? ProjectManager.getCurrentId() : null;
+  const keysToSave = currentId ? [key, 'use6_fav_' + currentId] : [key];
+
   try {
-    localStorage.setItem(key, JSON.stringify(favourites));
+    for (const k of keysToSave) {
+      localStorage.setItem(k, JSON.stringify(favourites));
+    }
   } catch(e) {
     console.warn('[_saveFavsSync] Failed to save:', key, e.message);
   }
@@ -27959,7 +27967,7 @@ function _hcAddToFav(idx, btn) {
     btn.textContent = '⭐ В избр.';
     btn.style.background = 'rgba(255,170,0,.2)';
   }
-  storeSave(_favKey(), favourites);
+  _saveFavsSync(); // синхронное сохранение
   renderFavBar();
 }
 
@@ -29847,8 +29855,9 @@ async function setProject(id) {
         favourites = tryFavs;
         // Если загрузили из другого ключа, сохраняем в правильный
         if (tryKey !== _favKey()) {
-          await storeSave(_favKey(), favourites);
-          await storeSave(tryKey, null); // очищаем старый ключ
+          _saveFavsSync(); // сохраняем синхронно в новый ключ
+          // Очищаем старый ключ асинхронно (не критично если не завершится)
+          storeSave(tryKey, null).catch(() => {});
         }
         break;
       }
@@ -33032,7 +33041,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1776115589157;
+window._BUILD_TS = 1776116606489;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;

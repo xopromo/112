@@ -34,8 +34,9 @@ async function setProject(id) {
         favourites = tryFavs;
         // Если загрузили из другого ключа, сохраняем в правильный
         if (tryKey !== _favKey()) {
-          await storeSave(_favKey(), favourites);
-          await storeSave(tryKey, null); // очищаем старый ключ
+          _saveFavsSync(); // сохраняем синхронно в новый ключ
+          // Очищаем старый ключ асинхронно (не критично если не завершится)
+          storeSave(tryKey, null).catch(() => {});
         }
         break;
       }

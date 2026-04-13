@@ -1450,7 +1450,7 @@ function _hcAddToFav(idx, btn) {
     btn.textContent = '⭐ В избр.';
     btn.style.background = 'rgba(255,170,0,.2)';
   }
-  storeSave(_favKey(), favourites);
+  _saveFavsSync(); // синхронное сохранение
   renderFavBar();
 }
 
