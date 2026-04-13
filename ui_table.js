@@ -421,7 +421,7 @@ function applyFilters(_force = false) {
     if (now - _applyFiltersLastMs < 100) return;
     _applyFiltersLastMs = now;
   }
-  const fName  = $('f_name').value.trim().toLowerCase();
+  const fName  = $('f_name').value.trim().toLowerCase().normalize('NFKD');
   const fFav   = $('f_fav').value;
   const fPnl   = parseFloat($('f_pnl').value);
   const fWr    = parseFloat($('f_wr').value);
@@ -453,7 +453,7 @@ function applyFilters(_force = false) {
                    _tableMode === 'oos' ? _oosTableResults : results;
 
   _visibleResults = _srcData.filter(r => {
-    if (fName && !r.name.toLowerCase().includes(fName)) return false;
+    if (fName && !r.name.toLowerCase().normalize('NFKD').includes(fName)) return false;
     // Фильтр Избранного работает во всех режимах
     if (fFav === 'fav' && !isFav(r.name)) return false;
     if (fFav === 'no'  &&  isFav(r.name)) return false;

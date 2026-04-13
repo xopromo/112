@@ -587,7 +587,7 @@ function applyOOSFilters() {
   const oosTbl = document.getElementById('oos-tbl-wrap');
   if (oosTbl) oosTbl.style.display = '';
 
-  const fname  = document.getElementById('oof_name')?.value.trim().toLowerCase() || '';
+  const fname  = (document.getElementById('oof_name')?.value.trim().toLowerCase() || '').normalize('NFKD');
   const ffav   = document.getElementById('oof_fav')?.value || '';
   const fopnl  = parseFloat(document.getElementById('oof_opnl')?.value);
   const fnpnl  = parseFloat(document.getElementById('oof_npnl')?.value);
@@ -605,7 +605,7 @@ function applyOOSFilters() {
   const frate_max = parseFloat(document.getElementById('oof_rate_max')?.value);
 
   const src = _oosTableResults.filter(r => {
-    if (fname && !r.name.toLowerCase().includes(fname)) return false;
+    if (fname && !r.name.toLowerCase().normalize('NFKD').includes(fname)) return false;
     if (ffav) {
       const oosLvl = getFavLevel(r.name);
       if (ffav === 'fav' && oosLvl === 0) return false;
