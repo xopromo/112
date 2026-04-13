@@ -89,7 +89,7 @@ git push -u origin claude/ваша-ветка
 - `_attachOOS` (1051) — IS/OOS split
 - `buildBtCfg` (3963) — сборка cfg для бэктеста
 - `runMassRobust` (4224) — массовый тест устойчивости
-- `HC_NUMERIC_PARAMS` (4544) — список параметров HC
+- `HC_NUMERIC_PARAMS` (4546) — список параметров HC
 
 **ui.js**:
 - `showDetail` (20) — standard detail панель
