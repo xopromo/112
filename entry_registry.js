@@ -98,7 +98,7 @@ const ENTRY_REGISTRY = [
     id:        'boll',
     flag:      'useBoll',
     htmlId:    'e_bol',
-    shortName: () => 'BBproboj',
+    shortName: c => `BBproboj(${c.bbLen||20}/${c.bbMult||2})`,
     // Используем полосы [i-2] (без включения сигнального бара) — как Дончиан.
     // [i-1] было self-referential: экстремальный close[i-1] расширял свою же полосу → сигнал не срабатывал.
     detectL: (cfg, i) => cfg.bbB && i >= 2 && cfg.bbD[i-2] > 0 && DATA[i-1].c > cfg.bbB[i-2]+cfg.bbD[i-2],

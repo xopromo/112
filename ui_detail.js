@@ -172,7 +172,8 @@ function showDetail(r) {
   let ex = '';
   ex += row('Безубыток (BE)',       c.useBE      ? `ВКЛ · триггер ${c.beTrig??0}×ATR от входа, оффсет SL=${c.beOff??0}×ATR (≈0=точный BE)` : 'ВЫКЛ', c.useBE?'on':'off');
   ex += row('Trailing Stop',        c.useTrail   ? `ВКЛ · триггер ${c.trTrig??0}×ATR, дистанция ${c.trDist??0}×ATR` : 'ВЫКЛ', c.useTrail?'on':'off');
-  ex += row('Wick Trailing SL', c.useWickTrail ? `ВКЛ · отступ ${c.wickMult??1}×${c.wickOffType||'atr'}` : 'ВЫКЛ', c.useWickTrail?'on':'off');
+  const wickTypeLabel = c.wickOffType === 'pct' ? '%' : c.wickOffType === 'pts' ? 'pts' : 'ATR';
+  ex += row('Wick Trailing SL', c.useWickTrail ? `ВКЛ · отступ ${c.wickMult??1}×${wickTypeLabel}` : 'ВЫКЛ', c.useWickTrail?'on':'off');
   ex += row('Обратный сигнал', c.useRev ? [
     `ВКЛ · мин баров в сделке: <b>${c.revBars??0}</b>`,
     `Пропустить N сигналов (skip): <b>${c.revSkip||0}</b>`,
@@ -630,7 +631,8 @@ function buildCopyText(r, c, slName, tpName) {
   lines.push('--- МЕХАНИКИ ВЫХОДА ---');
   lines.push('Безубыток:       ' + on(c.useBE,      'триггер=' + (c.beTrig??0) + 'xATR, оффсет=' + (c.beOff??0) + 'xATR'));
   lines.push('Trailing Stop:   ' + on(c.useTrail,   'триггер=' + (c.trTrig??0) + 'xATR, дист=' + (c.trDist??0) + 'xATR'));
-  lines.push('Wick Trail SL:   ' + on(c.useWickTrail, 'отступ=' + (c.wickMult??1) + 'x' + (c.wickOffType||'atr')));
+  const wickTypeLabelLog = c.wickOffType === 'pct' ? '%' : c.wickOffType === 'pts' ? 'pts' : 'ATR';
+  lines.push('Wick Trail SL:   ' + on(c.useWickTrail, 'отступ=' + (c.wickMult??1) + 'x' + wickTypeLabelLog));
   lines.push('Обратный сигнал: ' + on(c.useRev,
     'мин=' + (c.revBars??0) + ' баров' +
     ' | skip=' + (c.revSkip||0) +

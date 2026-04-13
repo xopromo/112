@@ -785,7 +785,7 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
           const wickOffset = cfg.wickOffType === 'pct'
             ? DATA[i].c * cfg.wickMult / 100
             : cfg.wickOffType === 'pts'
-              ? cfg.wickMult
+              ? cfg.wickMult / 10000  // Нормализация пунктов (10 pts = 0.0010)
               : atrArr[i] * cfg.wickMult; // ATR (default)
           const wickRaw = dir === 1
             ? DATA[i-1].l - wickOffset   // Long: ниже нижнего фитиля предыдущей свечи
