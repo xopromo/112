@@ -22717,19 +22717,24 @@ window.addEventListener('load', async () => {
   updateClxExitVisibility();
 
   // ── Projects ──────────────────────────────────────────────
+  console.log('[init] ProjectManager.init()...');
   ProjectManager.init();
   const projs = ProjectManager.getAll();
+  console.log('[init] проектов найдено:', projs.length);
   if (projs.length === 0) {
     // Первый запуск — мигрируем старые избранные, показываем диалог создания
     // Сначала пытаемся загрузить старые избранные (без ID проекта)
     favourites = (await storeLoad('use6_fav')) || [];
+    console.log('[init] первый запуск, загружено старых избранных:', favourites.length);
     // Если старых нет, загружаем из текущего ID (на случай восстановления)
     if (favourites.length === 0) {
       favourites = (await storeLoad(_favKey())) || [];
+      console.log('[init] старых нет, загружено из _favKey():', favourites.length);
     }
     _favNs = localStorage.getItem('use6_fav_ns') || '';
     openCreateProject(true); // true = первый запуск, нельзя закрыть
   } else {
+    console.log('[init] есть проекты, переходим на:', ProjectManager.getCurrentId() || projs[0].id);
     await setProject(ProjectManager.getCurrentId() || projs[0].id);
   }
 
@@ -23130,8 +23135,21 @@ function toast(msg, duration) { showTplToast(msg, duration); }
 // (используется вместо storeSave для гарантированного сохранения)
 function _saveFavsSync() {
   const key = _favKey();
+
+  // Защита: если ключ 'use6_fav' (без ID) и есть текущий проект, сохраняем в оба места
+  // Это предотвращает потерю избранных при неправильной инициализации ProjectManager
+  const currentId = typeof ProjectManager !== 'undefined' ? ProjectManager.getCurrentId() : null;
+  const keysToSave = currentId ? [key, 'use6_fav_' + currentId] : [key];
+
   try {
-    localStorage.setItem(key, JSON.stringify(favourites));
+    const serialized = JSON.stringify(favourites);
+    for (const k of keysToSave) {
+      localStorage.setItem(k, serialized);
+    }
+    // Диагностика: проверяем что действительно сохранилось
+    const verify = localStorage.getItem(key);
+    const verifyParsed = verify ? JSON.parse(verify) : null;
+    console.log(`[_saveFavsSync] Сохранено ${favourites.length} избранных в ключи:`, keysToSave, 'Проверка:', verifyParsed?.length || 0);
   } catch(e) {
     console.warn('[_saveFavsSync] Failed to save:', key, e.message);
   }
@@ -23153,7 +23171,10 @@ function _favStarText(name) {
 function toggleFav(idx, event, startLevel) {
   if (event) event.stopPropagation();
   const r = typeof idx === 'number' ? results[idx] : idx;
-  if (!r) return;
+  if (!r) {
+    console.warn('[toggleFav] результат не найден, idx=', idx);
+    return;
+  }
   const fi = favourites.findIndex(f => f.name===r.name && (f.ns||'')===_favNs);
   if (fi >= 0) {
     const cur = favourites[fi].level || 1;
@@ -23166,6 +23187,7 @@ function toggleFav(idx, event, startLevel) {
     } else {
       favourites[fi].level = cur + 1; // повысить уровень
     }
+    console.log('[toggleFav] обновлено существующее избранное:', r.name, 'новый уровень:', favourites[fi].level);
   } else {
     const favEntry = { name:r.name, ns:_favNs, level: startLevel || 1, stats:{
       pnl:r.pnl, wr:r.wr, n:r.n, dd:r.dd, pdd:r.pdd,
@@ -23180,6 +23202,7 @@ function toggleFav(idx, event, startLevel) {
       robScore:r.robScore, robMax:r.robMax, robDetails:r.robDetails
     }, cfg:r.cfg, ts:Date.now() };
     favourites.push(favEntry);
+    console.log('[toggleFav] добавлено новое избранное:', r.name, 'всего в массиве:', favourites.length);
     // Асинхронно запустить быстрый тест устойчивости для нового избранного
     _autoRunRobustForFav(favEntry);
   }
@@ -27959,7 +27982,7 @@ function _hcAddToFav(idx, btn) {
     btn.textContent = '⭐ В избр.';
     btn.style.background = 'rgba(255,170,0,.2)';
   }
-  storeSave(_favKey(), favourites);
+  _saveFavsSync(); // синхронное сохранение
   renderFavBar();
 }
 
@@ -29831,7 +29854,10 @@ async function setProject(id) {
   if (!proj) return;
 
   // Load per-project favourites
-  favourites = (await storeLoad(_favKey())) || [];
+  const currentKey = _favKey();
+  console.log(`[setProject] загружаем избранные из ключа: ${currentKey}`);
+  favourites = (await storeLoad(currentKey)) || [];
+  console.log(`[setProject] загружено ${favourites.length} избранных из ${currentKey}`);
 
   // 🔄 Миграция старых избранных (без ID проекта) в новый проект
   if (favourites.length === 0) {
@@ -29843,12 +29869,15 @@ async function setProject(id) {
 
     for (const tryKey of possibleKeys) {
       const tryFavs = await storeLoad(tryKey);
+      console.log(`[setProject] попытка загрузить из ${tryKey}:`, tryFavs?.length || 0);
       if (tryFavs && tryFavs.length > 0) {
         favourites = tryFavs;
+        console.log(`[setProject] мигрировано ${tryFavs.length} избранных из ${tryKey} в ${currentKey}`);
         // Если загрузили из другого ключа, сохраняем в правильный
-        if (tryKey !== _favKey()) {
-          await storeSave(_favKey(), favourites);
-          await storeSave(tryKey, null); // очищаем старый ключ
+        if (tryKey !== currentKey) {
+          _saveFavsSync(); // сохраняем синхронно в новый ключ
+          // Очищаем старый ключ асинхронно (не критично если не завершится)
+          storeSave(tryKey, null).catch(() => {});
         }
         break;
       }
@@ -33032,7 +33061,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1776115589157;
+window._BUILD_TS = 1776116941356;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;

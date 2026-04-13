@@ -526,19 +526,24 @@ window.addEventListener('load', async () => {
   updateClxExitVisibility();
 
   // ── Projects ──────────────────────────────────────────────
+  console.log('[init] ProjectManager.init()...');
   ProjectManager.init();
   const projs = ProjectManager.getAll();
+  console.log('[init] проектов найдено:', projs.length);
   if (projs.length === 0) {
     // Первый запуск — мигрируем старые избранные, показываем диалог создания
     // Сначала пытаемся загрузить старые избранные (без ID проекта)
     favourites = (await storeLoad('use6_fav')) || [];
+    console.log('[init] первый запуск, загружено старых избранных:', favourites.length);
     // Если старых нет, загружаем из текущего ID (на случай восстановления)
     if (favourites.length === 0) {
       favourites = (await storeLoad(_favKey())) || [];
+      console.log('[init] старых нет, загружено из _favKey():', favourites.length);
     }
     _favNs = localStorage.getItem('use6_fav_ns') || '';
     openCreateProject(true); // true = первый запуск, нельзя закрыть
   } else {
+    console.log('[init] есть проекты, переходим на:', ProjectManager.getCurrentId() || projs[0].id);
     await setProject(ProjectManager.getCurrentId() || projs[0].id);
   }
 
