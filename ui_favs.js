@@ -4,8 +4,16 @@
 // (используется вместо storeSave для гарантированного сохранения)
 function _saveFavsSync() {
   const key = _favKey();
+
+  // Защита: если ключ 'use6_fav' (без ID) и есть текущий проект, сохраняем в оба места
+  // Это предотвращает потерю избранных при неправильной инициализации ProjectManager
+  const currentId = typeof ProjectManager !== 'undefined' ? ProjectManager.getCurrentId() : null;
+  const keysToSave = currentId ? [key, 'use6_fav_' + currentId] : [key];
+
   try {
-    localStorage.setItem(key, JSON.stringify(favourites));
+    for (const k of keysToSave) {
+      localStorage.setItem(k, JSON.stringify(favourites));
+    }
   } catch(e) {
     console.warn('[_saveFavsSync] Failed to save:', key, e.message);
   }
