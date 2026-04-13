@@ -20154,6 +20154,7 @@ async function runOpt() {
                                     };
 
                                     // ##EQ_MA_FILTER## Двупроходный цикл: сначала расчётная equity, потом с фильтром
+                                    const _effUseEqMA = useEqMA; // В Exhaustive режиме используем глобальное значение
                                     let _eqCalc = null;
                                     if (_effUseEqMA) {
                                       const _shadowCfg = JSON.parse(JSON.stringify(btCfg));
@@ -32983,7 +32984,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1776109344426;
+window._BUILD_TS = 1776110526520;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
