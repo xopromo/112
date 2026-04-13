@@ -20,6 +20,28 @@ async function setProject(id) {
   // Load per-project favourites
   favourites = (await storeLoad(_favKey())) || [];
 
+  // 🔄 Миграция старых избранных (без ID проекта) в новый проект
+  if (favourites.length === 0) {
+    // Пробуем восстановить из всех возможных ключей (на случай потери currentId)
+    const possibleKeys = [
+      'use6_fav',           // старый формат без ID
+      'use6_fav_' + id,     // текущий проект (на случай сохранения до инициализации)
+    ];
+
+    for (const tryKey of possibleKeys) {
+      const tryFavs = await storeLoad(tryKey);
+      if (tryFavs && tryFavs.length > 0) {
+        favourites = tryFavs;
+        // Если загрузили из другого ключа, сохраняем в правильный
+        if (tryKey !== _favKey()) {
+          await storeSave(_favKey(), favourites);
+          await storeSave(tryKey, null); // очищаем старый ключ
+        }
+        break;
+      }
+    }
+  }
+
   // Restore last state
   const state = ProjectManager.loadState(id);
   _favNs = (state && state.favNs) ? state.favNs : '';
