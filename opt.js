@@ -4283,6 +4283,8 @@ async function runMassRobust() {
       favourites[fIdx].stats.robScore = score;
       favourites[fIdx].stats.robMax = tests.length;
       favourites[fIdx].stats.robDetails = details;
+      // Сохраняем избранные после обновления робасности
+      if (typeof _saveFavsSync === 'function') _saveFavsSync();
     }
     const rIdx = results.findIndex(x => x.name === r.name);
     if (rIdx >= 0) { results[rIdx].robScore = score; results[rIdx].robMax = tests.length; results[rIdx].robDetails = details; }

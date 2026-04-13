@@ -1,4 +1,16 @@
 // --- Favourites ---
+
+// Синхронное сохранение избранных в localStorage
+// (используется вместо storeSave для гарантированного сохранения)
+function _saveFavsSync() {
+  const key = _favKey();
+  try {
+    localStorage.setItem(key, JSON.stringify(favourites));
+  } catch(e) {
+    console.warn('[_saveFavsSync] Failed to save:', key, e.message);
+  }
+}
+
 function isFav(name) {
   return favourites.some(f => f.name===name && (f.ns||'')===_favNs);
 }
@@ -45,7 +57,8 @@ function toggleFav(idx, event, startLevel) {
     // Асинхронно запустить быстрый тест устойчивости для нового избранного
     _autoRunRobustForFav(favEntry);
   }
-  storeSave(_favKey(), favourites);
+  // Сохраняем в localStorage синхронно чтобы гарантировать сохранение
+  _saveFavsSync();
   renderFavBar();
   _refreshFavStars();
 }
@@ -66,7 +79,7 @@ async function _autoRunRobustForFav(favEntry) {
     favEntry.stats.robScore = robScore;
     favEntry.stats.robMax = 3; // 3 теста: oos(1) + walk(1) + param(1)
     favEntry.stats.robDetails = robDetails;
-    storeSave(_favKey(), favourites);
+    _saveFavsSync();
     // Обновляем отображение если открыт режим Избранные
     if (_tableMode === 'fav') renderVisibleResults();
   } catch(e) {
@@ -79,7 +92,7 @@ function removeFavByName(name, event) {
   const fi = favourites.findIndex(f => f.name === name && (f.ns||'') === _favNs);
   if (fi >= 0) {
     favourites.splice(fi, 1);
-    storeSave(_favKey(), favourites);
+    _saveFavsSync();
     renderFavBar();
     _refreshFavStars();
   }
@@ -124,7 +137,7 @@ function renderFavBar() { /* панель убрана — избранные д
 function toggleFavBody() {}
 function removeFav(i) {
   favourites.splice(i,1);
-  storeSave(_favKey(), favourites);
+  _saveFavsSync();
   renderFavBar();
   _refreshFavStars(); // не сбрасываем фильтры
 }
