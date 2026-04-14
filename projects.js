@@ -275,8 +275,12 @@ const ProjectManager = (() => {
 
   function init() {
     _loadLS();
+    console.log('[ProjectManager.init] проектов найдено:', _projects.length, 'текущий ID:', _currentId);
+
     // Очищаем осиротевшие CSV/fav из localStorage (от удалённых проектов)
     const knownIds = new Set(_projects.map(p => p.id));
+    console.log('[ProjectManager.init] известные IDs:', Array.from(knownIds));
+
     const orphanPrefixes = ['use6_csv_', 'use6_fav_', 'use6_state_'];
     const toRemove = [];
     for (let i = 0; i < localStorage.length; i++) {
@@ -285,13 +289,18 @@ const ProjectManager = (() => {
       for (const pfx of orphanPrefixes) {
         if (k.startsWith(pfx)) {
           const id = k.slice(pfx.length);
-          if (!knownIds.has(id)) toRemove.push(k);
+          // ВАЖНО: не удаляем пустой ID (это старые ключи вроде 'use6_fav' без ID)
+          // и не удаляем ключи которые принадлежат известным проектам
+          if (id && !knownIds.has(id)) {
+            console.log(`[ProjectManager.init] осиротевший ключ (ID="${id}" не найден): ${k}`);
+            toRemove.push(k);
+          }
         }
       }
     }
     if (toRemove.length > 0) {
+      console.log('[ProjectManager.init] удаляем осиротевшие ключи:', toRemove);
       toRemove.forEach(k => localStorage.removeItem(k));
-      console.log('[ProjectManager] очищено осиротевших ключей:', toRemove.length, toRemove);
     }
   }
 

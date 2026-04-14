@@ -11,9 +11,14 @@ function _saveFavsSync() {
   const keysToSave = currentId ? [key, 'use6_fav_' + currentId] : [key];
 
   try {
+    const serialized = JSON.stringify(favourites);
     for (const k of keysToSave) {
-      localStorage.setItem(k, JSON.stringify(favourites));
+      localStorage.setItem(k, serialized);
     }
+    // Диагностика: проверяем что действительно сохранилось
+    const verify = localStorage.getItem(key);
+    const verifyParsed = verify ? JSON.parse(verify) : null;
+    console.log(`[_saveFavsSync] Сохранено ${favourites.length} избранных в ключи:`, keysToSave, 'Проверка:', verifyParsed?.length || 0);
   } catch(e) {
     console.warn('[_saveFavsSync] Failed to save:', key, e.message);
   }
@@ -35,7 +40,10 @@ function _favStarText(name) {
 function toggleFav(idx, event, startLevel) {
   if (event) event.stopPropagation();
   const r = typeof idx === 'number' ? results[idx] : idx;
-  if (!r) return;
+  if (!r) {
+    console.warn('[toggleFav] результат не найден, idx=', idx);
+    return;
+  }
   const fi = favourites.findIndex(f => f.name===r.name && (f.ns||'')===_favNs);
   if (fi >= 0) {
     const cur = favourites[fi].level || 1;
@@ -48,6 +56,7 @@ function toggleFav(idx, event, startLevel) {
     } else {
       favourites[fi].level = cur + 1; // повысить уровень
     }
+    console.log('[toggleFav] обновлено существующее избранное:', r.name, 'новый уровень:', favourites[fi].level);
   } else {
     const favEntry = { name:r.name, ns:_favNs, level: startLevel || 1, stats:{
       pnl:r.pnl, wr:r.wr, n:r.n, dd:r.dd, pdd:r.pdd,
@@ -62,6 +71,7 @@ function toggleFav(idx, event, startLevel) {
       robScore:r.robScore, robMax:r.robMax, robDetails:r.robDetails
     }, cfg:r.cfg, ts:Date.now() };
     favourites.push(favEntry);
+    console.log('[toggleFav] добавлено новое избранное:', r.name, 'всего в массиве:', favourites.length);
     // Асинхронно запустить быстрый тест устойчивости для нового избранного
     _autoRunRobustForFav(favEntry);
   }

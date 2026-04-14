@@ -18,7 +18,10 @@ async function setProject(id) {
   if (!proj) return;
 
   // Load per-project favourites
-  favourites = (await storeLoad(_favKey())) || [];
+  const currentKey = _favKey();
+  console.log(`[setProject] загружаем избранные из ключа: ${currentKey}`);
+  favourites = (await storeLoad(currentKey)) || [];
+  console.log(`[setProject] загружено ${favourites.length} избранных из ${currentKey}`);
 
   // 🔄 Миграция старых избранных (без ID проекта) в новый проект
   if (favourites.length === 0) {
@@ -30,10 +33,12 @@ async function setProject(id) {
 
     for (const tryKey of possibleKeys) {
       const tryFavs = await storeLoad(tryKey);
+      console.log(`[setProject] попытка загрузить из ${tryKey}:`, tryFavs?.length || 0);
       if (tryFavs && tryFavs.length > 0) {
         favourites = tryFavs;
+        console.log(`[setProject] мигрировано ${tryFavs.length} избранных из ${tryKey} в ${currentKey}`);
         // Если загрузили из другого ключа, сохраняем в правильный
-        if (tryKey !== _favKey()) {
+        if (tryKey !== currentKey) {
           _saveFavsSync(); // сохраняем синхронно в новый ключ
           // Очищаем старый ключ асинхронно (не критично если не завершится)
           storeSave(tryKey, null).catch(() => {});
