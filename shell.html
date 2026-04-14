@@ -1743,6 +1743,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
       <button class="tbl-mode-btn" id="btn-tbl-tpl" onclick="openTableTplPopover()" title="Шаблоны фильтров — сохранить текущие фильтры / быстро применить сохранённый набор" style="border-color:var(--accent2);color:var(--accent)">💾 Наборы фильтров ▾</button>
     </div>
     <button class="tbl-mode-btn" onclick="_downloadSources()" title="Скачать исходные файлы: core.js, opt.js, ui.js, shell.html, build.py, README.md">⬇ Исходники</button>
+    <button class="tbl-mode-btn" onclick="openChangelogModal()" title="История изменений — все версии, исправления, новые функции">📋 История</button>
     <button class="tbl-mode-btn" id="btn-ml-scan" onclick="openMLModal()" title="ML-модели: обучить / управлять / скан сигналов" style="border-color:rgba(139,92,246,.5);color:var(--purple)">🤖 ML</button>
     <button class="tbl-mode-btn" id="btn-research" onclick="openResearchModal()" title="Анализ результатов: корреляции, аномалии, кластеры, факторы" style="border-color:rgba(166,227,161,.5);color:#a6e3a1">📊 Research</button>
     <a class="tbl-mode-btn" href="comparator.html" target="_blank" title="Сравни два периода CSV: что стабильно, что изменилось — Hurst, пивоты, волатильность, сигналы" style="border-color:rgba(137,220,235,.4);color:var(--accent);text-decoration:none">📊 Comparator</a>
@@ -2838,6 +2839,52 @@ window._BUILD_TS = /* ##BUILD_TS## */ 0;
       <button onclick="document.getElementById('ml-screening-modal').style.display='none'" style="background:none;border:none;color:var(--fg2);font-size:1.2em;cursor:pointer;padding:0 4px">✕</button>
     </div>
     <div id="ml-screening-body" style="color:var(--fg)"></div>
+  </div>
+</div>
+
+<!-- CHANGELOG MODAL -->
+<div id="changelog-modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;align-items:center;justify-content:center;padding:24px" onclick="if(event.target===this)closeChangelogModal()">
+  <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;width:100%;max-width:900px;max-height:85vh;display:flex;flex-direction:column;overflow:hidden">
+
+    <!-- Header -->
+    <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+      <div style="display:flex;align-items:center;gap:12px">
+        <span style="font-size:1.4em">📋</span>
+        <div>
+          <h2 style="margin:0;color:var(--accent)">История изменений</h2>
+          <div style="font-size:.8em;color:var(--text3)">USE Optimizer v6 — все версии с датами и описаниями</div>
+        </div>
+      </div>
+      <button onclick="closeChangelogModal()" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:1.3em">✕</button>
+    </div>
+
+    <!-- Controls -->
+    <div style="padding:12px 20px;background:var(--bg3);border-bottom:1px solid var(--border);display:flex;gap:12px;align-items:center">
+      <input id="changelog-search" type="text" placeholder="🔍 Поиск по версии, дате, описанию..."
+        style="flex:1;background:var(--bg);border:1px solid var(--border2);border-radius:4px;color:var(--text);padding:6px 12px;font-size:.9em;font-family:var(--font-mono)"
+        onkeyup="_filterChangelog()" oninput="_filterChangelog()">
+
+      <label style="display:flex;align-items:center;gap:6px;color:var(--text2);font-size:.9em;cursor:pointer">
+        <input id="changelog-filter-stable" type="checkbox" onchange="_filterChangelog()" style="cursor:pointer">
+        Только STABLE
+      </label>
+
+      <button onclick="_exportChangelogJSON()" title="Экспортировать в JSON"
+        style="padding:6px 12px;background:rgba(0,212,255,.15);border:1px solid var(--accent);border-radius:4px;color:var(--accent);font-size:.85em;cursor:pointer">
+        📥 Экспорт
+      </button>
+    </div>
+
+    <!-- Content -->
+    <div id="changelog-list" style="flex:1;overflow-y:auto;padding:0">
+      <div style="padding:20px;text-align:center;color:var(--text3)">Загрузка...</div>
+    </div>
+
+    <!-- Footer -->
+    <div style="padding:12px 20px;border-top:1px solid var(--border);background:var(--bg3);font-size:.75em;color:var(--text3)">
+      💡 Кликни на версию чтобы развернуть детали
+    </div>
+
   </div>
 </div>
 
