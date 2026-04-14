@@ -2,8 +2,39 @@
 
 // Синхронное сохранение избранных в localStorage
 // (используется вместо storeSave для гарантированного сохранения)
+// Валидация: проверить что массив избранных валиден
+function _validateFavourites() {
+  if (!Array.isArray(favourites)) {
+    console.error('[_validateFavourites] ❌ favourites не массив!', typeof favourites);
+    return false;
+  }
+
+  for (let i = 0; i < favourites.length; i++) {
+    const f = favourites[i];
+    if (!f.name || typeof f.name !== 'string') {
+      console.error(`[_validateFavourites] ❌ Элемент ${i} - нет name или не строка`);
+      return false;
+    }
+    if (!f.stats || typeof f.stats !== 'object') {
+      console.error(`[_validateFavourites] ❌ Элемент ${i} - нет stats`);
+      return false;
+    }
+  }
+
+  return true;
+}
+
+// Синхронное сохранение избранных в localStorage
+// (используется вместо storeSave для гарантированного сохранения)
 function _saveFavsSync() {
   const key = _favKey();
+
+  // Валидация: проверяем целостность данных перед сохранением
+  if (!_validateFavourites()) {
+    console.error('[_saveFavsSync] ❌ Данные не валидны, сохранение отменено!');
+    toast('⚠️ Ошибка: данные избранных повреждены. Перезагрузите страницу.', 3000);
+    return false;
+  }
 
   // Защита: если ключ 'use6_fav' (без ID) и есть текущий проект, сохраняем в оба места
   // Это предотвращает потерю избранных при неправильной инициализации ProjectManager
@@ -11,16 +42,54 @@ function _saveFavsSync() {
   const keysToSave = currentId ? [key, 'use6_fav_' + currentId] : [key];
 
   try {
+    // Сериализуем данные
     const serialized = JSON.stringify(favourites);
+    const sizeKB = (serialized.length / 1024).toFixed(1);
+
+    // Пытаемся сохранить в каждый ключ
     for (const k of keysToSave) {
-      localStorage.setItem(k, serialized);
+      try {
+        localStorage.setItem(k, serialized);
+      } catch(storageErr) {
+        // Обработка конкретной ошибки хранилища
+        if (storageErr.name === 'QuotaExceededError') {
+          console.error(`[_saveFavsSync] 💾 localStorage переполнен! Ключ: ${k}, размер: ${sizeKB} KB`);
+          toast('❌ Ошибка: хранилище переполнено. Удалите старые CSV кэши в Application→Storage.', 4000);
+          return false;
+        }
+        throw storageErr;
+      }
     }
-    // Диагностика: проверяем что действительно сохранилось
+
+    // Верификация: проверяем что данные действительно сохранились
     const verify = localStorage.getItem(key);
-    const verifyParsed = verify ? JSON.parse(verify) : null;
-    console.log(`[_saveFavsSync] Сохранено ${favourites.length} избранных в ключи:`, keysToSave, 'Проверка:', verifyParsed?.length || 0);
+    if (!verify) {
+      console.error(`[_saveFavsSync] ❌ Верификация не пройдена! Ключ ${key} не читается после сохранения`);
+      return false;
+    }
+
+    const verifyParsed = JSON.parse(verify);
+    if (!Array.isArray(verifyParsed)) {
+      console.error(`[_saveFavsSync] ❌ Верификация не пройдена! Данные повреждены в хранилище`);
+      return false;
+    }
+
+    console.log(`✅ [_saveFavsSync] Сохранено ${favourites.length} избранных (${sizeKB} KB) в ключи:`, keysToSave);
+    return true;
+
   } catch(e) {
-    console.warn('[_saveFavsSync] Failed to save:', key, e.message);
+    console.error(`[_saveFavsSync] ❌ ОШИБКА при сохранении: ${e.message}`);
+    console.error('  Тип ошибки:', e.name);
+    console.error('  Стек:', e.stack);
+
+    // Показываем ошибку пользователю
+    if (e.message.includes('quota')) {
+      toast('❌ Хранилище переполнено. Очистите кэши.', 3000);
+    } else {
+      toast(`⚠️ Ошибка при сохранении: ${e.message}`, 3000);
+    }
+
+    return false;
   }
 }
 
@@ -76,7 +145,11 @@ function toggleFav(idx, event, startLevel) {
     _autoRunRobustForFav(favEntry);
   }
   // Сохраняем в localStorage синхронно чтобы гарантировать сохранение
-  _saveFavsSync();
+  const saved = _saveFavsSync();
+  if (!saved) {
+    console.error('[toggleFav] ❌ Не удалось сохранить избранное!');
+    return; // Если сохранение не удалось, не обновляем UI
+  }
   renderFavBar();
   _refreshFavStars();
 }
