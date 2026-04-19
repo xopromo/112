@@ -16712,7 +16712,7 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
           const wickOffset = cfg.wickOffType === 'pct'
             ? DATA[i].c * cfg.wickMult / 100
             : cfg.wickOffType === 'pts'
-              ? cfg.wickMult / 10000  // Нормализация пунктов (10 pts = 0.0010)
+              ? cfg.wickMult  // Points: абсолютное значение цены (как в Pine)
               : atrArr[i] * cfg.wickMult; // ATR (default)
           const wickRaw = dir === 1
             ? DATA[i-1].l - wickOffset   // Long: ниже нижнего фитиля предыдущей свечи
@@ -33455,7 +33455,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1776597503280;
+window._BUILD_TS = 1776629113836;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
