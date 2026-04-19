@@ -15381,8 +15381,16 @@ const FILTER_REGISTRY = [
   {
     id:       'atrexp',
     flag:     'useAtrExp',
-    blocksL:  (cfg, i, ac) => !cfg.atrAvg || cfg.atrAvg[i-1] <= 0 || ac < cfg.atrAvg[i-1] * cfg.atrExpMult,
-    blocksS:  (cfg, i, ac) => !cfg.atrAvg || cfg.atrAvg[i-1] <= 0 || ac < cfg.atrAvg[i-1] * cfg.atrExpMult,
+    blocksL:  (cfg, i, ac) => {
+      if (!cfg.atrAvg || i < 1) return false;
+      const avg = cfg.atrAvg[i-1];
+      return !isFinite(avg) || avg <= 0 || ac < avg * cfg.atrExpMult;
+    },
+    blocksS:  (cfg, i, ac) => {
+      if (!cfg.atrAvg || i < 1) return false;
+      const avg = cfg.atrAvg[i-1];
+      return !isFinite(avg) || avg <= 0 || ac < avg * cfg.atrExpMult;
+    },
     nameLabel: (cfg) => `AtrExp>${cfg.atrExpMult}×`,
   },
 
@@ -15399,8 +15407,16 @@ const FILTER_REGISTRY = [
   {
     id:       'volf',
     flag:     'useVolF',
-    blocksL:  (cfg, i, ac) => cfg.atrAvg && ac > cfg.atrAvg[i-1] * cfg.volFMult,
-    blocksS:  (cfg, i, ac) => cfg.atrAvg && ac > cfg.atrAvg[i-1] * cfg.volFMult,
+    blocksL:  (cfg, i, ac) => {
+      if (!cfg.atrAvg || i < 1) return false;
+      const avg = cfg.atrAvg[i-1];
+      return !isFinite(avg) || avg <= 0 || ac > avg * cfg.volFMult;
+    },
+    blocksS:  (cfg, i, ac) => {
+      if (!cfg.atrAvg || i < 1) return false;
+      const avg = cfg.atrAvg[i-1];
+      return !isFinite(avg) || avg <= 0 || ac > avg * cfg.volFMult;
+    },
     nameLabel: (cfg) => `VFilt<${cfg.volFMult}×`,
   },
 
@@ -22817,6 +22833,9 @@ function yieldToUI() {
 function stopOpt() {
   stopped = true; paused = false;
   if (pauseResolve) { pauseResolve(); pauseResolve = null; }
+  // Сбросить флаги robustness тестов чтобы следующий тест не пропускал фазы
+  if (typeof _massRobRunning !== 'undefined') _massRobRunning = false;
+  if (typeof _hcRobRunning !== 'undefined') _hcRobRunning = false;
   $('pbtn').style.display = 'none';
   $('sbtn').style.display = 'none';
   $('rbtn').style.display = '';
@@ -33383,7 +33402,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1776278277841;
+window._BUILD_TS = 1776593232456;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
