@@ -370,8 +370,8 @@ function generatePineScript(r, mode = 'indicator') {
   lines.push(``);
   lines.push(`// Volatility filter`);
   lines.push(`float atr_avg = ta.sma(atr_v, vol_f_len)`);
-  lines.push(`bool vol_f_ok   = use_vol_f   ? (na(atr_avg[1]) or atr_avg[1] <= 0 ? false : atr_v[1] <= atr_avg[1] * vol_f_mult)  : true`);
-  lines.push(`bool atr_exp_ok = use_atr_exp ? (na(atr_avg[1]) or atr_avg[1] <= 0 ? false : atr_v[1] >= atr_avg[1] * atr_exp_mult) : true`);
+  lines.push(`bool vol_f_ok   = use_vol_f   ? (atr_v[1] <= atr_avg[1] * vol_f_mult)  : true`);
+  lines.push(`bool atr_exp_ok = use_atr_exp ? (atr_v[1] >= atr_avg[1] * atr_exp_mult) : true`);
   lines.push(``);
   lines.push(`// Candle size filter`);
   lines.push(`float candle_size_1 = high[1] - low[1]`);
