@@ -1162,7 +1162,7 @@ function generatePineScript(r, mode = 'indicator') {
   lines.push(`            bool _do_enter = false`);
   lines.push(`            int  _do_dir   = 0`);
   lines.push(`            // A. Проверка отложенного входа`);
-  lines.push(`            if use_wait and _pd != 0`);
+  lines.push(`            if _pd != 0`);
   lines.push(`                int _bw = bar_index - _pb`);
   lines.push(`                bool _cncl = (wait_max_b > 0 and _bw > wait_max_b) or (wait_catr > 0 and _pd * (close - _psc) > wait_catr * _ac)`);
   lines.push(`                if _cncl`);
@@ -1505,7 +1505,7 @@ function generatePineScript(r, mode = 'indicator') {
   lines.push(`        bool v_do_enter = false`);
   lines.push(`        int  v_do_dir   = 0`);
   lines.push(`        // A. Pending entry`);
-  lines.push(`        if use_wait and v_pd != 0`);
+  lines.push(`        if v_pd != 0`);
   lines.push(`            int _bw = bar_index - v_pb`);
   lines.push(`            bool _cncl = (wait_max_b > 0 and _bw > wait_max_b) or (wait_catr > 0 and v_pd * (close - v_psc) > wait_catr * atr_v[1])`);
   lines.push(`            if _cncl`);
@@ -1604,7 +1604,7 @@ function generatePineScript(r, mode = 'indicator') {
     lines.push(`    bool s_do_enter = false`);
     lines.push(`    int  s_do_dir   = 0`);
     lines.push(`    // A. Pending entry`);
-    lines.push(`    if use_wait and s_pd != 0`);
+    lines.push(`    if s_pd != 0`);
     lines.push(`        int _bw = bar_index - s_pb`);
     lines.push(`        bool _cncl = (wait_max_b > 0 and _bw > wait_max_b) or (wait_catr > 0 and s_pd * (close - s_psc) > wait_catr * atr_v[1])`);
     lines.push(`        if _cncl`);
