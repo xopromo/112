@@ -1743,6 +1743,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
       <button class="tbl-mode-btn" id="btn-tbl-tpl" onclick="openTableTplPopover()" title="Шаблоны фильтров — сохранить текущие фильтры / быстро применить сохранённый набор" style="border-color:var(--accent2);color:var(--accent)">💾 Наборы фильтров ▾</button>
     </div>
     <button class="tbl-mode-btn" onclick="_downloadSources()" title="Скачать исходные файлы: core.js, opt.js, ui.js, shell.html, build.py, README.md">⬇ Исходники</button>
+    <button class="tbl-mode-btn" onclick="_showStorageDiagnostic()" title="Диагностика хранилища: размер CSV кэшей, очистка, управление памятью">💾 Диагностика</button>
     <button class="tbl-mode-btn" onclick="openChangelogModal()" title="История изменений — все версии, исправления, новые функции">📋 История</button>
     <button class="tbl-mode-btn" id="btn-ml-scan" onclick="openMLModal()" title="ML-модели: обучить / управлять / скан сигналов" style="border-color:rgba(139,92,246,.5);color:var(--purple)">🤖 ML</button>
     <button class="tbl-mode-btn" id="btn-research" onclick="openResearchModal()" title="Анализ результатов: корреляции, аномалии, кластеры, факторы" style="border-color:rgba(166,227,161,.5);color:#a6e3a1">📊 Research</button>
@@ -23193,7 +23194,7 @@ function _saveFavsSync() {
         // Обработка конкретной ошибки хранилища
         if (storageErr.name === 'QuotaExceededError') {
           console.error(`[_saveFavsSync] 💾 localStorage переполнен! Ключ: ${k}, размер: ${sizeKB} KB`);
-          toast('❌ Ошибка: хранилище переполнено. Удалите старые CSV кэши в Application→Storage.', 4000);
+          toast('❌ Хранилище заполнено. Клик → 💾 Диагностика хранилища (главное меню)', 5000);
           return false;
         }
         throw storageErr;
@@ -26049,6 +26050,124 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   });
 });
+
+// ════════════════════════════════════════════════════════════
+// ДИАГНОСТИКА И ОЧИСТКА ХРАНИЛИЩА
+// ════════════════════════════════════════════════════════════
+function _getStorageInfo() {
+  const info = {};
+  let totalBytes = 0;
+  const csvKeys = [];
+
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    const val = localStorage.getItem(key);
+    if (!val) continue;
+
+    const bytes = new Blob([val]).size;
+    info[key] = { bytes, kb: (bytes / 1024).toFixed(1) };
+    totalBytes += bytes;
+
+    if (key.startsWith('use6_csv_')) csvKeys.push(key);
+  }
+
+  return { info, totalBytes, totalMB: (totalBytes / 1024 / 1024).toFixed(2), csvKeys };
+}
+
+// Показать диагностику хранилища
+function _showStorageDiagnostic() {
+  const { info, totalBytes, totalMB, csvKeys } = _getStorageInfo();
+  const html = `<div style="position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px" onclick="if(event.target===this)document.getElementById('storage-diag-overlay')?.remove()">
+  <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:20px;width:100%;max-width:700px;max-height:80vh;overflow-y:auto" id="storage-diag-overlay">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h2 style="margin:0;color:var(--accent);font-size:.95em">💾 Диагностика хранилища</h2>
+      <button onclick="document.getElementById('storage-diag-overlay')?.remove()" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:1.2em">✕</button>
+    </div>
+
+    <div style="padding:12px;background:var(--bg3);border-radius:4px;margin-bottom:16px;font-size:.8em;color:var(--text2)">
+      <div>📊 Всего: <strong style="color:var(--accent)">${totalMB} МБ</strong> из ~5 МБ (лимит браузера)</div>
+      <div style="margin-top:4px">⚠️ Если > 4 МБ: удалите старые CSV кэши ниже</div>
+    </div>
+
+    <div style="margin-bottom:16px">
+      <div style="color:var(--accent);font-weight:600;margin-bottom:8px;font-size:.85em">🗑️ CSV кэши (${csvKeys.length})</div>
+      ${csvKeys.length > 0 ? `
+        <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px">
+          ${csvKeys.map(k => `
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:6px;background:var(--bg2);border-radius:3px;border-left:3px solid var(--red);font-size:.75em">
+              <span style="color:var(--text2);flex:1">${k}</span>
+              <span style="color:var(--text3);margin:0 8px">${info[k].kb} KB</span>
+              <button onclick="_removeStorageKey('${k}');_showStorageDiagnostic()" style="padding:2px 8px;background:rgba(255,61,87,.2);border:1px solid var(--red);border-radius:3px;color:var(--red);font-size:.7em;cursor:pointer">✕ Удалить</button>
+            </div>
+          `).join('')}
+        </div>
+        <button onclick="_removeAllCSVCaches();_showStorageDiagnostic()" style="padding:6px 12px;background:rgba(255,61,87,.2);border:1px solid var(--red);border-radius:4px;color:var(--red);font-size:.75em;cursor:pointer;width:100%">✕ Удалить все CSV кэши</button>
+      ` : '<div style="color:var(--text3);font-size:.8em">✓ CSV кэшей не найдено</div>'}
+    </div>
+
+    <div>
+      <div style="color:var(--accent);font-weight:600;margin-bottom:8px;font-size:.85em">📋 Все ключи хранилища</div>
+      <div style="display:grid;grid-template-columns:1fr 80px;gap:8px;font-size:.7em;max-height:300px;overflow-y:auto">
+        ${Object.entries(info).map(([k, v]) => `
+          <div style="color:var(--text2)">${k}</div>
+          <div style="text-align:right;color:var(--text3)">${v.kb} KB</div>
+        `).join('')}
+      </div>
+    </div>
+
+    <div style="margin-top:16px;display:flex;gap:8px">
+      <button onclick="_clearAllStorage();document.getElementById('storage-diag-overlay')?.remove()" style="flex:1;padding:6px;background:rgba(255,61,87,.2);border:1px solid var(--red);border-radius:4px;color:var(--red);font-size:.75em;cursor:pointer;font-weight:600">⚠️ ПОЛНАЯ ОЧИСТКА хранилища</button>
+      <button onclick="document.getElementById('storage-diag-overlay')?.remove()" style="flex:1;padding:6px;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:.75em;cursor:pointer">Закрыть</button>
+    </div>
+  </div>
+</div>`;
+
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+
+function _removeStorageKey(key) {
+  try {
+    localStorage.removeItem(key);
+    console.log(`✓ Удалён ${key}`);
+    toast(`✓ Удалён: ${key}`, 1500);
+  } catch(e) {
+    console.error('Ошибка при удалении:', e);
+  }
+}
+
+function _removeAllCSVCaches() {
+  const { csvKeys } = _getStorageInfo();
+  let count = 0;
+  for (const k of csvKeys) {
+    try {
+      localStorage.removeItem(k);
+      count++;
+    } catch(e) {
+      console.error('Ошибка при удалении', k, e);
+    }
+  }
+  console.log(`✓ Удалено ${count} CSV кэшей`);
+  toast(`✓ Удалено ${count} CSV кэшей (освобождено ~${(count * 5).toFixed(0)} МБ)`, 2000);
+}
+
+function _clearAllStorage() {
+  if (!confirm('⚠️ ВНИМАНИЕ: Это удалит все данные хранилища (избранные, настройки, всё)!\n\nВы уверены?')) {
+    return;
+  }
+  try {
+    localStorage.clear();
+    sessionStorage.clear();
+    console.log('✓ Хранилище полностью очищено');
+    toast('✓ Хранилище очищено. Страница перезагружается...', 2000);
+    setTimeout(() => location.reload(), 1000);
+  } catch(e) {
+    console.error('Ошибка при очистке:', e);
+    alert('Ошибка: ' + e.message);
+  }
+}
+
+// Expose to window
+try { window._showStorageDiagnostic = _showStorageDiagnostic; } catch(e) {}
 
 // ══════════════════════════════════════════════════════════════════
 // ── ОЧЕРЕДЬ ЗАДАЧ TPE ─────────────────────────────────────────────
@@ -33383,7 +33502,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1776278277841;
+window._BUILD_TS = 1776590712768;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
