@@ -15951,9 +15951,13 @@ function calcEMA(data, period) {
 }
 function calcSMA(data, period) {
   const N = data.length, r = new Float64Array(N);
-  for (let i = period - 1; i < N; i++) {
-    let s = 0;
-    for (let j = i - period + 1; j <= i; j++) s += data[j];
+  if (period <= 0 || N < period) return r;
+  // Running sum: O(N) вместо O(N*period)
+  let s = 0;
+  for (let j = 0; j < period; j++) s += data[j];
+  r[period - 1] = s / period;
+  for (let i = period; i < N; i++) {
+    s += data[i] - data[i - period];
     r[i] = s / period;
   }
   return r;
@@ -19055,7 +19059,7 @@ async function runOpt() {
         // Рассчитываем MA(расчётная equity)
         if (_shadowEq && _shadowEq.length > 0) {
           const maLen = eqMALen || 20;
-          btCfg.eqCalcMAArr = calcSMA(Array.from(_shadowEq), maLen);
+          btCfg.eqCalcMAArr = calcSMA(_shadowEq, maLen);
           btCfg.eqCalcBaselineArr = Array.from(_shadowEq); // ##EQ_MA_FILTER## сохраняем саму baseline (не MA)
           _eqCalc = _shadowEq;  // сохраняем для последующего использования
         }
@@ -19458,7 +19462,7 @@ async function runOpt() {
         // Рассчитываем MA(расчётная equity)
         if (_shadowEq && _shadowEq.length > 0) {
           const maLen = eqMALen || 20;
-          btCfg.eqCalcMAArr = calcSMA(Array.from(_shadowEq), maLen);
+          btCfg.eqCalcMAArr = calcSMA(_shadowEq, maLen);
           btCfg.eqCalcBaselineArr = Array.from(_shadowEq); // ##EQ_MA_FILTER## сохраняем саму baseline (не MA)
           _eqCalc = _shadowEq;  // сохраняем для последующего использования
         }
@@ -19931,7 +19935,7 @@ async function runOpt() {
     for(const atrP of atrPs) {
       if(_mcDone) break;
       if(!atrCache[atrP]) atrCache[atrP]=calcRMA_ATR(atrP);
-      const atrAvg=calcSMA(Array.from(atrCache[atrP]),50);
+      const atrAvg=calcSMA(atrCache[atrP],50);
 
       for(const maP of maPs) {
         if(_mcDone) break;
@@ -20169,7 +20173,7 @@ async function runOpt() {
                                       // Рассчитываем MA(расчётная equity)
                                       if (_shadowEq && _shadowEq.length > 0) {
                                         const maLen = eqMALen || 20;
-                                        btCfg.eqCalcMAArr = calcSMA(Array.from(_shadowEq), maLen);
+                                        btCfg.eqCalcMAArr = calcSMA(_shadowEq, maLen);
                                         btCfg.eqCalcBaselineArr = Array.from(_shadowEq); // ##EQ_MA_FILTER## сохраняем саму baseline (не MA)
                                         _eqCalc = _shadowEq;  // сохраняем для последующего использования
                                       }
@@ -20461,7 +20465,7 @@ function _calcIndicators(cfg) {
   // ── ATR ───────────────────────────────────────────────────
   const atrP = cfg.atrPeriod || 14;
   const atrArr = calcRMA_ATR(atrP);
-  const atrAvg = calcSMA(Array.from(atrArr), 50);
+  const atrAvg = calcSMA(atrArr, 50);
 
   // ── MA (тренд-фильтр) ─────────────────────────────────────
   const maP  = cfg.maP  || 0;
@@ -33383,7 +33387,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1776278277841;
+window._BUILD_TS = 1776593831360;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;

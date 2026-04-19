@@ -2192,7 +2192,7 @@ async function runOpt() {
         // Рассчитываем MA(расчётная equity)
         if (_shadowEq && _shadowEq.length > 0) {
           const maLen = eqMALen || 20;
-          btCfg.eqCalcMAArr = calcSMA(Array.from(_shadowEq), maLen);
+          btCfg.eqCalcMAArr = calcSMA(_shadowEq, maLen);
           btCfg.eqCalcBaselineArr = Array.from(_shadowEq); // ##EQ_MA_FILTER## сохраняем саму baseline (не MA)
           _eqCalc = _shadowEq;  // сохраняем для последующего использования
         }
@@ -2595,7 +2595,7 @@ async function runOpt() {
         // Рассчитываем MA(расчётная equity)
         if (_shadowEq && _shadowEq.length > 0) {
           const maLen = eqMALen || 20;
-          btCfg.eqCalcMAArr = calcSMA(Array.from(_shadowEq), maLen);
+          btCfg.eqCalcMAArr = calcSMA(_shadowEq, maLen);
           btCfg.eqCalcBaselineArr = Array.from(_shadowEq); // ##EQ_MA_FILTER## сохраняем саму baseline (не MA)
           _eqCalc = _shadowEq;  // сохраняем для последующего использования
         }
@@ -3068,7 +3068,7 @@ async function runOpt() {
     for(const atrP of atrPs) {
       if(_mcDone) break;
       if(!atrCache[atrP]) atrCache[atrP]=calcRMA_ATR(atrP);
-      const atrAvg=calcSMA(Array.from(atrCache[atrP]),50);
+      const atrAvg=calcSMA(atrCache[atrP],50);
 
       for(const maP of maPs) {
         if(_mcDone) break;
@@ -3306,7 +3306,7 @@ async function runOpt() {
                                       // Рассчитываем MA(расчётная equity)
                                       if (_shadowEq && _shadowEq.length > 0) {
                                         const maLen = eqMALen || 20;
-                                        btCfg.eqCalcMAArr = calcSMA(Array.from(_shadowEq), maLen);
+                                        btCfg.eqCalcMAArr = calcSMA(_shadowEq, maLen);
                                         btCfg.eqCalcBaselineArr = Array.from(_shadowEq); // ##EQ_MA_FILTER## сохраняем саму baseline (не MA)
                                         _eqCalc = _shadowEq;  // сохраняем для последующего использования
                                       }
@@ -3598,7 +3598,7 @@ function _calcIndicators(cfg) {
   // ── ATR ───────────────────────────────────────────────────
   const atrP = cfg.atrPeriod || 14;
   const atrArr = calcRMA_ATR(atrP);
-  const atrAvg = calcSMA(Array.from(atrArr), 50);
+  const atrAvg = calcSMA(atrArr, 50);
 
   // ── MA (тренд-фильтр) ─────────────────────────────────────
   const maP  = cfg.maP  || 0;
