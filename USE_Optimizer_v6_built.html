@@ -15382,12 +15382,12 @@ const FILTER_REGISTRY = [
     id:       'atrexp',
     flag:     'useAtrExp',
     blocksL:  (cfg, i, ac) => {
-      if (!cfg.atrAvg || i < 1) return false;
+      if (!cfg.atrAvg || i < 1) return true;  // Нет данных = блокировать (безопасный default)
       const avg = cfg.atrAvg[i-1];
       return !isFinite(avg) || avg <= 0 || ac < avg * cfg.atrExpMult;
     },
     blocksS:  (cfg, i, ac) => {
-      if (!cfg.atrAvg || i < 1) return false;
+      if (!cfg.atrAvg || i < 1) return true;  // Нет данных = блокировать
       const avg = cfg.atrAvg[i-1];
       return !isFinite(avg) || avg <= 0 || ac < avg * cfg.atrExpMult;
     },
@@ -15408,12 +15408,12 @@ const FILTER_REGISTRY = [
     id:       'volf',
     flag:     'useVolF',
     blocksL:  (cfg, i, ac) => {
-      if (!cfg.atrAvg || i < 1) return false;
+      if (!cfg.atrAvg || i < 1) return true;  // Нет данных = блокировать
       const avg = cfg.atrAvg[i-1];
       return !isFinite(avg) || avg <= 0 || ac > avg * cfg.volFMult;
     },
     blocksS:  (cfg, i, ac) => {
-      if (!cfg.atrAvg || i < 1) return false;
+      if (!cfg.atrAvg || i < 1) return true;  // Нет данных = блокировать
       const avg = cfg.atrAvg[i-1];
       return !isFinite(avg) || avg <= 0 || ac > avg * cfg.volFMult;
     },
@@ -33455,7 +33455,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1776597013519;
+window._BUILD_TS = 1776597104300;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
