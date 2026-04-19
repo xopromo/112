@@ -10264,9 +10264,9 @@ function generatePineScript(r, mode = 'indicator') {
 
   // Delayed entry
   lines.push(`grp_wait = "⏳ ОТЛОЖЕННЫЙ ВХОД"`);
-  lines.push(`use_wait    = input.bool(${b(c.waitBars > 0 || c.waitRetrace)}, "Ждать отката", group=grp_wait)`);
   lines.push(`wait_bars   = input.int(${c.waitBars||0}, "Баров ожидания (Bars)", minval=0, maxval=20, group=grp_wait)`);
   lines.push(`wait_ret    = input.bool(${b(c.waitRetrace)}, "Требовать откат цены (Retrace)", group=grp_wait)`);
+  lines.push(`use_wait    = wait_bars > 0 or wait_ret  // Вычисляется динамически, как в JS`);
   lines.push(`wait_max_b  = input.int(${c.waitMaxBars||10}, "Отменить после N баров", minval=0, maxval=100, group=grp_wait)`);
   lines.push(`wait_catr   = input.float(${c.waitCancelAtr||0}, "Отменить при уходе ×ATR", minval=0, step=0.1, group=grp_wait)`);
   lines.push(``);
@@ -10352,8 +10352,8 @@ function generatePineScript(r, mode = 'indicator') {
   lines.push(``);
   lines.push(`// Volatility filter`);
   lines.push(`float atr_avg = ta.sma(atr_v, vol_f_len)`);
-  lines.push(`bool vol_f_ok   = use_vol_f   ? (atr_v[1] <= atr_avg[1] * vol_f_mult)  : true`);
-  lines.push(`bool atr_exp_ok = use_atr_exp ? (atr_v[1] >= atr_avg[1] * atr_exp_mult) : true`);
+  lines.push(`bool vol_f_ok   = use_vol_f   ? (na(atr_avg[1]) or atr_avg[1] <= 0 ? false : atr_v[1] <= atr_avg[1] * vol_f_mult)  : true`);
+  lines.push(`bool atr_exp_ok = use_atr_exp ? (na(atr_avg[1]) or atr_avg[1] <= 0 ? false : atr_v[1] >= atr_avg[1] * atr_exp_mult) : true`);
   lines.push(``);
   lines.push(`// Candle size filter`);
   lines.push(`float candle_size_1 = high[1] - low[1]`);
@@ -33455,7 +33455,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1776629246181;
+window._BUILD_TS = 1776630854983;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
