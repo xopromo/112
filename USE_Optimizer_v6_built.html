@@ -10589,12 +10589,12 @@ function generatePineScript(r, mode = 'indicator') {
   lines.push(`bool donch_s = use_donch and low[1]  < donch_lo`);
   lines.push(`boll_basis = ta.sma(close, boll_len)`);
   lines.push(`boll_dev   = ta.stdev(close, boll_len) * boll_mult`);
-  lines.push(`bool boll_l = use_boll and close[1] > (boll_basis + boll_dev)[1]`);
-  lines.push(`bool boll_s = use_boll and close[1] < (boll_basis - boll_dev)[1]`);
+  lines.push(`bool boll_l = use_boll and close[1] > (boll_basis + boll_dev)[2]  // Use [2] to avoid self-reference like Donchian`);
+  lines.push(`bool boll_s = use_boll and close[1] < (boll_basis - boll_dev)[2]  // Use [2] to avoid self-reference like Donchian`);
   lines.push(`atr_bo_ma  = ta.ema(close, atr_bo_len)`);
   lines.push(`atr_bo_atr = ta.atr(atr_bo_len)`);
-  lines.push(`bool atr_bo_l = use_atr_bo and close[1] > (atr_bo_ma + atr_bo_atr * atr_bo_mult)[1]`);
-  lines.push(`bool atr_bo_s = use_atr_bo and close[1] < (atr_bo_ma - atr_bo_atr * atr_bo_mult)[1]`);
+  lines.push(`bool atr_bo_l = use_atr_bo and close[1] > (atr_bo_ma + atr_bo_atr * atr_bo_mult)[2]  // Use [2] to avoid self-reference`);
+  lines.push(`bool atr_bo_s = use_atr_bo and close[1] < (atr_bo_ma - atr_bo_atr * atr_bo_mult)[2]  // Use [2] to avoid self-reference`);
   lines.push(``);
   lines.push(`// MA Touch — использует отдельную MA (mat_len/mat_type), не фильтр-MA`);
   lines.push(`float _mat_raw = request.security(syminfo.tickerid, timeframe.period, calc_ma(mat_type, close, mat_len)[1], barmerge.gaps_off, barmerge.lookahead_on)`);
@@ -33455,7 +33455,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1776633007238;
+window._BUILD_TS = 1776633110288;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
