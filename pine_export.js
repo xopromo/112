@@ -579,8 +579,8 @@ function generatePineScript(r, mode = 'indicator') {
   lines.push(`var float _kf_c = 0.0`);
   lines.push(`_kf_v := _kf_v + (close - _kf_c) * (1.0 / kalman_f_len)`);
   lines.push(`_kf_c := _kf_c + _kf_v`);
-  lines.push(`bool kalman_f_ok_l = not use_kalman_f or _kf_c[1] <= 0 or close[1] > _kf_c[1]`);
-  lines.push(`bool kalman_f_ok_s = not use_kalman_f or _kf_c[1] <= 0 or close[1] < _kf_c[1]`);
+  lines.push(`bool kalman_f_ok_l = not use_kalman_f or (_kf_c[1] > 0 and close[1] > _kf_c[1])  // JS: blocks if kma<=0 or close<=kma`);
+  lines.push(`bool kalman_f_ok_s = not use_kalman_f or (_kf_c[1] > 0 and close[1] < _kf_c[1])  // JS: blocks if kma<=0 or close>=kma`);
   lines.push(``);
 
   // Entry patterns logic
