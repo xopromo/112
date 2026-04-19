@@ -499,8 +499,8 @@ function generatePineScript(r, mode = 'indicator') {
   // RSI Filter
   lines.push(`// ── RSI Filter ──`);
   lines.push(`float rsi_f_val = ta.rsi(close, rsi_f_len)`);
-  lines.push(`bool rsi_f_ok_l = not use_rsi_f or rsi_f_val[1] < rsi_f_os`);
-  lines.push(`bool rsi_f_ok_s = not use_rsi_f or rsi_f_val[1] > rsi_f_ob`);
+  lines.push(`bool rsi_f_ok_l = not use_rsi_f or (rsi_f_val[1] > 0 and rsi_f_val[1] < rsi_f_os)`);
+  lines.push(`bool rsi_f_ok_s = not use_rsi_f or (rsi_f_val[1] > 0 and rsi_f_val[1] > rsi_f_ob)`);
   lines.push(``);
 
   // Consecutive bars filter
@@ -570,7 +570,7 @@ function generatePineScript(r, mode = 'indicator') {
   lines.push(`for _eri = 0 to er_period_v - 1`);
   lines.push(`    er_path += math.abs(close[_eri] - close[_eri + 1])`);
   lines.push(`float er_val = er_path > 0 ? er_net / er_path : 0`);
-  lines.push(`bool er_ok = not use_er_f or er_val[1] >= er_thresh_v`);
+  lines.push(`bool er_ok = not use_er_f or (er_val[1] > 0 and er_val[1] >= er_thresh_v)`);
   lines.push(``);
 
   // Kalman MA Direction filter
