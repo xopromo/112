@@ -370,8 +370,8 @@ function generatePineScript(r, mode = 'indicator') {
   lines.push(``);
   lines.push(`// Volatility filter`);
   lines.push(`float atr_avg = ta.sma(atr_v, vol_f_len)`);
-  lines.push(`bool vol_f_ok   = use_vol_f   ? (na(atr_avg[1]) or atr_avg[1] <= 0 ? false : atr_v[1] <= atr_avg[1] * vol_f_mult)  : true`);
-  lines.push(`bool atr_exp_ok = use_atr_exp ? (na(atr_avg[1]) or atr_avg[1] <= 0 ? false : atr_v[1] >= atr_avg[1] * atr_exp_mult) : true`);
+  lines.push(`bool vol_f_ok   = use_vol_f   ? (atr_v[1] <= atr_avg[1] * vol_f_mult)  : true`);
+  lines.push(`bool atr_exp_ok = use_atr_exp ? (atr_v[1] >= atr_avg[1] * atr_exp_mult) : true`);
   lines.push(``);
   lines.push(`// Candle size filter`);
   lines.push(`float candle_size_1 = high[1] - low[1]`);
@@ -455,8 +455,8 @@ function generatePineScript(r, mode = 'indicator') {
   lines.push(`float ma_val = ma_raw`);
   lines.push(`float conf_ma_raw = request.security(syminfo.tickerid, _conf_tf_str, calc_ma(conf_ma_type, close, conf_ma_len)[1], barmerge.gaps_off, barmerge.lookahead_on)`);
   lines.push(`float conf_ma_val = conf_ma_raw`);
-  lines.push(`bool conf_ok_l = not use_conf_ma or (not na(conf_ma_val) and close[1] > conf_ma_val)`);
-  lines.push(`bool conf_ok_s = not use_conf_ma or (not na(conf_ma_val) and close[1] < conf_ma_val)`);
+  lines.push(`bool conf_ok_l = not use_conf_ma or (not na(conf_ma_val) and conf_ma_val > 0 and close[1] > conf_ma_val)`);
+  lines.push(`bool conf_ok_s = not use_conf_ma or (not na(conf_ma_val) and conf_ma_val > 0 and close[1] < conf_ma_val)`);
   lines.push(`plot(ma_val, "MA", color=color.new(color.blue,50), linewidth=2, display=use_int_ma ? display.all : display.data_window)`);
   lines.push(`plot(use_conf_ma ? conf_ma_val : na, "Confirm MA", color=color.new(color.orange,50), linewidth=1)`);
   lines.push(``);
@@ -469,12 +469,12 @@ function generatePineScript(r, mode = 'indicator') {
   lines.push(`            st_above += 1`);
   lines.push(`        else`);
   lines.push(`            st_below += 1`);
-  lines.push(`bool st_ok_l = not use_simple_trend or st_above > st_below`);
-  lines.push(`bool st_ok_s = not use_simple_trend or st_below > st_above`);
+  lines.push(`bool st_ok_l = not use_simple_trend or (ma_val > 0 and st_above > st_below)`);
+  lines.push(`bool st_ok_s = not use_simple_trend or (ma_val > 0 and st_below > st_above)`);
   lines.push(``);
   lines.push(`// MA filters`);
-  lines.push(`bool ma_ok_l = use_int_ma ? close[1] > ma_val : true`);
-  lines.push(`bool ma_ok_s = use_int_ma ? close[1] < ma_val : true`);
+  lines.push(`bool ma_ok_l = use_int_ma ? (ma_val > 0 and close[1] > ma_val) : true`);
+  lines.push(`bool ma_ok_s = use_int_ma ? (ma_val > 0 and close[1] < ma_val) : true`);
   lines.push(`float ma_dist = use_int_ma and atr_v > 0 ? math.abs(close[1] - ma_val) / atr_v : 0`);
   lines.push(`bool ma_dist_ok = not use_ma_dist or not use_int_ma or ma_dist <= ma_dist_max`);
   lines.push(``);
@@ -499,8 +499,8 @@ function generatePineScript(r, mode = 'indicator') {
   // RSI Filter
   lines.push(`// ── RSI Filter ──`);
   lines.push(`float rsi_f_val = ta.rsi(close, rsi_f_len)`);
-  lines.push(`bool rsi_f_ok_l = not use_rsi_f or rsi_f_val[1] < rsi_f_os`);
-  lines.push(`bool rsi_f_ok_s = not use_rsi_f or rsi_f_val[1] > rsi_f_ob`);
+  lines.push(`bool rsi_f_ok_l = not use_rsi_f or (rsi_f_val[1] > 0 and rsi_f_val[1] < rsi_f_os)`);
+  lines.push(`bool rsi_f_ok_s = not use_rsi_f or (rsi_f_val[1] > 0 and rsi_f_val[1] > rsi_f_ob)`);
   lines.push(``);
 
   // Consecutive bars filter
@@ -570,7 +570,7 @@ function generatePineScript(r, mode = 'indicator') {
   lines.push(`for _eri = 0 to er_period_v - 1`);
   lines.push(`    er_path += math.abs(close[_eri] - close[_eri + 1])`);
   lines.push(`float er_val = er_path > 0 ? er_net / er_path : 0`);
-  lines.push(`bool er_ok = not use_er_f or er_val[1] >= er_thresh_v`);
+  lines.push(`bool er_ok = not use_er_f or (er_val[1] > 0 and er_val[1] >= er_thresh_v)`);
   lines.push(``);
 
   // Kalman MA Direction filter
@@ -579,8 +579,8 @@ function generatePineScript(r, mode = 'indicator') {
   lines.push(`var float _kf_c = 0.0`);
   lines.push(`_kf_v := _kf_v + (close - _kf_c) * (1.0 / kalman_f_len)`);
   lines.push(`_kf_c := _kf_c + _kf_v`);
-  lines.push(`bool kalman_f_ok_l = not use_kalman_f or _kf_c[1] <= 0 or close[1] > _kf_c[1]`);
-  lines.push(`bool kalman_f_ok_s = not use_kalman_f or _kf_c[1] <= 0 or close[1] < _kf_c[1]`);
+  lines.push(`bool kalman_f_ok_l = not use_kalman_f or (_kf_c[1] > 0 and close[1] > _kf_c[1])  // JS: blocks if kma<=0 or close<=kma`);
+  lines.push(`bool kalman_f_ok_s = not use_kalman_f or (_kf_c[1] > 0 and close[1] < _kf_c[1])  // JS: blocks if kma<=0 or close>=kma`);
   lines.push(``);
 
   // Entry patterns logic
@@ -607,12 +607,12 @@ function generatePineScript(r, mode = 'indicator') {
   lines.push(`bool donch_s = use_donch and low[1]  < donch_lo`);
   lines.push(`boll_basis = ta.sma(close, boll_len)`);
   lines.push(`boll_dev   = ta.stdev(close, boll_len) * boll_mult`);
-  lines.push(`bool boll_l = use_boll and close[1] > (boll_basis + boll_dev)[1]`);
-  lines.push(`bool boll_s = use_boll and close[1] < (boll_basis - boll_dev)[1]`);
+  lines.push(`bool boll_l = use_boll and close[1] > (boll_basis + boll_dev)[2]  // Use [2] to avoid self-reference like Donchian`);
+  lines.push(`bool boll_s = use_boll and close[1] < (boll_basis - boll_dev)[2]  // Use [2] to avoid self-reference like Donchian`);
   lines.push(`atr_bo_ma  = ta.ema(close, atr_bo_len)`);
   lines.push(`atr_bo_atr = ta.atr(atr_bo_len)`);
-  lines.push(`bool atr_bo_l = use_atr_bo and close[1] > (atr_bo_ma + atr_bo_atr * atr_bo_mult)[1]`);
-  lines.push(`bool atr_bo_s = use_atr_bo and close[1] < (atr_bo_ma - atr_bo_atr * atr_bo_mult)[1]`);
+  lines.push(`bool atr_bo_l = use_atr_bo and close[1] > (atr_bo_ma + atr_bo_atr * atr_bo_mult)[2]  // Use [2] to avoid self-reference`);
+  lines.push(`bool atr_bo_s = use_atr_bo and close[1] < (atr_bo_ma - atr_bo_atr * atr_bo_mult)[2]  // Use [2] to avoid self-reference`);
   lines.push(``);
   lines.push(`// MA Touch — использует отдельную MA (mat_len/mat_type), не фильтр-MA`);
   lines.push(`float _mat_raw = request.security(syminfo.tickerid, timeframe.period, calc_ma(mat_type, close, mat_len)[1], barmerge.gaps_off, barmerge.lookahead_on)`);
@@ -1162,7 +1162,7 @@ function generatePineScript(r, mode = 'indicator') {
   lines.push(`            bool _do_enter = false`);
   lines.push(`            int  _do_dir   = 0`);
   lines.push(`            // A. Проверка отложенного входа`);
-  lines.push(`            if use_wait and _pd != 0`);
+  lines.push(`            if _pd != 0`);
   lines.push(`                int _bw = bar_index - _pb`);
   lines.push(`                bool _cncl = (wait_max_b > 0 and _bw > wait_max_b) or (wait_catr > 0 and _pd * (close - _psc) > wait_catr * _ac)`);
   lines.push(`                if _cncl`);
@@ -1505,7 +1505,7 @@ function generatePineScript(r, mode = 'indicator') {
   lines.push(`        bool v_do_enter = false`);
   lines.push(`        int  v_do_dir   = 0`);
   lines.push(`        // A. Pending entry`);
-  lines.push(`        if use_wait and v_pd != 0`);
+  lines.push(`        if v_pd != 0`);
   lines.push(`            int _bw = bar_index - v_pb`);
   lines.push(`            bool _cncl = (wait_max_b > 0 and _bw > wait_max_b) or (wait_catr > 0 and v_pd * (close - v_psc) > wait_catr * atr_v[1])`);
   lines.push(`            if _cncl`);
@@ -1604,7 +1604,7 @@ function generatePineScript(r, mode = 'indicator') {
     lines.push(`    bool s_do_enter = false`);
     lines.push(`    int  s_do_dir   = 0`);
     lines.push(`    // A. Pending entry`);
-    lines.push(`    if use_wait and s_pd != 0`);
+    lines.push(`    if s_pd != 0`);
     lines.push(`        int _bw = bar_index - s_pb`);
     lines.push(`        bool _cncl = (wait_max_b > 0 and _bw > wait_max_b) or (wait_catr > 0 and s_pd * (close - s_psc) > wait_catr * atr_v[1])`);
     lines.push(`        if _cncl`);
