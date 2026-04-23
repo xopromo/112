@@ -62,8 +62,16 @@ const FILTER_REGISTRY = [
   {
     id:       'atrexp',
     flag:     'useAtrExp',
-    blocksL:  (cfg, i, ac) => !cfg.atrAvg || cfg.atrAvg[i-1] <= 0 || ac < cfg.atrAvg[i-1] * cfg.atrExpMult,
-    blocksS:  (cfg, i, ac) => !cfg.atrAvg || cfg.atrAvg[i-1] <= 0 || ac < cfg.atrAvg[i-1] * cfg.atrExpMult,
+    blocksL:  (cfg, i, ac) => {
+      if (!cfg.atrAvg || i < 1) return true;  // Нет данных = блокировать (безопасный default)
+      const avg = cfg.atrAvg[i-1];
+      return !isFinite(avg) || avg <= 0 || ac < avg * cfg.atrExpMult;
+    },
+    blocksS:  (cfg, i, ac) => {
+      if (!cfg.atrAvg || i < 1) return true;  // Нет данных = блокировать
+      const avg = cfg.atrAvg[i-1];
+      return !isFinite(avg) || avg <= 0 || ac < avg * cfg.atrExpMult;
+    },
     nameLabel: (cfg) => `AtrExp>${cfg.atrExpMult}×`,
   },
 
@@ -80,8 +88,16 @@ const FILTER_REGISTRY = [
   {
     id:       'volf',
     flag:     'useVolF',
-    blocksL:  (cfg, i, ac) => cfg.atrAvg && ac > cfg.atrAvg[i-1] * cfg.volFMult,
-    blocksS:  (cfg, i, ac) => cfg.atrAvg && ac > cfg.atrAvg[i-1] * cfg.volFMult,
+    blocksL:  (cfg, i, ac) => {
+      if (!cfg.atrAvg || i < 1) return true;  // Нет данных = блокировать
+      const avg = cfg.atrAvg[i-1];
+      return !isFinite(avg) || avg <= 0 || ac > avg * cfg.volFMult;
+    },
+    blocksS:  (cfg, i, ac) => {
+      if (!cfg.atrAvg || i < 1) return true;  // Нет данных = блокировать
+      const avg = cfg.atrAvg[i-1];
+      return !isFinite(avg) || avg <= 0 || ac > avg * cfg.volFMult;
+    },
     nameLabel: (cfg) => `VFilt<${cfg.volFMult}×`,
   },
 

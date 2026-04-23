@@ -625,6 +625,9 @@ function yieldToUI() {
 function stopOpt() {
   stopped = true; paused = false;
   if (pauseResolve) { pauseResolve(); pauseResolve = null; }
+  // Сбросить флаги robustness тестов чтобы следующий тест не пропускал фазы
+  if (typeof _massRobRunning !== 'undefined') _massRobRunning = false;
+  if (typeof _hcRobRunning !== 'undefined') _hcRobRunning = false;
   $('pbtn').style.display = 'none';
   $('sbtn').style.display = 'none';
   $('rbtn').style.display = '';
