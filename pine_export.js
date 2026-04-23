@@ -1099,7 +1099,7 @@ function generatePineScript(r, mode = 'indicator') {
   lines.push(`                            _dsl := ns`);
   lines.push(`            // Wick Trailing SL`);
   lines.push(`            if use_wick_trail and _in`);
-  lines.push(`                float _woff = wick_off_type == "pct" ? close[1] * wick_mult / 100 : wick_off_type == "pts" ? wick_mult : _u * wick_mult`);
+  lines.push(`                float _woff = wick_off_type == "pct" ? close * wick_mult / 100 : wick_off_type == "pts" ? wick_mult : _u * wick_mult`);
   lines.push(`                float _wraw = _dir == 1 ? low[1] - _woff : high[1] + _woff`);
   lines.push(`                if na(_wsl)`);
   lines.push(`                    _wsl := _wraw`);
@@ -1197,7 +1197,7 @@ function generatePineScript(r, mode = 'indicator') {
     lines.push(`                    _sig_skip := 0`);
     lines.push(`                    _cd_bar := -1`);
   lines.push(`                    _dsl := _sl_over > 0 ? (entry_price - _ac * _sl_ov) : calc_sl_level(1, entry_price, _ac, struct_bull)`);
-  lines.push(`                    float sl_d = math.abs(entry_price - _dsl)`);
+  lines.push(`                    float sl_d = na(_dsl) ? _ac : math.abs(entry_price - _dsl)`);
   lines.push(`                    _dtp := _tp_over > 0 ? (entry_price + _ac * _tp_ov) : calc_tp_level(1, entry_price, _ac, sl_d)`);
   lines.push(`                    _eb := bar_index`);
   lines.push(`                else if _do_dir == -1`);
@@ -1210,7 +1210,7 @@ function generatePineScript(r, mode = 'indicator') {
     lines.push(`                    _sig_skip := 0`);
     lines.push(`                    _cd_bar := -1`);
   lines.push(`                    _dsl := _sl_over > 0 ? (entry_price + _ac * _sl_ov) : calc_sl_level(-1, entry_price, _ac, struct_bear)`);
-  lines.push(`                    float sl_d = math.abs(entry_price - _dsl)`);
+  lines.push(`                    float sl_d = na(_dsl) ? _ac : math.abs(entry_price - _dsl)`);
   lines.push(`                    _dtp := _tp_over > 0 ? (entry_price - _ac * _tp_ov) : calc_tp_level(-1, entry_price, _ac, sl_d)`);
   lines.push(`                    _eb := bar_index`);
   lines.push(`    float _wr1 = _cnt1 > 0 ? _wins1 * 100.0 / _cnt1 : 0.0`);
@@ -1400,7 +1400,7 @@ function generatePineScript(r, mode = 'indicator') {
   lines.push(`                        v_sl := ns`);
   lines.push(`        // Wick Trailing SL`);
   lines.push(`        if use_wick_trail and v_in`);
-  lines.push(`            float _woff_v = wick_off_type == "pct" ? close[1] * wick_mult / 100 : wick_off_type == "pts" ? wick_mult : _u * wick_mult`);
+  lines.push(`            float _woff_v = wick_off_type == "pct" ? close * wick_mult / 100 : wick_off_type == "pts" ? wick_mult : _u * wick_mult`);
   lines.push(`            float _wraw_v = v_dir == 1 ? low[1] - _woff_v : high[1] + _woff_v`);
   lines.push(`            if na(v_wsl)`);
   lines.push(`                v_wsl := _wraw_v`);
@@ -1541,7 +1541,7 @@ function generatePineScript(r, mode = 'indicator') {
   lines.push(`            float _u = atr_v[1]`);
   lines.push(`            bool struct_ok = v_dir == 1 ? struct_bull : struct_bear`);
   lines.push(`            v_sl := calc_sl_level(v_dir, entry_price, _u, struct_ok)`);
-  lines.push(`            float sl_d = math.abs(entry_price - v_sl)`);
+  lines.push(`            float sl_d = na(v_sl) ? _u : math.abs(entry_price - v_sl)`);
   lines.push(`            v_tp := calc_tp_level(v_dir, entry_price, _u, sl_d)`);
   lines.push(`            v_eb := bar_index`);
   lines.push(`            string _emsg_txt_l  = "LONG @" + str.tostring(entry_price,"#.######") + " SL:" + str.tostring(v_sl,"#.######") + " TP:" + str.tostring(v_tp,"#.######")`);
@@ -1634,7 +1634,7 @@ function generatePineScript(r, mode = 'indicator') {
     lines.push(`        s_dir     := s_do_dir`);
     lines.push(`        bool s_struct_ok = s_dir == 1 ? struct_bull : struct_bear`);
     lines.push(`        s_sl      := calc_sl_level(s_dir, s_ep, _u, s_struct_ok)`);
-    lines.push(`        float _sl_d = math.abs(s_ep - s_sl)`);
+    lines.push(`        float _sl_d = na(s_sl) ? _u : math.abs(s_ep - s_sl)`);
     lines.push(`        s_tp      := calc_tp_level(s_dir, s_ep, _u, _sl_d)`);
     lines.push(`        s_ep_bar  := bar_index`);
     lines.push(`        s_tra     := false`);
@@ -1679,6 +1679,18 @@ function generatePineScript(r, mode = 'indicator') {
     lines.push(`                if ns < s_sl`);
     lines.push(`                    s_sl    := ns`);
     lines.push(`                    _sl_upd := true`);
+    lines.push(`    // Wick Trailing SL: ratchet stop по фитилю предыдущей свечи`);
+    lines.push(`    if use_wick_trail`);
+    lines.push(`        float _woff_s = wick_off_type == "pct" ? close * wick_mult / 100 : wick_off_type == "pts" ? wick_mult : _u * wick_mult`);
+    lines.push(`        float _wraw_s = s_dir == 1 ? low[1] - _woff_s : high[1] + _woff_s`);
+    lines.push(`        if na(s_wsl)`);
+    lines.push(`            s_wsl := _wraw_s`);
+    lines.push(`        else`);
+    lines.push(`            s_wsl := s_dir == 1 ? math.max(s_wsl, _wraw_s) : math.min(s_wsl, _wraw_s)`);
+    lines.push(`        float _new_s_sl = na(s_sl) ? s_wsl : (s_dir == 1 ? math.max(s_sl, s_wsl) : math.min(s_sl, s_wsl))`);
+    lines.push(`        if _new_s_sl != s_sl`);
+    lines.push(`            s_sl    := _new_s_sl`);
+    lines.push(`            _sl_upd := true`);
     lines.push(`    // Re-register exit order when stop updated`);
     lines.push(`    if _sl_upd`);
     lines.push(`        if s_dir == 1`);

@@ -1374,6 +1374,124 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 });
 
+// ════════════════════════════════════════════════════════════
+// ДИАГНОСТИКА И ОЧИСТКА ХРАНИЛИЩА
+// ════════════════════════════════════════════════════════════
+function _getStorageInfo() {
+  const info = {};
+  let totalBytes = 0;
+  const csvKeys = [];
+
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    const val = localStorage.getItem(key);
+    if (!val) continue;
+
+    const bytes = new Blob([val]).size;
+    info[key] = { bytes, kb: (bytes / 1024).toFixed(1) };
+    totalBytes += bytes;
+
+    if (key.startsWith('use6_csv_')) csvKeys.push(key);
+  }
+
+  return { info, totalBytes, totalMB: (totalBytes / 1024 / 1024).toFixed(2), csvKeys };
+}
+
+// Показать диагностику хранилища
+function _showStorageDiagnostic() {
+  const { info, totalBytes, totalMB, csvKeys } = _getStorageInfo();
+  const html = `<div style="position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px" onclick="if(event.target===this)document.getElementById('storage-diag-overlay')?.remove()">
+  <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:20px;width:100%;max-width:700px;max-height:80vh;overflow-y:auto" id="storage-diag-overlay">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h2 style="margin:0;color:var(--accent);font-size:.95em">💾 Диагностика хранилища</h2>
+      <button onclick="document.getElementById('storage-diag-overlay')?.remove()" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:1.2em">✕</button>
+    </div>
+
+    <div style="padding:12px;background:var(--bg3);border-radius:4px;margin-bottom:16px;font-size:.8em;color:var(--text2)">
+      <div>📊 Всего: <strong style="color:var(--accent)">${totalMB} МБ</strong> из ~5 МБ (лимит браузера)</div>
+      <div style="margin-top:4px">⚠️ Если > 4 МБ: удалите старые CSV кэши ниже</div>
+    </div>
+
+    <div style="margin-bottom:16px">
+      <div style="color:var(--accent);font-weight:600;margin-bottom:8px;font-size:.85em">🗑️ CSV кэши (${csvKeys.length})</div>
+      ${csvKeys.length > 0 ? `
+        <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px">
+          ${csvKeys.map(k => `
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:6px;background:var(--bg2);border-radius:3px;border-left:3px solid var(--red);font-size:.75em">
+              <span style="color:var(--text2);flex:1">${k}</span>
+              <span style="color:var(--text3);margin:0 8px">${info[k].kb} KB</span>
+              <button onclick="_removeStorageKey('${k}');_showStorageDiagnostic()" style="padding:2px 8px;background:rgba(255,61,87,.2);border:1px solid var(--red);border-radius:3px;color:var(--red);font-size:.7em;cursor:pointer">✕ Удалить</button>
+            </div>
+          `).join('')}
+        </div>
+        <button onclick="_removeAllCSVCaches();_showStorageDiagnostic()" style="padding:6px 12px;background:rgba(255,61,87,.2);border:1px solid var(--red);border-radius:4px;color:var(--red);font-size:.75em;cursor:pointer;width:100%">✕ Удалить все CSV кэши</button>
+      ` : '<div style="color:var(--text3);font-size:.8em">✓ CSV кэшей не найдено</div>'}
+    </div>
+
+    <div>
+      <div style="color:var(--accent);font-weight:600;margin-bottom:8px;font-size:.85em">📋 Все ключи хранилища</div>
+      <div style="display:grid;grid-template-columns:1fr 80px;gap:8px;font-size:.7em;max-height:300px;overflow-y:auto">
+        ${Object.entries(info).map(([k, v]) => `
+          <div style="color:var(--text2)">${k}</div>
+          <div style="text-align:right;color:var(--text3)">${v.kb} KB</div>
+        `).join('')}
+      </div>
+    </div>
+
+    <div style="margin-top:16px;display:flex;gap:8px">
+      <button onclick="_clearAllStorage();document.getElementById('storage-diag-overlay')?.remove()" style="flex:1;padding:6px;background:rgba(255,61,87,.2);border:1px solid var(--red);border-radius:4px;color:var(--red);font-size:.75em;cursor:pointer;font-weight:600">⚠️ ПОЛНАЯ ОЧИСТКА хранилища</button>
+      <button onclick="document.getElementById('storage-diag-overlay')?.remove()" style="flex:1;padding:6px;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:.75em;cursor:pointer">Закрыть</button>
+    </div>
+  </div>
+</div>`;
+
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+
+function _removeStorageKey(key) {
+  try {
+    localStorage.removeItem(key);
+    console.log(`✓ Удалён ${key}`);
+    toast(`✓ Удалён: ${key}`, 1500);
+  } catch(e) {
+    console.error('Ошибка при удалении:', e);
+  }
+}
+
+function _removeAllCSVCaches() {
+  const { csvKeys } = _getStorageInfo();
+  let count = 0;
+  for (const k of csvKeys) {
+    try {
+      localStorage.removeItem(k);
+      count++;
+    } catch(e) {
+      console.error('Ошибка при удалении', k, e);
+    }
+  }
+  console.log(`✓ Удалено ${count} CSV кэшей`);
+  toast(`✓ Удалено ${count} CSV кэшей (освобождено ~${(count * 5).toFixed(0)} МБ)`, 2000);
+}
+
+function _clearAllStorage() {
+  if (!confirm('⚠️ ВНИМАНИЕ: Это удалит все данные хранилища (избранные, настройки, всё)!\n\nВы уверены?')) {
+    return;
+  }
+  try {
+    localStorage.clear();
+    sessionStorage.clear();
+    console.log('✓ Хранилище полностью очищено');
+    toast('✓ Хранилище очищено. Страница перезагружается...', 2000);
+    setTimeout(() => location.reload(), 1000);
+  } catch(e) {
+    console.error('Ошибка при очистке:', e);
+    alert('Ошибка: ' + e.message);
+  }
+}
+
+// Expose to window
+try { window._showStorageDiagnostic = _showStorageDiagnostic; } catch(e) {}
+
 /* ##QUEUE## */
 
 /* ##HC## */

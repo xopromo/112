@@ -54,7 +54,7 @@ function _saveFavsSync() {
         // Обработка конкретной ошибки хранилища
         if (storageErr.name === 'QuotaExceededError') {
           console.error(`[_saveFavsSync] 💾 localStorage переполнен! Ключ: ${k}, размер: ${sizeKB} KB`);
-          toast('❌ Ошибка: хранилище переполнено. Удалите старые CSV кэши в Application→Storage.', 4000);
+          toast('❌ Хранилище заполнено. Клик → 💾 Диагностика хранилища (главное меню)', 5000);
           return false;
         }
         throw storageErr;

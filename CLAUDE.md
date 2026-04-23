@@ -4,11 +4,49 @@
 
 ---
 
+## 🌿 АКТИВНАЯ BRANCH STRATEGY (после стабилизационного аудита 2026-04-19)
+
+### Защищённые ветки (НЕ ТРОГАТЬ):
+- **`main`** — production, только merge через testing
+- **`archive/v6-before-stability-audit`** — BACKUP рабочей версии
+- **Tag `v6.2.2-before-audit`** — quick restore point
+
+### Активные ветки для фиксов:
+| Ветка | Категория | Префикс коммитов |
+|-------|-----------|------------------|
+| `fixes/pine-compatibility` | 🔴 Pine v6 look-ahead, process_orders | `[PINE-COMPAT]` |
+| `fixes/stability-critical` | 🔴 cfg sync, race conditions, quota | `[STABILITY]` |
+| `fixes/performance-opt` | 🚀 calcSMA, Array.from, кэши | `[PERF]` |
+| `fixes/trading-logic` | ⚙️ HC OOS, GT-Score, Kelly | `[TRADING]` |
+| `testing/merged-changes` | 🧪 интеграция всех фиксов | `[MERGE]` |
+
+### Процесс:
+1. Фиксы идут ТОЛЬКО в соответствующие `fixes/*` ветки (не в main!)
+2. После готовности каждой ветки → merge в `testing/merged-changes`
+3. Тестирование в `testing/merged-changes`
+4. После OK → PR из testing → main
+
+### Быстрый откат если что-то сломалось:
+```bash
+git checkout v6.2.2-before-audit   # стабильная версия
+# или
+git checkout archive/v6-before-stability-audit
+python build.py
+```
+
+### ПРАВИЛА ДЛЯ CLAUDE:
+1. **ВСЕГДА** проверяю текущую ветку перед коммитом: `git branch --show-current`
+2. Ветка должна соответствовать категории фикса (pine→pine-compat, perf→performance-opt)
+3. **НИКОГДА** не пушить в `main` или `archive/*`
+4. Коммит-сообщение начинается с `[CATEGORY]` префикса
+5. Один фикс — одна ветка, не смешивать категории
+
+---
+
 ## 📍 Проект: USE Optimizer
 
 Web-инструмент оптимизации торговых стратегий TradingView (браузер, без сервера).
 - **Repo**: `xopromo/112`
-- **Branch**: `main` (пуш запрещён, используй `claude/*`)
 - **Deploy**: GitHub Pages → `xopromo.github.io/112/USE_Optimizer_v6_built.html`
 
 ---
@@ -129,9 +167,9 @@ git push -u origin claude/ваша-ветка
 
 **pine_export.js**:
 - `generatePineScript` (20) — экспорт Pine индикатора
-- `generatePineStrategy` (1842) — экспорт Pine стратегии (strategy.exit)
-- `fixPineScript` (1851) — автоисправление Pine v5→v6
-- `_addActivePinev6` (1967) — toggle-группы Pine v6
+- `generatePineStrategy` (1854) — экспорт Pine стратегии (strategy.exit)
+- `fixPineScript` (1863) — автоисправление Pine v5→v6
+- `_addActivePinev6` (1979) — toggle-группы Pine v6
 
 ---
 
