@@ -795,7 +795,7 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
             ? DATA[i].c * cfg.wickMult / 100
             : cfg.wickOffType === 'pts'
               ? cfg.wickMult  // Points: абсолютное значение цены (как в Pine)
-              : atrArr[i] * cfg.wickMult; // ATR (default)
+              : atrArr[i-1] * cfg.wickMult; // ATR (default) — матчим Pine _u = atr_v[1]
           const wickRaw = dir === 1
             ? DATA[i-1].l - wickOffset   // Long: ниже нижнего фитиля предыдущей свечи
             : DATA[i-1].h + wickOffset;  // Short: выше верхнего фитиля
