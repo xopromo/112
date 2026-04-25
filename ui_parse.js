@@ -41,18 +41,18 @@ function parseTextToSettings(text) {
         if (j.useWickTrail !== undefined) ch.push({ id: 'x_wt', value: j.useWickTrail, type: 'chk', label: `Wick Trail: ${j.useWickTrail?'✅':'❌'}` });
         if (j.wickOffType !== undefined) document.getElementById('x_wt_type').value = j.wickOffType;
         if (j.wickMult !== undefined) ch.push({ id: 'x_wt_mult', value: String(j.wickMult), type: 'val', label: `Wick Mult=${j.wickMult}` });
-        if (j.useDynSLStruct !== undefined) ch.push({ id: 'x_dyn_sl', value: j.useDynSLStruct, type: 'chk', label: `Dynamic SL: ${j.useDynSLStruct?'✅':'❌'}` });
-        if (j.dynSLStructMult !== undefined) ch.push({ id: 'x_dyn_sl_mult', value: String(j.dynSLStructMult), type: 'val', label: `Dyn SL Mult=${j.dynSLStructMult}` });
+        if (j.useDynSLStruct !== undefined) ch.push({ id: 'x_dynsl', value: j.useDynSLStruct, type: 'chk', label: `Dynamic SL: ${j.useDynSLStruct?'✅':'❌'}` });
+        if (j.dynSLStructMult !== undefined) ch.push({ id: 'x_dynsl_m', value: String(j.dynSLStructMult), type: 'val', label: `Dyn SL Mult=${j.dynSLStructMult}` });
         if (j.usePartial !== undefined) ch.push({ id: 'x_part', value: j.usePartial, type: 'chk', label: `Partial TP: ${j.usePartial?'✅':'❌'}` });
-        if (j.partRR !== undefined) ch.push({ id: 'x_part_rr', value: String(j.partRR), type: 'val', label: `Part R:R=${j.partRR}` });
-        if (j.partPct !== undefined) ch.push({ id: 'x_part_pct', value: String(j.partPct), type: 'val', label: `Part %=${j.partPct}` });
-        if (j.partBE !== undefined) ch.push({ id: 'x_part_be', value: j.partBE, type: 'chk', label: `Part BE: ${j.partBE?'✅':'❌'}` });
+        if (j.partRR !== undefined) ch.push({ id: 'x_partr', value: String(j.partRR), type: 'val', label: `Part R:R=${j.partRR}` });
+        if (j.partPct !== undefined) ch.push({ id: 'x_partp', value: String(j.partPct), type: 'val', label: `Part %=${j.partPct}` });
+        if (j.partBE !== undefined) ch.push({ id: 'x_partbe', value: j.partBE, type: 'chk', label: `Part BE: ${j.partBE?'✅':'❌'}` });
         if (j.useRev !== undefined) ch.push({ id: 'x_rev', value: j.useRev, type: 'chk', label: `Rev Signal: ${j.useRev?'✅':'❌'}` });
         if (j.revMode !== undefined) ch.push({ id: '_xm_rev', value: j.revMode, type: 'xmode', xmodeType: 'rev', label: `revMode=${j.revMode}` });
         if (j.revSkip !== undefined) ch.push({ id: 'x_revskip', value: String(j.revSkip), type: 'val', label: `Rev Skip=${j.revSkip}` });
-        if (j.revCooldown !== undefined) ch.push({ id: 'x_revcool', value: String(j.revCooldown), type: 'val', label: `Rev Cooldown=${j.revCooldown}` });
+        if (j.revCooldown !== undefined) ch.push({ id: 'x_revcd', value: String(j.revCooldown), type: 'val', label: `Rev Cooldown=${j.revCooldown}` });
         if (j.useTime !== undefined) ch.push({ id: 'x_time', value: j.useTime, type: 'chk', label: `Time Exit: ${j.useTime?'✅':'❌'}` });
-        if (j.timeBars !== undefined) ch.push({ id: 'x_timebars', value: String(j.timeBars), type: 'val', label: `Time Bars=${j.timeBars}` });
+        if (j.timeBars !== undefined) ch.push({ id: 'x_timeb', value: String(j.timeBars), type: 'val', label: `Time Bars=${j.timeBars}` });
         if (j.clxMode !== undefined) ch.push({ id: '_xm_clx', value: j.clxMode, type: 'xmode', xmodeType: 'clx', label: `clxMode=${j.clxMode}` });
         if (ch.length) return ch;
       }
