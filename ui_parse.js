@@ -8,6 +8,44 @@ function openParseModal() {
 function closeParseModal() { $('parse-overlay').classList.remove('open'); }
 
 function parseTextToSettings(text) {
+  // ── РЕЖИМ -2: JSON блок из комментариев Pine скрипта (// ... JSON ... //) ──
+  // Ищем блок --- CFG JSON --- в комментариях: каждая строка начинается с //
+  const _pineCommentMatch = text.match(/\/\/\s*---\s*CFG JSON\s*---[\s\S]*?\/\/\s*---\s*\/CFG JSON\s*---/);
+  if (_pineCommentMatch) {
+    const commentBlock = _pineCommentMatch[0];
+    const jsonLines = commentBlock.split('\n')
+      .filter(line => line.trim().startsWith('//'))
+      .map(line => line.replace(/^\s*\/\/\s?/, ''))
+      .join('\n');
+    const cleanJson = jsonLines
+      .replace(/^---\s*CFG JSON\s*---/, '')
+      .replace(/---\s*\/CFG JSON\s*---$/, '')
+      .trim();
+    try {
+      const j = JSON.parse(cleanJson);
+      if (j && typeof j === 'object') {
+        const ch = [];
+        // Парсим параметры выходов (useTrail, useBE, useAdaptiveTP/SL)
+        if (j.useTrail !== undefined) ch.push({ id: 'x_tr', value: j.useTrail, type: 'chk', label: `Trailing: ${j.useTrail?'✅':'❌'}` });
+        if (j.trTrig !== undefined) ch.push({ id: 'x_trt', value: String(j.trTrig), type: 'val', label: `Trail Trig=${j.trTrig}` });
+        if (j.trDist !== undefined) ch.push({ id: 'x_trd', value: String(j.trDist), type: 'val', label: `Trail Dist=${j.trDist}` });
+        if (j.useBE !== undefined) ch.push({ id: 'x_be', value: j.useBE, type: 'chk', label: `BE: ${j.useBE?'✅':'❌'}` });
+        if (j.beTrig !== undefined) ch.push({ id: 'x_bet', value: String(j.beTrig), type: 'val', label: `BE Trig=${j.beTrig}` });
+        if (j.beOff !== undefined) ch.push({ id: 'x_beo', value: String(j.beOff), type: 'val', label: `BE Off=${j.beOff}` });
+        if (j.useAdaptiveTP !== undefined) ch.push({ id: 'x_adaptive_tp', value: j.useAdaptiveTP, type: 'chk', label: `Adaptive TP: ${j.useAdaptiveTP?'✅':'❌'}` });
+        if (j.tpAtrLen !== undefined) ch.push({ id: 'x_tp_atr_len', value: String(j.tpAtrLen), type: 'val', label: `TP ATR Len=${j.tpAtrLen}` });
+        if (j.tpAtrMult !== undefined) ch.push({ id: 'x_tp_atr_mult', value: String(j.tpAtrMult), type: 'val', label: `TP ATR Mult=${j.tpAtrMult}` });
+        if (j.useAdaptiveSL !== undefined) ch.push({ id: 'x_adaptive_sl', value: j.useAdaptiveSL, type: 'chk', label: `Adaptive SL: ${j.useAdaptiveSL?'✅':'❌'}` });
+        if (j.slAtrLen !== undefined) ch.push({ id: 'x_sl_atr_len', value: String(j.slAtrLen), type: 'val', label: `SL ATR Len=${j.slAtrLen}` });
+        if (j.slAtrMult !== undefined) ch.push({ id: 'x_sl_atr_mult', value: String(j.slAtrMult), type: 'val', label: `SL ATR Mult=${j.slAtrMult}` });
+        if (j.useWickTrail !== undefined) ch.push({ id: 'x_wt', value: j.useWickTrail, type: 'chk', label: `Wick Trail: ${j.useWickTrail?'✅':'❌'}` });
+        if (j.wickOffType !== undefined) document.getElementById('x_wt_type').value = j.wickOffType;
+        if (j.wickMult !== undefined) ch.push({ id: 'x_wt_mult', value: String(j.wickMult), type: 'val', label: `Wick Mult=${j.wickMult}` });
+        if (ch.length) return ch;
+      }
+    } catch(e) { /* не JSON блок в комментариях, переходим к следующему режиму */ }
+  }
+
   // ── РЕЖИМ -1: Comparator JSON формат ({apply:{...}, hints:[...], meta:{...}}) ──
   try {
     const _cmpJson = JSON.parse(text.trim());
