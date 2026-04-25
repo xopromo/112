@@ -58,6 +58,20 @@ function generatePineScript(r, mode = 'indicator') {
   lines.push(`// Конфиг: ${r.name}`);
   lines.push(`// PnL: ${r.pnl.toFixed(1)}%  WR: ${r.wr.toFixed(1)}%  Сделок: ${r.n}  DD: ${r.dd.toFixed(1)}%`);
   lines.push(`// ============================================================`);
+  lines.push(`// 🔄 СИНХРОНИЗАЦИЯ ПАРАМЕТРОВ (скопируй в USE Optimizer)`);
+  lines.push(`// При изменении параметров ниже в Pine: скопируй блок CFG JSON и импортируй в Optimizer`);
+  lines.push(`// Меню: 📂 Импорт → Вставь текст → ✅ Применить`);
+  const cfgExport = {
+    useTrail: c.useTrail || false, trTrig: c.trTrig || 1, trDist: c.trDist || 0.5,
+    useBE: c.useBE || false, beTrig: c.beTrig || 1, beOff: c.beOff || 0,
+    useAdaptiveTP: c.useAdaptiveTP || false, tpAtrLen: c.tpAtrLen || 20, tpAtrMult: c.tpAtrMult || 1.0,
+    useAdaptiveSL: c.useAdaptiveSL || false, slAtrLen: c.slAtrLen || 20, slAtrMult: c.slAtrMult || 0.5,
+    useWickTrail: c.useWickTrail || false, wickOffType: c.wickOffType || 'atr', wickMult: c.wickMult || 1.0
+  };
+  lines.push(`// --- CFG JSON ---`);
+  const cfgJson = JSON.stringify(cfgExport, null, 2).split('\n');
+  cfgJson.forEach(line => lines.push(`// ${line}`));
+  lines.push(`// --- /CFG JSON ---`);
   if (mode === 'strategy') {
     lines.push(`strategy("USE [${r.name}]", shorttitle="USE_STR", overlay=true, commission_type=strategy.commission.percent, commission_value=${comm.toFixed(4)}, initial_capital=10000, default_qty_type=strategy.percent_of_equity, default_qty_value=100, pyramiding=0, process_orders_on_close=true, max_lines_count=500, max_labels_count=500, max_boxes_count=500)`);
   } else {
@@ -297,6 +311,10 @@ function generatePineScript(r, mode = 'indicator') {
   lines.push(`spread_pct = input.float(${f(spread,3)}, "Спред %", step=0.05, group=grp_strat)`);
   lines.push(`atr_len    = input.int(${atrP}, "Период ATR", group=grp_strat)`);
   lines.push(`atr_step   = input.int(2, "Шаг вариаций ATR", group=grp_strat)`);
+  lines.push(``);
+
+  lines.push(`grp_sync = "🔄 СИНХРОНИЗАЦИЯ"`);
+  lines.push(`display_params = input.bool(true, "Показать таблицу параметров", group=grp_sync, tooltip="Выключи для чистого графика")`);
   // Align max_bars with optimizer's dataset: subtract MA/confirm warmup so TV starts from same bar
   const _maTypeW    = c.useMA      ? (c.maType   || 'EMA') : '';
   const _confTypeW  = c.useConfirm ? (c.confMatType || c.confType || 'WMA') : '';
@@ -1818,6 +1836,27 @@ function generatePineScript(r, mode = 'indicator') {
   lines.push(`        table.merge_cells(t, 0, 17, 5, 17)`);
   lines.push(``);
   } // end if (mode === 'indicator') — stats table
+
+  // ── ПАРАМЕТРЫ ВЫХОДОВ (таблица синхронизации) ──
+  if (mode === 'indicator') {
+    lines.push(`// ==========================================`);
+    lines.push(`// 7a. ПАРАМЕТРЫ ВЫХОДОВ (для синхронизации)`);
+    lines.push(`// ==========================================`);
+    lines.push(`if display_params`);
+    lines.push(`    tp = table.new(position=position.top_right, rows=4, columns=2, bgcolor=color.new(color.gray,80), border_color=color.gray, border_width=1, frame_color=color.gray)`);
+    lines.push(`    table.cell(tp, 0, 0, "Параметр", bgcolor=color.new(color.blue,40), text_color=color.white, text_size=size.small)`);
+    lines.push(`    table.cell(tp, 1, 0, "Значение", bgcolor=color.new(color.blue,40), text_color=color.white, text_size=size.small)`);
+    lines.push(`    row = 1`);
+    lines.push(`    table.cell(tp, 0, row, "🔄 Trailing: " + (use_trail ? "✅" : "❌"), text_size=size.small)`);
+    lines.push(`    table.cell(tp, 1, row, use_trail ? str.format("T:{0} D:{1}", str.tostring(trail_trig,"#.#"), str.tostring(trail_dist,"#.#")) : "ВЫКЛ", text_size=size.small)`);
+    lines.push(`    row := row + 1`);
+    lines.push(`    table.cell(tp, 0, row, "🔒 BE: " + (use_be ? "✅" : "❌"), text_size=size.small)`);
+    lines.push(`    table.cell(tp, 1, row, use_be ? str.format("T:{0} O:{1}", str.tostring(be_trig,"#.#"), str.tostring(be_offset,"#.#")) : "ВЫКЛ", text_size=size.small)`);
+    lines.push(`    row := row + 1`);
+    lines.push(`    table.cell(tp, 0, row, "⚡ Adapt TP/SL", text_size=size.small)`);
+    const adaptStr = `(use_adaptive_tp or use_adaptive_sl) ? str.format("TP:{0} SL:{1}", use_adaptive_tp ? "✅" : "❌", use_adaptive_sl ? "✅" : "❌") : "ВЫКЛ"`;
+    lines.push(`    table.cell(tp, 1, row, ${adaptStr}, text_size=size.small)`);
+  }
 
   // ── ALERTS ───────────────────────────────────────────────
   lines.push(`// ==========================================`);
