@@ -66,7 +66,12 @@ function generatePineScript(r, mode = 'indicator') {
     useBE: c.useBE || false, beTrig: c.beTrig || 1, beOff: c.beOff || 0,
     useAdaptiveTP: c.useAdaptiveTP || false, tpAtrLen: c.tpAtrLen || 20, tpAtrMult: c.tpAtrMult || 1.0,
     useAdaptiveSL: c.useAdaptiveSL || false, slAtrLen: c.slAtrLen || 20, slAtrMult: c.slAtrMult || 0.5,
-    useWickTrail: c.useWickTrail || false, wickOffType: c.wickOffType || 'atr', wickMult: c.wickMult || 1.0
+    useWickTrail: c.useWickTrail || false, wickOffType: c.wickOffType || 'atr', wickMult: c.wickMult || 1.0,
+    useDynSLStruct: c.useDynSLStruct || false, dynSLStructMult: c.dynSLStructMult || 0.3,
+    usePartial: c.usePartial || false, partRR: c.partRR || 0.5, partPct: c.partPct || 50, partBE: c.partBE || false,
+    useRev: c.useRev || false, revMode: c.revMode || 'any', revSkip: c.revSkip || 0, revCooldown: c.revCooldown || 0,
+    useTime: c.useTime || false, timeBars: c.timeBars || 50,
+    clxMode: c.clxMode || 'plus'
   };
   lines.push(`// --- CFG JSON ---`);
   const cfgJson = JSON.stringify(cfgExport, null, 2).split('\n');

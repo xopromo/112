@@ -10049,7 +10049,12 @@ function generatePineScript(r, mode = 'indicator') {
     useBE: c.useBE || false, beTrig: c.beTrig || 1, beOff: c.beOff || 0,
     useAdaptiveTP: c.useAdaptiveTP || false, tpAtrLen: c.tpAtrLen || 20, tpAtrMult: c.tpAtrMult || 1.0,
     useAdaptiveSL: c.useAdaptiveSL || false, slAtrLen: c.slAtrLen || 20, slAtrMult: c.slAtrMult || 0.5,
-    useWickTrail: c.useWickTrail || false, wickOffType: c.wickOffType || 'atr', wickMult: c.wickMult || 1.0
+    useWickTrail: c.useWickTrail || false, wickOffType: c.wickOffType || 'atr', wickMult: c.wickMult || 1.0,
+    useDynSLStruct: c.useDynSLStruct || false, dynSLStructMult: c.dynSLStructMult || 0.3,
+    usePartial: c.usePartial || false, partRR: c.partRR || 0.5, partPct: c.partPct || 50, partBE: c.partBE || false,
+    useRev: c.useRev || false, revMode: c.revMode || 'any', revSkip: c.revSkip || 0, revCooldown: c.revCooldown || 0,
+    useTime: c.useTime || false, timeBars: c.timeBars || 50,
+    clxMode: c.clxMode || 'plus'
   };
   lines.push(`// --- CFG JSON ---`);
   const cfgJson = JSON.stringify(cfgExport, null, 2).split('\n');
@@ -23890,7 +23895,7 @@ function parseTextToSettings(text) {
       const j = JSON.parse(cleanJson);
       if (j && typeof j === 'object') {
         const ch = [];
-        // Парсим параметры выходов (useTrail, useBE, useAdaptiveTP/SL)
+        // Парсим параметры выходов (useTrail, useBE, useAdaptiveTP/SL, usePartial, и т.д.)
         if (j.useTrail !== undefined) ch.push({ id: 'x_tr', value: j.useTrail, type: 'chk', label: `Trailing: ${j.useTrail?'✅':'❌'}` });
         if (j.trTrig !== undefined) ch.push({ id: 'x_trt', value: String(j.trTrig), type: 'val', label: `Trail Trig=${j.trTrig}` });
         if (j.trDist !== undefined) ch.push({ id: 'x_trd', value: String(j.trDist), type: 'val', label: `Trail Dist=${j.trDist}` });
@@ -23906,6 +23911,19 @@ function parseTextToSettings(text) {
         if (j.useWickTrail !== undefined) ch.push({ id: 'x_wt', value: j.useWickTrail, type: 'chk', label: `Wick Trail: ${j.useWickTrail?'✅':'❌'}` });
         if (j.wickOffType !== undefined) document.getElementById('x_wt_type').value = j.wickOffType;
         if (j.wickMult !== undefined) ch.push({ id: 'x_wt_mult', value: String(j.wickMult), type: 'val', label: `Wick Mult=${j.wickMult}` });
+        if (j.useDynSLStruct !== undefined) ch.push({ id: 'x_dyn_sl', value: j.useDynSLStruct, type: 'chk', label: `Dynamic SL: ${j.useDynSLStruct?'✅':'❌'}` });
+        if (j.dynSLStructMult !== undefined) ch.push({ id: 'x_dyn_sl_mult', value: String(j.dynSLStructMult), type: 'val', label: `Dyn SL Mult=${j.dynSLStructMult}` });
+        if (j.usePartial !== undefined) ch.push({ id: 'x_part', value: j.usePartial, type: 'chk', label: `Partial TP: ${j.usePartial?'✅':'❌'}` });
+        if (j.partRR !== undefined) ch.push({ id: 'x_part_rr', value: String(j.partRR), type: 'val', label: `Part R:R=${j.partRR}` });
+        if (j.partPct !== undefined) ch.push({ id: 'x_part_pct', value: String(j.partPct), type: 'val', label: `Part %=${j.partPct}` });
+        if (j.partBE !== undefined) ch.push({ id: 'x_part_be', value: j.partBE, type: 'chk', label: `Part BE: ${j.partBE?'✅':'❌'}` });
+        if (j.useRev !== undefined) ch.push({ id: 'x_rev', value: j.useRev, type: 'chk', label: `Rev Signal: ${j.useRev?'✅':'❌'}` });
+        if (j.revMode !== undefined) ch.push({ id: '_xm_rev', value: j.revMode, type: 'xmode', xmodeType: 'rev', label: `revMode=${j.revMode}` });
+        if (j.revSkip !== undefined) ch.push({ id: 'x_revskip', value: String(j.revSkip), type: 'val', label: `Rev Skip=${j.revSkip}` });
+        if (j.revCooldown !== undefined) ch.push({ id: 'x_revcool', value: String(j.revCooldown), type: 'val', label: `Rev Cooldown=${j.revCooldown}` });
+        if (j.useTime !== undefined) ch.push({ id: 'x_time', value: j.useTime, type: 'chk', label: `Time Exit: ${j.useTime?'✅':'❌'}` });
+        if (j.timeBars !== undefined) ch.push({ id: 'x_timebars', value: String(j.timeBars), type: 'val', label: `Time Bars=${j.timeBars}` });
+        if (j.clxMode !== undefined) ch.push({ id: '_xm_clx', value: j.clxMode, type: 'xmode', xmodeType: 'clx', label: `clxMode=${j.clxMode}` });
         if (ch.length) return ch;
       }
     } catch(e) { /* не JSON блок в комментариях, переходим к следующему режиму */ }
@@ -33663,7 +33681,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1777121859050;
+window._BUILD_TS = 1777130299621;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
