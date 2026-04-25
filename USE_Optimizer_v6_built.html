@@ -11661,11 +11661,19 @@ function generatePineScript(r, mode = 'indicator') {
     lines.push(`    // BE stop update`);
     lines.push(`    if use_be and not s_bea`);
     lines.push(`        if (s_dir == 1 and high >= s_ep + _u * be_trig) or (s_dir == -1 and low <= s_ep - _u * be_trig)`);
-    lines.push(`            float _be_sl = s_ep + s_dir * _u * be_offset`);
-    lines.push(`            float _new_sl = s_dir == 1 ? math.max(s_sl, _be_sl) : math.min(s_sl, _be_sl)`);
-    lines.push(`            if _new_sl != s_sl`);
+    lines.push(`            s_bea := true`);
+    lines.push(`            if be_offset >= be_trig`);
+    lines.push(`                // Ветка 1: beOff >= beTrig → немедленный выход на уровне beTrig (как в JS)`);
+    lines.push(`                float _be_exit = s_ep + s_dir * _u * be_trig`);
+    lines.push(`                if s_dir == 1`);
+    lines.push(`                    strategy.exit("LX", "L", limit=_be_exit, stop=_be_exit)`);
+    lines.push(`                else`);
+    lines.push(`                    strategy.exit("SX", "S", limit=_be_exit, stop=_be_exit)`);
+    lines.push(`            else`);
+    lines.push(`                // Ветка 2: beOff < beTrig → перестановка SL на уровень beOffset`);
+    lines.push(`                float _be_sl = s_ep + s_dir * _u * be_offset`);
+    lines.push(`                float _new_sl = s_dir == 1 ? math.max(s_sl, _be_sl) : math.min(s_sl, _be_sl)`);
     lines.push(`                s_sl    := _new_sl`);
-    lines.push(`                s_bea   := true`);
     lines.push(`                _sl_upd := true`);
     lines.push(`    // Trailing stop update`);
     lines.push(`    if use_trail`);
@@ -33681,7 +33689,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1777131266072;
+window._BUILD_TS = 1777131299455;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
