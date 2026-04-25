@@ -271,13 +271,13 @@ function generatePineScript(r, mode = 'indicator') {
 
   // ===== АДАПТИВНЫЕ TP/SL И KELLY CRITERION =====
   lines.push(`grp_adapt = "⚡ АДАПТИВНЫЕ TP/SL (ATR-зависимые)"`);
-  lines.push(`use_adaptive = input.bool(false, "Включить адаптивный режим", group=grp_adapt)`);
-  lines.push(`use_adaptive_tp = input.bool(false, "Адаптивный TP (зависит от ATR)", group=grp_adapt, active=use_adaptive)`);
-  lines.push(`tp_atr_len  = input.int(20, "Период ATR для TP", minval=5, maxval=100, group=grp_adapt, active=use_adaptive_tp)`);
-  lines.push(`tp_atr_mult = input.float(1.0, "Множитель ATR→TP", step=0.1, tooltip="Как сильно TP реагирует на рост ATR", group=grp_adapt, active=use_adaptive_tp)`);
-  lines.push(`use_adaptive_sl = input.bool(false, "Адаптивный SL (зависит от ATR)", group=grp_adapt, active=use_adaptive)`);
-  lines.push(`sl_atr_len  = input.int(20, "Период ATR для SL", minval=5, maxval=100, group=grp_adapt, active=use_adaptive_sl)`);
-  lines.push(`sl_atr_mult = input.float(0.5, "Множитель ATR→SL", step=0.1, tooltip="Как SL реагирует на ATR", group=grp_adapt, active=use_adaptive_sl)`);
+  lines.push(`use_adaptive = input.bool(${b(c.useAdaptive || false)}, "Включить адаптивный режим", group=grp_adapt)`);
+  lines.push(`use_adaptive_tp = input.bool(${b(c.useAdaptiveTP || false)}, "Адаптивный TP (зависит от ATR)", group=grp_adapt, active=use_adaptive)`);
+  lines.push(`tp_atr_len  = input.int(${c.tpAtrLen || 20}, "Период ATR для TP", minval=5, maxval=100, group=grp_adapt, active=use_adaptive_tp)`);
+  lines.push(`tp_atr_mult = input.float(${f(c.tpAtrMult || 1.0, 1)}, "Множитель ATR→TP", step=0.1, tooltip="Как сильно TP реагирует на рост ATR", group=grp_adapt, active=use_adaptive_tp)`);
+  lines.push(`use_adaptive_sl = input.bool(${b(c.useAdaptiveSL || false)}, "Адаптивный SL (зависит от ATR)", group=grp_adapt, active=use_adaptive)`);
+  lines.push(`sl_atr_len  = input.int(${c.slAtrLen || 20}, "Период ATR для SL", minval=5, maxval=100, group=grp_adapt, active=use_adaptive_sl)`);
+  lines.push(`sl_atr_mult = input.float(${f(c.slAtrMult || 0.5, 1)}, "Множитель ATR→SL", step=0.1, tooltip="Как SL реагирует на ATR", group=grp_adapt, active=use_adaptive_sl)`);
   lines.push(``);
 
   lines.push(`grp_kelly = "🎯 KELLY CRITERION (размер позиции)"`);
