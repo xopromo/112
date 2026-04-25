@@ -1270,6 +1270,7 @@ function generatePineScript(r, mode = 'indicator') {
     lines.push(`var bool v_tra = false`);
     lines.push(`var bool v_bea = false`);
     lines.push(`var float v_wsl = float(na)`);
+    lines.push(`var float v_xp_out = float(na)`);
     lines.push(`var int v_sig_skip = 0`);
     lines.push(`var int v_cd_bar = -1`);
     lines.push(`var box b_trade = na`);
@@ -1456,6 +1457,7 @@ function generatePineScript(r, mode = 'indicator') {
     lines.push(`                box.set_bottom(b_trade, math.min(v_ep, close))`);
   lines.push(`        if frc or hsl or htp or htr`);
   lines.push(`            float vtr = (v_dir == 1 ? (vxp - v_ep)/v_ep*100 : (v_ep - vxp)/v_ep*100) - total_cost`);
+  lines.push(`            v_xp_out := vxp`);
   lines.push(`            string _xmsg_txt_l  = "XL " + vxt + " @" + str.tostring(vxp,"#.######") + " entry:" + str.tostring(v_ep,"#.######") + " pnl:" + str.tostring(vtr,"#.##") + "%"`);
   lines.push(`            string _xmsg_json_l = '{"action":"sell","side":"long","ticker":"' + _bot_tkr + '","price":' + str.tostring(vxp,"#.######") + ',"entry":' + str.tostring(v_ep,"#.######") + ',"pnl":' + str.tostring(vtr,"#.##") + ',"reason":"' + vxt + '"}'`);
   lines.push(`            string _xmsg_txt_s  = "XS " + vxt + " @" + str.tostring(vxp,"#.######") + " entry:" + str.tostring(v_ep,"#.######") + " pnl:" + str.tostring(vtr,"#.##") + "%"`);
@@ -1888,11 +1890,11 @@ function generatePineScript(r, mode = 'indicator') {
   lines.push(`// Выходы: маленькие крестики`);
   lines.push(`plotshape(a_lx, "✖ Exit Long",   shape.xcross,       location.abovebar, color.new(color.orange,0),  size=size.tiny)`);
   lines.push(`plotshape(a_sx, "✖ Exit Short",  shape.xcross,       location.belowbar, color.new(color.aqua,0),    size=size.tiny)`);
-  lines.push(`// Числовые серии сигналов для экспорта CSV (Data Window only)`);
-  lines.push(`plot(a_le ? 1 : 0, "EL", display=display.data_window)`);
-  lines.push(`plot(a_se ? 1 : 0, "ES", display=display.data_window)`);
-  lines.push(`plot(a_lx ? 1 : 0, "XL", display=display.data_window)`);
-  lines.push(`plot(a_sx ? 1 : 0, "XS", display=display.data_window)`);
+  lines.push(`// Числовые серии для экспорта CSV (Data Window): цены вместо 0/1`);
+  lines.push(`plot(a_le ? entry_price : na, "EL", display=display.data_window)`);
+  lines.push(`plot(a_se ? entry_price : na, "ES", display=display.data_window)`);
+  lines.push(`plot(a_lx ? v_xp_out   : na, "XL", display=display.data_window)`);
+  lines.push(`plot(a_sx ? v_xp_out   : na, "XS", display=display.data_window)`);
 
   const rawCode = lines.join('\n');
   // Фаза 1: исправляем известные ошибки
