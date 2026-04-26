@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>USE Optimizer — Stable Snapshots</title>
+  <title>Версии USE Optimizer</title>
   <style>
     body {
       margin: 0;
@@ -13,11 +13,14 @@
       color: #e5eef8;
     }
     .wrap {
-      max-width: 900px;
+      max-width: 980px;
       margin: 0 auto;
     }
-    h1 {
+    h1, h2 {
       margin-top: 0;
+    }
+    .muted {
+      color: #9fb3c8;
     }
     .card {
       background: #111a2b;
@@ -26,35 +29,85 @@
       padding: 18px;
       margin-top: 18px;
     }
+    .row {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: flex-start;
+      flex-wrap: wrap;
+    }
+    .badge {
+      color: #9fb3c8;
+      font-size: .75em;
+      border: 1px solid #314769;
+      border-radius: 999px;
+      padding: 3px 8px;
+      white-space: nowrap;
+    }
     a {
       color: #7dd3fc;
       text-decoration: none;
     }
-    .muted {
-      color: #9fb3c8;
+    .links {
+      margin-top: 20px;
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
     }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <h1>Stable snapshots</h1>
-    <p class="muted">Отдельные исторические версии для GitHub Pages.</p>
+    <h1>Версии USE Optimizer</h1>
+    <p class="muted">Отдельные страницы для специальных снимков и полного архива по датам.</p>
     <div class="card">
+  <div class="row">
+    <div>
       <h2>stable-2026-03-03</h2>
-      <p>Ближайшая отмеченная стабильная версия примерно двухмесячной давности.</p>
-      <p><a href="./2026-03-03/">Open snapshot</a></p>
+      <div class="muted">Стабильная версия • 2026-03-03</div>
+      <p>Отмеченная стабильная версия.</p>
     </div>
-    <div class="card">
+    <div class="badge">STABLE</div>
+  </div>
+  <p><a href="./2026-03-03/">Открыть версию</a></p>
+</div>
+<div class="card">
+  <div class="row">
+    <div>
       <h2>stable-2026-03-07</h2>
-      <p>Более поздняя стабильная версия из марта 2026.</p>
-      <p><a href="./2026-03-07/">Open snapshot</a></p>
+      <div class="muted">Стабильная версия • 2026-03-07</div>
+      <p>Более поздняя стабильная версия марта.</p>
     </div>
-    <div class="card">
+    <div class="badge">STABLE</div>
+  </div>
+  <p><a href="./2026-03-07/">Открыть версию</a></p>
+</div>
+<div class="card">
+  <div class="row">
+    <div>
       <h2>v6.2.2-before-audit</h2>
-      <p>Снимок рабочей версии прямо перед стабилизационным аудитом.</p>
-      <p><a href="./v6.2.2-before-audit/">Open snapshot</a></p>
+      <div class="muted">Версия перед аудитом • 2026-04-15</div>
+      <p>Отдельный снимок перед аудитом.</p>
     </div>
-    <p><a href="../USE_Optimizer_v6_built.html">Open current version</a></p>
+    <div class="badge">SNAPSHOT</div>
+  </div>
+  <p><a href="./v6.2.2-before-audit/">Открыть версию</a></p>
+</div>
+<div class="card">
+  <div class="row">
+    <div>
+      <h2>Архив по датам</h2>
+      <div class="muted">Последние 2 месяца • 2026-02-26 — 2026-04-26</div>
+      <p>Полный архив по дням, всего 44 страниц.</p>
+    </div>
+    <div class="badge">DAILY</div>
+  </div>
+  <p><a href="./daily/">Открыть версию</a></p>
+</div>
+    <div class="links">
+      <a href="../USE_Optimizer_v6_built.html">Открыть текущую версию</a>
+      
+    </div>
   </div>
 </body>
 </html>
