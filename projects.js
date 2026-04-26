@@ -12,47 +12,68 @@ const ProjectManager = (() => {
   let _projects   = [];
   let _currentId  = null;
   let _db         = null;
+  const _handles  = new Map();
 
   // ─── IndexedDB (for FileSystemDirectoryHandle) ─────────────
 
   async function _openDB() {
     if (_db) return _db;
+    if (typeof indexedDB === 'undefined') throw new Error('IndexedDB unavailable');
     return new Promise((res, rej) => {
+      const tid = setTimeout(() => rej(new Error('IndexedDB open timeout')), 1500);
       const req = indexedDB.open(IDB_NAME, IDB_VER);
       req.onupgradeneeded = e => e.target.result.createObjectStore(IDB_STORE);
-      req.onsuccess  = e => { _db = e.target.result; res(_db); };
-      req.onerror    = e => rej(e.target.error);
+      req.onsuccess  = e => { clearTimeout(tid); _db = e.target.result; res(_db); };
+      req.onerror    = e => { clearTimeout(tid); rej(e.target.error); };
     });
   }
 
   async function _putHandle(id, handle) {
-    const db = await _openDB();
-    return new Promise((res, rej) => {
-      const tx = db.transaction(IDB_STORE, 'readwrite');
-      tx.objectStore(IDB_STORE).put(handle, id);
-      tx.oncomplete = res;
-      tx.onerror    = e => rej(e.target.error);
-    });
+    if (handle) _handles.set(id, handle);
+    try {
+      const db = await _openDB();
+      return await new Promise((res, rej) => {
+        const tx = db.transaction(IDB_STORE, 'readwrite');
+        tx.objectStore(IDB_STORE).put(handle, id);
+        tx.oncomplete = () => res(true);
+        tx.onerror    = e => rej(e.target.error);
+      });
+    } catch(e) {
+      console.warn('[ProjectManager] folder handle was kept for this session only', e);
+      return false;
+    }
   }
 
   async function _getHandle(id) {
-    const db = await _openDB();
-    return new Promise((res, rej) => {
-      const tx  = db.transaction(IDB_STORE, 'readonly');
-      const req = tx.objectStore(IDB_STORE).get(id);
-      req.onsuccess = e => res(e.target.result || null);
-      req.onerror   = e => rej(e.target.error);
-    });
+    if (_handles.has(id)) return _handles.get(id);
+    try {
+      const db = await _openDB();
+      return await new Promise((res, rej) => {
+        const tx  = db.transaction(IDB_STORE, 'readonly');
+        const req = tx.objectStore(IDB_STORE).get(id);
+        req.onsuccess = e => {
+          const handle = e.target.result || null;
+          if (handle) _handles.set(id, handle);
+          res(handle);
+        };
+        req.onerror   = e => rej(e.target.error);
+      });
+    } catch(e) {
+      return null;
+    }
   }
 
   async function _delHandle(id) {
-    const db = await _openDB();
-    return new Promise((res, rej) => {
-      const tx = db.transaction(IDB_STORE, 'readwrite');
-      tx.objectStore(IDB_STORE).delete(id);
-      tx.oncomplete = res;
-      tx.onerror    = e => rej(e.target.error);
-    });
+    _handles.delete(id);
+    try {
+      const db = await _openDB();
+      return await new Promise((res, rej) => {
+        const tx = db.transaction(IDB_STORE, 'readwrite');
+        tx.objectStore(IDB_STORE).delete(id);
+        tx.oncomplete = res;
+        tx.onerror    = e => rej(e.target.error);
+      });
+    } catch(e) {}
   }
 
   // ─── localStorage (project list + current id) ──────────────
@@ -93,9 +114,9 @@ const ProjectManager = (() => {
       lastFile:   null,
       knownFiles: [],
     };
+    await _putHandle(id, dirHandle);
     _projects.unshift(proj);
     _currentId = id;
-    await _putHandle(id, dirHandle);
     _saveLS();
     return proj;
   }
@@ -103,12 +124,6 @@ const ProjectManager = (() => {
   async function switchTo(id) {
     if (!_projects.find(p => p.id === id)) return false;
     _currentId = id;
-    // Keep recently used at top
-    const idx = _projects.findIndex(p => p.id === id);
-    if (idx > 0) {
-      const [proj] = _projects.splice(idx, 1);
-      _projects.unshift(proj);
-    }
     _saveLS();
     return true;
   }
