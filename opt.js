@@ -1204,7 +1204,8 @@ async function runOpt() {
   const useER         = $c('f_er');
   const erThresh      = $n('f_ert') || 0.3;
   const useKalmanMA   = $c('f_kalman');      // ##KALMAN_MA##
-  const kalmanLen     = $n('f_kalmanl') || 20; // ##KALMAN_MA##
+  const kalmanLenArr  = useKalmanMA ? (() => { const a = parseRange('f_kalmanl'); return a.length ? a : [20]; })() : [20]; // ##KALMAN_MA##
+  const kalmanLen     = kalmanLenArr[0] || 20; // ##KALMAN_MA##
   const useEqMA       = $c('f_eq_ma');         // ##EQ_MA_FILTER##
   const eqMAMode      = $v('f_eq_ma_mode') || 'filter'; // ##EQ_MA_FILTER## режим: 'filter' | 'display' | 'both'
   const useMLFilter     = $c('c_ml_filter')      && typeof mlScore     === 'function'; // ##ML_FILTER##
@@ -1683,6 +1684,7 @@ async function runOpt() {
     (stAtrPArr.length||1)*(stMultArr.length||1)*
     (dynSLStructMults.length||1)*(tpAtrLens.length||1)*(tpAtrMults.length||1)*
     (slAtrLens.length||1)*(slAtrMults.length||1)*
+    (kalmanLenArr.length||1)*
     (waitBarsArr.length||1)*(waitRetraceArr.length||1);
 
   // Monte Carlo: shuffle and limit
@@ -1708,6 +1710,7 @@ async function runOpt() {
     (_adxLArr.length||1)*(_sTrendArr.length||1)*
     (tlPvLs.length||1)*(tlPvRs.length||1)*
     (stAtrPArr.length||1)*(stMultArr.length||1)*
+    (kalmanLenArr.length||1)*
     (waitBarsArr.length||1)*(waitRetraceArr.length||1);
     // ── ИДЕЯ 7: Latin Hypercube Sampling — равномерное покрытие пространства
     // Делим [0, realTotal) на mcTotal равных страт, из каждой берём 1 случайную точку.
@@ -1755,6 +1758,7 @@ async function runOpt() {
     (_adxLArr.length||1)*(_sTrendArr.length||1)*
     (tlPvLs.length||1)*(tlPvRs.length||1)*
     (stAtrPArr.length||1)*(stMultArr.length||1)*
+    (kalmanLenArr.length||1)*
     (waitBarsArr.length||1)*(waitRetraceArr.length||1);
     const _mcEffective = Math.min(mcTotal, _mcRealTotal);
     if (_mcRealTotal <= mcTotal) {
@@ -1816,6 +1820,7 @@ async function runOpt() {
       ['eisPeriod',   (Array.isArray(eisPArr) && eisPArr.length > 0) ? eisPArr : [20]],
       ['erPeriod',    (Array.isArray(erPArr) && erPArr.length > 0) ? erPArr : [10]],
       ['kalmanCrossLen', (Array.isArray(kalmanCrossLenArr) && kalmanCrossLenArr.length > 0) ? kalmanCrossLenArr : [20]], // ##KALMAN_CROSS##
+      ['kalmanLen',      (Array.isArray(kalmanLenArr) && kalmanLenArr.length > 0) ? kalmanLenArr : [20]], // ##KALMAN_MA##
       ['pinRatio',       (Array.isArray(pinRatioArr) && pinRatioArr.length > 0) ? pinRatioArr : [2]],
       ['matPeriod',      (Array.isArray(matPArr) && matPArr.length > 0) ? matPArr : [20]],
       ['matZone',        (Array.isArray(matZoneArr) && matZoneArr.length > 0) ? matZoneArr : [0.2]],
@@ -1871,6 +1876,7 @@ async function runOpt() {
       structLen: 20, strPvL: 5, strPvR: 2, volDirPeriod: 10,
       stAtrP: 10, stMult: 3.0, waitBars: 0, waitRetrace: 0.618, eisPeriod: 20, erPeriod: 10,
       kalmanCrossLen: 20, // ##KALMAN_CROSS##
+      kalmanLen: 20, // ##KALMAN_MA##
       pinRatio: 2, matPeriod: 20, matZone: 0.2, tlZonePct: 0.3
     };
     window._ipCombos = [{}];
@@ -2062,6 +2068,7 @@ async function runOpt() {
       const eisPeriod   = _ip.eisPeriod   ?? window._ipDef.eisPeriod;
       const erPeriod    = _ip.erPeriod    ?? window._ipDef.erPeriod;
       const kalmanCrossLen = _ip.kalmanCrossLen ?? window._ipDef.kalmanCrossLen; // ##KALMAN_CROSS##
+      const kalmanLen   = _ip.kalmanLen   ?? window._ipDef.kalmanLen; // ##KALMAN_MA##
       const pinRatio    = _ip.pinRatio    ?? window._ipDef.pinRatio;
       const matPeriod   = _ip.matPeriod   ?? window._ipDef.matPeriod;
       const matZone     = _ip.matZone     ?? window._ipDef.matZone;
@@ -2471,6 +2478,7 @@ async function runOpt() {
       const eisPeriod   = _ip.eisPeriod   ?? window._ipDef.eisPeriod;
       const erPeriod    = _ip.erPeriod    ?? window._ipDef.erPeriod;
       const kalmanCrossLen = _ip.kalmanCrossLen ?? window._ipDef.kalmanCrossLen; // ##KALMAN_CROSS##
+      const kalmanLen   = _ip.kalmanLen   ?? window._ipDef.kalmanLen; // ##KALMAN_MA##
       const pinRatio    = _ip.pinRatio    ?? window._ipDef.pinRatio;
       const matPeriod   = _ip.matPeriod   ?? window._ipDef.matPeriod;
       const matZone     = _ip.matZone     ?? window._ipDef.matZone;
@@ -3172,6 +3180,7 @@ async function runOpt() {
                                     const waitBars    = _ip.waitBars    ?? window._ipDef.waitBars;
                                     const waitRetrace = _ip.waitRetrace ?? window._ipDef.waitRetrace;
                                     const kalmanCrossLen = _ip.kalmanCrossLen ?? window._ipDef.kalmanCrossLen; // ##KALMAN_CROSS##
+                                    const kalmanLen   = _ip.kalmanLen   ?? window._ipDef.kalmanLen; // ##KALMAN_MA##
                                     const pinRatio    = _ip.pinRatio    ?? window._ipDef.pinRatio;
                                     const matPeriod   = _ip.matPeriod   ?? window._ipDef.matPeriod;
                                     const matZone     = _ip.matZone     ?? window._ipDef.matZone;
