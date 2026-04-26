@@ -40,6 +40,7 @@ ui_robust     = open(os.path.join(base, 'ui_robust.js'),   encoding='utf-8').rea
 ui_parse      = open(os.path.join(base, 'ui_parse.js'),    encoding='utf-8').read()
 ui_research  = open(os.path.join(base, 'ui_research.js'),  encoding='utf-8').read()
 ui_changelog = open(os.path.join(base, 'ui_changelog.js'), encoding='utf-8').read()
+ui_versions  = open(os.path.join(base, 'ui_versions.js'),  encoding='utf-8').read()
 pine          = open(os.path.join(base, 'pine_export.js'), encoding='utf-8').read()
 
 # ── ML: model + inference + in-browser training ────────────────────────────
@@ -156,6 +157,9 @@ shell = shell.replace('/* ##PROJECTS## */', projects, 1)
 
 assert '/* ##CHANGELOG## */' in shell, "Placeholder ##CHANGELOG## not found in shell.html"
 shell = shell.replace('/* ##CHANGELOG## */', ui_changelog, 1)
+
+assert '/* ##VERSIONS## */' in shell, "Placeholder ##VERSIONS## not found in shell.html"
+shell = shell.replace('/* ##VERSIONS## */', ui_versions, 1)
 
 assert '/* ##UI## */' in shell, "Placeholder ##UI## not found in shell.html"
 result = shell.replace('/* ##UI## */', ui_built, 1)
