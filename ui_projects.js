@@ -7,13 +7,18 @@
 
 async function setProject(id) {
   if (!id) return;
+  const prevId = ProjectManager.getCurrentId();
   // Save current project state before switching
-  const curId = ProjectManager.getCurrentId();
+  const curId = prevId;
   if (curId && curId !== id) {
     ProjectManager.saveState({ favNs: _favNs }, curId);
   }
 
-  await ProjectManager.switchTo(id);
+  const switched = await ProjectManager.switchTo(id);
+  if (!switched) {
+    toast('Проект не найден', 1800);
+    return;
+  }
   const proj = ProjectManager.getCurrent();
   if (!proj) return;
 
@@ -65,6 +70,7 @@ async function setProject(id) {
 
   // Update UI
   _updateProjBar(proj);
+  _renderProjList();
   renderFavBar();
   const nsEl = document.getElementById('fav-ns-label');
   if (nsEl) nsEl.textContent = _favNs ? _favNs : '';
@@ -100,6 +106,7 @@ async function setProject(id) {
   }
 
   closeProjSwitcher();
+  if (prevId && prevId !== id) toast('Проект открыт: ' + proj.name, 1800);
 }
 
 function _updateProjBar(proj) {
@@ -111,6 +118,7 @@ function _updateProjBar(proj) {
 
 let _projCreateHandle = null;
 let _projCreateFirstLaunch = false;
+let _projCreating = false;
 
 function openCreateProject(firstLaunch) {
   _projCreateHandle = null;
@@ -140,23 +148,58 @@ async function projPickFolder() {
   try {
     _projCreateHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
     document.getElementById('proj-create-folder').textContent = _projCreateHandle.name;
+    toast('Папка выбрана: ' + _projCreateHandle.name, 1200);
+    const name = (document.getElementById('proj-create-name').value || '').trim();
+    if (name) confirmCreateProject();
   } catch(e) { /* user cancelled */ }
 }
 
 async function confirmCreateProject() {
+  if (_projCreating) return;
   const name = (document.getElementById('proj-create-name').value || '').trim();
-  if (!name) { toast('Введи название проекта', 1500); return; }
-  if (!_projCreateHandle) { toast('Выбери папку', 1500); return; }
+  if (!name) { toast('\u0412\u0432\u0435\u0434\u0438 \u043d\u0430\u0437\u0432\u0430\u043d\u0438\u0435 \u043f\u0440\u043e\u0435\u043a\u0442\u0430', 1500); return; }
+  if (!_projCreateHandle) { toast('\u0412\u044b\u0431\u0435\u0440\u0438 \u043f\u0430\u043f\u043a\u0443', 1500); return; }
+
+  const okBtn = document.getElementById('proj-create-ok');
+  if (okBtn) {
+    okBtn.disabled = true;
+    okBtn.textContent = '\u0421\u043e\u0437\u0434\u0430\u044e...';
+  }
+  _projCreating = true;
 
   // Snapshot current template
   const templateSnapshot = templates.find(t => t.isDefault) || null;
 
-  const proj = await ProjectManager.create(name, _projCreateHandle, templateSnapshot);
-  // Force close even if firstLaunch (guard in closeProjCreate would block it)
-  _projCreateFirstLaunch = false;
-  closeProjCreate();
-  await setProject(proj.id);
-  toast('✅ Проект создан: ' + name, 2000);
+  try {
+    const proj = await ProjectManager.create(name, _projCreateHandle, templateSnapshot);
+    _updateProjBar(proj);
+    _renderProjList();
+    favourites = [];
+    results = [];
+    equities = {};
+    DATA = null;
+    _rawDATA = null;
+    _rawDataInfo = '';
+    if ($('finfo')) $('finfo').textContent = 'Нет данных';
+    if ($('tb')) $('tb').innerHTML = '';
+    if ($('rbtn')) $('rbtn').disabled = true;
+    renderFavBar();
+    toast('\u041f\u0440\u043e\u0435\u043a\u0442 \u0441\u043e\u0437\u0434\u0430\u043d: ' + name, 2200);
+
+    // Force close even if firstLaunch (guard in closeProjCreate would block it)
+    _projCreateFirstLaunch = false;
+    closeProjCreate();
+    setProject(proj.id).catch(e => console.warn('[confirmCreateProject] delayed project load failed', e));
+  } catch(e) {
+    console.error('[confirmCreateProject] create failed', e);
+    toast('\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0441\u043e\u0437\u0434\u0430\u0442\u044c \u043f\u0440\u043e\u0435\u043a\u0442', 2500);
+  } finally {
+    if (okBtn) {
+      okBtn.disabled = false;
+      okBtn.textContent = '\u0421\u043e\u0437\u0434\u0430\u0442\u044c';
+    }
+    _projCreating = false;
+  }
 }
 
 // ── Switch project ─────────────────────────────────────────────
@@ -254,5 +297,3 @@ async function refreshProjectFiles() {
     toast('🔄 Данные обновлены: ' + files[0].name, 2000);
   }
 }
-
-
