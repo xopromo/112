@@ -1280,8 +1280,7 @@ function _getFavAsResults() {
     dwr: f.stats.dwr||0, avg: f.stats.avg||0,
     p1: f.stats.p1||0, p2: f.stats.p2||0,
     robScore: f.stats.robScore, robMax: f.stats.robMax,
-    robDetails: f.stats.robDetails,
-    old_eq: f.stats.old_eq, new_eq: f.stats.new_eq // полный график из OOS
+    robDetails: f.stats.robDetails
   }));
 }
 

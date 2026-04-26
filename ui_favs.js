@@ -26,6 +26,14 @@ function _validateFavourites() {
 
 // Синхронное сохранение избранных в localStorage
 // (используется вместо storeSave для гарантированного сохранения)
+function _compactFavouriteEntry(entry) {
+  if (!entry || !entry.stats || typeof entry.stats !== 'object') return entry;
+  delete entry.stats.eq;
+  delete entry.stats.old_eq;
+  delete entry.stats.new_eq;
+  return entry;
+}
+
 function _saveFavsSync() {
   const key = _favKey();
 
@@ -43,6 +51,7 @@ function _saveFavsSync() {
 
   try {
     // Сериализуем данные
+    favourites.forEach(_compactFavouriteEntry);
     const serialized = JSON.stringify(favourites);
     const sizeKB = (serialized.length / 1024).toFixed(1);
 
@@ -135,10 +144,10 @@ function toggleFav(idx, event, startLevel) {
       sortino:r.sortino, kRatio:r.kRatio, sqn:r.sqn,
       omega:r.omega, pain:r.pain, burke:r.burke, serenity:r.serenity, ir:r.ir,
       cpcvScore:r.cpcvScore,
-      eq:r.eq,
       old_eq:r.old_eq, new_eq:r.new_eq, // для полного OOS графика в режиме Избранное
       robScore:r.robScore, robMax:r.robMax, robDetails:r.robDetails
     }, cfg:r.cfg, ts:Date.now() };
+    _compactFavouriteEntry(favEntry);
     favourites.push(favEntry);
     console.log('[toggleFav] добавлено новое избранное:', r.name, 'всего в массиве:', favourites.length);
     // Асинхронно запустить быстрый тест устойчивости для нового избранного

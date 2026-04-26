@@ -1743,9 +1743,7 @@ tr.sel td { background: rgba(0,212,255,0.12) !important; outline: 1px solid rgba
       <button class="tbl-mode-btn" id="btn-tbl-tpl" onclick="openTableTplPopover()" title="Шаблоны фильтров — сохранить текущие фильтры / быстро применить сохранённый набор" style="border-color:var(--accent2);color:var(--accent)">💾 Наборы фильтров ▾</button>
     </div>
     <button class="tbl-mode-btn" onclick="_downloadSources()" title="Скачать исходные файлы: core.js, opt.js, ui.js, shell.html, build.py, README.md">⬇ Исходники</button>
-    <button class="tbl-mode-btn" onclick="_showStorageDiagnostic()" title="Диагностика хранилища: размер CSV кэшей, очистка, управление памятью">💾 Диагностика</button>
-<button class="tbl-mode-btn" onclick="openVersionsModal()" title="Версии — список снимков по датам и быстрые ссылки на отдельные страницы">🗂 Версии</button>
-<button class="tbl-mode-btn" onclick="openChangelogModal()" title="История изменений — все версии, исправления, новые функции">📋 История</button>
+    <button class="tbl-mode-btn" onclick="openChangelogModal()" title="История изменений — все версии, исправления, новые функции">📋 История</button>
     <button class="tbl-mode-btn" id="btn-ml-scan" onclick="openMLModal()" title="ML-модели: обучить / управлять / скан сигналов" style="border-color:rgba(139,92,246,.5);color:var(--purple)">🤖 ML</button>
     <button class="tbl-mode-btn" id="btn-research" onclick="openResearchModal()" title="Анализ результатов: корреляции, аномалии, кластеры, факторы" style="border-color:rgba(166,227,161,.5);color:#a6e3a1">📊 Research</button>
     <a class="tbl-mode-btn" href="comparator.html" target="_blank" title="Сравни два периода CSV: что стабильно, что изменилось — Hurst, пивоты, волатильность, сигналы" style="border-color:rgba(137,220,235,.4);color:var(--accent);text-decoration:none">📊 Comparator</a>
@@ -10042,22 +10040,8 @@ function generatePineScript(r, mode = 'indicator') {
   lines.push(`// Конфиг: ${r.name}`);
   lines.push(`// PnL: ${r.pnl.toFixed(1)}%  WR: ${r.wr.toFixed(1)}%  Сделок: ${r.n}  DD: ${r.dd.toFixed(1)}%`);
   lines.push(`// ============================================================`);
-  lines.push(`// 🔄 СИНХРОНИЗАЦИЯ ПАРАМЕТРОВ (скопируй в USE Optimizer)`);
-  lines.push(`// При изменении параметров ниже в Pine: скопируй блок CFG JSON и импортируй в Optimizer`);
-  lines.push(`// Меню: 📂 Импорт → Вставь текст → ✅ Применить`);
-  const cfgExport = {
-    useTrail: c.useTrail || false, trTrig: c.trTrig || 1, trDist: c.trDist || 0.5,
-    useBE: c.useBE || false, beTrig: c.beTrig || 1, beOff: c.beOff || 0,
-    useAdaptiveTP: c.useAdaptiveTP || false, tpAtrLen: c.tpAtrLen || 20, tpAtrMult: c.tpAtrMult || 1.0,
-    useAdaptiveSL: c.useAdaptiveSL || false, slAtrLen: c.slAtrLen || 20, slAtrMult: c.slAtrMult || 0.5,
-    useWickTrail: c.useWickTrail || false, wickOffType: c.wickOffType || 'atr', wickMult: c.wickMult || 1.0
-  };
-  lines.push(`// --- CFG JSON ---`);
-  const cfgJson = JSON.stringify(cfgExport, null, 2).split('\n');
-  cfgJson.forEach(line => lines.push(`// ${line}`));
-  lines.push(`// --- /CFG JSON ---`);
   if (mode === 'strategy') {
-    lines.push(`strategy("USE [${r.name}]", shorttitle="USE_STR", overlay=true, commission_type=strategy.commission.percent, commission_value=${comm.toFixed(4)}, initial_capital=10000, default_qty_type=strategy.percent_of_equity, default_qty_value=100, pyramiding=0, process_orders_on_close=true, calc_on_order_fills=true, calc_on_every_tick=true, max_lines_count=500, max_labels_count=500, max_boxes_count=500)`);
+    lines.push(`strategy("USE [${r.name}]", shorttitle="USE_STR", overlay=true, commission_type=strategy.commission.percent, commission_value=${comm.toFixed(4)}, initial_capital=10000, default_qty_type=strategy.percent_of_equity, default_qty_value=100, pyramiding=0, process_orders_on_close=true, max_lines_count=500, max_labels_count=500, max_boxes_count=500)`);
   } else {
     lines.push(`indicator("USE [${r.name}]", shorttitle="USE_EXP", overlay=true, max_lines_count=500, max_labels_count=500, max_boxes_count=500)`);
   }
@@ -10248,20 +10232,20 @@ function generatePineScript(r, mode = 'indicator') {
   lines.push(`sig_ex_mode     = input.string("${c.revMode||'any'}", "Режим выхода (any/plus/minus)", options=["any","plus","minus"], group=grp_exit)`);
   lines.push(`use_time_ex = input.bool(${b(c.useTime)}, "Выход по времени", group=grp_exit)`);
   lines.push(`max_bars_in = input.int(${Math.max(2, c.timeBars||50)}, "Макс баров в сделке", minval=2, maxval=500, group=grp_exit)`);
-  lines.push(`use_climax  = input.bool(${b(c.useClimax && c.clxMode !== 'any')}, "Climax выход (только в плюс)", group=grp_exit)`);
-  lines.push(`use_clx_any = input.bool(${b(c.useClimax && c.clxMode === 'any')}, "Climax± (любой)", group=grp_exit)`);
+  lines.push(`use_climax  = input.bool(${b(c.useClimax)}, "Climax выход (только в плюс)", group=grp_exit)`);
+  lines.push(`use_clx_any = input.bool(false, "Climax± (любой)", group=grp_exit)`);
   lines.push(`use_st_exit = input.bool(${b(c.useStExit)}, "Supertrend-выход (смена тренда против позиции)", group=grp_exit)`);
   lines.push(``);
 
   // ===== АДАПТИВНЫЕ TP/SL И KELLY CRITERION =====
   lines.push(`grp_adapt = "⚡ АДАПТИВНЫЕ TP/SL (ATR-зависимые)"`);
-  lines.push(`use_adaptive = input.bool(${b(c.useAdaptive || false)}, "Включить адаптивный режим", group=grp_adapt)`);
-  lines.push(`use_adaptive_tp = input.bool(${b(c.useAdaptiveTP || false)}, "Адаптивный TP (зависит от ATR)", group=grp_adapt, active=use_adaptive)`);
-  lines.push(`tp_atr_len  = input.int(${c.tpAtrLen || 20}, "Период ATR для TP", minval=5, maxval=100, group=grp_adapt, active=use_adaptive_tp)`);
-  lines.push(`tp_atr_mult = input.float(${f(c.tpAtrMult || 1.0, 1)}, "Множитель ATR→TP", step=0.1, tooltip="Как сильно TP реагирует на рост ATR", group=grp_adapt, active=use_adaptive_tp)`);
-  lines.push(`use_adaptive_sl = input.bool(${b(c.useAdaptiveSL || false)}, "Адаптивный SL (зависит от ATR)", group=grp_adapt, active=use_adaptive)`);
-  lines.push(`sl_atr_len  = input.int(${c.slAtrLen || 20}, "Период ATR для SL", minval=5, maxval=100, group=grp_adapt, active=use_adaptive_sl)`);
-  lines.push(`sl_atr_mult = input.float(${f(c.slAtrMult || 0.5, 1)}, "Множитель ATR→SL", step=0.1, tooltip="Как SL реагирует на ATR", group=grp_adapt, active=use_adaptive_sl)`);
+  lines.push(`use_adaptive = input.bool(false, "Включить адаптивный режим", group=grp_adapt)`);
+  lines.push(`use_adaptive_tp = input.bool(false, "Адаптивный TP (зависит от ATR)", group=grp_adapt, active=use_adaptive)`);
+  lines.push(`tp_atr_len  = input.int(20, "Период ATR для TP", minval=5, maxval=100, group=grp_adapt, active=use_adaptive_tp)`);
+  lines.push(`tp_atr_mult = input.float(1.0, "Множитель ATR→TP", step=0.1, tooltip="Как сильно TP реагирует на рост ATR", group=grp_adapt, active=use_adaptive_tp)`);
+  lines.push(`use_adaptive_sl = input.bool(false, "Адаптивный SL (зависит от ATR)", group=grp_adapt, active=use_adaptive)`);
+  lines.push(`sl_atr_len  = input.int(20, "Период ATR для SL", minval=5, maxval=100, group=grp_adapt, active=use_adaptive_sl)`);
+  lines.push(`sl_atr_mult = input.float(0.5, "Множитель ATR→SL", step=0.1, tooltip="Как SL реагирует на ATR", group=grp_adapt, active=use_adaptive_sl)`);
   lines.push(``);
 
   lines.push(`grp_kelly = "🎯 KELLY CRITERION (размер позиции)"`);
@@ -10274,8 +10258,8 @@ function generatePineScript(r, mode = 'indicator') {
   lines.push(``);
 
   lines.push(`grp_dynsl = "🏗️ ДИНАМИЧЕСКИЙ SL (по структуре)"`);
-  lines.push(`use_dynsl_struct = input.bool(${b(c.useDynSLStruct || false)}, "Сжимать SL при нарушении структуры", group=grp_dynsl)`);
-  lines.push(`dynsl_struct_mult = input.float(${f(c.dynSLStructMult || 0.3, 1)}, "Коэффициент сжатия SL", minval=0.1, maxval=0.9, step=0.1, group=grp_dynsl, active=use_dynsl_struct, tooltip="0.3 = SL × 0.3 при нарушении структуры")`);
+  lines.push(`use_dynsl_struct = input.bool(false, "Сжимать SL при нарушении структуры", group=grp_dynsl)`);
+  lines.push(`dynsl_struct_mult = input.float(0.3, "Коэффициент сжатия SL", minval=0.1, maxval=0.9, step=0.1, group=grp_dynsl, active=use_dynsl_struct, tooltip="0.3 = SL × 0.3 при нарушении структуры")`);
   lines.push(``);
 
   // Delayed entry
@@ -10295,10 +10279,6 @@ function generatePineScript(r, mode = 'indicator') {
   lines.push(`spread_pct = input.float(${f(spread,3)}, "Спред %", step=0.05, group=grp_strat)`);
   lines.push(`atr_len    = input.int(${atrP}, "Период ATR", group=grp_strat)`);
   lines.push(`atr_step   = input.int(2, "Шаг вариаций ATR", group=grp_strat)`);
-  lines.push(``);
-
-  lines.push(`grp_sync = "🔄 СИНХРОНИЗАЦИЯ"`);
-  lines.push(`display_params = input.bool(true, "Показать таблицу параметров", group=grp_sync, tooltip="Выключи для чистого графика")`);
   // Align max_bars with optimizer's dataset: subtract MA/confirm warmup so TV starts from same bar
   const _maTypeW    = c.useMA      ? (c.maType   || 'EMA') : '';
   const _confTypeW  = c.useConfirm ? (c.confMatType || c.confType || 'WMA') : '';
@@ -11101,7 +11081,7 @@ function generatePineScript(r, mode = 'indicator') {
   lines.push(`                            _dsl := ns`);
   lines.push(`            // Wick Trailing SL`);
   lines.push(`            if use_wick_trail and _in`);
-  lines.push(`                float _woff = wick_off_type == "pct" ? close * wick_mult / 100 : wick_off_type == "pts" ? wick_mult : _u * wick_mult`);
+  lines.push(`                float _woff = wick_off_type == "pct" ? close[1] * wick_mult / 100 : wick_off_type == "pts" ? wick_mult : _u * wick_mult`);
   lines.push(`                float _wraw = _dir == 1 ? low[1] - _woff : high[1] + _woff`);
   lines.push(`                if na(_wsl)`);
   lines.push(`                    _wsl := _wraw`);
@@ -11199,7 +11179,7 @@ function generatePineScript(r, mode = 'indicator') {
     lines.push(`                    _sig_skip := 0`);
     lines.push(`                    _cd_bar := -1`);
   lines.push(`                    _dsl := _sl_over > 0 ? (entry_price - _ac * _sl_ov) : calc_sl_level(1, entry_price, _ac, struct_bull)`);
-  lines.push(`                    float sl_d = na(_dsl) ? _ac : math.abs(entry_price - _dsl)`);
+  lines.push(`                    float sl_d = math.abs(entry_price - _dsl)`);
   lines.push(`                    _dtp := _tp_over > 0 ? (entry_price + _ac * _tp_ov) : calc_tp_level(1, entry_price, _ac, sl_d)`);
   lines.push(`                    _eb := bar_index`);
   lines.push(`                else if _do_dir == -1`);
@@ -11212,7 +11192,7 @@ function generatePineScript(r, mode = 'indicator') {
     lines.push(`                    _sig_skip := 0`);
     lines.push(`                    _cd_bar := -1`);
   lines.push(`                    _dsl := _sl_over > 0 ? (entry_price + _ac * _sl_ov) : calc_sl_level(-1, entry_price, _ac, struct_bear)`);
-  lines.push(`                    float sl_d = na(_dsl) ? _ac : math.abs(entry_price - _dsl)`);
+  lines.push(`                    float sl_d = math.abs(entry_price - _dsl)`);
   lines.push(`                    _dtp := _tp_over > 0 ? (entry_price - _ac * _tp_ov) : calc_tp_level(-1, entry_price, _ac, sl_d)`);
   lines.push(`                    _eb := bar_index`);
   lines.push(`    float _wr1 = _cnt1 > 0 ? _wins1 * 100.0 / _cnt1 : 0.0`);
@@ -11402,7 +11382,7 @@ function generatePineScript(r, mode = 'indicator') {
   lines.push(`                        v_sl := ns`);
   lines.push(`        // Wick Trailing SL`);
   lines.push(`        if use_wick_trail and v_in`);
-  lines.push(`            float _woff_v = wick_off_type == "pct" ? close * wick_mult / 100 : wick_off_type == "pts" ? wick_mult : _u * wick_mult`);
+  lines.push(`            float _woff_v = wick_off_type == "pct" ? close[1] * wick_mult / 100 : wick_off_type == "pts" ? wick_mult : _u * wick_mult`);
   lines.push(`            float _wraw_v = v_dir == 1 ? low[1] - _woff_v : high[1] + _woff_v`);
   lines.push(`            if na(v_wsl)`);
   lines.push(`                v_wsl := _wraw_v`);
@@ -11543,7 +11523,7 @@ function generatePineScript(r, mode = 'indicator') {
   lines.push(`            float _u = atr_v[1]`);
   lines.push(`            bool struct_ok = v_dir == 1 ? struct_bull : struct_bear`);
   lines.push(`            v_sl := calc_sl_level(v_dir, entry_price, _u, struct_ok)`);
-  lines.push(`            float sl_d = na(v_sl) ? _u : math.abs(entry_price - v_sl)`);
+  lines.push(`            float sl_d = math.abs(entry_price - v_sl)`);
   lines.push(`            v_tp := calc_tp_level(v_dir, entry_price, _u, sl_d)`);
   lines.push(`            v_eb := bar_index`);
   lines.push(`            string _emsg_txt_l  = "LONG @" + str.tostring(entry_price,"#.######") + " SL:" + str.tostring(v_sl,"#.######") + " TP:" + str.tostring(v_tp,"#.######")`);
@@ -11636,7 +11616,7 @@ function generatePineScript(r, mode = 'indicator') {
     lines.push(`        s_dir     := s_do_dir`);
     lines.push(`        bool s_struct_ok = s_dir == 1 ? struct_bull : struct_bear`);
     lines.push(`        s_sl      := calc_sl_level(s_dir, s_ep, _u, s_struct_ok)`);
-    lines.push(`        float _sl_d = na(s_sl) ? _u : math.abs(s_ep - s_sl)`);
+    lines.push(`        float _sl_d = math.abs(s_ep - s_sl)`);
     lines.push(`        s_tp      := calc_tp_level(s_dir, s_ep, _u, _sl_d)`);
     lines.push(`        s_ep_bar  := bar_index`);
     lines.push(`        s_tra     := false`);
@@ -11681,28 +11661,12 @@ function generatePineScript(r, mode = 'indicator') {
     lines.push(`                if ns < s_sl`);
     lines.push(`                    s_sl    := ns`);
     lines.push(`                    _sl_upd := true`);
-    lines.push(`    // Wick Trailing SL: ratchet stop по фитилю предыдущей свечи`);
-    lines.push(`    if use_wick_trail`);
-    lines.push(`        float _woff_s = wick_off_type == "pct" ? close * wick_mult / 100 : wick_off_type == "pts" ? wick_mult : _u * wick_mult`);
-    lines.push(`        float _wraw_s = s_dir == 1 ? low[1] - _woff_s : high[1] + _woff_s`);
-    lines.push(`        if na(s_wsl)`);
-    lines.push(`            s_wsl := _wraw_s`);
-    lines.push(`        else`);
-    lines.push(`            s_wsl := s_dir == 1 ? math.max(s_wsl, _wraw_s) : math.min(s_wsl, _wraw_s)`);
-    lines.push(`        float _new_s_sl = na(s_sl) ? s_wsl : (s_dir == 1 ? math.max(s_sl, s_wsl) : math.min(s_sl, s_wsl))`);
-    lines.push(`        if _new_s_sl != s_sl`);
-    lines.push(`            s_sl    := _new_s_sl`);
-    lines.push(`            _sl_upd := true`);
     lines.push(`    // Re-register exit order when stop updated`);
     lines.push(`    if _sl_upd`);
     lines.push(`        if s_dir == 1`);
     lines.push(`            strategy.exit("LX", "L", stop=s_sl, limit=s_tp)`);
     lines.push(`        else`);
     lines.push(`            strategy.exit("SX", "S", stop=s_sl, limit=s_tp)`);
-    lines.push(`    // Match optimizer precedence: if SL/TP is touched on this bar,`);
-    lines.push(`    // let strategy.exit handle the fill and do not override it with strategy.close.`);
-    lines.push(`    bool s_hit_sl = s_dir == 1 ? (not na(s_sl) and low <= s_sl) : (not na(s_sl) and high >= s_sl)`);
-    lines.push(`    bool s_hit_tp = s_dir == 1 ? (not na(s_tp) and high >= s_tp) : (not na(s_tp) and low <= s_tp)`);
     lines.push(`    // Signal exit`);
     lines.push(`    float s_cpnl = s_dir == 1 ? (close - s_ep) / s_ep * 100 : (s_ep - close) / s_ep * 100`);
     lines.push(`    bool s_frc = false`);
@@ -11738,7 +11702,7 @@ function generatePineScript(r, mode = 'indicator') {
     lines.push(`            s_frc := true`);
     lines.push(`    if use_time_ex and (bar_index - s_ep_bar) >= max_bars_in and not s_frc`);
     lines.push(`        s_frc := true`);
-    lines.push(`    if s_frc and not s_hit_sl and not s_hit_tp`);
+    lines.push(`    if s_frc`);
     lines.push(`        if s_dir == 1`);
     lines.push(`            strategy.close("L")`);
     lines.push(`        else`);
@@ -11824,27 +11788,6 @@ function generatePineScript(r, mode = 'indicator') {
   lines.push(`        table.merge_cells(t, 0, 17, 5, 17)`);
   lines.push(``);
   } // end if (mode === 'indicator') — stats table
-
-  // ── ПАРАМЕТРЫ ВЫХОДОВ (таблица синхронизации) ──
-  if (mode === 'indicator') {
-    lines.push(`// ==========================================`);
-    lines.push(`// 7a. ПАРАМЕТРЫ ВЫХОДОВ (для синхронизации)`);
-    lines.push(`// ==========================================`);
-    lines.push(`if display_params`);
-    lines.push(`    tp = table.new(position=position.top_right, rows=4, columns=2, bgcolor=color.new(color.gray,80), border_color=color.gray, border_width=1, frame_color=color.gray)`);
-    lines.push(`    table.cell(tp, 0, 0, "Параметр", bgcolor=color.new(color.blue,40), text_color=color.white, text_size=size.small)`);
-    lines.push(`    table.cell(tp, 1, 0, "Значение", bgcolor=color.new(color.blue,40), text_color=color.white, text_size=size.small)`);
-    lines.push(`    row = 1`);
-    lines.push(`    table.cell(tp, 0, row, "🔄 Trailing: " + (use_trail ? "✅" : "❌"), text_size=size.small)`);
-    lines.push(`    table.cell(tp, 1, row, use_trail ? str.format("T:{0} D:{1}", str.tostring(trail_trig,"#.#"), str.tostring(trail_dist,"#.#")) : "ВЫКЛ", text_size=size.small)`);
-    lines.push(`    row := row + 1`);
-    lines.push(`    table.cell(tp, 0, row, "🔒 BE: " + (use_be ? "✅" : "❌"), text_size=size.small)`);
-    lines.push(`    table.cell(tp, 1, row, use_be ? str.format("T:{0} O:{1}", str.tostring(be_trig,"#.#"), str.tostring(be_offset,"#.#")) : "ВЫКЛ", text_size=size.small)`);
-    lines.push(`    row := row + 1`);
-    lines.push(`    table.cell(tp, 0, row, "⚡ Adapt TP/SL", text_size=size.small)`);
-    const adaptStr = `(use_adaptive_tp or use_adaptive_sl) ? str.format("TP:{0} SL:{1}", use_adaptive_tp ? "✅" : "❌", use_adaptive_sl ? "✅" : "❌") : "ВЫКЛ"`;
-    lines.push(`    table.cell(tp, 1, row, ${adaptStr}, text_size=size.small)`);
-  }
 
   // ── ALERTS ───────────────────────────────────────────────
   lines.push(`// ==========================================`);
@@ -16770,7 +16713,7 @@ function backtest(pvLo, pvHi, atrArr, cfg) {
             ? DATA[i].c * cfg.wickMult / 100
             : cfg.wickOffType === 'pts'
               ? cfg.wickMult  // Points: абсолютное значение цены (как в Pine)
-              : atrArr[i-1] * cfg.wickMult; // ATR (default) — матчим Pine _u = atr_v[1]
+              : atrArr[i] * cfg.wickMult; // ATR (default)
           const wickRaw = dir === 1
             ? DATA[i-1].l - wickOffset   // Long: ниже нижнего фитиля предыдущей свечи
             : DATA[i-1].h + wickOffset;  // Short: выше верхнего фитиля
@@ -23294,14 +23237,6 @@ function _validateFavourites() {
 
 // Синхронное сохранение избранных в localStorage
 // (используется вместо storeSave для гарантированного сохранения)
-function _compactFavouriteEntry(entry) {
-  if (!entry || !entry.stats || typeof entry.stats !== 'object') return entry;
-  delete entry.stats.eq;
-  delete entry.stats.old_eq;
-  delete entry.stats.new_eq;
-  return entry;
-}
-
 function _saveFavsSync() {
   const key = _favKey();
 
@@ -23319,7 +23254,6 @@ function _saveFavsSync() {
 
   try {
     // Сериализуем данные
-    favourites.forEach(_compactFavouriteEntry);
     const serialized = JSON.stringify(favourites);
     const sizeKB = (serialized.length / 1024).toFixed(1);
 
@@ -23331,7 +23265,7 @@ function _saveFavsSync() {
         // Обработка конкретной ошибки хранилища
         if (storageErr.name === 'QuotaExceededError') {
           console.error(`[_saveFavsSync] 💾 localStorage переполнен! Ключ: ${k}, размер: ${sizeKB} KB`);
-          toast('❌ Хранилище заполнено. Клик → 💾 Диагностика хранилища (главное меню)', 5000);
+          toast('❌ Ошибка: хранилище переполнено. Удалите старые CSV кэши в Application→Storage.', 4000);
           return false;
         }
         throw storageErr;
@@ -23412,10 +23346,10 @@ function toggleFav(idx, event, startLevel) {
       sortino:r.sortino, kRatio:r.kRatio, sqn:r.sqn,
       omega:r.omega, pain:r.pain, burke:r.burke, serenity:r.serenity, ir:r.ir,
       cpcvScore:r.cpcvScore,
+      eq:r.eq,
       old_eq:r.old_eq, new_eq:r.new_eq, // для полного OOS графика в режиме Избранное
       robScore:r.robScore, robMax:r.robMax, robDetails:r.robDetails
     }, cfg:r.cfg, ts:Date.now() };
-    _compactFavouriteEntry(favEntry);
     favourites.push(favEntry);
     console.log('[toggleFav] добавлено новое избранное:', r.name, 'всего в массиве:', favourites.length);
     // Асинхронно запустить быстрый тест устойчивости для нового избранного
@@ -23887,44 +23821,6 @@ function openParseModal() {
 function closeParseModal() { $('parse-overlay').classList.remove('open'); }
 
 function parseTextToSettings(text) {
-  // ── РЕЖИМ -2: JSON блок из комментариев Pine скрипта (// ... JSON ... //) ──
-  // Ищем блок --- CFG JSON --- в комментариях: каждая строка начинается с //
-  const _pineCommentMatch = text.match(/\/\/\s*---\s*CFG JSON\s*---[\s\S]*?\/\/\s*---\s*\/CFG JSON\s*---/);
-  if (_pineCommentMatch) {
-    const commentBlock = _pineCommentMatch[0];
-    const jsonLines = commentBlock.split('\n')
-      .filter(line => line.trim().startsWith('//'))
-      .map(line => line.replace(/^\s*\/\/\s?/, ''))
-      .join('\n');
-    const cleanJson = jsonLines
-      .replace(/^---\s*CFG JSON\s*---/, '')
-      .replace(/---\s*\/CFG JSON\s*---$/, '')
-      .trim();
-    try {
-      const j = JSON.parse(cleanJson);
-      if (j && typeof j === 'object') {
-        const ch = [];
-        // Парсим параметры выходов (useTrail, useBE, useAdaptiveTP/SL)
-        if (j.useTrail !== undefined) ch.push({ id: 'x_tr', value: j.useTrail, type: 'chk', label: `Trailing: ${j.useTrail?'✅':'❌'}` });
-        if (j.trTrig !== undefined) ch.push({ id: 'x_trt', value: String(j.trTrig), type: 'val', label: `Trail Trig=${j.trTrig}` });
-        if (j.trDist !== undefined) ch.push({ id: 'x_trd', value: String(j.trDist), type: 'val', label: `Trail Dist=${j.trDist}` });
-        if (j.useBE !== undefined) ch.push({ id: 'x_be', value: j.useBE, type: 'chk', label: `BE: ${j.useBE?'✅':'❌'}` });
-        if (j.beTrig !== undefined) ch.push({ id: 'x_bet', value: String(j.beTrig), type: 'val', label: `BE Trig=${j.beTrig}` });
-        if (j.beOff !== undefined) ch.push({ id: 'x_beo', value: String(j.beOff), type: 'val', label: `BE Off=${j.beOff}` });
-        if (j.useAdaptiveTP !== undefined) ch.push({ id: 'x_adaptive_tp', value: j.useAdaptiveTP, type: 'chk', label: `Adaptive TP: ${j.useAdaptiveTP?'✅':'❌'}` });
-        if (j.tpAtrLen !== undefined) ch.push({ id: 'x_tp_atr_len', value: String(j.tpAtrLen), type: 'val', label: `TP ATR Len=${j.tpAtrLen}` });
-        if (j.tpAtrMult !== undefined) ch.push({ id: 'x_tp_atr_mult', value: String(j.tpAtrMult), type: 'val', label: `TP ATR Mult=${j.tpAtrMult}` });
-        if (j.useAdaptiveSL !== undefined) ch.push({ id: 'x_adaptive_sl', value: j.useAdaptiveSL, type: 'chk', label: `Adaptive SL: ${j.useAdaptiveSL?'✅':'❌'}` });
-        if (j.slAtrLen !== undefined) ch.push({ id: 'x_sl_atr_len', value: String(j.slAtrLen), type: 'val', label: `SL ATR Len=${j.slAtrLen}` });
-        if (j.slAtrMult !== undefined) ch.push({ id: 'x_sl_atr_mult', value: String(j.slAtrMult), type: 'val', label: `SL ATR Mult=${j.slAtrMult}` });
-        if (j.useWickTrail !== undefined) ch.push({ id: 'x_wt', value: j.useWickTrail, type: 'chk', label: `Wick Trail: ${j.useWickTrail?'✅':'❌'}` });
-        if (j.wickOffType !== undefined) document.getElementById('x_wt_type').value = j.wickOffType;
-        if (j.wickMult !== undefined) ch.push({ id: 'x_wt_mult', value: String(j.wickMult), type: 'val', label: `Wick Mult=${j.wickMult}` });
-        if (ch.length) return ch;
-      }
-    } catch(e) { /* не JSON блок в комментариях, переходим к следующему режиму */ }
-  }
-
   // ── РЕЖИМ -1: Comparator JSON формат ({apply:{...}, hints:[...], meta:{...}}) ──
   try {
     const _cmpJson = JSON.parse(text.trim());
@@ -25723,7 +25619,8 @@ function _getFavAsResults() {
     dwr: f.stats.dwr||0, avg: f.stats.avg||0,
     p1: f.stats.p1||0, p2: f.stats.p2||0,
     robScore: f.stats.robScore, robMax: f.stats.robMax,
-    robDetails: f.stats.robDetails
+    robDetails: f.stats.robDetails,
+    old_eq: f.stats.old_eq, new_eq: f.stats.new_eq // полный график из OOS
   }));
 }
 
@@ -26224,124 +26121,6 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   });
 });
-
-// ════════════════════════════════════════════════════════════
-// ДИАГНОСТИКА И ОЧИСТКА ХРАНИЛИЩА
-// ════════════════════════════════════════════════════════════
-function _getStorageInfo() {
-  const info = {};
-  let totalBytes = 0;
-  const csvKeys = [];
-
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    const val = localStorage.getItem(key);
-    if (!val) continue;
-
-    const bytes = new Blob([val]).size;
-    info[key] = { bytes, kb: (bytes / 1024).toFixed(1) };
-    totalBytes += bytes;
-
-    if (key.startsWith('use6_csv_')) csvKeys.push(key);
-  }
-
-  return { info, totalBytes, totalMB: (totalBytes / 1024 / 1024).toFixed(2), csvKeys };
-}
-
-// Показать диагностику хранилища
-function _showStorageDiagnostic() {
-  const { info, totalBytes, totalMB, csvKeys } = _getStorageInfo();
-  const html = `<div style="position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px" onclick="if(event.target===this)document.getElementById('storage-diag-overlay')?.remove()">
-  <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:20px;width:100%;max-width:700px;max-height:80vh;overflow-y:auto" id="storage-diag-overlay">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-      <h2 style="margin:0;color:var(--accent);font-size:.95em">💾 Диагностика хранилища</h2>
-      <button onclick="document.getElementById('storage-diag-overlay')?.remove()" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:1.2em">✕</button>
-    </div>
-
-    <div style="padding:12px;background:var(--bg3);border-radius:4px;margin-bottom:16px;font-size:.8em;color:var(--text2)">
-      <div>📊 Всего: <strong style="color:var(--accent)">${totalMB} МБ</strong> из ~5 МБ (лимит браузера)</div>
-      <div style="margin-top:4px">⚠️ Если > 4 МБ: удалите старые CSV кэши ниже</div>
-    </div>
-
-    <div style="margin-bottom:16px">
-      <div style="color:var(--accent);font-weight:600;margin-bottom:8px;font-size:.85em">🗑️ CSV кэши (${csvKeys.length})</div>
-      ${csvKeys.length > 0 ? `
-        <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px">
-          ${csvKeys.map(k => `
-            <div style="display:flex;justify-content:space-between;align-items:center;padding:6px;background:var(--bg2);border-radius:3px;border-left:3px solid var(--red);font-size:.75em">
-              <span style="color:var(--text2);flex:1">${k}</span>
-              <span style="color:var(--text3);margin:0 8px">${info[k].kb} KB</span>
-              <button onclick="_removeStorageKey('${k}');_showStorageDiagnostic()" style="padding:2px 8px;background:rgba(255,61,87,.2);border:1px solid var(--red);border-radius:3px;color:var(--red);font-size:.7em;cursor:pointer">✕ Удалить</button>
-            </div>
-          `).join('')}
-        </div>
-        <button onclick="_removeAllCSVCaches();_showStorageDiagnostic()" style="padding:6px 12px;background:rgba(255,61,87,.2);border:1px solid var(--red);border-radius:4px;color:var(--red);font-size:.75em;cursor:pointer;width:100%">✕ Удалить все CSV кэши</button>
-      ` : '<div style="color:var(--text3);font-size:.8em">✓ CSV кэшей не найдено</div>'}
-    </div>
-
-    <div>
-      <div style="color:var(--accent);font-weight:600;margin-bottom:8px;font-size:.85em">📋 Все ключи хранилища</div>
-      <div style="display:grid;grid-template-columns:1fr 80px;gap:8px;font-size:.7em;max-height:300px;overflow-y:auto">
-        ${Object.entries(info).map(([k, v]) => `
-          <div style="color:var(--text2)">${k}</div>
-          <div style="text-align:right;color:var(--text3)">${v.kb} KB</div>
-        `).join('')}
-      </div>
-    </div>
-
-    <div style="margin-top:16px;display:flex;gap:8px">
-      <button onclick="_clearAllStorage();document.getElementById('storage-diag-overlay')?.remove()" style="flex:1;padding:6px;background:rgba(255,61,87,.2);border:1px solid var(--red);border-radius:4px;color:var(--red);font-size:.75em;cursor:pointer;font-weight:600">⚠️ ПОЛНАЯ ОЧИСТКА хранилища</button>
-      <button onclick="document.getElementById('storage-diag-overlay')?.remove()" style="flex:1;padding:6px;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:.75em;cursor:pointer">Закрыть</button>
-    </div>
-  </div>
-</div>`;
-
-  document.body.insertAdjacentHTML('beforeend', html);
-}
-
-function _removeStorageKey(key) {
-  try {
-    localStorage.removeItem(key);
-    console.log(`✓ Удалён ${key}`);
-    toast(`✓ Удалён: ${key}`, 1500);
-  } catch(e) {
-    console.error('Ошибка при удалении:', e);
-  }
-}
-
-function _removeAllCSVCaches() {
-  const { csvKeys } = _getStorageInfo();
-  let count = 0;
-  for (const k of csvKeys) {
-    try {
-      localStorage.removeItem(k);
-      count++;
-    } catch(e) {
-      console.error('Ошибка при удалении', k, e);
-    }
-  }
-  console.log(`✓ Удалено ${count} CSV кэшей`);
-  toast(`✓ Удалено ${count} CSV кэшей (освобождено ~${(count * 5).toFixed(0)} МБ)`, 2000);
-}
-
-function _clearAllStorage() {
-  if (!confirm('⚠️ ВНИМАНИЕ: Это удалит все данные хранилища (избранные, настройки, всё)!\n\nВы уверены?')) {
-    return;
-  }
-  try {
-    localStorage.clear();
-    sessionStorage.clear();
-    console.log('✓ Хранилище полностью очищено');
-    toast('✓ Хранилище очищено. Страница перезагружается...', 2000);
-    setTimeout(() => location.reload(), 1000);
-  } catch(e) {
-    console.error('Ошибка при очистке:', e);
-    alert('Ошибка: ' + e.message);
-  }
-}
-
-// Expose to window
-try { window._showStorageDiagnostic = _showStorageDiagnostic; } catch(e) {}
 
 // ══════════════════════════════════════════════════════════════════
 // ── ОЧЕРЕДЬ ЗАДАЧ TPE ─────────────────────────────────────────────
@@ -30217,18 +29996,13 @@ function _hmRender(grid, xVals, yVals, xParam, yParam, metric, cX, cY) {
 
 async function setProject(id) {
   if (!id) return;
-  const prevId = ProjectManager.getCurrentId();
   // Save current project state before switching
-  const curId = prevId;
+  const curId = ProjectManager.getCurrentId();
   if (curId && curId !== id) {
     ProjectManager.saveState({ favNs: _favNs }, curId);
   }
 
-  const switched = await ProjectManager.switchTo(id);
-  if (!switched) {
-    toast('Проект не найден', 1800);
-    return;
-  }
+  await ProjectManager.switchTo(id);
   const proj = ProjectManager.getCurrent();
   if (!proj) return;
 
@@ -30280,7 +30054,6 @@ async function setProject(id) {
 
   // Update UI
   _updateProjBar(proj);
-  _renderProjList();
   renderFavBar();
   const nsEl = document.getElementById('fav-ns-label');
   if (nsEl) nsEl.textContent = _favNs ? _favNs : '';
@@ -30316,7 +30089,6 @@ async function setProject(id) {
   }
 
   closeProjSwitcher();
-  if (prevId && prevId !== id) toast('Проект открыт: ' + proj.name, 1800);
 }
 
 function _updateProjBar(proj) {
@@ -30328,7 +30100,6 @@ function _updateProjBar(proj) {
 
 let _projCreateHandle = null;
 let _projCreateFirstLaunch = false;
-let _projCreating = false;
 
 function openCreateProject(firstLaunch) {
   _projCreateHandle = null;
@@ -30358,58 +30129,23 @@ async function projPickFolder() {
   try {
     _projCreateHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
     document.getElementById('proj-create-folder').textContent = _projCreateHandle.name;
-    toast('Папка выбрана: ' + _projCreateHandle.name, 1200);
-    const name = (document.getElementById('proj-create-name').value || '').trim();
-    if (name) confirmCreateProject();
   } catch(e) { /* user cancelled */ }
 }
 
 async function confirmCreateProject() {
-  if (_projCreating) return;
   const name = (document.getElementById('proj-create-name').value || '').trim();
-  if (!name) { toast('\u0412\u0432\u0435\u0434\u0438 \u043d\u0430\u0437\u0432\u0430\u043d\u0438\u0435 \u043f\u0440\u043e\u0435\u043a\u0442\u0430', 1500); return; }
-  if (!_projCreateHandle) { toast('\u0412\u044b\u0431\u0435\u0440\u0438 \u043f\u0430\u043f\u043a\u0443', 1500); return; }
-
-  const okBtn = document.getElementById('proj-create-ok');
-  if (okBtn) {
-    okBtn.disabled = true;
-    okBtn.textContent = '\u0421\u043e\u0437\u0434\u0430\u044e...';
-  }
-  _projCreating = true;
+  if (!name) { toast('Введи название проекта', 1500); return; }
+  if (!_projCreateHandle) { toast('Выбери папку', 1500); return; }
 
   // Snapshot current template
   const templateSnapshot = templates.find(t => t.isDefault) || null;
 
-  try {
-    const proj = await ProjectManager.create(name, _projCreateHandle, templateSnapshot);
-    _updateProjBar(proj);
-    _renderProjList();
-    favourites = [];
-    results = [];
-    equities = {};
-    DATA = null;
-    _rawDATA = null;
-    _rawDataInfo = '';
-    if ($('finfo')) $('finfo').textContent = 'Нет данных';
-    if ($('tb')) $('tb').innerHTML = '';
-    if ($('rbtn')) $('rbtn').disabled = true;
-    renderFavBar();
-    toast('\u041f\u0440\u043e\u0435\u043a\u0442 \u0441\u043e\u0437\u0434\u0430\u043d: ' + name, 2200);
-
-    // Force close even if firstLaunch (guard in closeProjCreate would block it)
-    _projCreateFirstLaunch = false;
-    closeProjCreate();
-    setProject(proj.id).catch(e => console.warn('[confirmCreateProject] delayed project load failed', e));
-  } catch(e) {
-    console.error('[confirmCreateProject] create failed', e);
-    toast('\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0441\u043e\u0437\u0434\u0430\u0442\u044c \u043f\u0440\u043e\u0435\u043a\u0442', 2500);
-  } finally {
-    if (okBtn) {
-      okBtn.disabled = false;
-      okBtn.textContent = '\u0421\u043e\u0437\u0434\u0430\u0442\u044c';
-    }
-    _projCreating = false;
-  }
+  const proj = await ProjectManager.create(name, _projCreateHandle, templateSnapshot);
+  // Force close even if firstLaunch (guard in closeProjCreate would block it)
+  _projCreateFirstLaunch = false;
+  closeProjCreate();
+  await setProject(proj.id);
+  toast('✅ Проект создан: ' + name, 2000);
 }
 
 // ── Switch project ─────────────────────────────────────────────
@@ -30507,6 +30243,8 @@ async function refreshProjectFiles() {
     toast('🔄 Данные обновлены: ' + files[0].name, 2000);
   }
 }
+
+
 
 
 // ── ML Model Manager ──────────────────────────────────────────
@@ -31634,92 +31372,6 @@ function _fmtBarDate(bar) {
   return _normTime(bar.t);
 }
 
-function _tradeDiagTimeMs(t) {
-  if (!t && t !== 0) return NaN;
-  const s = String(t).trim();
-  if (/^\d{9,10}$/.test(s)) return parseInt(s, 10) * 1000;
-  if (/^\d{13}$/.test(s)) return parseInt(s, 10);
-  const ms = new Date(s.replace(' ', 'T')).getTime();
-  return isNaN(ms) ? new Date(s).getTime() : ms;
-}
-
-function _tradeDiagRangeFromTrades(trades) {
-  let first = Infinity, last = -Infinity;
-  for (const t of trades || []) {
-    for (const v of [t.entryDateStr, t.exitDateStr]) {
-      const ms = _tradeDiagTimeMs(v);
-      if (!isNaN(ms)) { first = Math.min(first, ms); last = Math.max(last, ms); }
-    }
-  }
-  return first !== Infinity ? { first, last } : null;
-}
-
-function _tradeDiagRangeFromBars(bars) {
-  if (!bars || !bars.length) return null;
-  const first = _tradeDiagTimeMs(bars[0].t);
-  const last = _tradeDiagTimeMs(bars[bars.length - 1].t);
-  return !isNaN(first) && !isNaN(last) ? { first, last } : null;
-}
-
-function _tradeDiagDataRange() {
-  if (!NEW_DATA || !NEW_DATA.length) return null;
-  const first = _tradeDiagTimeMs(_fmtBarDate(NEW_DATA[0]));
-  const last = _tradeDiagTimeMs(_fmtBarDate(NEW_DATA[NEW_DATA.length - 1]));
-  return !isNaN(first) && !isNaN(last) ? { first, last } : null;
-}
-
-function _tradeDiagFmtMs(ms) {
-  if (ms == null || isNaN(ms)) return '?';
-  return new Date(ms).toISOString().substring(0, 16).replace('T', ' ');
-}
-
-function _tradeInRange(trade, range) {
-  if (!range) return true;
-  const ms = _tradeDiagTimeMs(trade.entryDateStr);
-  return !isNaN(ms) && ms >= range.start && ms <= range.end;
-}
-
-function _computeTradeOverlap(optTrades, tvTrades) {
-  const jsRange = _tradeDiagDataRange() || _tradeDiagRangeFromTrades(optTrades);
-  const tvRange = _tradeDiagRangeFromBars(tvTrades && tvTrades._sourceBars) || _tradeDiagRangeFromTrades(tvTrades);
-  if (!jsRange || !tvRange) return null;
-  const start = Math.max(jsRange.first, tvRange.first);
-  const end = Math.min(jsRange.last, tvRange.last);
-  if (!(start <= end)) return { jsRange, tvRange, start, end, empty: true };
-  const optIn = (optTrades || []).filter(t => _tradeInRange(t, { start, end }));
-  const tvIn = (tvTrades || []).filter(t => _tradeInRange(t, { start, end }));
-  return {
-    jsRange, tvRange, start, end,
-    optIn, tvIn,
-    optSkippedBefore: (optTrades || []).filter(t => _tradeDiagTimeMs(t.entryDateStr) < start).length,
-    optSkippedAfter: (optTrades || []).filter(t => _tradeDiagTimeMs(t.entryDateStr) > end).length,
-    tvSkippedBefore: (tvTrades || []).filter(t => _tradeDiagTimeMs(t.entryDateStr) < start).length,
-    tvSkippedAfter: (tvTrades || []).filter(t => _tradeDiagTimeMs(t.entryDateStr) > end).length,
-  };
-}
-
-function _plainDiagObject(obj) {
-  const out = {};
-  for (const [k, v] of Object.entries(obj || {})) {
-    if (v == null) continue;
-    if (typeof v === 'boolean' || typeof v === 'number' || typeof v === 'string') out[k] = v;
-    else if (Array.isArray(v)) out[k] = v.slice(0, 100);
-    else if (typeof v === 'object' &&
-             !(v instanceof Float64Array) && !(v instanceof Uint8Array) &&
-             !(v instanceof Int8Array) && !(v instanceof Int32Array)) out[k] = v;
-  }
-  return out;
-}
-
-function _findNewDataBarByTime(timeStr) {
-  if (!NEW_DATA || !timeStr) return -1;
-  const needle = _normTime(timeStr);
-  for (let i = 0; i < NEW_DATA.length; i++) {
-    if (_fmtBarDate(NEW_DATA[i]) === needle) return i;
-  }
-  return -1;
-}
-
 function _parseListOfTrades(csvText) {
   const lines = csvText.trim().split(/\r?\n/).filter(l => l.trim());
   if (lines.length < 2) return null;
@@ -31769,7 +31421,6 @@ function _parseListOfTrades(csvText) {
       pending = null;
     }
   }
-  if (trades.length) trades._sourceFormat = 'list-of-trades';
   return trades.length ? trades : null;
 }
 
@@ -31847,10 +31498,6 @@ function _parseIndicatorExport(csvText) {
       }
     }
   }
-  if (trades.length) {
-    trades._sourceFormat = 'indicator-export';
-    trades._sourceBars = bars;
-  }
   return trades.length ? trades : null;
 }
 
@@ -31880,7 +31527,7 @@ function _rerunWithTradeLog(cfg) {
   }
 }
 
-function _matchTrades(optTrades, tvTrades, meta = {}) {
+function _matchTrades(optTrades, tvTrades) {
   // Вычисляем интервал бара (мс) для нечёткого матчинга по дате
   let barIntervalMs = 24 * 3600 * 1000;
   if (NEW_DATA && NEW_DATA.length >= 2) {
@@ -31958,70 +31605,24 @@ function _matchTrades(optTrades, tvTrades, meta = {}) {
     }
   }
 
-  return { issues, totalOpt: optTrades.length, totalTV: tvTrades.length, meta };
+  return { issues, totalOpt: optTrades.length, totalTV: tvTrades.length };
 }
 
-function _getBarsContext(barIdx, count, markLabel) {
+function _getBarsContext(barIdx, count) {
   if (!NEW_DATA || barIdx == null) return '';
   const start = Math.max(0, barIdx - 1);
   const end   = Math.min(NEW_DATA.length - 1, barIdx + count);
   let s = '';
   for (let i = start; i <= end; i++) {
     const b = NEW_DATA[i];
-    const mark = i === barIdx ? ` ← ${markLabel || 'бар'}` : (i === barIdx - 1 ? ' ← предыдущий бар' : '');
+    const mark = i === barIdx ? ' ← вход опт' : (i === barIdx - 1 ? ' ← сигнал' : '');
     s += `  ${_fmtBarDate(b)}: O=${b.o?.toFixed(4)} H=${b.h?.toFixed(4)} L=${b.l?.toFixed(4)} C=${b.c?.toFixed(4)}${mark}\n`;
   }
   return s;
 }
 
-function _buildTradeDiagPayload(r, optTrades, tvTrades, matchResult) {
-  const meta = matchResult?.meta || {};
-  const payload = {
-    app: 'USE Optimizer v6',
-    reportKind: 'trade-comparison-diagnostic',
-    generatedAt: new Date().toISOString(),
-    result: {
-      name: r?.name || '',
-      pnl: r?.pnl ?? null,
-      wr: r?.wr ?? null,
-      n: r?.n ?? null,
-      dd: r?.dd ?? null,
-      pdd: r?.pdd ?? null,
-      avg: r?.avg ?? null,
-    },
-    data: {
-      optimizerBars: NEW_DATA?.length || 0,
-      optimizerFirst: NEW_DATA?.length ? _fmtBarDate(NEW_DATA[0]) : null,
-      optimizerLast: NEW_DATA?.length ? _fmtBarDate(NEW_DATA[NEW_DATA.length - 1]) : null,
-      tvFormat: meta.csvFormat || tvTrades?._sourceFormat || null,
-      tvBars: tvTrades?._sourceBars?.length || null,
-      tvFirst: tvTrades?._sourceBars?.length ? tvTrades._sourceBars[0].t : null,
-      tvLast: tvTrades?._sourceBars?.length ? tvTrades._sourceBars[tvTrades._sourceBars.length - 1].t : null,
-      overlapStart: meta.overlap && !meta.overlap.empty ? _tradeDiagFmtMs(meta.overlap.start) : null,
-      overlapEnd: meta.overlap && !meta.overlap.empty ? _tradeDiagFmtMs(meta.overlap.end) : null,
-    },
-    counts: {
-      optimizerTradesCompared: matchResult?.totalOpt ?? null,
-      tvTradesCompared: matchResult?.totalTV ?? null,
-      issues: matchResult?.issues?.length ?? null,
-      optimizerTradesOriginal: meta.originalOptCount ?? null,
-      tvTradesOriginal: meta.originalTVCount ?? null,
-      skippedOutsideOverlap: meta.overlap ? {
-        optBefore: meta.overlap.optSkippedBefore || 0,
-        optAfter: meta.overlap.optSkippedAfter || 0,
-        tvBefore: meta.overlap.tvSkippedBefore || 0,
-        tvAfter: meta.overlap.tvSkippedAfter || 0,
-      } : null,
-    },
-    config: _plainDiagObject(r?.cfg || {}),
-    firstOptTrades: (optTrades || []).slice(0, 12),
-    firstTVTrades: (tvTrades || []).slice(0, 12),
-  };
-  return `\n### Полный диагностический пакет\nСкопируй весь отчет целиком: ниже уже есть конфигурация, диапазоны данных и первые сделки.\n\n\`\`\`json\n${JSON.stringify(payload, null, 2)}\n\`\`\`\n`;
-}
-
 function _generateTradeCompReport(r, optTrades, tvTrades, matchResult) {
-  const { issues, totalOpt, totalTV, meta = {} } = matchResult;
+  const { issues, totalOpt, totalTV } = matchResult;
 
   const typeCounts = {};
   for (const iss of issues) {
@@ -32029,13 +31630,13 @@ function _generateTradeCompReport(r, optTrades, tvTrades, matchResult) {
   }
 
   const typeDesc = {
-    ENTRY_TIMING: 'Разный бар входа',
+    ENTRY_TIMING: 'Разный бар входа (close текущего vs open следующего)',
     ENTRY_PRICE:  'Разная цена входа при одинаковом баре',
     EXIT_TYPE:    'Противоположный исход (прибыль vs убыток)',
     EXIT_PRICE:   'Разная цена выхода',
-    INTRABAR_SL:  'Разный intrabar/уровневый выход',
-    MISSING_TV:   'Есть в оптимизаторе, нет в индикаторном экспорте TV на общем участке',
-    MISSING_OPT:  'Есть в индикаторном экспорте TV, нет в оптимизаторе на общем участке',
+    INTRABAR_SL:  'Intrabar SL: TV сработал стоп (Low бара), оптимизатор нет',
+    MISSING_TV:   'Есть в оптимизаторе, нет в TV (фильтр Pine блокирует?)',
+    MISSING_OPT:  'Есть в TV, нет в оптимизаторе (фильтр JS блокирует?)',
     DIR_MISMATCH: 'Разное направление (Long vs Short)',
   };
 
@@ -32057,18 +31658,6 @@ function _generateTradeCompReport(r, optTrades, tvTrades, matchResult) {
   const perfect = totalOpt - diverged - missingTV;
 
   let rep = `## Trade Comparison: ${r.name}\n\n`;
-  rep += `### Режим диагностики\n`;
-  rep += `Источник TV: ${meta.csvFormat || tvTrades._sourceFormat || 'unknown'}; сравнение идет только по общему участку времени.\n`;
-  if (meta.overlap && !meta.overlap.empty) {
-    const o = meta.overlap;
-    rep += `Общий участок: ${_tradeDiagFmtMs(o.start)} — ${_tradeDiagFmtMs(o.end)}\n`;
-    rep += `Диапазон оптимизатора: ${_tradeDiagFmtMs(o.jsRange.first)} — ${_tradeDiagFmtMs(o.jsRange.last)}\n`;
-    rep += `Диапазон TV CSV: ${_tradeDiagFmtMs(o.tvRange.first)} — ${_tradeDiagFmtMs(o.tvRange.last)}\n`;
-    rep += `Вне общего участка отброшено: OPT до=${o.optSkippedBefore}, после=${o.optSkippedAfter}; TV до=${o.tvSkippedBefore}, после=${o.tvSkippedAfter}\n`;
-  } else if (meta.overlap && meta.overlap.empty) {
-    rep += `Общий участок не найден: диапазоны данных не пересекаются.\n`;
-  }
-  rep += `Важно: диагностика использует индикаторные EL/ES/XL/XS-сигналы, без предположений про strategy.close/strategy.exit.\n\n`;
   rep += `### Конфигурация\n${cfgParts.join(' | ') || '(нет данных)'}\n\n`;
   rep += `### Период B\n${period}\n\n`;
   rep += `### Сводка\n`;
@@ -32081,7 +31670,6 @@ function _generateTradeCompReport(r, optTrades, tvTrades, matchResult) {
 
   if (!Object.keys(typeCounts).length) {
     rep += `### ✅ Расхождений не найдено\nВсе ${totalOpt} сделок оптимизатора совпадают с TradingView.\n`;
-    rep += _buildTradeDiagPayload(r, optTrades, tvTrades, matchResult);
     return rep;
   }
 
@@ -32117,19 +31705,8 @@ function _generateTradeCompReport(r, optTrades, tvTrades, matchResult) {
     }
 
     if (opt && opt.entryBar != null) {
-      rep += `\nБары NEW_DATA вокруг входа оптимизатора:\n`;
-      rep += _getBarsContext(opt.entryBar, 2, 'вход opt');
-    }
-
-    if (opt && opt.exitBar != null) {
-      rep += `\nБары NEW_DATA вокруг выхода оптимизатора:\n`;
-      rep += _getBarsContext(opt.exitBar, 2, 'выход opt');
-    } else if (tv && tv.exitDateStr) {
-      const tvExitBar = _findNewDataBarByTime(tv.exitDateStr);
-      if (tvExitBar >= 0) {
-        rep += `\nБары NEW_DATA вокруг выхода TV:\n`;
-        rep += _getBarsContext(tvExitBar, 2, 'выход TV');
-      }
+      rep += `\nБары NEW_DATA (вокруг входа оптимизатора):\n`;
+      rep += _getBarsContext(opt.entryBar, 2);
     }
 
     if (types.includes('ENTRY_TIMING')) {
@@ -32147,7 +31724,6 @@ function _generateTradeCompReport(r, optTrades, tvTrades, matchResult) {
     rep += '\n';
   }
 
-  rep += _buildTradeDiagPayload(r, optTrades, tvTrades, matchResult);
   return rep;
 }
 
@@ -32174,15 +31750,15 @@ function showOOSTradeDiag(oosIdx) {
       <button class="tpl-btn2" style="padding:2px 10px" onclick="document.getElementById('oos-trade-diag-modal').remove()">✕</button>
     </div>
     <div style="font-size:.8em;color:var(--text3);margin-bottom:10px;line-height:1.5">
-      Загрузи CSV из индикатора USE с колонками <b>EL/ES/XL/XS</b>.<br>
-      Если попадется старый List of Trades, он тоже прочитается, но полная диагностика лучше по индикаторному CSV.
+      Загрузи <b>List of Trades</b> из TradingView Strategy Tester<br>
+      (кнопка Export → List of Trades CSV) за период Б.
     </div>
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
       <input type="file" id="oos-diag-file" accept=".csv,.tsv" style="display:none"
              onchange="runOOSTradeDiag(${oosIdx}, event)">
       <button class="tpl-btn2" style="padding:5px 14px"
               onclick="document.getElementById('oos-diag-file').click()">
-        📂 Загрузить TV CSV
+        📂 Загрузить List of Trades
       </button>
       <span id="oos-diag-status" style="font-size:.8em;color:var(--text3)">файл не загружен</span>
     </div>
@@ -32195,8 +31771,8 @@ function showOOSTradeDiag(oosIdx) {
       <div style="margin-top:8px;display:flex;gap:8px">
         <button class="tpl-btn2" style="padding:6px 18px;border-color:#4ade80;color:#4ade80"
                 onclick="navigator.clipboard.writeText(document.getElementById('oos-diag-text').value)
-                  .then(()=>{this.textContent='✅ Скопировано!';setTimeout(()=>this.textContent='📋 Скопировать полный пакет',2000)})">
-          📋 Скопировать полный пакет
+                  .then(()=>{this.textContent='✅ Скопировано!';setTimeout(()=>this.textContent='📋 Скопировать для Claude',2000)})">
+          📋 Скопировать для Claude
         </button>
       </div>
     </div>
@@ -32239,28 +31815,13 @@ function runOOSTradeDiag(oosIdx, event) {
       return;
     }
 
-    const overlap = _computeTradeOverlap(optTrades, tvTrades);
-    let optForCompare = optTrades;
-    let tvForCompare = tvTrades;
-    if (overlap && !overlap.empty) {
-      optForCompare = overlap.optIn;
-      tvForCompare = overlap.tvIn;
-      tvForCompare._sourceFormat = tvTrades._sourceFormat;
-      tvForCompare._sourceBars = tvTrades._sourceBars;
-    }
-
-    const matchResult = _matchTrades(optForCompare, tvForCompare, {
-      csvFormat,
-      overlap,
-      originalOptCount: optTrades.length,
-      originalTVCount: tvTrades.length,
-    });
-    const report      = _generateTradeCompReport(r, optForCompare, tvForCompare, matchResult);
+    const matchResult = _matchTrades(optTrades, tvTrades);
+    const report      = _generateTradeCompReport(r, optTrades, tvTrades, matchResult);
 
     const divCount = matchResult.issues.filter(x => !x.types.includes('MISSING_TV') && !x.types.includes('MISSING_OPT')).length;
     const fmtLabel = csvFormat === 'indicator-export' ? ' [формат: индикатор EL/ES/XL/XS]' : ' [формат: List of Trades]';
     if (statusEl) statusEl.textContent =
-      `✅ TV: ${tvForCompare.length}/${tvTrades.length} сд. | Опт: ${optForCompare.length}/${optTrades.length} сд. | Расхождений: ${matchResult.issues.length} (${divCount} с парой)${fmtLabel}`;
+      `✅ TV: ${tvTrades.length} сд. | Опт: ${optTrades.length} сд. | Расхождений: ${matchResult.issues.length} (${divCount} с парой)${fmtLabel}`;
     if (textEl)   textEl.value = report;
     if (reportEl) reportEl.style.display = 'block';
   };
@@ -33025,68 +32586,47 @@ const ProjectManager = (() => {
   let _projects   = [];
   let _currentId  = null;
   let _db         = null;
-  const _handles  = new Map();
 
   // ─── IndexedDB (for FileSystemDirectoryHandle) ─────────────
 
   async function _openDB() {
     if (_db) return _db;
-    if (typeof indexedDB === 'undefined') throw new Error('IndexedDB unavailable');
     return new Promise((res, rej) => {
-      const tid = setTimeout(() => rej(new Error('IndexedDB open timeout')), 1500);
       const req = indexedDB.open(IDB_NAME, IDB_VER);
       req.onupgradeneeded = e => e.target.result.createObjectStore(IDB_STORE);
-      req.onsuccess  = e => { clearTimeout(tid); _db = e.target.result; res(_db); };
-      req.onerror    = e => { clearTimeout(tid); rej(e.target.error); };
+      req.onsuccess  = e => { _db = e.target.result; res(_db); };
+      req.onerror    = e => rej(e.target.error);
     });
   }
 
   async function _putHandle(id, handle) {
-    if (handle) _handles.set(id, handle);
-    try {
-      const db = await _openDB();
-      return await new Promise((res, rej) => {
-        const tx = db.transaction(IDB_STORE, 'readwrite');
-        tx.objectStore(IDB_STORE).put(handle, id);
-        tx.oncomplete = () => res(true);
-        tx.onerror    = e => rej(e.target.error);
-      });
-    } catch(e) {
-      console.warn('[ProjectManager] folder handle was kept for this session only', e);
-      return false;
-    }
+    const db = await _openDB();
+    return new Promise((res, rej) => {
+      const tx = db.transaction(IDB_STORE, 'readwrite');
+      tx.objectStore(IDB_STORE).put(handle, id);
+      tx.oncomplete = res;
+      tx.onerror    = e => rej(e.target.error);
+    });
   }
 
   async function _getHandle(id) {
-    if (_handles.has(id)) return _handles.get(id);
-    try {
-      const db = await _openDB();
-      return await new Promise((res, rej) => {
-        const tx  = db.transaction(IDB_STORE, 'readonly');
-        const req = tx.objectStore(IDB_STORE).get(id);
-        req.onsuccess = e => {
-          const handle = e.target.result || null;
-          if (handle) _handles.set(id, handle);
-          res(handle);
-        };
-        req.onerror   = e => rej(e.target.error);
-      });
-    } catch(e) {
-      return null;
-    }
+    const db = await _openDB();
+    return new Promise((res, rej) => {
+      const tx  = db.transaction(IDB_STORE, 'readonly');
+      const req = tx.objectStore(IDB_STORE).get(id);
+      req.onsuccess = e => res(e.target.result || null);
+      req.onerror   = e => rej(e.target.error);
+    });
   }
 
   async function _delHandle(id) {
-    _handles.delete(id);
-    try {
-      const db = await _openDB();
-      return await new Promise((res, rej) => {
-        const tx = db.transaction(IDB_STORE, 'readwrite');
-        tx.objectStore(IDB_STORE).delete(id);
-        tx.oncomplete = res;
-        tx.onerror    = e => rej(e.target.error);
-      });
-    } catch(e) {}
+    const db = await _openDB();
+    return new Promise((res, rej) => {
+      const tx = db.transaction(IDB_STORE, 'readwrite');
+      tx.objectStore(IDB_STORE).delete(id);
+      tx.oncomplete = res;
+      tx.onerror    = e => rej(e.target.error);
+    });
   }
 
   // ─── localStorage (project list + current id) ──────────────
@@ -33098,47 +32638,10 @@ const ProjectManager = (() => {
     } catch(e) { _projects = []; _currentId = null; }
   }
 
-  function _isQuotaError(e) {
-    return e && (e.name === 'QuotaExceededError' || e.code === 22 || e.code === 1014);
-  }
-
-  function _cleanupStorageForProjectSave() {
-    const prefixes = ['use6_csv_', 'rob_', 'robSurrogate_'];
-    let count = 0;
-    try {
-      const keys = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && prefixes.some(pfx => key.startsWith(pfx))) keys.push(key);
-      }
-      keys.forEach(key => {
-        localStorage.removeItem(key);
-        count++;
-      });
-    } catch(e) {}
-    return count;
-  }
-
   function _saveLS() {
-    try {
-      localStorage.setItem(LS_KEY, JSON.stringify(_projects));
-      if (_currentId) localStorage.setItem(LS_CURRENT, _currentId);
-      else            localStorage.removeItem(LS_CURRENT);
-      return true;
-    } catch(e) {
-      if (!_isQuotaError(e)) throw e;
-      const removed = _cleanupStorageForProjectSave();
-      console.warn(`[ProjectManager] localStorage quota exceeded; removed ${removed} cache keys and retrying`);
-      try {
-        localStorage.setItem(LS_KEY, JSON.stringify(_projects));
-        if (_currentId) localStorage.setItem(LS_CURRENT, _currentId);
-        else            localStorage.removeItem(LS_CURRENT);
-        return true;
-      } catch(e2) {
-        console.warn('[ProjectManager] project list was kept for this session only', e2);
-        return false;
-      }
-    }
+    localStorage.setItem(LS_KEY, JSON.stringify(_projects));
+    if (_currentId) localStorage.setItem(LS_CURRENT, _currentId);
+    else            localStorage.removeItem(LS_CURRENT);
   }
 
   function _uuid() {
@@ -33164,9 +32667,9 @@ const ProjectManager = (() => {
       lastFile:   null,
       knownFiles: [],
     };
-    await _putHandle(id, dirHandle);
     _projects.unshift(proj);
     _currentId = id;
+    await _putHandle(id, dirHandle);
     _saveLS();
     return proj;
   }
@@ -33174,6 +32677,12 @@ const ProjectManager = (() => {
   async function switchTo(id) {
     if (!_projects.find(p => p.id === id)) return false;
     _currentId = id;
+    // Keep recently used at top
+    const idx = _projects.findIndex(p => p.id === id);
+    if (idx > 0) {
+      const [proj] = _projects.splice(idx, 1);
+      _projects.unshift(proj);
+    }
     _saveLS();
     return true;
   }
@@ -33946,7 +33455,7 @@ document.getElementById('c_synth_gamma')?.addEventListener('input', function() {
 
 <script>
 // Build age timer — показывает сколько времени прошло с последнего обновления кода
-window._BUILD_TS = 1777239110016;
+window._BUILD_TS = 1776633324796;
 (function() {
   const wrap = document.getElementById('build-age-wrap');
   if (!wrap || !window._BUILD_TS) return;
@@ -33980,633 +33489,6 @@ window._BUILD_TS = 1777239110016;
     <div id="ml-screening-body" style="color:var(--fg)"></div>
   </div>
 </div>
-
-<script>
-// ============================================================
-// VERSIONS VIEWER — generated by build_version_archive.py
-// ============================================================
-
-const VERSIONS_DATA = [
-  {
-    "group": "current",
-    "key": "current",
-    "title": "Текущая версия",
-    "version": "Current build",
-    "date": "2026-04-27",
-    "status": "LIVE",
-    "emoji": "🟦",
-    "note": "Актуальная сборка оптимизатора.",
-    "url": "./USE_Optimizer_v6_built.html"
-  },
-  {
-    "key": "stable-2026-03-03",
-    "title": "Стабильная версия",
-    "version": "stable-2026-03-03",
-    "date": "2026-03-03",
-    "status": "STABLE",
-    "emoji": "🟢",
-    "note": "Отмеченная стабильная версия.",
-    "url": "./stable/2026-03-03/",
-    "archive_url": "./2026-03-03/",
-    "group": "special"
-  },
-  {
-    "key": "stable-2026-03-07",
-    "title": "Стабильная версия",
-    "version": "stable-2026-03-07",
-    "date": "2026-03-07",
-    "status": "STABLE",
-    "emoji": "🟢",
-    "note": "Более поздняя стабильная версия марта.",
-    "url": "./stable/2026-03-07/",
-    "archive_url": "./2026-03-07/",
-    "group": "special"
-  },
-  {
-    "key": "v6.2.2-before-audit",
-    "title": "Версия перед аудитом",
-    "version": "v6.2.2-before-audit",
-    "date": "2026-04-15",
-    "status": "SNAPSHOT",
-    "emoji": "🟠",
-    "note": "Отдельный снимок перед аудитом.",
-    "url": "./stable/v6.2.2-before-audit/",
-    "archive_url": "./v6.2.2-before-audit/",
-    "group": "special"
-  },
-  {
-    "group": "daily",
-    "key": "daily-2026-04-26",
-    "title": "Архив по датам",
-    "version": "2026-04-26",
-    "date": "2026-04-26",
-    "status": "DAILY",
-    "emoji": "📅",
-    "note": "3d63ee6 • build: auto-update bundle [skip ci]",
-    "url": "./stable/daily/2026-04-26/"
-  },
-  {
-    "group": "daily",
-    "key": "daily-2026-04-25",
-    "title": "Архив по датам",
-    "version": "2026-04-25",
-    "date": "2026-04-25",
-    "status": "DAILY",
-    "emoji": "📅",
-    "note": "d86d1fc • build: auto-update bundle [skip ci]",
-    "url": "./stable/daily/2026-04-25/"
-  },
-  {
-    "group": "daily",
-    "key": "daily-2026-04-23",
-    "title": "Архив по датам",
-    "version": "2026-04-23",
-    "date": "2026-04-23",
-    "status": "DAILY",
-    "emoji": "📅",
-    "note": "a7b8f0e • build: auto-update bundle [skip ci]",
-    "url": "./stable/daily/2026-04-23/"
-  },
-  {
-    "group": "daily",
-    "key": "daily-2026-04-19",
-    "title": "Архив по датам",
-    "version": "2026-04-19",
-    "date": "2026-04-19",
-    "status": "DAILY",
-    "emoji": "📅",
-    "note": "1363e7b • build: auto-update bundle [skip ci]",
-    "url": "./stable/daily/2026-04-19/"
-  },
-  {
-    "group": "daily",
-    "key": "daily-2026-04-20",
-    "title": "Архив по датам",
-    "version": "2026-04-20",
-    "date": "2026-04-20",
-    "status": "DAILY",
-    "emoji": "📅",
-    "note": "72a9bd0 • Merge pull request #326 from xopromo/fixes/trading-logic",
-    "url": "./stable/daily/2026-04-20/"
-  },
-  {
-    "group": "daily",
-    "key": "daily-2026-04-15",
-    "title": "Архив по датам",
-    "version": "2026-04-15",
-    "date": "2026-04-15",
-    "status": "DAILY",
-    "emoji": "📅",
-    "note": "d4b5ab8 • build: auto-update bundle [skip ci]",
-    "url": "./stable/daily/2026-04-15/"
-  },
-  {
-    "group": "daily",
-    "key": "daily-2026-04-14",
-    "title": "Архив по датам",
-    "version": "2026-04-14",
-    "date": "2026-04-14",
-    "status": "DAILY",
-    "emoji": "📅",
-    "note": "c056e4e • build: auto-update bundle [skip ci]",
-    "url": "./stable/daily/2026-04-14/"
-  },
-  {
-    "group": "daily",
-    "key": "daily-2026-04-13",
-    "title": "Архив по датам",
-    "version": "2026-04-13",
-    "date": "2026-04-13",
-    "status": "DAILY",
-    "emoji": "📅",
-    "note": "08ad9d5 • build: auto-update bundle [skip ci]",
-    "url": "./stable/daily/2026-04-13/"
-  },
-  {
-    "group": "daily",
-    "key": "daily-2026-04-11",
-    "title": "Архив по датам",
-    "version": "2026-04-11",
-    "date": "2026-04-11",
-    "status": "DAILY",
-    "emoji": "📅",
-    "note": "7910027 • build: auto-update bundle [skip ci]",
-    "url": "./stable/daily/2026-04-11/"
-  },
-  {
-    "group": "daily",
-    "key": "daily-2026-04-05",
-    "title": "Архив по датам",
-    "version": "2026-04-05",
-    "date": "2026-04-05",
-    "status": "DAILY",
-    "emoji": "📅",
-    "note": "4a65b64 • feat: добавить старую версию оптимизатора (9e91177)",
-    "url": "./stable/daily/2026-04-05/"
-  },
-  {
-    "group": "daily",
-    "key": "daily-2026-04-02",
-    "title": "Архив по датам",
-    "version": "2026-04-02",
-    "date": "2026-04-02",
-    "status": "DAILY",
-    "emoji": "📅",
-    "note": "9e91177 • feat: Pine Script индикатор Flat Zone Detector",
-    "url": "./stable/daily/2026-04-02/"
-  },
-  {
-    "group": "daily",
-    "key": "daily-2026-04-01",
-    "title": "Архив по датам",
-    "version": "2026-04-01",
-    "date": "2026-04-01",
-    "status": "DAILY",
-    "emoji": "📅",
-    "note": "61b6ffc • build: auto-update bundle [skip ci]",
-    "url": "./stable/daily/2026-04-01/"
-  },
-  {
-    "group": "daily",
-    "key": "daily-2026-03-31",
-    "title": "Архив по датам",
-    "version": "2026-03-31",
-    "date": "2026-03-31",
-    "status": "DAILY",
-    "emoji": "📅",
-    "note": "13044cc • fix: close indicator trade immediately on intrabar TP/SL touch",
-    "url": "./stable/daily/2026-03-31/"
-  },
-  {
-    "group": "daily",
-    "key": "daily-2026-03-30",
-    "title": "Архив по датам",
-    "version": "2026-03-30",
-    "date": "2026-03-30",
-    "status": "DAILY",
-    "emoji": "📅",
-    "note": "6c331f9 • build: auto-update bundle [skip ci]",
-    "url": "./stable/daily/2026-03-30/"
-  },
-  {
-    "group": "daily",
-    "key": "daily-2026-03-29",
-    "title": "Архив по датам",
-    "version": "2026-03-29",
-    "date": "2026-03-29",
-    "status": "DAILY",
-    "emoji": "📅",
-    "note": "7d1dab3 • Fix canvas null check and improve OOS diagnostic with TV CSV comparison note",
-    "url": "./stable/daily/2026-03-29/"
-  },
-  {
-    "group": "daily",
-    "key": "daily-2026-03-28",
-    "title": "Архив по датам",
-    "version": "2026-03-28",
-    "date": "2026-03-28",
-    "status": "DAILY",
-    "emoji": "📅",
-    "note": "8c1a258 • fix: graph shows ML-filtered equity (not unfiltered TV equity)",
-    "url": "./stable/daily/2026-03-28/"
-  },
-  {
-    "group": "daily",
-    "key": "daily-2026-03-27",
-    "title": "Архив по датам",
-    "version": "2026-03-27",
-    "date": "2026-03-27",
-    "status": "DAILY",
-    "emoji": "📅",
-    "note": "420dcb9 • build: auto-update bundle [skip ci]",
-    "url": "./stable/daily/2026-03-27/"
-  },
-  {
-    "group": "daily",
-    "key": "daily-2026-03-26",
-    "title": "Архив по датам",
-    "version": "2026-03-26",
-    "date": "2026-03-26",
-    "status": "DAILY",
-    "emoji": "📅",
-    "note": "ec85bd7 • build: auto-update bundle [skip ci]",
-    "url": "./stable/daily/2026-03-26/"
-  },
-  {
-    "group": "daily",
-    "key": "daily-2026-03-25",
-    "title": "Архив по датам",
-    "version": "2026-03-25",
-    "date": "2026-03-25",
-    "status": "DAILY",
-    "emoji": "📅",
-    "note": "394aaf6 • fix(pine): clamp consecMax defval to minval=2 to avoid Pine Script error",
-    "url": "./stable/daily/2026-03-25/"
-  },
-  {
-    "group": "daily",
-    "key": "daily-2026-03-24",
-    "title": "Архив по датам",
-    "version": "2026-03-24",
-    "date": "2026-03-24",
-    "status": "DAILY",
-    "emoji": "📅",
-    "note": "8aedf53 • fix(pine_export): MA всегда попадает в CSV-экспорт",
-    "url": "./stable/daily/2026-03-24/"
-  },
-  {
-    "group": "daily",
-    "key": "daily-2026-03-23",
-    "title": "Архив по датам",
-    "version": "2026-03-23",
-    "date": "2026-03-23",
-    "status": "DAILY",
-    "emoji": "📅",
-    "note": "c9ee187 • build: auto-update bundle [skip ci]",
-    "url": "./stable/daily/2026-03-23/"
-  },
-  {
-    "group": "daily",
-    "key": "daily-2026-03-22",
-    "title": "Архив по датам",
-    "version": "2026-03-22",
-    "date": "2026-03-22",
-    "status": "DAILY",
-    "emoji": "📅",
-    "note": "f307ea3 • fix: закрывать окно создания проекта после успешного создания",
-    "url": "./stable/daily/2026-03-22/"
-  },
-  {
-    "group": "daily",
-    "key": "daily-2026-03-19",
-    "title": "Архив по датам",
-    "version": "2026-03-19",
-    "date": "2026-03-19",
-    "status": "DAILY",
-    "emoji": "📅",
-    "note": "f91f9ce • fix(struct): исправить пивот-сравнение и отображение параметров",
-    "url": "./stable/daily/2026-03-19/"
-  },
-  {
-    "group": "daily",
-    "key": "daily-2026-03-21",
-    "title": "Архив по датам",
-    "version": "2026-03-21",
-    "date": "2026-03-21",
-    "status": "DAILY",
-    "emoji": "📅",
-    "note": "987934c • Merge pull request #67 from xopromo/claude/strategy-game-html-GuTCf",
-    "url": "./stable/daily/2026-03-21/"
-  },
-  {
-    "group": "daily",
-    "key": "daily-2026-03-20",
-    "title": "Архив по датам",
-    "version": "2026-03-20",
-    "date": "2026-03-20",
-    "status": "DAILY",
-    "emoji": "📅",
-    "note": "4e5f296 • Merge pull request #58 from xopromo/claude/strategy-game-html-GuTCf",
-    "url": "./stable/daily/2026-03-20/"
-  },
-  {
-    "group": "daily",
-    "key": "daily-2026-03-17",
-    "title": "Архив по датам",
-    "version": "2026-03-17",
-    "date": "2026-03-17",
-    "status": "DAILY",
-    "emoji": "📅",
-    "note": "77a266c • Merge pull request #53 from xopromo/claude/vk-sales-automation-6eirg",
-    "url": "./stable/daily/2026-03-17/"
-  },
-  {
-    "group": "daily",
-    "key": "daily-2026-03-16",
-    "title": "Архив по датам",
-    "version": "2026-03-16",
-    "date": "2026-03-16",
-    "status": "DAILY",
-    "emoji": "📅",
-    "note": "7fca6ae • Merge pull request #43 from xopromo/claude/vk-sales-automation-6eirg",
-    "url": "./stable/daily/2026-03-16/"
-  },
-  {
-    "group": "daily",
-    "key": "daily-2026-03-15",
-    "title": "Архив по датам",
-    "version": "2026-03-15",
-    "date": "2026-03-15",
-    "status": "DAILY",
-    "emoji": "📅",
-    "note": "2231916 • fix(pine): MA Touch — separate mat_val from filter MA, fix zone logic",
-    "url": "./stable/daily/2026-03-15/"
-  },
-  {
-    "group": "daily",
-    "key": "daily-2026-03-14",
-    "title": "Архив по датам",
-    "version": "2026-03-14",
-    "date": "2026-03-14",
-    "status": "DAILY",
-    "emoji": "📅",
-    "note": "69a3b4f • fix(buildBtCfg): useMA now respects cfg.useMA flag instead of maP>0",
-    "url": "./stable/daily/2026-03-14/"
-  },
-  {
-    "group": "daily",
-    "key": "daily-2026-03-13",
-    "title": "Архив по датам",
-    "version": "2026-03-13",
-    "date": "2026-03-13",
-    "status": "DAILY",
-    "emoji": "📅",
-    "note": "e46023f • fix: add useMacdFilter/useER to all _cfg objects + OOS diagnostics",
-    "url": "./stable/daily/2026-03-13/"
-  },
-  {
-    "group": "daily",
-    "key": "daily-2026-03-12",
-    "title": "Архив по датам",
-    "version": "2026-03-12",
-    "date": "2026-03-12",
-    "status": "DAILY",
-    "emoji": "📅",
-    "note": "76569e5 • feat: Kalman filter integration — 3 new applications",
-    "url": "./stable/daily/2026-03-12/"
-  },
-  {
-    "group": "daily",
-    "key": "daily-2026-03-11",
-    "title": "Архив по датам",
-    "version": "2026-03-11",
-    "date": "2026-03-11",
-    "status": "DAILY",
-    "emoji": "📅",
-    "note": "bf8259e • fix: multiply maP by htfRatio in backtest start offset",
-    "url": "./stable/daily/2026-03-11/"
-  },
-  {
-    "group": "daily",
-    "key": "daily-2026-03-10",
-    "title": "Архив по датам",
-    "version": "2026-03-10",
-    "date": "2026-03-10",
-    "status": "DAILY",
-    "emoji": "📅",
-    "note": "ab64ba1 • Fix MC/TPE/BO crash: пустой rsiPairs + try/catch + early yield",
-    "url": "./stable/daily/2026-03-10/"
-  },
-  {
-    "group": "daily",
-    "key": "daily-2026-03-09",
-    "title": "Архив по датам",
-    "version": "2026-03-09",
-    "date": "2026-03-09",
-    "status": "DAILY",
-    "emoji": "📅",
-    "note": "9708364 • fix: create missing synthesis.js, pareto_front.js, synthesis_ui.js files and update build pipeline",
-    "url": "./stable/daily/2026-03-09/"
-  },
-  {
-    "group": "daily",
-    "key": "daily-2026-03-08",
-    "title": "Архив по датам",
-    "version": "2026-03-08",
-    "date": "2026-03-08",
-    "status": "DAILY",
-    "emoji": "📅",
-    "note": "6c2244b • feat: table filter templates, panel collapse/grid, JS tooltip, global notepad",
-    "url": "./stable/daily/2026-03-08/"
-  },
-  {
-    "group": "daily",
-    "key": "daily-2026-03-07",
-    "title": "Архив по датам",
-    "version": "2026-03-07",
-    "date": "2026-03-07",
-    "status": "DAILY",
-    "emoji": "📅",
-    "note": "6d9aeed • fix(pine_export): fix invalid timeframe format in f_tf_str",
-    "url": "./stable/daily/2026-03-07/"
-  },
-  {
-    "group": "daily",
-    "key": "daily-2026-03-06",
-    "title": "Архив по датам",
-    "version": "2026-03-06",
-    "date": "2026-03-06",
-    "status": "DAILY",
-    "emoji": "📅",
-    "note": "a883d41 • Fix SL Pivot + new entry ranges: exhaustive loop, buildName, showDetail",
-    "url": "./stable/daily/2026-03-06/"
-  },
-  {
-    "group": "daily",
-    "key": "daily-2026-03-04",
-    "title": "Архив по датам",
-    "version": "2026-03-04",
-    "date": "2026-03-04",
-    "status": "DAILY",
-    "emoji": "📅",
-    "note": "578740a • feat: add tlPvL/tlPvR as optimization dimensions for TL Touch/Break",
-    "url": "./stable/daily/2026-03-04/"
-  },
-  {
-    "group": "daily",
-    "key": "daily-2026-03-03",
-    "title": "Архив по датам",
-    "version": "2026-03-03",
-    "date": "2026-03-03",
-    "status": "DAILY",
-    "emoji": "📅",
-    "note": "7bbd251 • chore: update STATE.md",
-    "url": "./stable/daily/2026-03-03/"
-  },
-  {
-    "group": "daily",
-    "key": "daily-2026-03-02",
-    "title": "Архив по датам",
-    "version": "2026-03-02",
-    "date": "2026-03-02",
-    "status": "DAILY",
-    "emoji": "📅",
-    "note": "50871b2 • fix: compute bbD in _calcIndicators, log exceptions in _runOOS, diagnose IS>TV trades",
-    "url": "./stable/daily/2026-03-02/"
-  },
-  {
-    "group": "daily",
-    "key": "daily-2026-03-01",
-    "title": "Архив по датам",
-    "version": "2026-03-01",
-    "date": "2026-03-01",
-    "status": "DAILY",
-    "emoji": "📅",
-    "note": "271046c • Fix runOOSScan: walk/param/noise/mc tests always returning 0",
-    "url": "./stable/daily/2026-03-01/"
-  },
-  {
-    "group": "daily",
-    "key": "daily-2026-02-28",
-    "title": "Архив по датам",
-    "version": "2026-02-28",
-    "date": "2026-02-28",
-    "status": "DAILY",
-    "emoji": "📅",
-    "note": "432378e • fix: replace Groq API with claude CLI in research agent",
-    "url": "./stable/daily/2026-02-28/"
-  },
-  {
-    "group": "daily",
-    "key": "daily-2026-02-27",
-    "title": "Архив по датам",
-    "version": "2026-02-27",
-    "date": "2026-02-27",
-    "status": "DAILY",
-    "emoji": "📅",
-    "note": "d42ba88 • fix(chart): restore sticky equity chart at top of viewport",
-    "url": "./stable/daily/2026-02-27/"
-  },
-  {
-    "group": "daily",
-    "key": "daily-2026-02-26",
-    "title": "Архив по датам",
-    "version": "2026-02-26",
-    "date": "2026-02-26",
-    "status": "DAILY",
-    "emoji": "📅",
-    "note": "c77292f • fix(oos): prevent near-zero IS gain from inflating retention to thousands%",
-    "url": "./stable/daily/2026-02-26/"
-  }
-];
-const VERSION_GROUPS = [["current", "Текущая версия"], ["special", "Специальные версии"], ["daily", "Архив по датам"]];
-
-function openVersionsModal() {
-  _ensureVersionsModal();
-  const overlay = document.getElementById('versions-modal-overlay');
-  if (!overlay) return;
-  overlay.style.display = 'flex';
-  _renderVersionsList();
-}
-
-function closeVersionsModal() {
-  const overlay = document.getElementById('versions-modal-overlay');
-  if (overlay) overlay.style.display = 'none';
-}
-
-function _renderVersionsList() {
-  const list = document.getElementById('versions-list');
-  if (!list) return;
-  const parts = [];
-  VERSION_GROUPS.forEach(([groupKey, groupTitle]) => {
-    const rows = VERSIONS_DATA.filter(v => v.group === groupKey);
-    if (!rows.length) return;
-    parts.push(`
-      <div style="padding:14px 20px;border-bottom:1px solid var(--border);background:var(--bg3);position:sticky;top:0;z-index:1">
-        <strong style="color:var(--accent)">${groupTitle}</strong>
-        <span style="color:var(--text3);font-size:.82em;margin-left:8px">${rows.length}</span>
-      </div>
-    `);
-    rows.forEach(v => {
-      parts.push(`
-        <div style="border-bottom:1px solid var(--border);padding:16px 20px;display:flex;gap:14px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap">
-          <div style="display:flex;gap:12px;align-items:flex-start;min-width:280px;flex:1">
-            <div style="font-size:1.2em;line-height:1.2">${v.emoji}</div>
-            <div>
-              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
-                <strong style="color:var(--accent)">${v.version}</strong>
-                <span style="color:var(--text3);font-size:.8em">${v.date}</span>
-                <span style="color:var(--text3);font-size:.75em;background:var(--bg3);padding:2px 8px;border-radius:3px">${v.status}</span>
-              </div>
-              <div style="color:var(--text);font-size:.92em;margin-bottom:4px">${v.title}</div>
-              <div style="color:var(--text2);font-size:.84em">${v.note}</div>
-            </div>
-          </div>
-          <div style="display:flex;gap:8px;align-items:center">
-            <a href="${v.url}" target="_blank" rel="noopener noreferrer"
-               style="padding:8px 12px;background:rgba(0,212,255,.15);border:1px solid var(--accent);border-radius:6px;color:var(--accent);font-size:.85em;text-decoration:none;white-space:nowrap">
-              Открыть версию
-            </a>
-          </div>
-        </div>
-      `);
-    });
-  });
-  list.innerHTML = parts.join('');
-}
-
-function _ensureVersionsModal() {
-  if (document.getElementById('versions-modal-overlay')) return;
-  const wrap = document.createElement('div');
-  wrap.innerHTML = `
-    <div id="versions-modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;align-items:center;justify-content:center;padding:24px" onclick="if(event.target===this)closeVersionsModal()">
-      <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;width:100%;max-width:980px;max-height:85vh;display:flex;flex-direction:column;overflow:hidden">
-        <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
-          <div style="display:flex;align-items:center;gap:12px">
-            <span style="font-size:1.4em">🗂</span>
-            <div>
-              <h2 style="margin:0;color:var(--accent)">Версии</h2>
-              <div style="font-size:.8em;color:var(--text3)">Отдельные страницы по датам: специальные снимки и полный архив за последние месяцы.</div>
-            </div>
-          </div>
-          <button onclick="closeVersionsModal()" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:1.3em">✕</button>
-        </div>
-        <div style="padding:12px 20px;background:var(--bg3);border-bottom:1px solid var(--border);font-size:.85em;color:var(--text2)">
-          У каждой версии видны подпись, дата и тип. Открытие идет на отдельной надежной странице.
-        </div>
-        <div id="versions-list" style="flex:1;overflow-y:auto;padding:0">
-          <div style="padding:20px;text-align:center;color:var(--text3)">Загрузка...</div>
-        </div>
-      </div>
-    </div>
-  `;
-  document.body.appendChild(wrap.firstElementChild);
-}
-
-try { window.openVersionsModal = openVersionsModal; } catch(e) {}
-try { window.closeVersionsModal = closeVersionsModal; } catch(e) {}
-
-</script>
 
 <!-- CHANGELOG MODAL -->
 <div id="changelog-modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;align-items:center;justify-content:center;padding:24px" onclick="if(event.target===this)closeChangelogModal()">
