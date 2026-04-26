@@ -121,6 +121,92 @@ function _fmtBarDate(bar) {
   return _normTime(bar.t);
 }
 
+function _tradeDiagTimeMs(t) {
+  if (!t && t !== 0) return NaN;
+  const s = String(t).trim();
+  if (/^\d{9,10}$/.test(s)) return parseInt(s, 10) * 1000;
+  if (/^\d{13}$/.test(s)) return parseInt(s, 10);
+  const ms = new Date(s.replace(' ', 'T')).getTime();
+  return isNaN(ms) ? new Date(s).getTime() : ms;
+}
+
+function _tradeDiagRangeFromTrades(trades) {
+  let first = Infinity, last = -Infinity;
+  for (const t of trades || []) {
+    for (const v of [t.entryDateStr, t.exitDateStr]) {
+      const ms = _tradeDiagTimeMs(v);
+      if (!isNaN(ms)) { first = Math.min(first, ms); last = Math.max(last, ms); }
+    }
+  }
+  return first !== Infinity ? { first, last } : null;
+}
+
+function _tradeDiagRangeFromBars(bars) {
+  if (!bars || !bars.length) return null;
+  const first = _tradeDiagTimeMs(bars[0].t);
+  const last = _tradeDiagTimeMs(bars[bars.length - 1].t);
+  return !isNaN(first) && !isNaN(last) ? { first, last } : null;
+}
+
+function _tradeDiagDataRange() {
+  if (!NEW_DATA || !NEW_DATA.length) return null;
+  const first = _tradeDiagTimeMs(_fmtBarDate(NEW_DATA[0]));
+  const last = _tradeDiagTimeMs(_fmtBarDate(NEW_DATA[NEW_DATA.length - 1]));
+  return !isNaN(first) && !isNaN(last) ? { first, last } : null;
+}
+
+function _tradeDiagFmtMs(ms) {
+  if (ms == null || isNaN(ms)) return '?';
+  return new Date(ms).toISOString().substring(0, 16).replace('T', ' ');
+}
+
+function _tradeInRange(trade, range) {
+  if (!range) return true;
+  const ms = _tradeDiagTimeMs(trade.entryDateStr);
+  return !isNaN(ms) && ms >= range.start && ms <= range.end;
+}
+
+function _computeTradeOverlap(optTrades, tvTrades) {
+  const jsRange = _tradeDiagDataRange() || _tradeDiagRangeFromTrades(optTrades);
+  const tvRange = _tradeDiagRangeFromBars(tvTrades && tvTrades._sourceBars) || _tradeDiagRangeFromTrades(tvTrades);
+  if (!jsRange || !tvRange) return null;
+  const start = Math.max(jsRange.first, tvRange.first);
+  const end = Math.min(jsRange.last, tvRange.last);
+  if (!(start <= end)) return { jsRange, tvRange, start, end, empty: true };
+  const optIn = (optTrades || []).filter(t => _tradeInRange(t, { start, end }));
+  const tvIn = (tvTrades || []).filter(t => _tradeInRange(t, { start, end }));
+  return {
+    jsRange, tvRange, start, end,
+    optIn, tvIn,
+    optSkippedBefore: (optTrades || []).filter(t => _tradeDiagTimeMs(t.entryDateStr) < start).length,
+    optSkippedAfter: (optTrades || []).filter(t => _tradeDiagTimeMs(t.entryDateStr) > end).length,
+    tvSkippedBefore: (tvTrades || []).filter(t => _tradeDiagTimeMs(t.entryDateStr) < start).length,
+    tvSkippedAfter: (tvTrades || []).filter(t => _tradeDiagTimeMs(t.entryDateStr) > end).length,
+  };
+}
+
+function _plainDiagObject(obj) {
+  const out = {};
+  for (const [k, v] of Object.entries(obj || {})) {
+    if (v == null) continue;
+    if (typeof v === 'boolean' || typeof v === 'number' || typeof v === 'string') out[k] = v;
+    else if (Array.isArray(v)) out[k] = v.slice(0, 100);
+    else if (typeof v === 'object' &&
+             !(v instanceof Float64Array) && !(v instanceof Uint8Array) &&
+             !(v instanceof Int8Array) && !(v instanceof Int32Array)) out[k] = v;
+  }
+  return out;
+}
+
+function _findNewDataBarByTime(timeStr) {
+  if (!NEW_DATA || !timeStr) return -1;
+  const needle = _normTime(timeStr);
+  for (let i = 0; i < NEW_DATA.length; i++) {
+    if (_fmtBarDate(NEW_DATA[i]) === needle) return i;
+  }
+  return -1;
+}
+
 function _parseListOfTrades(csvText) {
   const lines = csvText.trim().split(/\r?\n/).filter(l => l.trim());
   if (lines.length < 2) return null;
@@ -170,6 +256,7 @@ function _parseListOfTrades(csvText) {
       pending = null;
     }
   }
+  if (trades.length) trades._sourceFormat = 'list-of-trades';
   return trades.length ? trades : null;
 }
 
@@ -247,6 +334,10 @@ function _parseIndicatorExport(csvText) {
       }
     }
   }
+  if (trades.length) {
+    trades._sourceFormat = 'indicator-export';
+    trades._sourceBars = bars;
+  }
   return trades.length ? trades : null;
 }
 
@@ -276,7 +367,7 @@ function _rerunWithTradeLog(cfg) {
   }
 }
 
-function _matchTrades(optTrades, tvTrades) {
+function _matchTrades(optTrades, tvTrades, meta = {}) {
   // Вычисляем интервал бара (мс) для нечёткого матчинга по дате
   let barIntervalMs = 24 * 3600 * 1000;
   if (NEW_DATA && NEW_DATA.length >= 2) {
@@ -354,24 +445,70 @@ function _matchTrades(optTrades, tvTrades) {
     }
   }
 
-  return { issues, totalOpt: optTrades.length, totalTV: tvTrades.length };
+  return { issues, totalOpt: optTrades.length, totalTV: tvTrades.length, meta };
 }
 
-function _getBarsContext(barIdx, count) {
+function _getBarsContext(barIdx, count, markLabel) {
   if (!NEW_DATA || barIdx == null) return '';
   const start = Math.max(0, barIdx - 1);
   const end   = Math.min(NEW_DATA.length - 1, barIdx + count);
   let s = '';
   for (let i = start; i <= end; i++) {
     const b = NEW_DATA[i];
-    const mark = i === barIdx ? ' ← вход опт' : (i === barIdx - 1 ? ' ← сигнал' : '');
+    const mark = i === barIdx ? ` ← ${markLabel || 'бар'}` : (i === barIdx - 1 ? ' ← предыдущий бар' : '');
     s += `  ${_fmtBarDate(b)}: O=${b.o?.toFixed(4)} H=${b.h?.toFixed(4)} L=${b.l?.toFixed(4)} C=${b.c?.toFixed(4)}${mark}\n`;
   }
   return s;
 }
 
+function _buildTradeDiagPayload(r, optTrades, tvTrades, matchResult) {
+  const meta = matchResult?.meta || {};
+  const payload = {
+    app: 'USE Optimizer v6',
+    reportKind: 'trade-comparison-diagnostic',
+    generatedAt: new Date().toISOString(),
+    result: {
+      name: r?.name || '',
+      pnl: r?.pnl ?? null,
+      wr: r?.wr ?? null,
+      n: r?.n ?? null,
+      dd: r?.dd ?? null,
+      pdd: r?.pdd ?? null,
+      avg: r?.avg ?? null,
+    },
+    data: {
+      optimizerBars: NEW_DATA?.length || 0,
+      optimizerFirst: NEW_DATA?.length ? _fmtBarDate(NEW_DATA[0]) : null,
+      optimizerLast: NEW_DATA?.length ? _fmtBarDate(NEW_DATA[NEW_DATA.length - 1]) : null,
+      tvFormat: meta.csvFormat || tvTrades?._sourceFormat || null,
+      tvBars: tvTrades?._sourceBars?.length || null,
+      tvFirst: tvTrades?._sourceBars?.length ? tvTrades._sourceBars[0].t : null,
+      tvLast: tvTrades?._sourceBars?.length ? tvTrades._sourceBars[tvTrades._sourceBars.length - 1].t : null,
+      overlapStart: meta.overlap && !meta.overlap.empty ? _tradeDiagFmtMs(meta.overlap.start) : null,
+      overlapEnd: meta.overlap && !meta.overlap.empty ? _tradeDiagFmtMs(meta.overlap.end) : null,
+    },
+    counts: {
+      optimizerTradesCompared: matchResult?.totalOpt ?? null,
+      tvTradesCompared: matchResult?.totalTV ?? null,
+      issues: matchResult?.issues?.length ?? null,
+      optimizerTradesOriginal: meta.originalOptCount ?? null,
+      tvTradesOriginal: meta.originalTVCount ?? null,
+      skippedOutsideOverlap: meta.overlap ? {
+        optBefore: meta.overlap.optSkippedBefore || 0,
+        optAfter: meta.overlap.optSkippedAfter || 0,
+        tvBefore: meta.overlap.tvSkippedBefore || 0,
+        tvAfter: meta.overlap.tvSkippedAfter || 0,
+      } : null,
+    },
+    config: _plainDiagObject(r?.cfg || {}),
+    firstOptTrades: (optTrades || []).slice(0, 12),
+    firstTVTrades: (tvTrades || []).slice(0, 12),
+  };
+  return `\n### Полный диагностический пакет\nСкопируй весь отчет целиком: ниже уже есть конфигурация, диапазоны данных и первые сделки.\n\n\`\`\`json\n${JSON.stringify(payload, null, 2)}\n\`\`\`\n`;
+}
+
 function _generateTradeCompReport(r, optTrades, tvTrades, matchResult) {
-  const { issues, totalOpt, totalTV } = matchResult;
+  const { issues, totalOpt, totalTV, meta = {} } = matchResult;
 
   const typeCounts = {};
   for (const iss of issues) {
@@ -379,13 +516,13 @@ function _generateTradeCompReport(r, optTrades, tvTrades, matchResult) {
   }
 
   const typeDesc = {
-    ENTRY_TIMING: 'Разный бар входа (close текущего vs open следующего)',
+    ENTRY_TIMING: 'Разный бар входа',
     ENTRY_PRICE:  'Разная цена входа при одинаковом баре',
     EXIT_TYPE:    'Противоположный исход (прибыль vs убыток)',
     EXIT_PRICE:   'Разная цена выхода',
-    INTRABAR_SL:  'Intrabar SL: TV сработал стоп (Low бара), оптимизатор нет',
-    MISSING_TV:   'Есть в оптимизаторе, нет в TV (фильтр Pine блокирует?)',
-    MISSING_OPT:  'Есть в TV, нет в оптимизаторе (фильтр JS блокирует?)',
+    INTRABAR_SL:  'Разный intrabar/уровневый выход',
+    MISSING_TV:   'Есть в оптимизаторе, нет в индикаторном экспорте TV на общем участке',
+    MISSING_OPT:  'Есть в индикаторном экспорте TV, нет в оптимизаторе на общем участке',
     DIR_MISMATCH: 'Разное направление (Long vs Short)',
   };
 
@@ -407,6 +544,18 @@ function _generateTradeCompReport(r, optTrades, tvTrades, matchResult) {
   const perfect = totalOpt - diverged - missingTV;
 
   let rep = `## Trade Comparison: ${r.name}\n\n`;
+  rep += `### Режим диагностики\n`;
+  rep += `Источник TV: ${meta.csvFormat || tvTrades._sourceFormat || 'unknown'}; сравнение идет только по общему участку времени.\n`;
+  if (meta.overlap && !meta.overlap.empty) {
+    const o = meta.overlap;
+    rep += `Общий участок: ${_tradeDiagFmtMs(o.start)} — ${_tradeDiagFmtMs(o.end)}\n`;
+    rep += `Диапазон оптимизатора: ${_tradeDiagFmtMs(o.jsRange.first)} — ${_tradeDiagFmtMs(o.jsRange.last)}\n`;
+    rep += `Диапазон TV CSV: ${_tradeDiagFmtMs(o.tvRange.first)} — ${_tradeDiagFmtMs(o.tvRange.last)}\n`;
+    rep += `Вне общего участка отброшено: OPT до=${o.optSkippedBefore}, после=${o.optSkippedAfter}; TV до=${o.tvSkippedBefore}, после=${o.tvSkippedAfter}\n`;
+  } else if (meta.overlap && meta.overlap.empty) {
+    rep += `Общий участок не найден: диапазоны данных не пересекаются.\n`;
+  }
+  rep += `Важно: диагностика использует индикаторные EL/ES/XL/XS-сигналы, без предположений про strategy.close/strategy.exit.\n\n`;
   rep += `### Конфигурация\n${cfgParts.join(' | ') || '(нет данных)'}\n\n`;
   rep += `### Период B\n${period}\n\n`;
   rep += `### Сводка\n`;
@@ -419,6 +568,7 @@ function _generateTradeCompReport(r, optTrades, tvTrades, matchResult) {
 
   if (!Object.keys(typeCounts).length) {
     rep += `### ✅ Расхождений не найдено\nВсе ${totalOpt} сделок оптимизатора совпадают с TradingView.\n`;
+    rep += _buildTradeDiagPayload(r, optTrades, tvTrades, matchResult);
     return rep;
   }
 
@@ -454,8 +604,19 @@ function _generateTradeCompReport(r, optTrades, tvTrades, matchResult) {
     }
 
     if (opt && opt.entryBar != null) {
-      rep += `\nБары NEW_DATA (вокруг входа оптимизатора):\n`;
-      rep += _getBarsContext(opt.entryBar, 2);
+      rep += `\nБары NEW_DATA вокруг входа оптимизатора:\n`;
+      rep += _getBarsContext(opt.entryBar, 2, 'вход opt');
+    }
+
+    if (opt && opt.exitBar != null) {
+      rep += `\nБары NEW_DATA вокруг выхода оптимизатора:\n`;
+      rep += _getBarsContext(opt.exitBar, 2, 'выход opt');
+    } else if (tv && tv.exitDateStr) {
+      const tvExitBar = _findNewDataBarByTime(tv.exitDateStr);
+      if (tvExitBar >= 0) {
+        rep += `\nБары NEW_DATA вокруг выхода TV:\n`;
+        rep += _getBarsContext(tvExitBar, 2, 'выход TV');
+      }
     }
 
     if (types.includes('ENTRY_TIMING')) {
@@ -473,6 +634,7 @@ function _generateTradeCompReport(r, optTrades, tvTrades, matchResult) {
     rep += '\n';
   }
 
+  rep += _buildTradeDiagPayload(r, optTrades, tvTrades, matchResult);
   return rep;
 }
 
@@ -499,15 +661,15 @@ function showOOSTradeDiag(oosIdx) {
       <button class="tpl-btn2" style="padding:2px 10px" onclick="document.getElementById('oos-trade-diag-modal').remove()">✕</button>
     </div>
     <div style="font-size:.8em;color:var(--text3);margin-bottom:10px;line-height:1.5">
-      Загрузи <b>List of Trades</b> из TradingView Strategy Tester<br>
-      (кнопка Export → List of Trades CSV) за период Б.
+      Загрузи CSV из индикатора USE с колонками <b>EL/ES/XL/XS</b>.<br>
+      Если попадется старый List of Trades, он тоже прочитается, но полная диагностика лучше по индикаторному CSV.
     </div>
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
       <input type="file" id="oos-diag-file" accept=".csv,.tsv" style="display:none"
              onchange="runOOSTradeDiag(${oosIdx}, event)">
       <button class="tpl-btn2" style="padding:5px 14px"
               onclick="document.getElementById('oos-diag-file').click()">
-        📂 Загрузить List of Trades
+        📂 Загрузить TV CSV
       </button>
       <span id="oos-diag-status" style="font-size:.8em;color:var(--text3)">файл не загружен</span>
     </div>
@@ -520,8 +682,8 @@ function showOOSTradeDiag(oosIdx) {
       <div style="margin-top:8px;display:flex;gap:8px">
         <button class="tpl-btn2" style="padding:6px 18px;border-color:#4ade80;color:#4ade80"
                 onclick="navigator.clipboard.writeText(document.getElementById('oos-diag-text').value)
-                  .then(()=>{this.textContent='✅ Скопировано!';setTimeout(()=>this.textContent='📋 Скопировать для Claude',2000)})">
-          📋 Скопировать для Claude
+                  .then(()=>{this.textContent='✅ Скопировано!';setTimeout(()=>this.textContent='📋 Скопировать полный пакет',2000)})">
+          📋 Скопировать полный пакет
         </button>
       </div>
     </div>
@@ -564,13 +726,28 @@ function runOOSTradeDiag(oosIdx, event) {
       return;
     }
 
-    const matchResult = _matchTrades(optTrades, tvTrades);
-    const report      = _generateTradeCompReport(r, optTrades, tvTrades, matchResult);
+    const overlap = _computeTradeOverlap(optTrades, tvTrades);
+    let optForCompare = optTrades;
+    let tvForCompare = tvTrades;
+    if (overlap && !overlap.empty) {
+      optForCompare = overlap.optIn;
+      tvForCompare = overlap.tvIn;
+      tvForCompare._sourceFormat = tvTrades._sourceFormat;
+      tvForCompare._sourceBars = tvTrades._sourceBars;
+    }
+
+    const matchResult = _matchTrades(optForCompare, tvForCompare, {
+      csvFormat,
+      overlap,
+      originalOptCount: optTrades.length,
+      originalTVCount: tvTrades.length,
+    });
+    const report      = _generateTradeCompReport(r, optForCompare, tvForCompare, matchResult);
 
     const divCount = matchResult.issues.filter(x => !x.types.includes('MISSING_TV') && !x.types.includes('MISSING_OPT')).length;
     const fmtLabel = csvFormat === 'indicator-export' ? ' [формат: индикатор EL/ES/XL/XS]' : ' [формат: List of Trades]';
     if (statusEl) statusEl.textContent =
-      `✅ TV: ${tvTrades.length} сд. | Опт: ${optTrades.length} сд. | Расхождений: ${matchResult.issues.length} (${divCount} с парой)${fmtLabel}`;
+      `✅ TV: ${tvForCompare.length}/${tvTrades.length} сд. | Опт: ${optForCompare.length}/${optTrades.length} сд. | Расхождений: ${matchResult.issues.length} (${divCount} с парой)${fmtLabel}`;
     if (textEl)   textEl.value = report;
     if (reportEl) reportEl.style.display = 'block';
   };
