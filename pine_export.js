@@ -73,7 +73,7 @@ function generatePineScript(r, mode = 'indicator') {
   cfgJson.forEach(line => lines.push(`// ${line}`));
   lines.push(`// --- /CFG JSON ---`);
   if (mode === 'strategy') {
-    lines.push(`strategy("USE [${r.name}]", shorttitle="USE_STR", overlay=true, commission_type=strategy.commission.percent, commission_value=${comm.toFixed(4)}, initial_capital=10000, default_qty_type=strategy.percent_of_equity, default_qty_value=100, pyramiding=0, process_orders_on_close=true, max_lines_count=500, max_labels_count=500, max_boxes_count=500)`);
+    lines.push(`strategy("USE [${r.name}]", shorttitle="USE_STR", overlay=true, commission_type=strategy.commission.percent, commission_value=${comm.toFixed(4)}, initial_capital=10000, default_qty_type=strategy.percent_of_equity, default_qty_value=100, pyramiding=0, process_orders_on_close=true, calc_on_order_fills=true, calc_on_every_tick=true, max_lines_count=500, max_labels_count=500, max_boxes_count=500)`);
   } else {
     lines.push(`indicator("USE [${r.name}]", shorttitle="USE_EXP", overlay=true, max_lines_count=500, max_labels_count=500, max_boxes_count=500)`);
   }
@@ -1715,6 +1715,10 @@ function generatePineScript(r, mode = 'indicator') {
     lines.push(`            strategy.exit("LX", "L", stop=s_sl, limit=s_tp)`);
     lines.push(`        else`);
     lines.push(`            strategy.exit("SX", "S", stop=s_sl, limit=s_tp)`);
+    lines.push(`    // Match optimizer precedence: if SL/TP is touched on this bar,`);
+    lines.push(`    // let strategy.exit handle the fill and do not override it with strategy.close.`);
+    lines.push(`    bool s_hit_sl = s_dir == 1 ? (not na(s_sl) and low <= s_sl) : (not na(s_sl) and high >= s_sl)`);
+    lines.push(`    bool s_hit_tp = s_dir == 1 ? (not na(s_tp) and high >= s_tp) : (not na(s_tp) and low <= s_tp)`);
     lines.push(`    // Signal exit`);
     lines.push(`    float s_cpnl = s_dir == 1 ? (close - s_ep) / s_ep * 100 : (s_ep - close) / s_ep * 100`);
     lines.push(`    bool s_frc = false`);
@@ -1750,7 +1754,7 @@ function generatePineScript(r, mode = 'indicator') {
     lines.push(`            s_frc := true`);
     lines.push(`    if use_time_ex and (bar_index - s_ep_bar) >= max_bars_in and not s_frc`);
     lines.push(`        s_frc := true`);
-    lines.push(`    if s_frc`);
+    lines.push(`    if s_frc and not s_hit_sl and not s_hit_tp`);
     lines.push(`        if s_dir == 1`);
     lines.push(`            strategy.close("L")`);
     lines.push(`        else`);
