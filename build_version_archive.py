@@ -11,6 +11,7 @@ from pathlib import Path
 BASE = Path(__file__).resolve().parent
 STABLE_DIR = BASE / "stable"
 DAILY_DIR = STABLE_DIR / "daily"
+OVERRIDES_FILE = STABLE_DIR / "version_overrides.json"
 SINCE = "2026-02-26"
 UNTIL = "2026-04-26 23:59:59"
 BUILD_FILE = "USE_Optimizer_v6_built.html"
@@ -78,6 +79,12 @@ def latest_daily_commits() -> list[dict[str, str]]:
     return list(grouped.values())
 
 
+def load_version_overrides() -> dict[str, dict]:
+    if not OVERRIDES_FILE.exists():
+        return {}
+    return json.loads(OVERRIDES_FILE.read_text(encoding="utf-8"))
+
+
 def git_show_file(commit_hash: str, file_path: str) -> str | None:
     try:
         return run_git("show", f"{commit_hash}:{file_path}")
@@ -89,6 +96,28 @@ def write_text(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="\n") as fh:
         fh.write(content)
+
+
+def apply_override_to_content(content: str, override: dict) -> str:
+    for repl in override.get("replacements", []):
+        old = repl["old"]
+        new = repl["new"]
+        if old in content:
+            content = content.replace(old, new)
+    return content
+
+
+def append_patch_note(text: str, override: dict) -> str:
+    patched_at = override.get("patchedAt")
+    patch_note = override.get("patchNote")
+    if not patched_at and not patch_note:
+        return text
+    extra = []
+    if patched_at:
+        extra.append(f"исправлено {patched_at}")
+    if patch_note:
+        extra.append(patch_note)
+    return f"{text} • {'; '.join(extra)}"
 
 
 def build_snapshot_wrapper(title: str, subtitle: str, app_rel: str, back_rel: str, current_rel: str) -> str:
@@ -345,19 +374,23 @@ try {{ window.closeVersionsModal = closeVersionsModal; }} catch(e) {{}}
 def main() -> None:
     STABLE_DIR.mkdir(parents=True, exist_ok=True)
     DAILY_DIR.mkdir(parents=True, exist_ok=True)
+    overrides = load_version_overrides()
 
     daily_entries: list[dict[str, str]] = []
     daily_cards: list[str] = []
 
     for item in latest_daily_commits():
+        archive_key = f"daily/{item['date']}"
+        override = overrides.get(archive_key, {})
         app = git_show_file(item["hash"], BUILD_FILE)
         if not app:
             continue
+        app = apply_override_to_content(app, override)
         day_dir = DAILY_DIR / item["date"]
         write_text(day_dir / "app.html", app)
         short_hash = item["hash"][:7]
         title = f"Архивная версия: {item['date']}"
-        subtitle = f"{short_hash} • {item['subject']}"
+        subtitle = append_patch_note(f"{short_hash} - {item['subject']}", override)
         write_text(
             day_dir / "index.html",
             build_snapshot_wrapper(
@@ -377,7 +410,7 @@ def main() -> None:
                 "date": item["date"],
                 "status": "DAILY",
                 "emoji": "📅",
-                "note": f"{short_hash} • {item['subject']}",
+                "note": append_patch_note(f"{short_hash} - {item['subject']}", override),
                 "url": f"./stable/daily/{item['date']}/",
             }
         )
@@ -386,7 +419,7 @@ def main() -> None:
                 version=item["date"],
                 title="Архив по датам",
                 date=item["date"],
-                note=f"{short_hash} • {item['subject']}",
+                note=append_patch_note(f"{short_hash} - {item['subject']}", override),
                 url=f"./{item['date']}/",
                 status="DAILY",
             )

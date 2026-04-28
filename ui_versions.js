@@ -8,7 +8,7 @@ const VERSIONS_DATA = [
     "key": "current",
     "title": "Текущая версия",
     "version": "Current build",
-    "date": "2026-04-27",
+    "date": "2026-04-28",
     "status": "LIVE",
     "emoji": "🟦",
     "note": "Актуальная сборка оптимизатора.",
@@ -58,7 +58,7 @@ const VERSIONS_DATA = [
     "date": "2026-04-26",
     "status": "DAILY",
     "emoji": "📅",
-    "note": "3d63ee6 • build: auto-update bundle [skip ci]",
+    "note": "3d63ee6 - build: auto-update bundle [skip ci]",
     "url": "./stable/daily/2026-04-26/"
   },
   {
@@ -69,7 +69,7 @@ const VERSIONS_DATA = [
     "date": "2026-04-25",
     "status": "DAILY",
     "emoji": "📅",
-    "note": "d86d1fc • build: auto-update bundle [skip ci]",
+    "note": "d86d1fc - build: auto-update bundle [skip ci]",
     "url": "./stable/daily/2026-04-25/"
   },
   {
@@ -80,7 +80,7 @@ const VERSIONS_DATA = [
     "date": "2026-04-23",
     "status": "DAILY",
     "emoji": "📅",
-    "note": "a7b8f0e • build: auto-update bundle [skip ci]",
+    "note": "a7b8f0e - build: auto-update bundle [skip ci]",
     "url": "./stable/daily/2026-04-23/"
   },
   {
@@ -91,7 +91,7 @@ const VERSIONS_DATA = [
     "date": "2026-04-19",
     "status": "DAILY",
     "emoji": "📅",
-    "note": "1363e7b • build: auto-update bundle [skip ci]",
+    "note": "1363e7b - build: auto-update bundle [skip ci]",
     "url": "./stable/daily/2026-04-19/"
   },
   {
@@ -102,7 +102,7 @@ const VERSIONS_DATA = [
     "date": "2026-04-20",
     "status": "DAILY",
     "emoji": "📅",
-    "note": "72a9bd0 • Merge pull request #326 from xopromo/fixes/trading-logic",
+    "note": "72a9bd0 - Merge pull request #326 from xopromo/fixes/trading-logic",
     "url": "./stable/daily/2026-04-20/"
   },
   {
@@ -113,7 +113,7 @@ const VERSIONS_DATA = [
     "date": "2026-04-15",
     "status": "DAILY",
     "emoji": "📅",
-    "note": "d4b5ab8 • build: auto-update bundle [skip ci]",
+    "note": "d4b5ab8 - build: auto-update bundle [skip ci]",
     "url": "./stable/daily/2026-04-15/"
   },
   {
@@ -124,7 +124,7 @@ const VERSIONS_DATA = [
     "date": "2026-04-14",
     "status": "DAILY",
     "emoji": "📅",
-    "note": "c056e4e • build: auto-update bundle [skip ci]",
+    "note": "c056e4e - build: auto-update bundle [skip ci]",
     "url": "./stable/daily/2026-04-14/"
   },
   {
@@ -135,7 +135,7 @@ const VERSIONS_DATA = [
     "date": "2026-04-13",
     "status": "DAILY",
     "emoji": "📅",
-    "note": "08ad9d5 • build: auto-update bundle [skip ci]",
+    "note": "08ad9d5 - build: auto-update bundle [skip ci]",
     "url": "./stable/daily/2026-04-13/"
   },
   {
@@ -146,7 +146,7 @@ const VERSIONS_DATA = [
     "date": "2026-04-11",
     "status": "DAILY",
     "emoji": "📅",
-    "note": "7910027 • build: auto-update bundle [skip ci]",
+    "note": "7910027 - build: auto-update bundle [skip ci]",
     "url": "./stable/daily/2026-04-11/"
   },
   {
@@ -157,7 +157,7 @@ const VERSIONS_DATA = [
     "date": "2026-04-05",
     "status": "DAILY",
     "emoji": "📅",
-    "note": "4a65b64 • feat: добавить старую версию оптимизатора (9e91177)",
+    "note": "4a65b64 - feat: добавить старую версию оптимизатора (9e91177)",
     "url": "./stable/daily/2026-04-05/"
   },
   {
@@ -168,7 +168,7 @@ const VERSIONS_DATA = [
     "date": "2026-04-02",
     "status": "DAILY",
     "emoji": "📅",
-    "note": "9e91177 • feat: Pine Script индикатор Flat Zone Detector",
+    "note": "9e91177 - feat: Pine Script индикатор Flat Zone Detector",
     "url": "./stable/daily/2026-04-02/"
   },
   {
@@ -179,7 +179,7 @@ const VERSIONS_DATA = [
     "date": "2026-04-01",
     "status": "DAILY",
     "emoji": "📅",
-    "note": "61b6ffc • build: auto-update bundle [skip ci]",
+    "note": "61b6ffc - build: auto-update bundle [skip ci]",
     "url": "./stable/daily/2026-04-01/"
   },
   {
@@ -190,7 +190,7 @@ const VERSIONS_DATA = [
     "date": "2026-03-31",
     "status": "DAILY",
     "emoji": "📅",
-    "note": "13044cc • fix: close indicator trade immediately on intrabar TP/SL touch",
+    "note": "13044cc - fix: close indicator trade immediately on intrabar TP/SL touch • исправлено 2026-04-28; исправлен генератор Pine индикатора",
     "url": "./stable/daily/2026-03-31/"
   },
   {
@@ -201,7 +201,7 @@ const VERSIONS_DATA = [
     "date": "2026-03-30",
     "status": "DAILY",
     "emoji": "📅",
-    "note": "6c331f9 • build: auto-update bundle [skip ci]",
+    "note": "6c331f9 - build: auto-update bundle [skip ci]",
     "url": "./stable/daily/2026-03-30/"
   },
   {
@@ -212,7 +212,7 @@ const VERSIONS_DATA = [
     "date": "2026-03-29",
     "status": "DAILY",
     "emoji": "📅",
-    "note": "7d1dab3 • Fix canvas null check and improve OOS diagnostic with TV CSV comparison note",
+    "note": "7d1dab3 - Fix canvas null check and improve OOS diagnostic with TV CSV comparison note",
     "url": "./stable/daily/2026-03-29/"
   },
   {
@@ -223,7 +223,7 @@ const VERSIONS_DATA = [
     "date": "2026-03-28",
     "status": "DAILY",
     "emoji": "📅",
-    "note": "8c1a258 • fix: graph shows ML-filtered equity (not unfiltered TV equity)",
+    "note": "8c1a258 - fix: graph shows ML-filtered equity (not unfiltered TV equity)",
     "url": "./stable/daily/2026-03-28/"
   },
   {
@@ -234,7 +234,7 @@ const VERSIONS_DATA = [
     "date": "2026-03-27",
     "status": "DAILY",
     "emoji": "📅",
-    "note": "420dcb9 • build: auto-update bundle [skip ci]",
+    "note": "420dcb9 - build: auto-update bundle [skip ci]",
     "url": "./stable/daily/2026-03-27/"
   },
   {
@@ -245,7 +245,7 @@ const VERSIONS_DATA = [
     "date": "2026-03-26",
     "status": "DAILY",
     "emoji": "📅",
-    "note": "ec85bd7 • build: auto-update bundle [skip ci]",
+    "note": "ec85bd7 - build: auto-update bundle [skip ci]",
     "url": "./stable/daily/2026-03-26/"
   },
   {
@@ -256,7 +256,7 @@ const VERSIONS_DATA = [
     "date": "2026-03-25",
     "status": "DAILY",
     "emoji": "📅",
-    "note": "394aaf6 • fix(pine): clamp consecMax defval to minval=2 to avoid Pine Script error",
+    "note": "394aaf6 - fix(pine): clamp consecMax defval to minval=2 to avoid Pine Script error",
     "url": "./stable/daily/2026-03-25/"
   },
   {
@@ -267,7 +267,7 @@ const VERSIONS_DATA = [
     "date": "2026-03-24",
     "status": "DAILY",
     "emoji": "📅",
-    "note": "8aedf53 • fix(pine_export): MA всегда попадает в CSV-экспорт",
+    "note": "8aedf53 - fix(pine_export): MA всегда попадает в CSV-экспорт",
     "url": "./stable/daily/2026-03-24/"
   },
   {
@@ -278,7 +278,7 @@ const VERSIONS_DATA = [
     "date": "2026-03-23",
     "status": "DAILY",
     "emoji": "📅",
-    "note": "c9ee187 • build: auto-update bundle [skip ci]",
+    "note": "c9ee187 - build: auto-update bundle [skip ci]",
     "url": "./stable/daily/2026-03-23/"
   },
   {
@@ -289,7 +289,7 @@ const VERSIONS_DATA = [
     "date": "2026-03-22",
     "status": "DAILY",
     "emoji": "📅",
-    "note": "f307ea3 • fix: закрывать окно создания проекта после успешного создания",
+    "note": "f307ea3 - fix: закрывать окно создания проекта после успешного создания",
     "url": "./stable/daily/2026-03-22/"
   },
   {
@@ -300,7 +300,7 @@ const VERSIONS_DATA = [
     "date": "2026-03-19",
     "status": "DAILY",
     "emoji": "📅",
-    "note": "f91f9ce • fix(struct): исправить пивот-сравнение и отображение параметров",
+    "note": "f91f9ce - fix(struct): исправить пивот-сравнение и отображение параметров",
     "url": "./stable/daily/2026-03-19/"
   },
   {
@@ -311,7 +311,7 @@ const VERSIONS_DATA = [
     "date": "2026-03-21",
     "status": "DAILY",
     "emoji": "📅",
-    "note": "987934c • Merge pull request #67 from xopromo/claude/strategy-game-html-GuTCf",
+    "note": "987934c - Merge pull request #67 from xopromo/claude/strategy-game-html-GuTCf",
     "url": "./stable/daily/2026-03-21/"
   },
   {
@@ -322,7 +322,7 @@ const VERSIONS_DATA = [
     "date": "2026-03-20",
     "status": "DAILY",
     "emoji": "📅",
-    "note": "4e5f296 • Merge pull request #58 from xopromo/claude/strategy-game-html-GuTCf",
+    "note": "4e5f296 - Merge pull request #58 from xopromo/claude/strategy-game-html-GuTCf",
     "url": "./stable/daily/2026-03-20/"
   },
   {
@@ -333,7 +333,7 @@ const VERSIONS_DATA = [
     "date": "2026-03-17",
     "status": "DAILY",
     "emoji": "📅",
-    "note": "77a266c • Merge pull request #53 from xopromo/claude/vk-sales-automation-6eirg",
+    "note": "77a266c - Merge pull request #53 from xopromo/claude/vk-sales-automation-6eirg",
     "url": "./stable/daily/2026-03-17/"
   },
   {
@@ -344,7 +344,7 @@ const VERSIONS_DATA = [
     "date": "2026-03-16",
     "status": "DAILY",
     "emoji": "📅",
-    "note": "7fca6ae • Merge pull request #43 from xopromo/claude/vk-sales-automation-6eirg",
+    "note": "7fca6ae - Merge pull request #43 from xopromo/claude/vk-sales-automation-6eirg",
     "url": "./stable/daily/2026-03-16/"
   },
   {
@@ -355,7 +355,7 @@ const VERSIONS_DATA = [
     "date": "2026-03-15",
     "status": "DAILY",
     "emoji": "📅",
-    "note": "2231916 • fix(pine): MA Touch — separate mat_val from filter MA, fix zone logic",
+    "note": "2231916 - fix(pine): MA Touch — separate mat_val from filter MA, fix zone logic",
     "url": "./stable/daily/2026-03-15/"
   },
   {
@@ -366,7 +366,7 @@ const VERSIONS_DATA = [
     "date": "2026-03-14",
     "status": "DAILY",
     "emoji": "📅",
-    "note": "69a3b4f • fix(buildBtCfg): useMA now respects cfg.useMA flag instead of maP>0",
+    "note": "69a3b4f - fix(buildBtCfg): useMA now respects cfg.useMA flag instead of maP>0",
     "url": "./stable/daily/2026-03-14/"
   },
   {
@@ -377,7 +377,7 @@ const VERSIONS_DATA = [
     "date": "2026-03-13",
     "status": "DAILY",
     "emoji": "📅",
-    "note": "e46023f • fix: add useMacdFilter/useER to all _cfg objects + OOS diagnostics",
+    "note": "e46023f - fix: add useMacdFilter/useER to all _cfg objects + OOS diagnostics",
     "url": "./stable/daily/2026-03-13/"
   },
   {
@@ -388,7 +388,7 @@ const VERSIONS_DATA = [
     "date": "2026-03-12",
     "status": "DAILY",
     "emoji": "📅",
-    "note": "76569e5 • feat: Kalman filter integration — 3 new applications",
+    "note": "76569e5 - feat: Kalman filter integration — 3 new applications",
     "url": "./stable/daily/2026-03-12/"
   },
   {
@@ -399,7 +399,7 @@ const VERSIONS_DATA = [
     "date": "2026-03-11",
     "status": "DAILY",
     "emoji": "📅",
-    "note": "bf8259e • fix: multiply maP by htfRatio in backtest start offset",
+    "note": "bf8259e - fix: multiply maP by htfRatio in backtest start offset",
     "url": "./stable/daily/2026-03-11/"
   },
   {
@@ -410,7 +410,7 @@ const VERSIONS_DATA = [
     "date": "2026-03-10",
     "status": "DAILY",
     "emoji": "📅",
-    "note": "ab64ba1 • Fix MC/TPE/BO crash: пустой rsiPairs + try/catch + early yield",
+    "note": "ab64ba1 - Fix MC/TPE/BO crash: пустой rsiPairs + try/catch + early yield",
     "url": "./stable/daily/2026-03-10/"
   },
   {
@@ -421,7 +421,7 @@ const VERSIONS_DATA = [
     "date": "2026-03-09",
     "status": "DAILY",
     "emoji": "📅",
-    "note": "9708364 • fix: create missing synthesis.js, pareto_front.js, synthesis_ui.js files and update build pipeline",
+    "note": "9708364 - fix: create missing synthesis.js, pareto_front.js, synthesis_ui.js files and update build pipeline",
     "url": "./stable/daily/2026-03-09/"
   },
   {
@@ -432,7 +432,7 @@ const VERSIONS_DATA = [
     "date": "2026-03-08",
     "status": "DAILY",
     "emoji": "📅",
-    "note": "6c2244b • feat: table filter templates, panel collapse/grid, JS tooltip, global notepad",
+    "note": "6c2244b - feat: table filter templates, panel collapse/grid, JS tooltip, global notepad",
     "url": "./stable/daily/2026-03-08/"
   },
   {
@@ -443,7 +443,7 @@ const VERSIONS_DATA = [
     "date": "2026-03-07",
     "status": "DAILY",
     "emoji": "📅",
-    "note": "6d9aeed • fix(pine_export): fix invalid timeframe format in f_tf_str",
+    "note": "6d9aeed - fix(pine_export): fix invalid timeframe format in f_tf_str",
     "url": "./stable/daily/2026-03-07/"
   },
   {
@@ -454,7 +454,7 @@ const VERSIONS_DATA = [
     "date": "2026-03-06",
     "status": "DAILY",
     "emoji": "📅",
-    "note": "a883d41 • Fix SL Pivot + new entry ranges: exhaustive loop, buildName, showDetail",
+    "note": "a883d41 - Fix SL Pivot + new entry ranges: exhaustive loop, buildName, showDetail",
     "url": "./stable/daily/2026-03-06/"
   },
   {
@@ -465,7 +465,7 @@ const VERSIONS_DATA = [
     "date": "2026-03-04",
     "status": "DAILY",
     "emoji": "📅",
-    "note": "578740a • feat: add tlPvL/tlPvR as optimization dimensions for TL Touch/Break",
+    "note": "578740a - feat: add tlPvL/tlPvR as optimization dimensions for TL Touch/Break",
     "url": "./stable/daily/2026-03-04/"
   },
   {
@@ -476,7 +476,7 @@ const VERSIONS_DATA = [
     "date": "2026-03-03",
     "status": "DAILY",
     "emoji": "📅",
-    "note": "7bbd251 • chore: update STATE.md",
+    "note": "7bbd251 - chore: update STATE.md",
     "url": "./stable/daily/2026-03-03/"
   },
   {
@@ -487,7 +487,7 @@ const VERSIONS_DATA = [
     "date": "2026-03-02",
     "status": "DAILY",
     "emoji": "📅",
-    "note": "50871b2 • fix: compute bbD in _calcIndicators, log exceptions in _runOOS, diagnose IS>TV trades",
+    "note": "50871b2 - fix: compute bbD in _calcIndicators, log exceptions in _runOOS, diagnose IS>TV trades",
     "url": "./stable/daily/2026-03-02/"
   },
   {
@@ -498,7 +498,7 @@ const VERSIONS_DATA = [
     "date": "2026-03-01",
     "status": "DAILY",
     "emoji": "📅",
-    "note": "271046c • Fix runOOSScan: walk/param/noise/mc tests always returning 0",
+    "note": "271046c - Fix runOOSScan: walk/param/noise/mc tests always returning 0",
     "url": "./stable/daily/2026-03-01/"
   },
   {
@@ -509,7 +509,7 @@ const VERSIONS_DATA = [
     "date": "2026-02-28",
     "status": "DAILY",
     "emoji": "📅",
-    "note": "432378e • fix: replace Groq API with claude CLI in research agent",
+    "note": "432378e - fix: replace Groq API with claude CLI in research agent",
     "url": "./stable/daily/2026-02-28/"
   },
   {
@@ -520,7 +520,7 @@ const VERSIONS_DATA = [
     "date": "2026-02-27",
     "status": "DAILY",
     "emoji": "📅",
-    "note": "d42ba88 • fix(chart): restore sticky equity chart at top of viewport",
+    "note": "d42ba88 - fix(chart): restore sticky equity chart at top of viewport",
     "url": "./stable/daily/2026-02-27/"
   },
   {
@@ -531,7 +531,7 @@ const VERSIONS_DATA = [
     "date": "2026-02-26",
     "status": "DAILY",
     "emoji": "📅",
-    "note": "c77292f • fix(oos): prevent near-zero IS gain from inflating retention to thousands%",
+    "note": "c77292f - fix(oos): prevent near-zero IS gain from inflating retention to thousands%",
     "url": "./stable/daily/2026-02-26/"
   }
 ];

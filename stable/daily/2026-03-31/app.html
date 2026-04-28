@@ -11282,10 +11282,10 @@ function generatePineScript(r, mode = 'indicator') {
     lines.push(`            vxt := "TIME"`);
   lines.push(`        // BE immediate exit (beOff >= beTrig)`);
   lines.push(`        if use_be and not v_bea and be_offset >= be_trig and not frc`);
-  lines.push(`            if (v_dir == 1 and high >= v_ep + _u * be_trig) or (v_dir == -1 and low <= v_ep - _u * be_trig)`);
+  lines.push(`        if (v_dir == 1 and high >= v_ep + _u * be_trig) or (v_dir == -1 and low <= v_ep - _u * be_trig)`);
     lines.push(`                hsl := true`);
     lines.push(`                vxp := v_ep + v_dir * _u * be_trig`);
-    lines.push(`                v_bea := true`);
+  lines.push(`            v_bea := true`);
     lines.push(`                vxt := "BE"`);
   lines.push(`        if not hsl`);
   lines.push(`            if v_dir == 1`);

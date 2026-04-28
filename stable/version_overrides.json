@@ -1,0 +1,28 @@
+{
+  "daily/2026-03-31": {
+    "patchedAt": "2026-04-28",
+    "patchNote": "исправлен генератор Pine индикатора",
+    "replacements": [
+      {
+        "old": "  lines.push(`    if v_in and not htr and use_be and not v_bea and be_offset < be_trig`);",
+        "new": "  lines.push(`    float _u = atr_v[1]`);\n  lines.push(`    if v_in and not htr and use_be and not v_bea and be_offset < be_trig`);"
+      },
+      {
+        "old": "  lines.push(`            if (v_dir == 1 and high >= v_ep + _u * be_trig) or (v_dir == -1 and low <= v_ep - _u * be_trig)`);",
+        "new": "  lines.push(`        if (v_dir == 1 and high >= v_ep + _u * be_trig) or (v_dir == -1 and low <= v_ep - _u * be_trig)`);"
+      },
+      {
+        "old": "    lines.push(`                float v_be_sl = v_ep + v_dir * _u * be_offset`);",
+        "new": "  lines.push(`            float v_be_sl = v_ep + v_dir * _u * be_offset`);"
+      },
+      {
+        "old": "    lines.push(`                v_sl := v_dir == 1 ? math.max(v_sl, v_be_sl) : math.min(v_sl, v_be_sl)`);",
+        "new": "  lines.push(`            v_sl := v_dir == 1 ? math.max(v_sl, v_be_sl) : math.min(v_sl, v_be_sl)`);"
+      },
+      {
+        "old": "    lines.push(`                v_bea := true`);",
+        "new": "  lines.push(`            v_bea := true`);"
+      }
+    ]
+  }
+}
