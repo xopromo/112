@@ -1,0 +1,41 @@
+# arXiv Digest — 2026-05-21
+
+Всего статей: 8
+
+## q-fin.TR — Trading and Market Microstructure
+
+**ATLAS: Adaptive Trading with LLM AgentS Through Dynamic Prompt Optimization and Multi-Agent Coordination**
+URL: https://arxiv.org/abs/2510.15949
+arXiv:2510.15949v5 Announce Type: replace Abstract: Large language models show promise for financial decision-making, yet deploying them as autonomous trading agents raises fundamental challenges: how to adapt instructions when rewards arrive late and obscured by market noise, how to synthesize heterogeneous information streams into coherent decisions, and how to bridge the gap between model outputs and executable market actions. We present ATLAS (Adaptive Trading with LLM AgentS), a unified multi-agent framework that integrates structured information from markets, news, and corporate fundamen
+
+## q-fin.CP — Computational Finance
+
+**Memory-Induced Supra-Competitive Outcomes Between Deep Reinforcement Learning Agents in Optimal Trade Execution**
+URL: https://arxiv.org/abs/2605.20348
+arXiv:2605.20348v1 Announce Type: new Abstract: In this paper, we investigate whether deep reinforcement-learning agents interacting in a shared optimal-execution environment can sustain supra-competitive outcomes, in the sense of achieving lower implementation shortfalls than the relevant game-theoretical competitive benchmark. We study a two-agent Almgren-Chriss liquidation game and examine how learned behavior depends on intra-episode environment feedback, the ability to interpret the mid-price and the agent's knoledge of the past. We first use ex-ante schedule-learning agents to remove int
+
+**The Statistical Significance of the Inclusion of Graph Neural Networks in the Financial Time Series Forecasting Problem**
+URL: https://arxiv.org/abs/2605.21192
+arXiv:2605.21192v1 Announce Type: cross Abstract: Forecasting univariate time series in the financial market is a challenging endeavor. While numerous statistical and machine learning models have been introduced to address this challenge, they typically concentrate solely on analyzing temporal patterns within the time series data. In this research, we study the statistical significance of the inclusion of geometric patterns in enhancing forecasting accuracy within the context of time series analysis. We introduce the Time-Geometric model, a combination of models designed to exploit both geomet
+
+**Portfolio Preference Elicitation in Institutional Crossing Markets**
+URL: https://arxiv.org/abs/2605.21409
+arXiv:2605.21409v1 Announce Type: cross Abstract: Institutional crossing platforms face a hidden-information problem: investors value trades as portfolios, but liquidity discovery is typically organized around individual securities. We model portfolio crossing as limited-communication preference elicitation over signed portfolio trades. The platform first uses price-directed demand queries to search the portfolio space and then verifies selected packages through value queries; an incumbent verification query records the demand-discovered allocation before further exploration. Final allocations
+
+**Ensemble RL through Classifier Models: Enhancing Risk-Return Trade-offs in Trading Strategies**
+URL: https://arxiv.org/abs/2502.17518
+arXiv:2502.17518v2 Announce Type: replace-cross Abstract: This paper presents a comprehensive study on the use of ensemble Reinforcement Learning (RL) models in financial trading strategies, leveraging classifier models to enhance performance. By combining RL algorithms such as A2C, PPO, and SAC with traditional classifiers like Support Vector Machines (SVM), Decision Trees, and Logistic Regression, we investigate how different classifier groups can be integrated to improve risk-return trade-offs. The study evaluates the effectiveness of various ensemble methods, comparing them with individual
+
+## q-fin.PM — Portfolio Management
+
+**Continuous Timing Signals for Growth-Defensive Style Allocation: Factor Attribution, Risk Matching, and Out-of-Sample Evidence**
+URL: https://arxiv.org/abs/2605.20636
+arXiv:2605.20636v1 Announce Type: new Abstract: This paper studies conditional allocation between a growth/technology ETF basket, denoted by $G$, and a defensive income/value-oriented ETF basket, denoted by $D$. The objective is not to discover a new standalone alpha factor, but to examine whether known style exposures can be dynamically allocated using macro-market timing signals. Fama-French five-factor plus momentum attribution shows that the relative portfolio $G-D$ is a recognizable style portfolio: its market beta is 0.273, its HML beta is -0.552, its momentum beta is 0.117, and its annu
+
+**Portfolio Preference Elicitation in Institutional Crossing Markets**
+URL: https://arxiv.org/abs/2605.21409
+arXiv:2605.21409v1 Announce Type: new Abstract: Institutional crossing platforms face a hidden-information problem: investors value trades as portfolios, but liquidity discovery is typically organized around individual securities. We model portfolio crossing as limited-communication preference elicitation over signed portfolio trades. The platform first uses price-directed demand queries to search the portfolio space and then verifies selected packages through value queries; an incumbent verification query records the demand-discovered allocation before further exploration. Final allocations a
+
+**Do Better Volatility Forecasts Lead to Better Portfolios? Evidence from Graph Neural Networks**
+URL: https://arxiv.org/abs/2605.19278
+arXiv:2605.19278v2 Announce Type: replace Abstract: This paper tests whether graph neural networks improve realized volatility forecasts and whether those forecasts improve portfolio performance. Using weekly realized volatility for 465 S&P 500 equities from 2015-2025, Heterogeneous Autoregressive and Long Short-Term Memory baselines are compared against GraphSAGE models built on rolling correlation, sector, and Granger-causal graphs, with and without macro regime features. The empirical finding is that the model with the lowest forecast MSE, the model with the highest cross-sectional ranking 
